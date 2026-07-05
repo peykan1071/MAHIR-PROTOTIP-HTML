@@ -104,3 +104,37 @@ Bayrak:
 - `assets/icons/teacher-control.png`
 
 Bu sprintte `index.html`, `styles.css` ve `script.js` dosyaları değiştirilmemiştir.
+## Sprint 1 - v1.5
+
+MAHİR UI Kit görsel varlıklarının standart dosya adlarıyla `assets` klasör yapısına yerleştirilmesi hedeflenmiştir.
+
+Bu sprint için beklenen dosya yolları:
+
+Logo:
+
+- `assets/logo/mahir-logo.png`
+
+Hero:
+
+- `assets/hero/mahir-hero-teacher.png`
+
+Bayrak:
+
+- `assets/flag/mahir-kurumsal-bayrak.png`
+
+İkonlar:
+
+- `assets/icons/document.png`
+- `assets/icons/chart.png`
+- `assets/icons/brain.png`
+- `assets/icons/clipboard.png`
+- `assets/icons/shield-check.png`
+- `assets/icons/upload-file.png`
+- `assets/icons/sparkles.png`
+- `assets/icons/report-file.png`
+- `assets/icons/trust.png`
+- `assets/icons/target.png`
+- `assets/icons/analytics.png`
+- `assets/icons/teacher-control.png`
+
+Kontrol notu: Bu kontrol sırasında varlık dosyaları henüz klasörlere eklenmemiş görünmektedir. Görseller HTML'ye bağlanmamış, CSS yazılmamış, yeni görsel/ikon üretilmemiş ve `index.html`, `styles.css`, `script.js` dosyaları değiştirilmemiştir.
