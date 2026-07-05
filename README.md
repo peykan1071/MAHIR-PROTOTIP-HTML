@@ -39,3 +39,15 @@ Bu sürümde yapılan layout düzenlemeleri:
 - Footer sayfanın alt alanında sade biçimde konumlandırıldı.
 
 Bu sprintte renk, gölge, border-radius, gradient, animasyon, responsive yapı, font değişikliği, logo, ikon, bayrak, görsel, framework veya dış kütüphane eklenmemiştir.
+## Sprint 1 - v1.3
+
+v1.1 HTML iskeleti ve v1.2 layout düzeni korunarak yalnızca tipografi hiyerarşisi oluşturulmuştur.
+
+Bu sürümde yapılan tipografi düzenlemeleri:
+
+- Sistem fontları tanımlandı.
+- Ana başlık, alt başlık ve açıklama metinleri için okunabilir font ölçüleri ve satır yükseklikleri ayarlandı.
+- Kart başlıkları ve küçük açıklamalar için sade bir metin hiyerarşisi kuruldu.
+- Buton metni daha güçlü görünecek şekilde düzenlendi.
+
+Bu sprintte HTML yapısı, JavaScript, renk sistemi, logo, ikon, bayrak, hero görseli, gölge, gradient, border-radius, animasyon, responsive yapı, framework veya dış kütüphane eklenmemiştir.
