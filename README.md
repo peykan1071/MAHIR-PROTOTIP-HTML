@@ -24,3 +24,18 @@ Bu sürümde oluşturulan ana bölümler:
 - Footer
 
 Bu sprintte tasarım, renk, responsive yapı, animasyon, logo, ikon, bayrak, hero görseli, framework veya dış kütüphane eklenmemiştir.
+
+## Sprint 1 - v1.2
+
+v1.1'de oluşturulan semantik HTML iskeleti korunarak yalnızca sayfa yerleşimi oluşturulmuştur.
+
+Bu sürümde yapılan layout düzenlemeleri:
+
+- Header, Hero, Information Cards, Primary Button Area, Values Band ve Footer akışı kuruldu.
+- Hero alanı iki sütunlu yerleşime alındı; sağ sütun boş bırakıldı.
+- Information Cards alanı üç eşit kart düzenine alındı.
+- Primary Button Area sayfa ortasında konumlandırıldı.
+- Values Band dört sütunlu yatay yapıya alındı.
+- Footer sayfanın alt alanında sade biçimde konumlandırıldı.
+
+Bu sprintte renk, gölge, border-radius, gradient, animasyon, responsive yapı, font değişikliği, logo, ikon, bayrak, görsel, framework veya dış kütüphane eklenmemiştir.
