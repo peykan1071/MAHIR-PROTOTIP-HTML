@@ -138,3 +138,6 @@ Bayrak:
 - `assets/icons/teacher-control.png`
 
 Kontrol notu: Bu kontrol sırasında varlık dosyaları henüz klasörlere eklenmemiş görünmektedir. Görseller HTML'ye bağlanmamış, CSS yazılmamış, yeni görsel/ikon üretilmemiş ve `index.html`, `styles.css`, `script.js` dosyaları değiştirilmemiştir.
+## Sprint 1 / Task 03
+
+Project management documents oluşturuldu.
