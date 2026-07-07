@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
@@ -14,7 +14,7 @@
   </header>
 
   <main id="main-content">
-    <div class="screen-container" data-screen-container>
+    <div class="screen-container" data-screen-container aria-live="polite">
       <section id="welcome-screen" class="screen active-screen" aria-labelledby="welcome-title" data-screen="welcome" data-screen-state="active" aria-hidden="false">
         <header class="screen-header">
           <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
@@ -211,6 +211,8 @@
         <p class="notification-message" data-component="Notification Message">
           Değerlendirme adımları hazırlanıyor; lütfen kısa bir süre bekleyiniz.
         </p>
+
+        <button class="primary-button" data-component="Primary Button" type="button" data-target-screen="report-screen">Raporu Görüntüle</button>
       </section>
 
       <section id="report-screen" class="screen hidden-screen" aria-labelledby="report-title" data-screen="report" data-screen-state="hidden" aria-hidden="true" hidden>

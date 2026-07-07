@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --color-primary: #008c95;
   --color-secondary: #12345b;
   --color-accent: #c92127;
@@ -165,6 +165,7 @@ dt {
 }
 
 .screen.hidden-screen,
+.screen[data-screen-state="hidden"],
 .screen[hidden] {
   display: none !important;
 }
