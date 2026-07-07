@@ -146,22 +146,35 @@ dt {
 }
 
 #main-content {
-  display: grid;
-  gap: var(--space-2xl);
   padding-top: var(--space-2xl);
   padding-bottom: var(--space-2xl);
 }
 
+.screen-container {
+  min-height: 640px;
+}
+
 .screen {
+  display: none;
   padding: var(--space-xl);
 }
 
-.screen > header {
-  margin-bottom: var(--space-xl);
+.screen.active-screen {
+  display: grid;
+  gap: var(--space-lg);
 }
 
-#welcome-screen {
-  display: grid;
+.screen.hidden-screen,
+.screen[hidden] {
+  display: none !important;
+}
+
+.screen > header,
+.screen-header {
+  margin-bottom: var(--space-md);
+}
+
+#welcome-screen.active-screen {
   grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
   gap: var(--space-xl);
   align-items: center;
@@ -260,7 +273,7 @@ button {
 
 .progress-stepper ol {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: var(--space-sm);
   margin-bottom: 0;
   padding-left: 0;
@@ -336,8 +349,7 @@ input[type="checkbox"] {
   margin-bottom: 0;
 }
 
-#report-screen {
-  display: grid;
+#report-screen.active-screen {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.36fr);
   gap: var(--space-lg);
 }
@@ -375,10 +387,9 @@ input[type="checkbox"] {
 
 @media (max-width: 760px) {
   .app-header,
-  #welcome-screen,
-  #report-screen,
+  #welcome-screen.active-screen,
+  #report-screen.active-screen,
   .validation-card dl,
-  .progress-stepper ol,
   #welcome-screen .information-card ul {
     grid-template-columns: 1fr;
   }
