@@ -1,104 +1,86 @@
-# Sprint 1 Closing Report
+﻿# MAHİR Sprint 1 Review
 
-MAHİR - Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı
+Bu belge, MAHİR projesinde Sprint 1 boyunca yürütülen ürün geliştirme sürecinin resmî kapanış raporudur. Rapor; Development Charter, wireframe kararları, UI Contract, Visual Identity ve tamamlanan Feature kayıtları doğrultusunda hazırlanmıştır.
 
-Sprint 1, MAHİR prototipinin ürün yönünü, çalışma disiplinini, temel kullanıcı akışını ve ilk arayüz omurgasını oluşturmak için yürütülmüştür. Bu rapor teknik uygulama detaylarından çok, Sprint 1 sonunda ortaya çıkan ürün kararlarını ve kazanımları özetler.
+## 1. Sprint 1 Amacı
 
-## 1. Sprint Amacı
+Sprint 1'in temel amacı, MAHİR'i yalnızca bir fikir düzeyinden çıkararak öğretmen kontrollü, Türkçe çalışan, kamu hizmeti anlayışına uygun ve tek evrak MVP yaklaşımına dayanan ilk prototip zeminine taşımaktır.
 
-Sprint 1'in ana amacı, MAHİR'i yalnızca bir fikir olmaktan çıkarıp öğretmen kontrollü, Türkçe çalışan ve sınav analizi raporu üretim sürecine hazırlanan somut bir prototip temeline dönüştürmekti.
+Bu sprintte hedef, gerçek yapay zekâ, veri analizi, dosya okuma veya rapor üretimi yapmak değildir. Hedef; ürünün yönünü, ekran akışını, bileşen davranışlarını, görsel kimlik ilkelerini ve çalışabilir arayüz omurgasını küçük, denetlenebilir ve onaylı adımlarla oluşturmaktır.
 
-Bu sprintte ürünün ilk ilkeleri netleştirildi: MAHİR öğretmenin yerine karar veren bir sistem olmayacak, öğretmenin sınav verilerini daha düzenli, kanıta dayalı ve raporlanabilir hale getirmesine yardımcı olan bir eğitim evrakı prototipi olacaktır.
-
-Sprint boyunca hedef, büyük bir sistem kurmak değil; güven veren, sade, resmi dile uygun ve adım adım geliştirilebilir bir ürün zemini oluşturmaktı.
+Sprint 1 sonunda MAHİR'in, sınav verilerini öğretmen kontrolünde yapılandırılmış değerlendirme ve rapor taslağı sürecine taşıyan ilk kullanıcı deneyimi netleşmiştir.
 
 ## 2. Tamamlanan Feature'lar
 
-Sprint 1 kapsamında Feature 01-16 tamamlanmıştır.
-
-| Feature | Kapanış Özeti |
+| Feature | Tamamlanan Çalışma |
 | --- | --- |
 | Feature 01 | Kurumsal giriş ekranı için ilk semantik HTML iskeleti oluşturuldu. |
-| Feature 02 | Ana sayfa yerleşimi için ilk layout düzeni kuruldu. |
-| Feature 03 | Sistem fontlarına dayalı temel tipografi hiyerarşisi oluşturuldu. |
+| Feature 02 | Giriş ekranı için temel sayfa yerleşimi ve bölüm akışı kuruldu. |
+| Feature 03 | Sistem fontlarına dayalı sade tipografi hiyerarşisi oluşturuldu. |
 | Feature 04 | Kurumsal görsel varlıklar için `assets` klasör yapısı ve adlandırma standardı belirlendi. |
 | Feature 05 | Logo, hero, bayrak ve ikon varlıklarının hedef dosya yolları netleştirildi. |
-| Feature 06 | MAHİR Design System belgesi oluşturularak tasarım kararları tek referansta toplandı. |
-| Feature 07 | Roadmap, changelog ve development log belgeleriyle proje yönetim zemini kuruldu. |
-| Feature 08 | Altı ekranlık düşük sadakatli wireframe hazırlandı. |
-| Feature 09 | Wireframe genişletilerek her ekran için amaç, psikoloji, işlem ve başarı kriterleri tanımlandı. |
-| Feature 10 | UI Contract oluşturularak temel bileşen davranışları standartlaştırıldı. |
-| Feature 11 | Altı ekranlık semantik HTML temeli kuruldu. |
-| Feature 12 | Visual Identity belgesiyle güven, resmiyet, sadelik ve erişilebilirlik ilkeleri tanımlandı. |
-| Feature 13 | Görsel kimlik ilkeleri `styles.css` içine temel renk, tipografi, kart ve buton dili olarak uygulandı. |
-| Feature 14 | İlk kullanıcı arayüzü için container, bölüm boşlukları, kartlar, stepper, upload, validation ve rapor yerleşim temeli oluşturuldu. |
-| Feature 15 | Ekranlar tek sayfa içinde bağımsız `screen` yapısına ayrıldı; başlangıçta yalnızca karşılama ekranının görünmesi sağlandı. |
-| Feature 16 | JavaScript tabanlı navigation engine kuruldu; ekran geçişleri, aktif stepper durumu ve sayfa üstüne dönüş davranışı çalışır hale getirildi. |
+| Feature 06 | `DESIGN_SYSTEM.md` ile logo, hero, bayrak, ikon, renk, tipografi, kart, buton ve boşluk ilkeleri belgelendi. |
+| Feature 07 | `ROADMAP.md`, `CHANGELOG.md` ve `docs/DEVELOPMENT_LOG.md` ile proje yönetim belgeleri oluşturuldu. |
+| Feature 08 | Altı ekranlık düşük sadakatli wireframe taslağı hazırlandı. |
+| Feature 09 | Wireframe her ekran için amaç, öğretmen psikolojisi, işlem, zorunlu alan, geçiş şartı ve başarı kriteriyle genişletildi. |
+| Feature 10 | `UI_CONTRACT.md` ile temel arayüz bileşenlerinin davranış sözleşmesi oluşturuldu. |
+| Feature 11 | Altı ekranlık Semantic HTML Foundation kuruldu. |
+| Feature 12 | `VISUAL_IDENTITY.md` ile MAHİR'in güven, resmiyet, sadelik ve erişilebilirlik odaklı görsel kimliği belgelendi. |
+| Feature 13 | Visual Identity kararları `styles.css` içinde temel renk, tipografi, kart, buton ve odak görünümü olarak uygulandı. |
+| Feature 14 | Layout Foundation ile container, header, hero alanı, güven kartları, stepper, upload, validation ve rapor kolon temeli oluşturuldu. |
+| Feature 15 | Screen Flow yapısı kuruldu; ekranlar bağımsız `screen` yapısına ayrıldı ve ilk açılışta yalnızca karşılama ekranı görünür hale getirildi. |
+| Feature 16 | Navigation Engine oluşturuldu; ekran geçişleri, aktif Progress Stepper durumu ve sayfa üstüne dönüş davranışı çalışır hale getirildi. |
 
-## 3. Temel Mimari Kararlar
+## 3. Ürün Açısından Kazanımlar
 
-MAHİR'in ilk prototipi yalın HTML, CSS ve JavaScript ile geliştirilecek şekilde konumlandırıldı. Framework, build sistemi, veritabanı, API, OCR, dosya okuma, PDF/Word üretimi ve gerçek yapay zeka entegrasyonu Sprint 1 kapsamı dışında bırakıldı.
+Sprint 1 boyunca MAHİR'in ürün kimliği öğretmen merkezli yaklaşım üzerine kurulmuştur. Ürün, öğretmenin yerine karar veren bir sistem olarak değil; öğretmenin mesleki kararını güçlendiren, veriyi düzenleyen ve rapor taslağına dönüştürmeye yardımcı olan bir destek aracı olarak konumlandırılmıştır.
 
-Tek sayfalık yapı korunurken kullanıcı deneyimi uzun bir sayfa gibi değil, adım adım ilerleyen bir uygulama akışı gibi tasarlandı. Bu karar, öğretmenin aynı anda yalnızca bulunduğu ekranı görmesini ve süreçte zihinsel yükünün azalmasını destekler.
+Minimum girdi - maksimum pedagojik değer yaklaşımı benimsenmiştir. Öğretmenin başlangıçta yalnızca temel bağlamı seçmesi, mevcut verisini paylaşması ve süreci kontrol etmesi hedeflenmiştir. Böylece ürün yeni bir iş yükü oluşturmak yerine öğretmenin zaten sahip olduğu sınav verisini daha anlamlı hale getirmeye odaklanır.
 
-Bileşen dili UI Contract ile ayrıştırıldı. Primary Button, Secondary Button, Progress Stepper, Upload Box, Validation Card, Analysis Progress, Report Section ve Notification Message gibi temel parçalar ürün davranışı açısından standart hale getirildi.
+Öğretmen onayı olmadan analiz yapılmaması temel ürün ilkesi olarak korunmuştur. Eksik bilgiler hata olarak değil, tamamlanabilir bilgi olarak ele alınmıştır. Raporun sahibi öğretmendir; MAHİR yalnızca taslak üretim, yapılandırma ve karar desteği sağlar.
 
-## 4. UX Kararları
+Kanıta dayalı değerlendirme yaklaşımı ürün diline yerleştirilmiştir. Analiz, rapor ve kaynak dayanakları kavramları; kesin hüküm yerine ölçülü, akademik ve öğretmen denetimine açık bir değerlendirme sürecini destekleyecek şekilde kurgulanmıştır.
 
-Sprint 1'de UX yaklaşımı öğretmen psikolojisi üzerinden şekillendirildi. Karşılama ekranı, öğretmene yeni bir yük değil, kontrollü bir destek aracı sunduğunu açıkça hissettirecek şekilde kurgulandı.
+Kamu odaklı güvenilirlik, görsel kimlik ve dil kararlarında merkezi ilke olmuştur. MAHİR'in MEB, EBA, ÖBA, e-Okul ve MEBBİS gibi resmî sistemlerin güven tonunu taşıyan; ancak daha sade, çağdaş ve kullanıcı dostu bir arayüz dili benimsemesi hedeflenmiştir.
 
-Akış, Karşılama, Hazırlık, Veri Ekleme, Veri Doğrulama, Analiz Süreci ve Rapor ekranları üzerinden ilerleyecek şekilde tanımlandı. Bu sıralama öğretmenin önce bağlamı belirlemesini, sonra veriyi paylaşmasını, ardından kontrol ve rapor adımlarına geçmesini sağlar.
+Tek evrak MVP yaklaşımı korunmuştur. Sprint 1, çoklu evrak, kullanıcı hesabı, veri tabanı veya karmaşık sistem entegrasyonu yerine yalnızca Sınav Analizi ve Değerlendirme Raporu akışının temelini oluşturmuştur.
 
-Hata dili yerine rehber mesaj yaklaşımı benimsendi. Eksik bilgiler keskin bir engel gibi değil, tamamlanabilir bilgiler olarak sunulacaktır. Bu karar MAHİR'in öğretmen dostu ve güven veren ürün dili açısından temel bir kazanımdır.
+## 4. Mimari Kazanımlar
 
-## 5. Ürün Kazanımları
+Semantic HTML Foundation tamamlanmıştır. Altı ekran `main`, `section`, `header`, `footer`, `form`, `fieldset`, `article`, `aside` gibi semantik yapılarla kurulmuş; form alanları label ilişkileriyle erişilebilirlik temelini koruyacak şekilde yerleştirilmiştir.
 
-Sprint 1 sonunda MAHİR'in ürün karakteri belirginleşmiştir. Prototip artık yalnızca bir rapor fikri değil; öğretmenin sınav verisini yapılandırılmış değerlendirme ve rapor taslağına dönüştürmesini anlatan ekran akışına sahiptir.
+Screen Flow yaklaşımı oluşturulmuştur. MAHİR tek sayfalık bir HTML dosyası içinde kalırken, kullanıcıya uzun bir sayfa yerine adım adım ilerleyen uygulama deneyimi sunacak ekran mantığına geçmiştir.
 
-Öğretmen kontrolü ilkesi tüm belgelerde ve arayüz kararlarında korunmuştur. Raporun sahibi öğretmendir; MAHİR yalnızca düzenleme, yapılandırma ve taslak hazırlama desteği sağlar.
+UI Contract ile bileşen davranışları standartlaştırılmıştır. Primary Button, Secondary Button, Progress Stepper, Upload Box, Dropdown, Information Card, Validation Card, Analysis Progress, Summary Card, Report Section, Source Reference Panel ve Notification Message için ürün davranışı netleştirilmiştir.
 
-Ürünün dili resmi, ölçülü, akademik ve kamu hizmeti anlayışına uygun bir hatta oturtulmuştur. Tasarım yönü de MEB, EBA, ÖBA, e-Okul ve MEBBİS gibi resmi sistemlerin güven tonunu çağdaş ve sade bir arayüz yaklaşımıyla birleştirecek şekilde tanımlanmıştır.
+Visual Identity iki aşamalı biçimde ele alınmıştır: önce ilke belgesi oluşturulmuş, ardından temel renk, tipografi, kart, buton ve odak görünümü CSS tarafına kontrollü olarak uygulanmıştır.
 
-## 6. Tamamlanan Teknik Altyapı
+Navigation Engine ile ekran geçişleri çalışır hale gelmiştir. Başlayalım, Devam, Düzenle, Analizi Başlat ve Raporu Görüntüle eylemleri ekranları değiştirmekte; Progress Stepper aktif ekranı göstermekte ve URL değişmeden sayfa akışı yönetilmektedir.
 
-Sprint 1'de ürünün çalışabilir temel dosya yapısı korunmuş ve genişletilmiştir. `index.html`, `styles.css` ve `script.js` dosyaları prototipin ana uygulama yüzeyi olarak yapılandırılmıştır.
+## 5. Sprint Boyunca Değiştirilen Kararlar
 
-Altı ekranın semantik HTML temeli oluşturulmuş, ekranlar `screen` mantığıyla ayrılmış ve JavaScript ile yönetilebilir hale getirilmiştir. Navigation engine sayesinde Başlayalım, Devam, Düzenle, Analizi Başlat ve Raporu Görüntüle eylemleri ekran akışını değiştirebilir duruma gelmiştir.
+- Tek sayfalık uzun HTML görünümü yerine tek dosya içinde SPA benzeri ekran yönetimi yaklaşımı benimsendi.
+- Sadece rapor çıktısı fikri yerine pedagojik karar desteği yaklaşımı öne çıkarıldı.
+- Visual Identity tek seferde uygulanmak yerine önce belge, sonra CSS uygulaması olarak iki aşamaya ayrıldı.
+- İlk giriş ekranı odağı, kurumsal tanıtımdan öğretmenin güven duygusunu ve kontrolünü güçlendiren akış başlangıcına dönüştürüldü.
+- Eksik bilgi yaklaşımı hata dili yerine tamamlanabilir bilgi ve rehber mesaj diliyle ele alındı.
+- Gerçek dosya okuma ve analiz yerine önce ekran davranışı, bileşen sözleşmesi ve akış güvenilirliği tamamlandı.
+- Görsel asset'lerin varlığı kabul edildi; ancak arayüze bağlanması sonraki onaylı aşamalara bırakıldı.
 
-CSS tarafında görsel kimlik ilkeleri, temel tipografi, kart dili, buton görünümü, section boşlukları ve ekran durum sınıfları oluşturulmuştur. Bu altyapı ileride yapılacak tasarım ve işlev geliştirmeleri için kontrollü bir başlangıç sağlar.
+## 6. Sprint 1 Sonunda Ortaya Çıkan Ürün
 
-## 7. Sprint Sonunda Ortaya Çıkan Ürün Durumu
+Bugün itibarıyla MAHİR, doğrudan tarayıcıda açılabilen, altı ekranlı ve ekran geçişleri çalışan bir HTML/CSS/JavaScript prototipi seviyesine ulaşmıştır.
 
-Sprint 1 sonunda MAHİR, doğrudan tarayıcıda açılabilir bir HTML/CSS/JavaScript prototipi halindedir. Kullanıcı ilk olarak karşılama ekranını görür ve adım adım hazırlık, veri ekleme, doğrulama, analiz süreci ve rapor ekranına ilerleyebilir.
+Kullanıcı akışı Karşılama, Hazırlık, Veri Ekleme, Veri Doğrulama, Analiz Süreci ve Rapor ekranlarından oluşmaktadır. Öğretmen ilk ekranda ürünün amacını ve güven ilkelerini görür; ardından temel bağlamı seçer, veri ekleme alanına geçer, doğrulama ekranında bilgileri kontrol eder, analiz sürecini izler ve rapor ekranına ulaşır.
 
-Prototip henüz gerçek veri işleme, dosya okuma, yapay zeka, OCR veya rapor üretimi yapmaz. Buna rağmen ürün deneyiminin ana omurgası kurulmuştur: öğretmen kontrollü, aşamalı, güven veren ve rapor taslağına yönelen bir akış görünür durumdadır.
+Ürün henüz gerçek yapay zekâ, gerçek veri analizi, OCR, dosya okuma, veritabanı, kullanıcı hesabı veya PDF/Word üretimi içermez. Ancak MAHİR'in ürün dili, temel ekran mimarisi, bileşen davranışları, görsel kimlik yönü ve navigation altyapısı Sprint 1 sonunda oluşmuştur.
 
-Sprint 1 çıktısı, Sprint 2'de yapılacak içerik, etkileşim, doğrulama ve rapor alanı geliştirmeleri için sağlam bir ürün zemini sağlar.
+Bu durum, Sprint 1'i bir fikir doğrulama ve ürün omurgası kurma sprinti olarak başarıyla kapatmaktadır.
 
-## 8. Sprint 2'ye Devreden Konular
+## 7. Sprint 2'ye Devreden Konular
 
-Sprint 2'ye devreden başlıklar şunlardır:
-
-- Hazırlık ekranındaki ders ve sınıf düzeyi seçimlerinin rehber mesajlarla güçlendirilmesi.
-- Veri ekleme ekranında gerçek dosya okuma yapmadan örnek/prototip veri giriş deneyiminin netleştirilmesi.
-- Veri doğrulama ekranında öğretmen kontrolünü destekleyen düzenleme alanlarının olgunlaştırılması.
-- Analiz süreci ekranında aşama durumlarının daha anlaşılır hale getirilmesi.
-- Rapor ekranındaki bölümlerin örnek taslak içeriklerle ürün değerini daha görünür kılması.
-- Görsel varlıkların uygun sprintte ve kapsam onayıyla arayüze kontrollü biçimde bağlanması.
-- Erişilebilirlik, okunabilirlik ve temel kullanım testlerinin genişletilmesi.
-
-Bu konular Sprint 2 çalışması değildir; yalnızca Sprint 1 sonunda devreden ürün gündemidir.
-
-## 9. Sprint 1 Değerlendirmesi
-
-Sprint 1 başarılı şekilde tamamlanmıştır. Çalışma, Development Charter ilkesine uygun biçimde küçük, kontrollü ve onaylı adımlarla ilerlemiştir.
-
-Kapsam yönetimi korunmuştur. Gerçek yapay zeka, veri işleme, dosya okuma, PDF/Word üretimi, kullanıcı hesabı veya karmaşık sistem entegrasyonu eklenmemiştir. Bu sayede prototip, erken aşamada sade ve denetlenebilir kalmıştır.
-
-En önemli ürün kazanımı, MAHİR'in yönünün netleşmesidir. Ürün artık öğretmenin güven duygusunu, karar yetkisini ve resmi raporlama ihtiyacını merkeze alan bir eğitim aracı olarak şekillenmektedir.
-
-## 10. Sonuç
-
-Sprint 1, MAHİR için güçlü bir başlangıç sprinti olmuştur. Projenin geliştirme disiplini, belge mimarisi, tasarım ilkeleri, kullanıcı akışı, bileşen sözleşmesi, semantik HTML temeli, görsel kimlik uygulaması ve ekran geçiş motoru tamamlanmıştır.
-
-Sprint sonunda MAHİR, öğretmen kontrollü sınav analizi ve değerlendirme raporu prototipi için çalışır bir ilk ürün omurgasına sahiptir. Bundan sonraki ilerleme, aynı kontrollü geliştirme anlayışıyla ve kullanıcı onayıyla yürütülmelidir.
+- Asset Integration
+- AI Decision Engine
+- Gerçek veri analizi
+- Knowledge Base
+- Gerçek rapor üretimi
