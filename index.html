@@ -3,66 +3,274 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="MAHİR Kurumsal Giriş Ekranı HTML iskeleti">
-  <title>MAHİR | Kurumsal Giriş Ekranı</title>
+  <meta name="description" content="MAHİR altı ekranlı semantik HTML prototip temeli">
+  <title>MAHİR | Sınav Analizi ve Değerlendirme Raporu</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="site-header" aria-labelledby="site-title">
-    <p>MAHİR</p>
-    <h1 id="site-title">Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı</h1>
+  <header class="app-header" aria-labelledby="app-title">
+    <p class="app-name">MAHİR</p>
+    <h1 id="app-title">Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı</h1>
   </header>
 
-  <main>
-    <section id="hero" aria-labelledby="hero-title">
+  <main id="main-content">
+    <section id="welcome-screen" class="screen" aria-labelledby="welcome-title" data-screen="welcome">
       <header>
-        <h2 id="hero-title">MAHİR Kurumsal Giriş Ekranı</h2>
+        <p>MAHİR</p>
+        <h2 id="welcome-title">Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı</h2>
       </header>
-      <p>Sınav Analizi ve Değerlendirme Raporu modülü için giriş alanı.</p>
+
+      <article class="summary-card" data-component="Summary Card" aria-labelledby="welcome-message-title">
+        <h3 id="welcome-message-title">Her sınav, öğretimi geliştirecek güçlü veriler içerir.</h3>
+        <p>MAHİR, bu verileri güvenilir eğitim kararlarına dönüştürmenize destek olur.</p>
+      </article>
+
+      <article class="information-card" data-component="Information Card" aria-labelledby="trust-title">
+        <h3 id="trust-title">Güven maddeleri</h3>
+        <ul>
+          <li>Yeni bir iş yükü oluşturmaz.</li>
+          <li>Son karar her zaman öğretmenindir.</li>
+          <li>Her değerlendirme güvenilir kanıtlarla desteklenir.</li>
+        </ul>
+      </article>
+
+      <button class="primary-button" data-component="Primary Button" type="button">Başlayalım</button>
+
+      <p class="notification-message" data-component="Notification Message">
+        İlk adımda yalnızca dersinizi ve sınıf düzeyinizi seçmeniz yeterlidir.
+      </p>
     </section>
 
-    <section id="information-cards" aria-labelledby="information-cards-title">
+    <section id="preparation-screen" class="screen" aria-labelledby="preparation-title" data-screen="preparation">
       <header>
-        <h2 id="information-cards-title">Information Cards</h2>
+        <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
+          <ol>
+            <li aria-current="step">Hazırlık</li>
+            <li>Veri</li>
+            <li>Analiz</li>
+            <li>Rapor</li>
+          </ol>
+        </nav>
+        <h2 id="preparation-title">Hazırlık</h2>
       </header>
-      <div class="information-card-list">
-        <article class="information-card">
-          <h3>Öğretmen Kontrolü</h3>
-          <p>İçeriklerin son düzenleme ve onay süreci öğretmene aittir.</p>
-        </article>
-        <article class="information-card">
-          <h3>Sınav Analizi</h3>
-          <p>Sınav bilgileri ve soru bazlı veriler rapor taslağına temel oluşturur.</p>
-        </article>
-        <article class="information-card">
-          <h3>Rapor Taslağı</h3>
-          <p>Hazırlanan çıktı örnek taslak niteliğindedir.</p>
-        </article>
+
+      <form aria-labelledby="preparation-title">
+        <fieldset>
+          <legend>Ders ve sınıf düzeyi bilgileri</legend>
+
+          <div class="dropdown" data-component="Dropdown">
+            <label for="course-select">Ders seçimi</label>
+            <select id="course-select" name="course" required>
+              <option value="">Ders seçiniz</option>
+              <option value="turkce">Türkçe</option>
+              <option value="matematik">Matematik</option>
+              <option value="fen-bilimleri">Fen Bilimleri</option>
+              <option value="sosyal-bilgiler">Sosyal Bilgiler</option>
+            </select>
+          </div>
+
+          <div class="dropdown" data-component="Dropdown">
+            <label for="grade-select">Sınıf düzeyi seçimi</label>
+            <select id="grade-select" name="grade" required>
+              <option value="">Sınıf düzeyi seçiniz</option>
+              <option value="5">5. sınıf</option>
+              <option value="6">6. sınıf</option>
+              <option value="7">7. sınıf</option>
+              <option value="8">8. sınıf</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <p class="notification-message" data-component="Notification Message">
+          Bu bilgiler rapor taslağının doğru bağlamda hazırlanmasına yardımcı olur.
+        </p>
+
+        <button class="primary-button" data-component="Primary Button" type="button">Devam</button>
+      </form>
+    </section>
+
+    <section id="data-entry-screen" class="screen" aria-labelledby="data-entry-title" data-screen="data-entry">
+      <header>
+        <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
+          <ol>
+            <li>Hazırlık</li>
+            <li aria-current="step">Veri</li>
+            <li>Analiz</li>
+            <li>Rapor</li>
+          </ol>
+        </nav>
+        <h2 id="data-entry-title">Veri Ekleme</h2>
+      </header>
+
+      <p>Mevcut sınav verilerinizi paylaşmanız yeterlidir.</p>
+
+      <form aria-labelledby="data-entry-title">
+        <div class="upload-box" data-component="Upload Box" role="group" aria-labelledby="upload-title">
+          <h3 id="upload-title">Sınav verisi ekleme alanı</h3>
+          <label for="exam-file">Dosya seç</label>
+          <input id="exam-file" name="exam-file" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv">
+          <p>Desteklenen biçimler: Görsel, PDF, Word, Excel, CSV</p>
+        </div>
+
+        <fieldset>
+          <legend>Alternatif veri girişi</legend>
+          <div>
+            <input id="manual-entry" name="data-entry-method" type="checkbox" value="manual">
+            <label for="manual-entry">Elle veri girişi alternatifi</label>
+          </div>
+        </fieldset>
+
+        <p class="notification-message" data-component="Notification Message">
+          Elinizdeki veri tam değilse de başlayabilirsiniz; eksik bilgiler sonraki adımda tamamlanabilir.
+        </p>
+
+        <div class="button-group" aria-label="Veri ekleme işlemleri">
+          <button class="secondary-button" data-component="Secondary Button" type="button">Geri</button>
+          <button class="primary-button" data-component="Primary Button" type="button">Devam</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="validation-screen" class="screen" aria-labelledby="validation-title" data-screen="validation">
+      <header>
+        <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
+          <ol>
+            <li>Hazırlık</li>
+            <li aria-current="step">Veri</li>
+            <li>Analiz</li>
+            <li>Rapor</li>
+          </ol>
+        </nav>
+        <h2 id="validation-title">Veri Doğrulama</h2>
+      </header>
+
+      <article class="validation-card" data-component="Validation Card" aria-labelledby="detected-info-title">
+        <h3 id="detected-info-title">Algılanan bilgiler</h3>
+        <dl>
+          <dt>Ders</dt>
+          <dd>Öğretmen kontrolünde doğrulanacak.</dd>
+          <dt>Sınıf düzeyi</dt>
+          <dd>Öğretmen kontrolünde doğrulanacak.</dd>
+          <dt>Öğrenci sayısı</dt>
+          <dd>Öğretmen kontrolünde doğrulanacak.</dd>
+          <dt>Soru sayısı</dt>
+          <dd>Öğretmen kontrolünde doğrulanacak.</dd>
+          <dt>Öğrenme çıktısı eşleştirmesi</dt>
+          <dd>Tamamlanabilir bilgi.</dd>
+          <dt>Veri giriş yöntemi</dt>
+          <dd>Öğretmen kontrolünde doğrulanacak.</dd>
+        </dl>
+      </article>
+
+      <p class="notification-message" data-component="Notification Message">
+        Daha kapsamlı değerlendirme için öğrenme çıktısı eşleştirmesi tamamlanabilir.
+      </p>
+
+      <div class="button-group" aria-label="Veri doğrulama işlemleri">
+        <button class="secondary-button" data-component="Secondary Button" type="button">Düzenle</button>
+        <button class="primary-button" data-component="Primary Button" type="button">Analizi Başlat</button>
       </div>
     </section>
 
-    <section id="primary-button-area" aria-labelledby="primary-button-title">
+    <section id="analysis-screen" class="screen" aria-labelledby="analysis-title" data-screen="analysis">
       <header>
-        <h2 id="primary-button-title">Primary Button Area</h2>
+        <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
+          <ol>
+            <li>Hazırlık</li>
+            <li>Veri</li>
+            <li aria-current="step">Analiz</li>
+            <li>Rapor</li>
+          </ol>
+        </nav>
+        <h2 id="analysis-title">Analiz Süreci</h2>
       </header>
-      <button type="button">Hadi başlayalım</button>
+
+      <article class="analysis-progress" data-component="Analysis Progress" aria-labelledby="analysis-progress-title">
+        <h3 id="analysis-progress-title">Aşama listesi</h3>
+        <ol>
+          <li>Veriler doğrulanıyor.</li>
+          <li>Soru ve puan ilişkileri yapılandırılıyor.</li>
+          <li>Öğrenme çıktıları eşleştiriliyor.</li>
+          <li>Sayısal analiz hazırlanıyor.</li>
+          <li>Kanıt kontrolü yapılıyor.</li>
+          <li>Pedagojik değerlendirme oluşturuluyor.</li>
+          <li>Öğretim önerileri hazırlanıyor.</li>
+        </ol>
+      </article>
+
+      <p class="notification-message" data-component="Notification Message">
+        Değerlendirme adımları hazırlanıyor; lütfen kısa bir süre bekleyiniz.
+      </p>
     </section>
 
-    <section id="values-band" aria-labelledby="values-band-title">
+    <section id="report-screen" class="screen" aria-labelledby="report-title" data-screen="report">
       <header>
-        <h2 id="values-band-title">Values Band</h2>
+        <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
+          <ol>
+            <li>Hazırlık</li>
+            <li>Veri</li>
+            <li>Analiz</li>
+            <li aria-current="step">Rapor</li>
+          </ol>
+        </nav>
+        <h2 id="report-title">Maarif Modeli Temelli Sınav Analizi ve Değerlendirme Raporu</h2>
       </header>
-      <ul>
-        <li>Öğretmen kontrolü</li>
-        <li>Sadelik</li>
-        <li>Şeffaf süreç</li>
-        <li>Taslak odaklı çalışma</li>
-      </ul>
+
+      <p class="notification-message" data-component="Notification Message">
+        Raporun sahibi öğretmendir. Dil resmî, ölçülü, akademik ve kamu hizmeti anlayışına uygun olmalıdır.
+      </p>
+
+      <article class="summary-card" data-component="Summary Card" aria-labelledby="report-summary-title">
+        <h3 id="report-summary-title">Rapor Özeti</h3>
+        <p>Bu alan, öğretmen kontrolünde incelenecek rapor taslağının genel çerçevesini sunar.</p>
+      </article>
+
+      <article class="report-section" data-component="Report Section" aria-labelledby="general-evaluation-title">
+        <h3 id="general-evaluation-title">Genel Değerlendirme</h3>
+        <p>Bu bölüm öğretmen tarafından incelenecek taslak değerlendirme alanıdır.</p>
+      </article>
+
+      <article class="report-section" data-component="Report Section" aria-labelledby="analysis-table-title">
+        <h3 id="analysis-table-title">Analiz Çizelgesi</h3>
+        <p>Bu bölüm soru ve puan ilişkilerinin rapor taslağı içinde düzenleneceği alandır.</p>
+      </article>
+
+      <article class="report-section" data-component="Report Section" aria-labelledby="learning-outcomes-title">
+        <h3 id="learning-outcomes-title">Öğrenme Çıktıları Değerlendirmesi</h3>
+        <p>Bu bölüm öğrenme çıktılarıyla ilgili değerlendirme taslağını içerir.</p>
+      </article>
+
+      <article class="report-section" data-component="Report Section" aria-labelledby="strong-areas-title">
+        <h3 id="strong-areas-title">Güçlü Öğrenme Alanları</h3>
+        <p>Bu bölüm güçlü öğrenme alanlarının öğretmen kontrolünde sunulacağı alandır.</p>
+      </article>
+
+      <article class="report-section" data-component="Report Section" aria-labelledby="development-areas-title">
+        <h3 id="development-areas-title">Gelişimi Desteklenecek Alanlar</h3>
+        <p>Bu bölüm gelişimi desteklenecek alanlara ilişkin taslak değerlendirmeyi içerir.</p>
+      </article>
+
+      <article class="report-section" data-component="Report Section" aria-labelledby="teaching-suggestions-title">
+        <h3 id="teaching-suggestions-title">Öğretim Önerileri</h3>
+        <p>Bu bölüm öğretim sürecini destekleyecek öneri taslaklarını içerir.</p>
+      </article>
+
+      <article class="report-section" data-component="Report Section" aria-labelledby="monitoring-plan-title">
+        <h3 id="monitoring-plan-title">İzleme ve Gelişim Planı</h3>
+        <p>Bu bölüm izleme ve gelişim planının öğretmen tarafından düzenleneceği alandır.</p>
+      </article>
+
+      <aside class="source-reference-panel" data-component="Source Reference Panel" aria-labelledby="source-reference-title">
+        <h3 id="source-reference-title">Kaynak Dayanakları</h3>
+        <p>Bu bölüm rapor taslağındaki değerlendirmelerin dayanaklarını öğretmen kontrolüne sunar.</p>
+      </aside>
+
+      <button class="secondary-button" data-component="Secondary Button" type="button">Raporu Gözden Geçir</button>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <p>MAHİR prototipi - Sprint 1 v1.1</p>
+  <footer class="app-footer">
+    <p>MAHİR prototipi - Semantic HTML Foundation</p>
   </footer>
 
   <script src="script.js"></script>
