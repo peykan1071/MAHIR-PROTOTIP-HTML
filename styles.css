@@ -221,6 +221,8 @@ dt {
 .summary-card,
 .information-card,
 .validation-card,
+.table-card,
+.data-scope-card,
 .analysis-progress,
 .report-section,
 .source-reference-panel,
@@ -342,6 +344,56 @@ input[type="checkbox"] {
 .validation-card dt,
 .validation-card dd {
   margin-bottom: 0;
+}
+
+.data-confirmation-layout {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.table-card,
+.data-scope-card {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  color: var(--color-text);
+}
+
+.data-table caption {
+  margin-bottom: var(--space-sm);
+  color: var(--color-muted);
+  text-align: left;
+}
+
+.data-table th,
+.data-table td {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.data-table th {
+  color: var(--color-secondary);
+  font-weight: 700;
+}
+
+.data-scope-card {
+  border-left: 4px solid var(--color-secondary);
+}
+
+#validation-screen[data-data-approval-state="approved"] .notification-message {
+  border-left-color: var(--color-primary);
 }
 
 .analysis-progress ol {

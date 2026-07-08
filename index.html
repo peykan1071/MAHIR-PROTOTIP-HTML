@@ -131,7 +131,7 @@
           </fieldset>
 
           <p class="notification-message" data-component="Notification Message">
-            Elinizdeki veri tam değilse de başlayabilirsiniz; eksik bilgiler sonraki adımda tamamlanabilir.
+            Elinizdeki veri tamamlanacak ayrıntılar içerse de başlayabilirsiniz; bilgiler sonraki adımda öğretmen kontrolünde zenginleştirilebilir.
           </p>
 
           <div class="button-group" aria-label="Veri ekleme işlemleri">
@@ -141,7 +141,7 @@
         </form>
       </section>
 
-      <section id="validation-screen" class="screen hidden-screen" aria-labelledby="validation-title" data-screen="validation" data-screen-state="hidden" aria-hidden="true" hidden>
+      <section id="validation-screen" class="screen hidden-screen" aria-labelledby="validation-title" data-screen="validation" data-screen-state="hidden" data-data-approval-state="pending" aria-hidden="true" hidden>
         <header class="screen-header">
           <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
             <ol>
@@ -151,37 +151,114 @@
               <li>Rapor</li>
             </ol>
           </nav>
-          <h2 id="validation-title">Veri Doğrulama</h2>
+          <h2 id="validation-title">Veri Onay</h2>
+          <p>Analiz başlamadan önce paylaşılan veri kapsamını ve örnek veri yapısını öğretmen kontrolünde gözden geçiriniz.</p>
         </header>
 
-        <article class="validation-card" data-component="Validation Card" aria-labelledby="detected-info-title">
-          <h3 id="detected-info-title">Algılanan bilgiler</h3>
-          <dl>
-            <dt>Ders</dt>
-            <dd>Öğretmen kontrolünde doğrulanacak.</dd>
-            <dt>Sınıf düzeyi</dt>
-            <dd>Öğretmen kontrolünde doğrulanacak.</dd>
-            <dt>Öğrenci sayısı</dt>
-            <dd>Öğretmen kontrolünde doğrulanacak.</dd>
-            <dt>Soru sayısı</dt>
-            <dd>Öğretmen kontrolünde doğrulanacak.</dd>
-            <dt>Öğrenme çıktısı eşleştirmesi</dt>
-            <dd>Tamamlanabilir bilgi.</dd>
-            <dt>Veri giriş yöntemi</dt>
-            <dd>Öğretmen kontrolünde doğrulanacak.</dd>
-          </dl>
-        </article>
+        <div class="data-confirmation-layout" aria-label="Veri onay katmanı">
+          <article class="table-card question-map-card" data-component="Validation Card" aria-labelledby="question-map-title">
+            <h3 id="question-map-title">Soru, Puan ve Öğrenme Çıktısı Eşleştirmesi</h3>
+            <div class="table-wrap">
+              <table class="data-table">
+                <caption>Soru bazlı puan ve öğrenme çıktısı özeti</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Soru</th>
+                    <th scope="col">Puan</th>
+                    <th scope="col">Öğrenme Çıktısı</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>1. Soru</td>
+                    <td>10</td>
+                    <td>Okuduğunu anlama ve çıkarım yapma</td>
+                  </tr>
+                  <tr>
+                    <td>2. Soru</td>
+                    <td>10</td>
+                    <td>Problem çözme stratejisi geliştirme</td>
+                  </tr>
+                  <tr>
+                    <td>3. Soru</td>
+                    <td>15</td>
+                    <td>Kavramlar arası ilişki kurma</td>
+                  </tr>
+                  <tr>
+                    <td>4. Soru</td>
+                    <td>15</td>
+                    <td>Kanıta dayalı açıklama yapma</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
 
-        <p class="notification-message" data-component="Notification Message">
-          Daha kapsamlı değerlendirme için öğrenme çıktısı eşleştirmesi tamamlanabilir.
+          <article class="table-card student-data-card" data-component="Validation Card" aria-labelledby="student-data-title">
+            <h3 id="student-data-title">Öğretmen Kontrolündeki Öğrenci Verisi</h3>
+            <div class="table-wrap">
+              <table class="data-table">
+                <caption>Örnek öğrenci puanları</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Öğrenci No</th>
+                    <th scope="col">Ad Soyad</th>
+                    <th scope="col">1. Soru</th>
+                    <th scope="col">2. Soru</th>
+                    <th scope="col">3. Soru</th>
+                    <th scope="col">4. Soru</th>
+                    <th scope="col">Toplam Puan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>102</td>
+                    <td>Ayşe Yılmaz</td>
+                    <td>8</td>
+                    <td>10</td>
+                    <td>12</td>
+                    <td>13</td>
+                    <td>43</td>
+                  </tr>
+                  <tr>
+                    <td>117</td>
+                    <td>Mehmet Kaya</td>
+                    <td>6</td>
+                    <td>8</td>
+                    <td>11</td>
+                    <td>10</td>
+                    <td>35</td>
+                  </tr>
+                  <tr>
+                    <td>124</td>
+                    <td>Zeynep Demir</td>
+                    <td>10</td>
+                    <td>9</td>
+                    <td>14</td>
+                    <td>15</td>
+                    <td>48</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="data-scope-card" data-component="Summary Card" aria-labelledby="data-scope-title">
+            <h3 id="data-scope-title">Paylaşılan Veri Kapsamı</h3>
+            <p>Bu prototipte ders, sınıf düzeyi, öğrenci bazlı puanlar, soru puan değerleri ve öğrenme çıktısı eşleştirmeleri öğretmen kontrolüne sunulur.</p>
+            <p>Daha kapsamlı değerlendirme için ek bilgiler paylaşabilirsiniz. Mevcut verilerle de analiz oluşturulabilir.</p>
+          </article>
+        </div>
+
+        <p class="notification-message" data-component="Notification Message" data-approval-message aria-live="polite" tabindex="-1">
+          Analize geçmek için paylaşılan veri kapsamını gözden geçirip öğretmen onayıyla işaretleyiniz.
         </p>
 
-        <div class="button-group" aria-label="Veri doğrulama işlemleri">
-          <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="data-entry-screen">Düzenle</button>
-          <button class="primary-button" data-component="Primary Button" type="button" data-target-screen="analysis-screen">Analizi Başlat</button>
+        <div class="button-group" aria-label="Veri onay işlemleri">
+          <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="data-entry-screen" data-reset-data-approval="true">Düzenle</button>
+          <button class="primary-button" data-component="Primary Button" type="button" data-target-screen="analysis-screen" data-approval-action="confirm-data">Verileri Onayla</button>
         </div>
       </section>
-
       <section id="analysis-screen" class="screen hidden-screen" aria-labelledby="analysis-title" data-screen="analysis" data-screen-state="hidden" aria-hidden="true" hidden>
         <header class="screen-header">
           <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
