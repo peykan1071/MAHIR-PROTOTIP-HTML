@@ -9,12 +9,21 @@
 </head>
 <body>
   <header class="app-header" aria-labelledby="app-title">
-    <div class="brand-lockup">
+    <div class="home-brand-panel">
       <img class="app-logo" src="assets/logo/mahir-logo.png" alt="MAHİR logosu">
       <div class="brand-text">
         <p class="app-name">MAHİR</p>
-        <h1 id="app-title">Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı</h1>
+        <h1 id="app-title">Sınav Analizi ve Değerlendirme Raporu</h1>
       </div>
+      <nav class="home-process-nav" aria-label="Ana süreç adımları">
+        <ol>
+          <li aria-current="step">Karşılama</li>
+          <li>Hazırlık</li>
+          <li>Veri</li>
+          <li>Analiz</li>
+          <li>Rapor</li>
+        </ol>
+      </nav>
     </div>
 
     <div class="institutional-accent" aria-label="Kurumsal vurgu alanı">
@@ -25,48 +34,38 @@
   <main id="main-content">
     <div class="screen-container" data-screen-container aria-live="polite">
       <section id="welcome-screen" class="screen active-screen" aria-labelledby="welcome-title" data-screen="welcome" data-screen-state="active" aria-hidden="false">
-        <header class="screen-header welcome-copy">
-          <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
-            <ol>
-              <li aria-current="step">Karşılama</li>
-              <li>Hazırlık</li>
-              <li>Veri</li>
-              <li>Analiz</li>
-              <li>Rapor</li>
-            </ol>
-          </nav>
-          <p class="welcome-eyebrow">Sınav Analizi ve Değerlendirme Raporu</p>
-          <h2 id="welcome-title">Hoş geldiniz!</h2>
-          <p class="welcome-subtitle">Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı</p>
-        </header>
+        <div class="welcome-content">
+          <header class="screen-header welcome-copy">
+            <p class="welcome-eyebrow">Öğretmen kontrollü değerlendirme alanı</p>
+            <h2 id="welcome-title">Hoş geldiniz!</h2>
+            <p class="welcome-lead">Her sınav, öğretimi geliştirecek güçlü veriler içerir.</p>
+            <p class="welcome-support">MAHİR, bu verileri güvenilir eğitim kararlarına dönüştürmenize destek olur.</p>
+          </header>
 
-        <article class="summary-card welcome-message" data-component="Summary Card" aria-labelledby="welcome-message-title">
-          <h3 id="welcome-message-title">Her sınav, öğretimi geliştirecek güçlü veriler içerir.</h3>
-          <p>MAHİR, bu verileri güvenilir eğitim kararlarına dönüştürmenize destek olur.</p>
-        </article>
+          <div class="welcome-action-row">
+            <button class="primary-button welcome-primary-action" data-component="Primary Button" type="button" data-target-screen="preparation-screen">Başlayalım</button>
+            <p class="notification-message welcome-note" data-component="Notification Message">
+              İlk adımda yalnızca dersinizi ve sınıf düzeyinizi seçmeniz yeterlidir.
+            </p>
+          </div>
 
-        <button class="primary-button welcome-primary-action" data-component="Primary Button" type="button" data-target-screen="preparation-screen">Başlayalım</button>
-
-        <p class="notification-message welcome-note" data-component="Notification Message">
-          İlk adımda yalnızca dersinizi ve sınıf düzeyinizi seçmeniz yeterlidir.
-        </p>
-
-        <article class="information-card trust-card-group" data-component="Information Card" aria-label="Güven ilkeleri">
-          <ul class="trust-card-list">
-            <li>
-              <span class="trust-card-icon" aria-hidden="true"></span>
-              <span>Yeni bir iş yükü oluşturmaz.</span>
-            </li>
-            <li>
-              <span class="trust-card-icon" aria-hidden="true"></span>
-              <span>Son karar her zaman öğretmenindir.</span>
-            </li>
-            <li>
-              <span class="trust-card-icon" aria-hidden="true"></span>
-              <span>Her değerlendirme güvenilir kanıtlarla desteklenir.</span>
-            </li>
-          </ul>
-        </article>
+          <article class="information-card trust-card-group" data-component="Information Card" aria-label="Güven ilkeleri">
+            <ul class="trust-card-list">
+              <li>
+                <span class="trust-card-icon" aria-hidden="true"></span>
+                <span>Yeni bir iş yükü oluşturmaz.</span>
+              </li>
+              <li>
+                <span class="trust-card-icon" aria-hidden="true"></span>
+                <span>Son karar her zaman öğretmenindir.</span>
+              </li>
+              <li>
+                <span class="trust-card-icon" aria-hidden="true"></span>
+                <span>Her değerlendirme güvenilir kanıtlarla desteklenir.</span>
+              </li>
+            </ul>
+          </article>
+        </div>
 
         <figure class="welcome-hero-visual">
           <img src="assets/hero/mahir-hero-teacher.png" alt="Öğretmen kontrollü sınav analizi arayüzünü temsil eden MAHİR hero görseli">
@@ -381,7 +380,7 @@
   </main>
 
   <footer class="app-footer">
-    <p>MAHİR | Öğretmen kontrollü sınav analizi prototipi</p>
+    <p>Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı</p>
   </footer>
 
   <script src="script.js"></script>

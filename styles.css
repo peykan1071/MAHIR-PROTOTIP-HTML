@@ -175,48 +175,6 @@ dt {
   margin-bottom: var(--space-md);
 }
 
-#welcome-screen.active-screen {
-  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-  gap: var(--space-xl);
-  align-items: center;
-}
-
-#welcome-screen > header,
-#welcome-screen > .summary-card,
-#welcome-screen > .primary-button,
-#welcome-screen > .notification-message {
-  grid-column: 1;
-}
-
-#welcome-screen::after {
-  content: "";
-  min-height: 320px;
-  grid-column: 2;
-  grid-row: 1 / span 4;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-soft);
-  background: var(--color-background);
-}
-
-#welcome-screen > .information-card {
-  grid-column: 1 / -1;
-}
-
-#welcome-screen .information-card ul {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-md);
-  padding-left: 0;
-  list-style: none;
-}
-
-#welcome-screen .information-card li {
-  min-height: 96px;
-  padding: var(--space-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-soft);
-  background: var(--color-background);
-}
 
 .summary-card,
 .information-card,
@@ -447,7 +405,6 @@ input[type="checkbox"] {
     grid-template-columns: 1fr;
   }
 
-  #welcome-screen::after,
   #report-screen > .source-reference-panel,
   #report-screen > .report-section {
     grid-column: 1;
@@ -458,31 +415,49 @@ input[type="checkbox"] {
     flex-wrap: wrap;
   }
 }
-/* Feature 18 - Ana sayfa kurumsal UI düzenlemesi */
+/* Feature 18 Revision - Clean Welcome Screen */
 body {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+body:has(#welcome-screen.active-screen) {
+  height: 100vh;
+  overflow: hidden;
+}
+
+body:has(#welcome-screen.active-screen) #main-content {
+  min-height: 0;
+  padding-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
+}
+
+body:has(#welcome-screen.active-screen) .screen-container {
+  min-height: 0;
+  height: 100%;
 }
 
 .app-header {
   grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 72px;
+  gap: var(--space-lg);
+  align-items: stretch;
+  min-height: 96px;
   margin-top: var(--space-md);
   padding: var(--space-md) var(--space-lg);
 }
 
-.brand-lockup {
-  display: flex;
-  gap: var(--space-md);
+.home-brand-panel {
+  display: grid;
+  grid-template-columns: 118px minmax(220px, 0.42fr) minmax(360px, 1fr);
+  gap: var(--space-lg);
   align-items: center;
   min-width: 0;
 }
 
 .app-logo {
-  width: 84px;
+  width: 118px;
   height: auto;
   display: block;
-  flex: 0 0 auto;
 }
 
 .brand-text {
@@ -494,28 +469,60 @@ body {
 .app-name {
   min-height: auto;
   display: block;
+  margin-bottom: 0;
   border: 0;
   border-radius: 0;
   color: var(--color-primary);
+  font-size: 1.6rem;
+  font-weight: 800;
   line-height: 1;
   text-align: left;
 }
 
 .app-header h1 {
+  margin-bottom: 0;
+  color: var(--color-secondary);
   font-size: 1rem;
   font-weight: 650;
-  color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+.home-process-nav ol {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(64px, 1fr));
+  gap: var(--space-sm);
+  margin-bottom: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.home-process-nav li {
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-soft);
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  font-weight: 650;
+  text-align: center;
+  background: var(--color-background);
+}
+
+.home-process-nav [aria-current="step"] {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-surface);
 }
 
 .institutional-accent {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 88px;
   gap: var(--space-md);
-  align-items: center;
-  justify-content: flex-end;
+  align-items: start;
+  justify-content: end;
 }
 
 .public-logo-placeholder {
-  min-width: 104px;
+  min-width: 108px;
   padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-soft);
@@ -527,136 +534,95 @@ body {
 }
 
 .flag-accent {
-  width: 84px;
-  height: 42px;
+  width: 88px;
+  height: 44px;
   display: block;
   object-fit: cover;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-soft);
 }
 
-#main-content {
-  padding-top: var(--space-md);
-  padding-bottom: var(--space-md);
-}
-
 #welcome-screen.active-screen {
-  height: calc(100vh - 210px);
-  min-height: 520px;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.88fr);
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
-  grid-template-areas:
-    "copy visual"
-    "message visual"
-    "action visual"
-    "note visual"
-    "trust visual";
-  gap: var(--space-md) var(--space-xl);
-  align-items: center;
-  padding: clamp(18px, 3vw, 32px);
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.86fr);
+  gap: var(--space-xl);
+  align-items: stretch;
+  padding: clamp(18px, 2.4vw, 32px);
   overflow: hidden;
 }
 
-#welcome-screen::after {
-  content: none;
-}
-
-#welcome-screen > .screen-header {
-  grid-area: copy;
-  margin-bottom: 0;
-}
-
-#welcome-screen > .summary-card {
-  grid-area: message;
-}
-
-#welcome-screen > .primary-button {
-  grid-area: action;
-}
-
-#welcome-screen > .notification-message {
-  grid-area: note;
-}
-
-#welcome-screen > .information-card {
-  grid-area: trust;
+.welcome-content {
+  display: grid;
+  grid-template-rows: minmax(0, auto) auto minmax(0, 1fr);
+  gap: clamp(10px, 1.6vh, 18px);
+  align-content: center;
+  min-width: 0;
 }
 
 .welcome-copy {
   display: grid;
   gap: var(--space-sm);
-}
-
-.welcome-copy .progress-stepper {
-  margin-bottom: var(--space-sm);
-}
-
-.welcome-copy .progress-stepper ol {
-  grid-template-columns: repeat(5, minmax(72px, 1fr));
-}
-
-.welcome-copy .progress-stepper li {
-  padding: var(--space-xs) var(--space-sm);
-  font-size: 0.875rem;
+  margin-bottom: 0;
 }
 
 .welcome-eyebrow {
   margin-bottom: 0;
   color: var(--color-primary);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 #welcome-title {
   margin-bottom: 0;
-  font-size: clamp(2.25rem, 4vw, 4.25rem);
   color: var(--color-secondary);
+  font-size: clamp(2.35rem, 4.2vw, 4.4rem);
+  font-weight: 800;
+  line-height: 1;
 }
 
-.welcome-subtitle {
-  max-width: 680px;
+.welcome-lead {
+  max-width: 780px;
+  margin-bottom: 0;
+  color: var(--color-secondary);
+  font-size: clamp(1.25rem, 1.8vw, 1.8rem);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.welcome-support {
+  max-width: 700px;
   margin-bottom: 0;
   color: var(--color-muted);
-  font-weight: 650;
+  font-size: 1.05rem;
 }
 
-#welcome-screen > .welcome-message {
-  max-width: 720px;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-  background: transparent;
-}
-
-#welcome-screen > .welcome-message h3 {
-  margin-bottom: var(--space-sm);
-  font-size: clamp(1.35rem, 2vw, 2rem);
-}
-
-#welcome-screen > .welcome-message p {
-  margin-bottom: 0;
-  color: var(--color-muted);
+.welcome-action-row {
+  display: grid;
+  grid-template-columns: auto minmax(260px, 520px);
+  gap: var(--space-md);
+  align-items: center;
 }
 
 .welcome-primary-action {
-  min-height: 52px;
+  min-height: 54px;
   padding-right: var(--space-xl);
   padding-left: var(--space-xl);
 }
 
-#welcome-screen > .welcome-note {
-  max-width: 620px;
+.welcome-note {
   margin-bottom: 0;
   padding: var(--space-md);
 }
 
 .trust-card-group {
+  align-self: end;
   padding: 0;
   border: 0;
   box-shadow: none;
   background: transparent;
 }
 
-#welcome-screen .trust-card-list {
+.trust-card-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-md);
@@ -665,10 +631,10 @@ body {
   list-style: none;
 }
 
-#welcome-screen .trust-card-list li {
+.trust-card-list li {
   min-height: 96px;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 46px minmax(0, 1fr);
   gap: var(--space-md);
   align-items: center;
   padding: var(--space-md);
@@ -679,17 +645,15 @@ body {
 }
 
 .trust-card-icon {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   display: block;
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-soft);
-  background: var(--color-background);
+  background: linear-gradient(135deg, rgba(0, 140, 149, 0.14), rgba(18, 52, 91, 0.06));
 }
 
 .welcome-hero-visual {
-  grid-area: visual;
-  align-self: stretch;
   min-height: 0;
   margin: 0;
   overflow: hidden;
@@ -702,7 +666,6 @@ body {
 .welcome-hero-visual img {
   width: 100%;
   height: 100%;
-  min-height: 360px;
   display: block;
   object-fit: cover;
   object-position: center;
@@ -710,37 +673,41 @@ body {
 
 .app-footer {
   margin-bottom: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-sm) var(--space-lg);
   text-align: center;
 }
 
-@media (max-width: 920px) {
-  .app-header,
-  #welcome-screen.active-screen {
+.app-footer p {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 1080px) {
+  body:has(#welcome-screen.active-screen) {
+    height: auto;
+    overflow: auto;
+  }
+
+  .home-brand-panel,
+  #welcome-screen.active-screen,
+  .welcome-action-row,
+  .trust-card-list {
+    grid-template-columns: 1fr;
+  }
+
+  .app-header {
     grid-template-columns: 1fr;
   }
 
   .institutional-accent {
-    justify-content: flex-start;
+    justify-content: start;
   }
 
   #welcome-screen.active-screen {
-    min-height: auto;
-    grid-template-areas:
-      "copy"
-      "visual"
-      "message"
-      "action"
-      "note"
-      "trust";
     overflow: visible;
   }
 
-  .welcome-hero-visual img {
-    min-height: 300px;
-  }
-
-  #welcome-screen .trust-card-list {
-    grid-template-columns: 1fr;
+  .welcome-hero-visual {
+    min-height: 320px;
   }
 }
