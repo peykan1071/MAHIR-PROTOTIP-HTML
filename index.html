@@ -8,68 +8,88 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="app-header" aria-labelledby="app-title">
-    <div class="home-brand-panel">
-      <img class="app-logo" src="assets/logo/mahir-logo.png" alt="MAHİR logosu">
-      <div class="brand-text">
-        <p class="app-name">MAHİR</p>
-        <h1 id="app-title">Sınav Analizi ve Değerlendirme Raporu</h1>
+  <div class="app-shell welcome-shell" data-reference-size="2048x900">
+  <header class="app-header welcome-header" aria-labelledby="app-title">
+    <div class="welcome-brand">
+      <img class="welcome-logo" src="assets/logo/mahir-logo.png" alt="MAHİR logosu">
+      <div class="welcome-brand-text">
+        <p>Maarif Anlayışıyla</p>
+        <h1 id="app-title">Hizmet İşleme ve Raporlama Ajanı</h1>
       </div>
-      <nav class="home-process-nav" aria-label="Ana süreç adımları">
-        <ol>
-          <li aria-current="step">Karşılama</li>
-          <li>Hazırlık</li>
-          <li>Veri</li>
-          <li>Analiz</li>
-          <li>Rapor</li>
-        </ol>
-      </nav>
     </div>
 
-    <div class="institutional-accent" aria-label="Kurumsal vurgu alanı">
-      <span class="public-logo-placeholder">Kamu Logosu</span>
-      <img class="flag-accent" src="assets/flag/mahir-kurumsal-bayrak.png" alt="Kurumsal bayrak görseli">
+    <nav class="welcome-process-nav" aria-label="Ana süreç adımları">
+      <ol>
+        <li aria-current="step">
+          <span class="welcome-icon icon-home" aria-hidden="true"></span>
+          <span>Karşılama</span>
+        </li>
+        <li>
+          <span class="welcome-icon icon-preparation" aria-hidden="true"></span>
+          <span>Hazırlık</span>
+        </li>
+        <li>
+          <span class="welcome-icon icon-data" aria-hidden="true"></span>
+          <span>Veri</span>
+        </li>
+        <li>
+          <span class="welcome-icon icon-analysis" aria-hidden="true"></span>
+          <span>Analiz</span>
+        </li>
+        <li>
+          <span class="welcome-icon icon-report" aria-hidden="true"></span>
+          <span>Rapor</span>
+        </li>
+      </ol>
+    </nav>
+
+    <div class="welcome-institution" aria-label="Kurumsal gösterge alanı">
+      <img class="welcome-public-logo" src="assets/public/kamu-logo.png" alt="Temsili kamu logosu">
+      <img class="welcome-flag" src="assets/flag/mahir-kurumsal-bayrak.png" alt="Kurumsal bayrak görseli">
     </div>
   </header>
-  <main id="main-content">
+  <main id="main-content" class="welcome-main">
     <div class="screen-container" data-screen-container aria-live="polite">
-      <section id="welcome-screen" class="screen active-screen" aria-labelledby="welcome-title" data-screen="welcome" data-screen-state="active" aria-hidden="false">
-        <div class="welcome-content">
+      <section id="welcome-screen" class="screen active-screen welcome-screen-v2" aria-labelledby="welcome-title" data-screen="welcome" data-screen-state="active" aria-hidden="false">
+        <div class="welcome-copy-area">
           <header class="screen-header welcome-copy">
-            <p class="welcome-eyebrow">Öğretmen kontrollü değerlendirme alanı</p>
             <h2 id="welcome-title">Hoş geldiniz!</h2>
             <p class="welcome-lead">Her sınav, öğretimi geliştirecek güçlü veriler içerir.</p>
             <p class="welcome-support">MAHİR, bu verileri güvenilir eğitim kararlarına dönüştürmenize destek olur.</p>
           </header>
 
           <div class="welcome-action-row">
-            <button class="primary-button welcome-primary-action" data-component="Primary Button" type="button" data-target-screen="preparation-screen">Başlayalım</button>
+            <button class="primary-button welcome-primary-action" data-component="Primary Button" type="button" data-target-screen="preparation-screen">
+              <span>Başlayalım</span>
+              <span class="welcome-icon icon-next" aria-hidden="true"></span>
+            </button>
             <p class="notification-message welcome-note" data-component="Notification Message">
-              İlk adımda yalnızca dersinizi ve sınıf düzeyinizi seçmeniz yeterlidir.
+              <span class="welcome-icon icon-info" aria-hidden="true"></span>
+              <span>İlk adımda yalnızca dersinizi ve sınıf düzeyinizi seçmeniz yeterlidir.</span>
             </p>
           </div>
-
-          <article class="information-card trust-card-group" data-component="Information Card" aria-label="Güven ilkeleri">
-            <ul class="trust-card-list">
-              <li>
-                <span class="trust-card-icon" aria-hidden="true"></span>
-                <span>Yeni bir iş yükü oluşturmaz.</span>
-              </li>
-              <li>
-                <span class="trust-card-icon" aria-hidden="true"></span>
-                <span>Son karar her zaman öğretmenindir.</span>
-              </li>
-              <li>
-                <span class="trust-card-icon" aria-hidden="true"></span>
-                <span>Her değerlendirme güvenilir kanıtlarla desteklenir.</span>
-              </li>
-            </ul>
-          </article>
         </div>
 
         <figure class="welcome-hero-visual">
           <img src="assets/hero/mahir-hero-teacher.png" alt="Öğretmen kontrollü sınav analizi arayüzünü temsil eden MAHİR hero görseli">
         </figure>
+
+        <article class="information-card welcome-trust-grid" data-component="Information Card" aria-label="Güven ilkeleri">
+          <ul>
+            <li>
+              <span class="welcome-trust-icon" aria-hidden="true"><img src="assets/icons/workload.svg" alt=""></span>
+              <span>Yeni bir iş yükü oluşturmaz.</span>
+            </li>
+            <li>
+              <span class="welcome-trust-icon" aria-hidden="true"><img src="assets/icons/teacher-control.svg" alt=""></span>
+              <span>Son karar her zaman öğretmenindir.</span>
+            </li>
+            <li>
+              <span class="welcome-trust-icon" aria-hidden="true"><img src="assets/icons/evidence.svg" alt=""></span>
+              <span>Her değerlendirme güvenilir kanıtlarla desteklenir.</span>
+            </li>
+          </ul>
+        </article>
       </section>
       <section id="preparation-screen" class="screen hidden-screen" aria-labelledby="preparation-title" data-screen="preparation" data-screen-state="hidden" aria-hidden="true" hidden>
         <header class="screen-header">
@@ -379,9 +399,50 @@
     </div>
   </main>
 
-  <footer class="app-footer">
-    <p>Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı</p>
+  <footer class="app-footer welcome-footer" aria-label="Kurumsal alt bilgi">
+    <div class="welcome-footer-brand">
+      <img class="welcome-footer-logo" src="assets/public/kamu-logo.png" alt="Temsili kamu logosu">
+      <p class="welcome-footer-text">
+        <strong>MAHİR</strong>
+        <span>Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı</span>
+      </p>
+    </div>
+
+    <nav class="welcome-footer-links" aria-label="Alt bilgi bağlantıları">
+      <a href="#">Hakkımızda</a>
+      <a href="#">Gizlilik Politikası</a>
+      <a href="#">Kullanım İlkeleri</a>
+      <a href="#">İletişim</a>
+    </nav>
+
+    <div class="welcome-footer-social" aria-label="Sosyal ikon alanları">
+      <span aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+          <path d="M4 19V9"></path>
+          <path d="M8 19V5"></path>
+          <path d="M12 19v-7"></path>
+          <path d="M16 19V8"></path>
+          <path d="M20 19v-4"></path>
+        </svg>
+      </span>
+      <span aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+          <circle cx="12" cy="12" r="8"></circle>
+          <path d="M8 12h8"></path>
+          <path d="M12 8v8"></path>
+        </svg>
+      </span>
+      <span aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+          <path d="M5 8h14"></path>
+          <path d="M5 8l7 5 7-5"></path>
+          <rect x="4" y="6" width="16" height="12" rx="2"></rect>
+        </svg>
+      </span>
+    </div>
   </footer>
+
+  </div>
 
   <script src="script.js"></script>
 </body>
