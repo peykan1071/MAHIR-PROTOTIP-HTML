@@ -21,31 +21,30 @@
     <nav class="welcome-process-nav" aria-label="Ana süreç adımları">
       <ol>
         <li aria-current="step">
-          <span class="welcome-icon icon-home" aria-hidden="true"></span>
+          <img class="welcome-nav-icon" src="assets/icons/home.svg" alt="" aria-hidden="true">
           <span>Karşılama</span>
         </li>
         <li>
-          <span class="welcome-icon icon-preparation" aria-hidden="true"></span>
+          <img class="welcome-nav-icon" src="assets/icons/preparation.svg" alt="" aria-hidden="true">
           <span>Hazırlık</span>
         </li>
         <li>
-          <span class="welcome-icon icon-data" aria-hidden="true"></span>
+          <img class="welcome-nav-icon" src="assets/icons/data.svg" alt="" aria-hidden="true">
           <span>Veri</span>
         </li>
         <li>
-          <span class="welcome-icon icon-analysis" aria-hidden="true"></span>
+          <img class="welcome-nav-icon" src="assets/icons/analysis.svg" alt="" aria-hidden="true">
           <span>Analiz</span>
         </li>
         <li>
-          <span class="welcome-icon icon-report" aria-hidden="true"></span>
+          <img class="welcome-nav-icon" src="assets/icons/report.svg" alt="" aria-hidden="true">
           <span>Rapor</span>
         </li>
       </ol>
     </nav>
 
-    <div class="welcome-institution" aria-label="Kurumsal gösterge alanı">
-      <img class="welcome-public-logo" src="assets/public/kamu-logo.png" alt="Temsili kamu logosu">
-      <img class="welcome-flag" src="assets/flag/mahir-kurumsal-bayrak.png" alt="Kurumsal bayrak görseli">
+    <div class="welcome-institution" aria-hidden="true">
+      <img class="welcome-flag" src="assets/flag/mahir-kurumsal-bayrak.png" alt="">
     </div>
   </header>
   <main id="main-content" class="welcome-main">
@@ -57,17 +56,6 @@
             <p class="welcome-lead">Her sınav, öğretimi geliştirecek güçlü veriler içerir.</p>
             <p class="welcome-support">MAHİR, bu verileri güvenilir eğitim kararlarına dönüştürmenize destek olur.</p>
           </header>
-
-          <div class="welcome-action-row">
-            <button class="primary-button welcome-primary-action" data-component="Primary Button" type="button" data-target-screen="preparation-screen">
-              <span>Başlayalım</span>
-              <span class="welcome-icon icon-next" aria-hidden="true"></span>
-            </button>
-            <p class="notification-message welcome-note" data-component="Notification Message">
-              <span class="welcome-icon icon-info" aria-hidden="true"></span>
-              <span>İlk adımda yalnızca dersinizi ve sınıf düzeyinizi seçmeniz yeterlidir.</span>
-            </p>
-          </div>
         </div>
 
         <figure class="welcome-hero-visual">
@@ -78,18 +66,29 @@
           <ul>
             <li>
               <span class="welcome-trust-icon" aria-hidden="true"><img src="assets/icons/workload.svg" alt=""></span>
-              <span>Yeni bir iş yükü oluşturmaz.</span>
+              <span class="welcome-trust-text"><strong>Yeni bir iş yükü oluşturmaz.</strong><span>Mevcut süreçlerinizi kolaylaştırır, ek zaman yükü getirmez.</span></span>
             </li>
             <li>
               <span class="welcome-trust-icon" aria-hidden="true"><img src="assets/icons/teacher-control.svg" alt=""></span>
-              <span>Son karar her zaman öğretmenindir.</span>
+              <span class="welcome-trust-text"><strong>Son karar her zaman öğretmenindir.</strong><span>Analizler destek sunar, kararı siz verirsiniz.</span></span>
             </li>
             <li>
               <span class="welcome-trust-icon" aria-hidden="true"><img src="assets/icons/evidence.svg" alt=""></span>
-              <span>Her değerlendirme güvenilir kanıtlarla desteklenir.</span>
+              <span class="welcome-trust-text"><strong>Her değerlendirme güvenilir kanıtlarla desteklenir.</strong><span>Kaynak gösterimi ile şeffaf ve izlenebilirdir.</span></span>
             </li>
           </ul>
         </article>
+
+        <div class="welcome-action-row">
+          <button class="primary-button welcome-primary-action" data-component="Primary Button" type="button" data-target-screen="preparation-screen">
+            <span>Başlayalım</span>
+            <img class="welcome-action-icon" src="assets/icons/next.svg" alt="" aria-hidden="true">
+          </button>
+          <p class="notification-message welcome-note" data-component="Notification Message">
+            <img class="welcome-note-icon" src="assets/icons/info.svg" alt="" aria-hidden="true">
+            <span>İlk adımda yalnızca dersinizi ve sınıf düzeyinizi seçmeniz yeterlidir.</span>
+          </p>
+        </div>
       </section>
       <section id="preparation-screen" class="screen hidden-screen" aria-labelledby="preparation-title" data-screen="preparation" data-screen-state="hidden" aria-hidden="true" hidden>
         <header class="screen-header">
