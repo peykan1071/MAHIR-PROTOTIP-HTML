@@ -90,8 +90,8 @@
           </p>
         </div>
       </section>
-      <section id="preparation-screen" class="screen hidden-screen" aria-labelledby="preparation-title" data-screen="preparation" data-screen-state="hidden" aria-hidden="true" hidden>
-        <header class="screen-header">
+      <section id="preparation-screen" class="screen hidden-screen preparation-screen" aria-labelledby="preparation-title" data-screen="preparation" data-screen-state="hidden" aria-hidden="true" hidden>
+        <header class="screen-header preparation-screen-header">
           <nav class="progress-stepper" data-component="Progress Stepper" aria-label="İlerleme durumu">
             <ol>
               <li aria-current="step">Hazırlık</li>
@@ -100,42 +100,125 @@
               <li>Rapor</li>
             </ol>
           </nav>
-          <h2 id="preparation-title">Hazırlık</h2>
+          <div class="preparation-title-block">
+            <p class="preparation-kicker">Hazırlık Ekranı</p>
+            <h2 id="preparation-title">Analiz İçin Hazırlık</h2>
+            <p>Rapor taslağının doğru bağlamda kurulması için kademenizi, okul türünüzü, sınıf düzeyinizi ve dersinizi öğretmen kontrolünde seçiniz.</p>
+          </div>
         </header>
 
-        <form aria-labelledby="preparation-title">
-          <fieldset>
-            <legend>Ders ve sınıf düzeyi bilgileri</legend>
+        <div class="preparation-layout">
+          <form class="preparation-form" aria-labelledby="preparation-title" data-preparation-form>
+            <p id="preparation-guidance" class="notification-message preparation-guidance" data-component="Notification Message">
+              Seçimler adım adım açılır. Her alan, önceki seçiminize göre güncellenir.
+            </p>
 
-            <div class="dropdown" data-component="Dropdown">
-              <label for="course-select">Ders seçimi</label>
-              <select id="course-select" name="course" required>
-                <option value="">Ders seçiniz</option>
-                <option value="turkce">Türkçe</option>
-                <option value="matematik">Matematik</option>
-                <option value="fen-bilimleri">Fen Bilimleri</option>
-                <option value="sosyal-bilgiler">Sosyal Bilgiler</option>
-              </select>
+            <fieldset class="preparation-fieldset">
+              <legend>Eğitim bağlamı</legend>
+
+              <div class="preparation-field-grid">
+                <div class="selection-card" data-field-card="stage" data-component="Dropdown">
+                  <label for="education-stage">Öğretim Kademesi</label>
+                  <select id="education-stage" name="educationStage" data-prep-field="stage" required>
+                    <option value="">Öğretim kademesi seçiniz</option>
+                  </select>
+                  <p class="preparation-helper">Önce ortaokul veya lise düzeyini belirleyiniz.</p>
+                </div>
+
+                <div class="selection-card is-disabled" data-field-card="schoolType" data-component="Dropdown">
+                  <label for="school-type">Okul Türü</label>
+                  <select id="school-type" name="schoolType" data-prep-field="schoolType" required disabled>
+                    <option value="">Okul türü seçiniz</option>
+                  </select>
+                  <p class="preparation-helper">Okul türü ders listesini ve ek alanları belirler.</p>
+                </div>
+
+                <div class="selection-card conditional-field" data-field-card="otherSchool" hidden>
+                  <label for="other-school-type">Okul türünü yazınız</label>
+                  <input id="other-school-type" name="otherSchoolType" data-prep-field="otherSchool" type="text" autocomplete="off" disabled>
+                  <p class="preparation-helper">Listede yer almayan okul türünü öğretmen kontrolünde yazınız.</p>
+                </div>
+
+                <div class="selection-card conditional-field is-disabled" data-field-card="programType" data-component="Dropdown" hidden>
+                  <label for="program-type">Program Türü</label>
+                  <select id="program-type" name="programType" data-prep-field="programType" disabled>
+                    <option value="">Program türü seçiniz</option>
+                  </select>
+                  <p class="preparation-helper">Bu alan yalnız Mesleki ve Teknik Anadolu Lisesi için açılır.</p>
+                </div>
+
+                <div class="selection-card conditional-field is-disabled" data-field-card="mtalField" data-component="Dropdown" hidden>
+                  <label for="mtal-field">Alan</label>
+                  <select id="mtal-field" name="mtalField" data-prep-field="mtalField" disabled>
+                    <option value="">Alan seçiniz</option>
+                  </select>
+                  <p class="preparation-helper">Alan seçimi dal seçeneklerini günceller.</p>
+                </div>
+
+                <div class="selection-card conditional-field is-disabled" data-field-card="mtalBranch" data-component="Dropdown" hidden>
+                  <label for="mtal-branch">Dal</label>
+                  <select id="mtal-branch" name="mtalBranch" data-prep-field="mtalBranch" disabled>
+                    <option value="">Dal seçiniz</option>
+                  </select>
+                  <p class="preparation-helper">Dal bilgisi mesleki ders bağlamını netleştirir.</p>
+                </div>
+
+                <div class="selection-card is-disabled" data-field-card="grade" data-component="Dropdown">
+                  <label for="grade-level">Sınıf Düzeyi</label>
+                  <select id="grade-level" name="gradeLevel" data-prep-field="grade" required disabled>
+                    <option value="">Sınıf düzeyi seçiniz</option>
+                  </select>
+                  <p class="preparation-helper">Seçilen kademeye göre sınıf düzeyleri açılır.</p>
+                </div>
+
+                <div class="selection-card is-disabled" data-field-card="courseType" data-component="Dropdown">
+                  <label for="course-type">Ders Türü</label>
+                  <select id="course-type" name="courseType" data-prep-field="courseType" required disabled>
+                    <option value="">Ders türü seçiniz</option>
+                  </select>
+                  <p class="preparation-helper">Ortak veya seçmeli ders yapısını belirleyiniz.</p>
+                </div>
+
+                <div class="selection-card is-disabled" data-field-card="course" data-component="Dropdown">
+                  <label for="course-select">Ders</label>
+                  <select id="course-select" name="course" data-prep-field="course" required disabled>
+                    <option value="">Ders seçiniz</option>
+                  </select>
+                  <p class="preparation-helper">Ders listesi seçilen okul türüne göre güncellenir.</p>
+                </div>
+
+                <div class="selection-card conditional-field" data-field-card="otherCourse" hidden>
+                  <label for="other-course-name">Ders adını yazınız</label>
+                  <input id="other-course-name" name="otherCourseName" data-prep-field="otherCourse" type="text" autocomplete="off" disabled>
+                  <p class="preparation-helper">Listede yer almayan dersi öğretmen kontrolünde yazınız.</p>
+                </div>
+              </div>
+            </fieldset>
+
+            <div class="preparation-actions" aria-label="Hazırlık ekranı işlemleri">
+              <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="welcome-screen">Geri</button>
+              <button class="primary-button" data-component="Primary Button" type="button" data-target-screen="data-entry-screen" data-preparation-next disabled aria-disabled="true">Devam Et</button>
             </div>
+          </form>
 
-            <div class="dropdown" data-component="Dropdown">
-              <label for="grade-select">Sınıf düzeyi seçimi</label>
-              <select id="grade-select" name="grade" required>
-                <option value="">Sınıf düzeyi seçiniz</option>
-                <option value="5">5. sınıf</option>
-                <option value="6">6. sınıf</option>
-                <option value="7">7. sınıf</option>
-                <option value="8">8. sınıf</option>
-              </select>
-            </div>
-          </fieldset>
-
-          <p class="notification-message" data-component="Notification Message">
-            Bu bilgiler rapor taslağının doğru bağlamda hazırlanmasına yardımcı olur.
-          </p>
-
-          <button class="primary-button" data-component="Primary Button" type="button" data-target-screen="data-entry-screen">Devam</button>
-        </form>
+          <aside class="summary-card preparation-summary" data-component="Summary Card" aria-labelledby="preparation-summary-title" aria-live="polite">
+            <h3 id="preparation-summary-title">Hazırlık Özeti</h3>
+            <p>Seçimleriniz, sınav analizi raporunun öğretim bağlamını oluşturur.</p>
+            <dl>
+              <div class="summary-line"><dt>Öğretim Kademesi</dt><dd data-summary-field="stage">Henüz seçilmedi</dd></div>
+              <div class="summary-line"><dt>Okul Türü</dt><dd data-summary-field="schoolType">Henüz seçilmedi</dd></div>
+              <div class="summary-line"><dt>Program Türü</dt><dd data-summary-field="programType">Henüz seçilmedi</dd></div>
+              <div class="summary-line"><dt>Alan</dt><dd data-summary-field="mtalField">Henüz seçilmedi</dd></div>
+              <div class="summary-line"><dt>Dal</dt><dd data-summary-field="mtalBranch">Henüz seçilmedi</dd></div>
+              <div class="summary-line"><dt>Sınıf Düzeyi</dt><dd data-summary-field="grade">Henüz seçilmedi</dd></div>
+              <div class="summary-line"><dt>Ders Türü</dt><dd data-summary-field="courseType">Henüz seçilmedi</dd></div>
+              <div class="summary-line"><dt>Ders</dt><dd data-summary-field="course">Henüz seçilmedi</dd></div>
+            </dl>
+            <p class="notification-message preparation-status" data-component="Notification Message" data-preparation-status>
+              Öğretim kademesi seçerek başlayınız.
+            </p>
+          </aside>
+        </div>
       </section>
 
       <section id="data-entry-screen" class="screen hidden-screen" aria-labelledby="data-entry-title" data-screen="data-entry" data-screen-state="hidden" aria-hidden="true" hidden>
