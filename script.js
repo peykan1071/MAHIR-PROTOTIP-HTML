@@ -1,5 +1,317 @@
 "use strict";
 
+/* =========================================================
+   MAHIR AI ENGINE CORE - FEATURE 23
+   ========================================================= */
+(() => {
+  const version = "0.23.0";
+
+  const createId = (prefix) => {
+    const randomId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    return `${prefix}-${randomId}`;
+  };
+
+  const createSession = () => ({
+    id: createId("mahir-session"),
+    createdAt: new Date().toISOString(),
+    teacherSelections: {},
+    uploadedFiles: [],
+    analysisStatus: "idle",
+    reportStatus: "idle"
+  });
+
+  const createInitialState = () => ({
+    context: {},
+    documents: {},
+    structuredData: {},
+    curriculum: {},
+    statistics: {},
+    pedagogy: {},
+    evidence: {},
+    report: {},
+    validation: {},
+    teacherApproval: {},
+    logs: []
+  });
+
+  const createEventBus = () => {
+    const listeners = new Map();
+
+    return {
+      on(eventName, handler) {
+        if (typeof handler !== "function") {
+          return () => {};
+        }
+
+        const handlers = listeners.get(eventName) || new Set();
+        handlers.add(handler);
+        listeners.set(eventName, handlers);
+
+        return () => this.off(eventName, handler);
+      },
+
+      off(eventName, handler) {
+        const handlers = listeners.get(eventName);
+
+        if (!handlers) {
+          return;
+        }
+
+        handlers.delete(handler);
+
+        if (handlers.size === 0) {
+          listeners.delete(eventName);
+        }
+      },
+
+      emit(eventName, payload = {}) {
+        const handlers = listeners.get(eventName);
+
+        if (!handlers) {
+          return;
+        }
+
+        handlers.forEach((handler) => {
+          handler(payload);
+        });
+      }
+    };
+  };
+
+  const createLogger = (state) => ({
+    start(agentName) {
+      const entry = {
+        id: createId("mahir-log"),
+        agent: agentName,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        durationMs: null,
+        status: "started",
+        success: false
+      };
+
+      state.logs.push(entry);
+      return entry;
+    },
+
+    finish(entry, success = true) {
+      const finishedAt = new Date();
+      const startedAt = new Date(entry.startedAt);
+
+      entry.finishedAt = finishedAt.toISOString();
+      entry.durationMs = Math.max(0, finishedAt.getTime() - startedAt.getTime());
+      entry.status = success ? "completed" : "failed";
+      entry.success = Boolean(success);
+
+      return entry;
+    },
+
+    info(message, details = {}) {
+      const entry = {
+        id: createId("mahir-log"),
+        message,
+        details,
+        createdAt: new Date().toISOString(),
+        status: "info",
+        success: true
+      };
+
+      state.logs.push(entry);
+      return entry;
+    }
+  });
+
+  class BaseAgent {
+    constructor({ name, state, logger, events }) {
+      this.name = name;
+      this.state = state;
+      this.logger = logger;
+      this.events = events;
+      this.status = "idle";
+    }
+
+    initialize() {
+      this.status = "initialized";
+      return Promise.resolve({ agent: this.name, status: this.status });
+    }
+
+    execute() {
+      this.status = "executed";
+      return Promise.resolve({ agent: this.name, status: this.status });
+    }
+
+    validate() {
+      this.status = "validated";
+      return Promise.resolve({ agent: this.name, status: this.status });
+    }
+
+    export() {
+      this.status = "exported";
+      return Promise.resolve({ agent: this.name, status: this.status });
+    }
+
+    reset() {
+      this.status = "idle";
+      return Promise.resolve({ agent: this.name, status: this.status });
+    }
+  }
+
+  class DocumentAgent extends BaseAgent {
+    constructor(config) {
+      super({ ...config, name: "DocumentAgent" });
+    }
+  }
+
+  class StructuringAgent extends BaseAgent {
+    constructor(config) {
+      super({ ...config, name: "StructuringAgent" });
+    }
+  }
+
+  class CurriculumAgent extends BaseAgent {
+    constructor(config) {
+      super({ ...config, name: "CurriculumAgent" });
+    }
+  }
+
+  class MeasurementAgent extends BaseAgent {
+    constructor(config) {
+      super({ ...config, name: "MeasurementAgent" });
+    }
+  }
+
+  class PedagogyAgent extends BaseAgent {
+    constructor(config) {
+      super({ ...config, name: "PedagogyAgent" });
+    }
+  }
+
+  class EvidenceAgent extends BaseAgent {
+    constructor(config) {
+      super({ ...config, name: "EvidenceAgent" });
+    }
+  }
+
+  class ValidationAgent extends BaseAgent {
+    constructor(config) {
+      super({ ...config, name: "ValidationAgent" });
+    }
+  }
+
+  class ReportAgent extends BaseAgent {
+    constructor(config) {
+      super({ ...config, name: "ReportAgent" });
+    }
+  }
+
+  class OCRService {}
+  class LLMService {}
+  class CurriculumService {}
+  class StatisticsService {}
+  class ReportService {}
+
+  class AIOrchestrator {
+    constructor({ agents, logger, events }) {
+      this.agents = agents;
+      this.logger = logger;
+      this.events = events;
+      this.flow = [
+        "DocumentAgent",
+        "StructuringAgent",
+        "CurriculumAgent",
+        "MeasurementAgent",
+        "PedagogyAgent",
+        "EvidenceAgent",
+        "ValidationAgent",
+        "ReportAgent"
+      ];
+      this.status = "idle";
+    }
+
+    async run() {
+      this.status = "running";
+      this.events.emit("orchestrator:started", { flow: [...this.flow] });
+
+      for (const agentName of this.flow) {
+        const agent = this.agents[agentName];
+
+        if (!agent) {
+          continue;
+        }
+
+        console.info(`[MAHIR] ${agentName} başladı`);
+        const logEntry = this.logger.start(agentName);
+        this.events.emit("agent:started", { agent: agentName });
+
+        try {
+          await agent.initialize();
+          await agent.execute();
+          await agent.validate();
+          await agent.export();
+          this.logger.finish(logEntry, true);
+          this.events.emit("agent:completed", { agent: agentName, log: logEntry });
+          console.info(`[MAHIR] ${agentName} bitti`);
+        } catch (error) {
+          this.logger.finish(logEntry, false);
+          this.events.emit("agent:failed", { agent: agentName, error, log: logEntry });
+          console.error(`[MAHIR] ${agentName} tamamlanamadı`, error);
+          throw error;
+        }
+      }
+
+      this.status = "completed";
+      this.events.emit("orchestrator:completed", { flow: [...this.flow] });
+      return { status: this.status, flow: [...this.flow] };
+    }
+
+    reset() {
+      this.status = "idle";
+      return Promise.all(this.flow.map((agentName) => this.agents[agentName]?.reset()));
+    }
+  }
+
+  const state = createInitialState();
+  const session = createSession();
+  const events = createEventBus();
+  const logger = createLogger(state);
+  const agentConfig = { state, logger, events };
+  const agents = {
+    DocumentAgent: new DocumentAgent(agentConfig),
+    StructuringAgent: new StructuringAgent(agentConfig),
+    CurriculumAgent: new CurriculumAgent(agentConfig),
+    MeasurementAgent: new MeasurementAgent(agentConfig),
+    PedagogyAgent: new PedagogyAgent(agentConfig),
+    EvidenceAgent: new EvidenceAgent(agentConfig),
+    ValidationAgent: new ValidationAgent(agentConfig),
+    ReportAgent: new ReportAgent(agentConfig)
+  };
+  const services = {
+    OCRService: new OCRService(),
+    LLMService: new LLMService(),
+    CurriculumService: new CurriculumService(),
+    StatisticsService: new StatisticsService(),
+    ReportService: new ReportService()
+  };
+  const orchestrator = new AIOrchestrator({ agents, logger, events });
+
+  window.MAHIR = {
+    version,
+    session,
+    state,
+    agents,
+    orchestrator,
+    services,
+    logger,
+    events
+  };
+
+  logger.info("MAHIR initialized", { version, sessionId: session.id });
+  console.info("MAHIR initialized");
+})();
+
 const preparationManager = (() => {
   const emptyText = "Henüz seçilmedi";
   const mtalSchoolType = "Mesleki ve Teknik Anadolu Lisesi";
