@@ -821,6 +821,442 @@
   MAHIR.logger.info("MAHIR contracts initialized", { contractCount: schemaRegistry.list().length });
   console.info("MAHIR contracts initialized");
 })();
+/* =========================================================
+   DOCUMENT AGENT CORE - FEATURE 25
+   ========================================================= */
+(() => {
+  const MAHIR = window.MAHIR;
+
+  if (!MAHIR) {
+    return;
+  }
+
+  const documentTypes = [
+    "exam_pdf",
+    "exam_image",
+    "answer_key",
+    "excel_scores",
+    "word_exam",
+    "csv_scores",
+    "unknown"
+  ];
+
+  const utils = MAHIR.utils;
+  const createValidationResult = (errors = [], warnings = []) => ({ valid: errors.length === 0, errors, warnings });
+  const getPrimaryFile = (input = {}) => input.uploadedFiles?.[0] || {};
+  const now = () => utils.nowIso();
+
+  const createDocumentWarning = ({ code, message, severity = "info", page = null }) => ({
+    code,
+    message,
+    severity,
+    page
+  });
+
+  const createQuestion = (number) => ({
+    id: `q${number}`,
+    number,
+    text: `${number}. örnek soru metni`,
+    maxScore: 10,
+    page: 1,
+    bbox: { x: 80, y: 120 + number * 90, width: 720, height: 72 },
+    confidence: 0.92,
+    status: "mock"
+  });
+
+  const createAnswerKey = (questionId, correctAnswer) => ({
+    questionId,
+    correctAnswer,
+    confidence: 0.9
+  });
+
+  const createStudent = (studentNo, fullName, answers, totalScore) => ({
+    studentNo,
+    fullName,
+    answers,
+    totalScore,
+    confidence: 0.88
+  });
+
+  const createTable = () => ({
+    id: "table-1",
+    page: 1,
+    rows: 3,
+    columns: 4,
+    cells: [
+      ["Öğrenci No", "Ad Soyad", "Soru 1", "Toplam"],
+      ["101", "Ayşe Yılmaz", "8", "15"],
+      ["102", "Mehmet Kaya", "7", "13"]
+    ]
+  });
+
+  const createImage = () => ({
+    id: "image-1",
+    page: 1,
+    purpose: "exam-header",
+    width: 1024,
+    height: 240
+  });
+
+  const createDocumentOutputDefault = () => ({
+    documentId: utils.createId("document"),
+    documentType: "unknown",
+    metadata: {
+      title: "Örnek Sınav Belgesi",
+      pageCount: 1,
+      language: "tr",
+      source: "mock",
+      createdAt: now(),
+      checksum: "mock-checksum"
+    },
+    questions: [createQuestion(1), createQuestion(2)],
+    answerKey: [createAnswerKey("q1", "A"), createAnswerKey("q2", "B")],
+    students: [
+      createStudent("101", "Ayşe Yılmaz", { q1: "A", q2: "B" }, 15),
+      createStudent("102", "Mehmet Kaya", { q1: "A", q2: "C" }, 13)
+    ],
+    tables: [createTable()],
+    images: [createImage()],
+    warnings: [createDocumentWarning({ code: "MOCK_PROVIDER", message: "Bu çıktı mock provider tarafından üretilmiştir." })],
+    confidence: 0.89,
+    processingTime: 0
+  });
+
+  const validateArray = (payload, path, errors) => {
+    const value = utils.getByPath(payload, path);
+    if (!Array.isArray(value)) {
+      errors.push({ fieldPath: path, message: `${path} alanı dizi olmalıdır.` });
+    }
+  };
+
+  const validateObject = (payload, path, errors) => {
+    const value = utils.getByPath(payload, path);
+    if (!utils.isPlainObject(value)) {
+      errors.push({ fieldPath: path, message: `${path} alanı nesne olmalıdır.` });
+    }
+  };
+
+  const validateNumber = (payload, path, errors) => {
+    const value = utils.getByPath(payload, path);
+    if (!utils.isFiniteNumber(value)) {
+      errors.push({ fieldPath: path, message: `${path} alanı sayı olmalıdır.` });
+    }
+  };
+
+  const createContract = ({ name, description, required, optional = [], createDefault, validate }) => ({
+    name,
+    version: "1.0.0",
+    description,
+    required,
+    optional,
+    validate(payload) {
+      const errors = [];
+      const warnings = [];
+
+      if (!utils.isPlainObject(payload)) {
+        errors.push({ fieldPath: "payload", message: `${name} plain object bekler.` });
+        return createValidationResult(errors, warnings);
+      }
+
+      errors.push(...utils.validateRequiredPaths(payload, required));
+
+      if (typeof validate === "function") {
+        const customResult = validate(payload);
+        errors.push(...(customResult.errors || []));
+        warnings.push(...(customResult.warnings || []));
+      }
+
+      return createValidationResult(errors, warnings);
+    },
+    createDefault() {
+      return utils.deepClone(createDefault());
+    }
+  });
+  const documentOutputContract = createContract({
+    name: "DocumentOutput",
+    description: "DocumentAgent tarafından sınıflandırılmış ve standartlaştırılmış belge çıktısı.",
+    required: [
+      "documentId",
+      "documentType",
+      "metadata",
+      "metadata.title",
+      "metadata.pageCount",
+      "metadata.language",
+      "metadata.source",
+      "metadata.createdAt",
+      "metadata.checksum",
+      "questions",
+      "answerKey",
+      "students",
+      "tables",
+      "images",
+      "warnings",
+      "confidence",
+      "processingTime"
+    ],
+    optional: [],
+    createDefault: createDocumentOutputDefault,
+    validate(payload) {
+      const errors = [];
+      const warnings = [];
+      validateObject(payload, "metadata", errors);
+      ["questions", "answerKey", "students", "tables", "images", "warnings"].forEach((path) => validateArray(payload, path, errors));
+      validateNumber(payload, "confidence", errors);
+      validateNumber(payload, "processingTime", errors);
+
+      if (!documentTypes.includes(payload.documentType)) {
+        errors.push({ fieldPath: "documentType", message: "documentType tanımlı belge türlerinden biri olmalıdır." });
+      }
+
+      if (payload.questions?.some((question) => !utils.isNonEmptyString(question.id) || !utils.isFiniteNumber(question.number))) {
+        errors.push({ fieldPath: "questions", message: "Her soru id ve number alanı taşımalıdır." });
+      }
+
+      if (payload.answerKey?.some((answer) => !utils.isNonEmptyString(answer.questionId))) {
+        errors.push({ fieldPath: "answerKey", message: "Her cevap anahtarı maddesi questionId taşımalıdır." });
+      }
+
+      if (payload.confidence < 0.5) {
+        warnings.push({ fieldPath: "confidence", message: "Belge güven değeri düşük görünüyor." });
+      }
+
+      return { errors, warnings };
+    }
+  });
+
+  const structuringInputContract = createContract({
+    name: "StructuringInput",
+    description: "StructuringAgent için Feature 25 DocumentOutput girdisi.",
+    required: ["documentId", "documentType", "metadata", "questions", "students", "tables"],
+    optional: ["answerKey", "images", "warnings", "confidence", "processingTime"],
+    createDefault: createDocumentOutputDefault,
+    validate(payload) {
+      const errors = [];
+      validateObject(payload, "metadata", errors);
+      ["questions", "students", "tables"].forEach((path) => validateArray(payload, path, errors));
+      return { errors, warnings: [] };
+    }
+  });
+
+  MAHIR.contracts.DocumentOutput = documentOutputContract;
+  MAHIR.contracts.StructuringInput = structuringInputContract;
+  MAHIR.state.contracts = MAHIR.contracts;
+  MAHIR.schemaRegistry.register("DocumentOutput", documentOutputContract);
+  MAHIR.schemaRegistry.register("StructuringInput", structuringInputContract);
+  const createMockProvider = () => ({
+    name: "mock",
+    detectDocumentType(file = {}) {
+      const name = String(file.name || "").toLowerCase();
+      const mimeType = String(file.mimeType || file.type || "").toLowerCase();
+
+      if (name.includes("answer") || name.includes("cevap")) {
+        return "answer_key";
+      }
+      if (mimeType.includes("pdf") || name.endsWith(".pdf")) {
+        return "exam_pdf";
+      }
+      if (mimeType.includes("image") || /\.(png|jpg|jpeg|webp)$/.test(name)) {
+        return "exam_image";
+      }
+      if (/\.(xlsx|xls)$/.test(name)) {
+        return "excel_scores";
+      }
+      if (/\.(docx|doc)$/.test(name)) {
+        return "word_exam";
+      }
+      if (mimeType.includes("csv") || name.endsWith(".csv")) {
+        return "csv_scores";
+      }
+      return "unknown";
+    },
+    extractMetadata(input, documentType) {
+      const file = getPrimaryFile(input);
+      return {
+        title: file.name || "Örnek Sınav Belgesi",
+        pageCount: documentType === "excel_scores" || documentType === "csv_scores" ? 1 : 2,
+        language: "tr",
+        source: "mock",
+        createdAt: file.uploadedAt || now(),
+        checksum: file.checksum || "mock-checksum"
+      };
+    },
+    extractQuestions() {
+      return [createQuestion(1), createQuestion(2)];
+    },
+    extractAnswerKey() {
+      return [createAnswerKey("q1", "A"), createAnswerKey("q2", "B")];
+    },
+    extractStudents() {
+      return [
+        createStudent("101", "Ayşe Yılmaz", { q1: "A", q2: "B" }, 15),
+        createStudent("102", "Mehmet Kaya", { q1: "A", q2: "C" }, 13)
+      ];
+    },
+    extractTables() {
+      return [createTable()];
+    },
+    extractImages() {
+      return [createImage()];
+    }
+  });
+
+  class DocumentService {
+    constructor() {
+      this.activeProvider = "mock";
+      this.providers = {
+        openaiVision: { name: "openaiVision", available: false },
+        azureDocument: { name: "azureDocument", available: false },
+        googleDocumentAI: { name: "googleDocumentAI", available: false },
+        tesseract: { name: "tesseract", available: false },
+        paddleOCR: { name: "paddleOCR", available: false },
+        mistralOCR: { name: "mistralOCR", available: false },
+        mock: createMockProvider()
+      };
+    }
+
+    get provider() {
+      return this.providers[this.activeProvider];
+    }
+
+    initialize(input = {}) {
+      return Promise.resolve({ provider: this.activeProvider, inputSummary: utils.summarizePayload(input) });
+    }
+
+    detectDocumentType(input = {}) {
+      return Promise.resolve(this.provider.detectDocumentType(getPrimaryFile(input)));
+    }
+
+    extract(input = {}) {
+      return Promise.resolve({ rawText: "Mock OCR çıktısı", inputSummary: utils.summarizePayload(input) });
+    }
+
+    extractMetadata(input = {}, context = {}) {
+      return Promise.resolve(this.provider.extractMetadata(input, context.documentType));
+    }
+
+    extractQuestions() {
+      return Promise.resolve(this.provider.extractQuestions());
+    }
+
+    extractStudents() {
+      return Promise.resolve(this.provider.extractStudents());
+    }
+
+    extractTables() {
+      return Promise.resolve(this.provider.extractTables());
+    }
+
+    extractAnswerKey() {
+      return Promise.resolve(this.provider.extractAnswerKey());
+    }
+
+    extractImages() {
+      return Promise.resolve(this.provider.extractImages());
+    }
+
+    finalize(input = {}, context = {}) {
+      const startedAt = context.startedAt || performance.now();
+      const documentType = context.documentType || "unknown";
+      const metadata = context.metadata || this.provider.extractMetadata(input, documentType);
+      const output = {
+        documentId: utils.createId("document"),
+        documentType,
+        metadata,
+        questions: context.questions || [],
+        answerKey: context.answerKey || [],
+        students: context.students || [],
+        tables: context.tables || [],
+        images: context.images || [],
+        warnings: context.warnings?.length ? context.warnings : [createDocumentWarning({ code: "MOCK_PROVIDER", message: "Bu çıktı mock provider tarafından üretilmiştir." })],
+        confidence: 0.89,
+        processingTime: Math.max(0, Math.round(performance.now() - startedAt))
+      };
+      return Promise.resolve(output);
+    }
+  }
+
+  const documentService = new DocumentService();
+  MAHIR.services.document = documentService;
+  const runDocumentStep = async (label, methodName, input, context) => {
+    console.info(`[MAHIR] ${label} başladı`);
+    const stepLog = MAHIR.logger.start(`DocumentAgent.${methodName}`);
+
+    try {
+      const value = await documentService[methodName](input, context);
+      MAHIR.logger.finish(stepLog, true);
+      console.info(`[MAHIR] ${label} bitti`);
+      return value;
+    } catch (error) {
+      MAHIR.logger.finish(stepLog, false);
+      MAHIR.logger.error(`${label} tamamlanamadı`, { error: error.message });
+      throw error;
+    }
+  };
+
+  MAHIR.agents.DocumentAgent.execute = async (input = MAHIR.contracts.DocumentInput.createDefault()) => {
+    const startedAt = performance.now();
+    const context = { startedAt, warnings: [] };
+    MAHIR.events.emit("mahir:document:started", { inputSummary: utils.summarizePayload(input) });
+
+    try {
+      await runDocumentStep("Document Service Initialize", "initialize", input, context);
+      context.documentType = await runDocumentStep("Document Type Detection", "detectDocumentType", input, context);
+      context.metadata = await runDocumentStep("Metadata Extraction", "extractMetadata", input, context);
+      context.questions = await runDocumentStep("Question Extraction", "extractQuestions", input, context);
+      context.answerKey = await runDocumentStep("Answer Key Extraction", "extractAnswerKey", input, context);
+      context.students = await runDocumentStep("Student Extraction", "extractStudents", input, context);
+      context.tables = await runDocumentStep("Table Extraction", "extractTables", input, context);
+      context.images = await runDocumentStep("Image Extraction", "extractImages", input, context);
+      const output = await runDocumentStep("Document Finalize", "finalize", input, context);
+      const validationResult = MAHIR.schemaRegistry.validate("DocumentOutput", output);
+
+      if (!validationResult.valid) {
+        const issue = {
+          id: utils.createId("validation-issue"),
+          severity: "blocking",
+          code: "DOCUMENT_OUTPUT_INVALID",
+          message: "DocumentOutput sözleşme doğrulaması başarısız oldu.",
+          sourceAgent: "DocumentAgent",
+          fieldPath: validationResult.errors[0]?.fieldPath || "DocumentOutput",
+          suggestion: "DocumentService çıktısı DocumentOutput sözleşmesine uygun hale getirilmelidir.",
+          errors: validationResult.errors,
+          warnings: validationResult.warnings
+        };
+        MAHIR.state.validationIssues.push(issue);
+        MAHIR.events.emit("mahir:document:error", { issue });
+        throw new Error(issue.message);
+      }
+
+      MAHIR.state.agentOutputs.document = output;
+      MAHIR.events.emit("mahir:document:completed", { output });
+      console.info("Document Agent Completed");
+      return output;
+    } catch (error) {
+      MAHIR.events.emit("mahir:document:error", { error });
+      throw error;
+    }
+  };
+
+  MAHIR.document = {
+    agent: MAHIR.agents.DocumentAgent,
+    service: documentService,
+    documentTypes,
+    models: {
+      question: createQuestion,
+      answerKey: createAnswerKey,
+      student: createStudent,
+      table: createTable,
+      image: createImage,
+      warning: createDocumentWarning
+    },
+    run(input) {
+      return MAHIR.agents.DocumentAgent.execute(input);
+    }
+  };
+
+  MAHIR.logger.info("MAHIR Document Agent Core initialized", { activeProvider: documentService.activeProvider });
+  console.info("MAHIR Document Agent Core initialized");
+})();
 const preparationManager = (() => {
   const emptyText = "Henüz seçilmedi";
   const mtalSchoolType = "Mesleki ve Teknik Anadolu Lisesi";
