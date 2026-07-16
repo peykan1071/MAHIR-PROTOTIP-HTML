@@ -1257,6 +1257,410 @@
   MAHIR.logger.info("MAHIR Document Agent Core initialized", { activeProvider: documentService.activeProvider });
   console.info("MAHIR Document Agent Core initialized");
 })();
+/* =========================================================
+   STRUCTURING AGENT CORE - FEATURE 26
+   ========================================================= */
+(() => {
+  const MAHIR = window.MAHIR;
+
+  if (!MAHIR) {
+    return;
+  }
+
+  const utils = MAHIR.utils;
+  const createValidationResult = (errors = [], warnings = []) => ({ valid: errors.length === 0, errors, warnings });
+
+  const normalizeValue = (value) => {
+    if (value === undefined || value === "") {
+      return null;
+    }
+    if (Array.isArray(value)) {
+      return value.map(normalizeValue);
+    }
+    if (utils.isPlainObject(value)) {
+      return Object.fromEntries(Object.entries(value).map(([key, entryValue]) => [key, normalizeValue(entryValue)]));
+    }
+    return value;
+  };
+
+  const toNumber = (value, fallback = 0) => {
+    if (utils.isFiniteNumber(value)) {
+      return value;
+    }
+    const parsed = Number(String(value ?? "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const toStringValue = (value) => value === undefined || value === null ? "" : String(value);
+
+  const createStructuringIssue = ({ code, message, severity = "warning", source = "StructuringAgent" }) => ({
+    id: utils.createId("missing-info"),
+    code,
+    message,
+    severity,
+    source
+  });
+
+  const validateArray = (payload, path, errors) => {
+    const value = utils.getByPath(payload, path);
+    if (!Array.isArray(value)) {
+      errors.push({ fieldPath: path, message: `${path} alanı dizi olmalıdır.` });
+    }
+  };
+
+  const validateObject = (payload, path, errors) => {
+    const value = utils.getByPath(payload, path);
+    if (!utils.isPlainObject(value)) {
+      errors.push({ fieldPath: path, message: `${path} alanı nesne olmalıdır.` });
+    }
+  };
+
+  const createContract = ({ name, description, required, optional = [], createDefault, validate }) => ({
+    name,
+    version: "1.0.0",
+    description,
+    required,
+    optional,
+    validate(payload) {
+      const errors = [];
+      const warnings = [];
+
+      if (!utils.isPlainObject(payload)) {
+        errors.push({ fieldPath: "payload", message: `${name} plain object bekler.` });
+        return createValidationResult(errors, warnings);
+      }
+
+      errors.push(...utils.validateRequiredPaths(payload, required));
+
+      if (typeof validate === "function") {
+        const customResult = validate(payload);
+        errors.push(...(customResult.errors || []));
+        warnings.push(...(customResult.warnings || []));
+      }
+
+      return createValidationResult(errors, warnings);
+    },
+    createDefault() {
+      return utils.deepClone(createDefault());
+    }
+  });
+  const createMockDocumentOutput = () => {
+    const questionScores = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 10, 10];
+    const questions = questionScores.map((score, index) => ({
+      id: `q${index + 1}`,
+      number: index + 1,
+      text: `${index + 1}. örnek yapılandırma sorusu`,
+      maxScore: score,
+      page: index < 9 ? 1 : 2,
+      bbox: { x: 80, y: 90 + (index % 9) * 72, width: 720, height: 58 },
+      confidence: 0.9,
+      status: "mock"
+    }));
+    const answerKey = questions.map((question, index) => ({ questionId: question.id, correctAnswer: index % 2 === 0 ? "A" : "B", confidence: 0.9 }));
+    const students = [
+      {
+        studentNo: "101",
+        fullName: "Ayşe Yılmaz",
+        answers: Object.fromEntries(questions.map((question, index) => [question.id, index % 2 === 0 ? "A" : "B"])),
+        totalScore: 88,
+        confidence: 0.9
+      },
+      {
+        studentNo: "102",
+        fullName: "Mehmet Kaya",
+        answers: Object.fromEntries(questions.map((question, index) => [question.id, index % 3 === 0 ? "A" : "C"])),
+        totalScore: 72,
+        confidence: 0.87
+      }
+    ];
+
+    return {
+      documentId: "document-structuring-mock",
+      documentType: "exam_pdf",
+      metadata: {
+        title: "Türk Dili ve Edebiyatı 10. Sınıf Yazılı Sınavı",
+        pageCount: 2,
+        language: "tr",
+        source: "mock",
+        createdAt: utils.nowIso(),
+        checksum: "structuring-mock-checksum",
+        course: "Türk Dili ve Edebiyatı",
+        educationLevel: "Lise",
+        schoolType: "Anadolu Lisesi",
+        grade: "10",
+        examType: "Yazılı Sınav",
+        examDate: null,
+        teacher: null
+      },
+      questions,
+      answerKey,
+      students,
+      tables: [{ id: "table-structuring-1", page: 1, rows: 3, columns: 4, cells: [] }],
+      images: [],
+      warnings: [],
+      confidence: 0.9,
+      processingTime: 12
+    };
+  };
+
+  const buildQuestion = (question, answerKeyItem) => ({
+    id: toStringValue(question.id || `q${question.number}`),
+    number: toNumber(question.number, 0),
+    text: normalizeValue(question.text),
+    maxScore: toNumber(question.maxScore, 0),
+    learningOutcomeIds: Array.isArray(question.learningOutcomeIds) ? question.learningOutcomeIds : [],
+    answerKey: answerKeyItem?.correctAnswer ?? null,
+    page: toNumber(question.page, 0),
+    confidence: toNumber(question.confidence, 0),
+    status: question.status || "normalized"
+  });
+
+  const buildStudent = (student, questions) => {
+    const answersObject = utils.isPlainObject(student.answers) ? student.answers : {};
+    const answers = questions.map((question) => ({ questionId: question.id, answer: normalizeValue(answersObject[question.id]) }));
+    const questionScores = questions.map((question) => ({
+      questionId: question.id,
+      score: answersObject[question.id] && question.answerKey && answersObject[question.id] === question.answerKey ? question.maxScore : 0
+    }));
+
+    return {
+      studentNo: toStringValue(student.studentNo),
+      fullName: normalizeValue(student.fullName),
+      answers,
+      questionScores,
+      totalScore: toNumber(student.totalScore, questionScores.reduce((sum, item) => sum + item.score, 0))
+    };
+  };
+
+  const createStructuringOutputDefault = () => {
+    const documentOutput = createMockDocumentOutput();
+    const questions = documentOutput.questions.map((question) => buildQuestion(question, documentOutput.answerKey.find((item) => item.questionId === question.id)));
+    const students = documentOutput.students.map((student) => buildStudent(student, questions));
+    const totalScore = questions.reduce((sum, question) => sum + question.maxScore, 0);
+
+    return {
+      exam: {
+        id: utils.createId("exam"),
+        title: documentOutput.metadata.title,
+        course: documentOutput.metadata.course,
+        educationLevel: documentOutput.metadata.educationLevel,
+        schoolType: documentOutput.metadata.schoolType,
+        grade: documentOutput.metadata.grade,
+        examType: documentOutput.metadata.examType,
+        examDate: documentOutput.metadata.examDate,
+        teacher: documentOutput.metadata.teacher,
+        questionCount: questions.length,
+        totalScore
+      },
+      questions,
+      students,
+      scoringModel: {
+        totalScore,
+        questionWeights: Object.fromEntries(questions.map((question) => [question.id, question.maxScore])),
+        gradingScale: { type: "100-point", max: 100, pass: 50 },
+        answerKeyPresent: questions.every((question) => Boolean(question.answerKey)),
+        scoreDistribution: students.map((student) => ({ studentNo: student.studentNo, totalScore: student.totalScore }))
+      },
+      missingInformation: [],
+      quality: {
+        ocrConfidence: documentOutput.confidence,
+        missingQuestionCount: 0,
+        missingAnswerKey: false,
+        missingScores: false,
+        duplicateStudents: [],
+        warnings: []
+      },
+      confidence: documentOutput.confidence
+    };
+  };
+
+  const structuringOutputContract = createContract({
+    name: "StructuringOutput",
+    description: "DocumentOutput üzerinden normalize edilmiş ortak MAHİR sınav veri modeli.",
+    required: ["exam", "questions", "students", "scoringModel", "missingInformation", "quality", "confidence"],
+    optional: [],
+    createDefault: createStructuringOutputDefault,
+    validate(payload) {
+      const errors = [];
+      validateObject(payload, "exam", errors);
+      validateObject(payload, "scoringModel", errors);
+      validateObject(payload, "quality", errors);
+      ["questions", "students", "missingInformation"].forEach((path) => validateArray(payload, path, errors));
+      if (payload.exam && !utils.isFiniteNumber(payload.exam.questionCount)) {
+        errors.push({ fieldPath: "exam.questionCount", message: "Soru sayısı sayı olmalıdır." });
+      }
+      if (payload.exam && !utils.isFiniteNumber(payload.exam.totalScore)) {
+        errors.push({ fieldPath: "exam.totalScore", message: "Toplam puan sayı olmalıdır." });
+      }
+      if (!utils.isFiniteNumber(payload.confidence)) {
+        errors.push({ fieldPath: "confidence", message: "confidence sayı olmalıdır." });
+      }
+      return { errors, warnings: [] };
+    }
+  });
+
+  MAHIR.contracts.StructuringOutput = structuringOutputContract;
+  MAHIR.state.contracts = MAHIR.contracts;
+  MAHIR.schemaRegistry.register("StructuringOutput", structuringOutputContract);
+  const structuringCore = {
+    readDocument(input) {
+      return normalizeValue(input || createMockDocumentOutput());
+    },
+    normalize(documentOutput) {
+      return normalizeValue({
+        ...documentOutput,
+        questions: (documentOutput.questions || []).map((question) => ({ ...question, maxScore: toNumber(question.maxScore, 0), number: toNumber(question.number, 0) })),
+        students: (documentOutput.students || []).map((student) => ({ ...student, studentNo: toStringValue(student.studentNo), totalScore: toNumber(student.totalScore, 0) }))
+      });
+    },
+    buildExam(normalizedDocument, questions) {
+      const metadata = normalizedDocument.metadata || {};
+      return {
+        id: utils.createId("exam"),
+        title: metadata.title || "Sınav Analizi",
+        course: metadata.course || "Türk Dili ve Edebiyatı",
+        educationLevel: metadata.educationLevel || "Lise",
+        schoolType: metadata.schoolType || "Anadolu Lisesi",
+        grade: metadata.grade || "10",
+        examType: metadata.examType || "Yazılı Sınav",
+        examDate: metadata.examDate || null,
+        teacher: metadata.teacher || null,
+        questionCount: questions.length,
+        totalScore: questions.reduce((sum, question) => sum + question.maxScore, 0)
+      };
+    },
+    buildQuestions(normalizedDocument) {
+      return (normalizedDocument.questions || []).map((question) => buildQuestion(question, (normalizedDocument.answerKey || []).find((item) => item.questionId === question.id)));
+    },
+    buildStudents(normalizedDocument, questions) {
+      return (normalizedDocument.students || []).map((student) => buildStudent(student, questions));
+    },
+    buildScoringModel(questions, students) {
+      const totalScore = questions.reduce((sum, question) => sum + question.maxScore, 0);
+      return {
+        totalScore,
+        questionWeights: Object.fromEntries(questions.map((question) => [question.id, question.maxScore])),
+        gradingScale: { type: "100-point", max: 100, pass: 50 },
+        answerKeyPresent: questions.every((question) => Boolean(question.answerKey)),
+        scoreDistribution: students.map((student) => ({ studentNo: student.studentNo, totalScore: student.totalScore }))
+      };
+    },
+    detectMissingInformation(normalizedDocument, questions, students, scoringModel) {
+      const missing = [];
+      if (questions.length === 0) {
+        missing.push(createStructuringIssue({ code: "MISSING_QUESTION", message: "Soru bilgisi bulunamadı." }));
+      }
+      if (questions.some((question) => !question.maxScore)) {
+        missing.push(createStructuringIssue({ code: "MISSING_SCORE", message: "Bazı sorularda puan bilgisi eksik." }));
+      }
+      if (!scoringModel.answerKeyPresent) {
+        missing.push(createStructuringIssue({ code: "MISSING_ANSWER_KEY", message: "Cevap anahtarı tüm sorular için tamamlanmamış." }));
+      }
+      if (students.length === 0) {
+        missing.push(createStructuringIssue({ code: "MISSING_STUDENT", message: "Öğrenci bilgisi bulunamadı." }));
+      }
+      if ((normalizedDocument.tables || []).some((table) => !Array.isArray(table.cells))) {
+        missing.push(createStructuringIssue({ code: "BROKEN_TABLE", message: "Tablo hücreleri okunabilir formatta değil." }));
+      }
+      if (toNumber(normalizedDocument.confidence, 0) < 0.6) {
+        missing.push(createStructuringIssue({ code: "LOW_OCR_CONFIDENCE", message: "Belge okuma güven değeri düşük." }));
+      }
+      return missing;
+    },
+    buildQuality(normalizedDocument, questions, students, missingInformation, scoringModel) {
+      const studentNos = students.map((student) => student.studentNo).filter(Boolean);
+      const duplicateStudents = studentNos.filter((studentNo, index) => studentNos.indexOf(studentNo) !== index);
+      return {
+        ocrConfidence: toNumber(normalizedDocument.confidence, 0),
+        missingQuestionCount: questions.filter((question) => !question.text).length,
+        missingAnswerKey: !scoringModel.answerKeyPresent,
+        missingScores: questions.some((question) => !question.maxScore),
+        duplicateStudents: Array.from(new Set(duplicateStudents)),
+        warnings: [...(normalizedDocument.warnings || []), ...missingInformation]
+      };
+    },
+    finalize({ exam, questions, students, scoringModel, missingInformation, quality, normalizedDocument }) {
+      return {
+        exam,
+        questions,
+        students,
+        scoringModel,
+        missingInformation,
+        quality,
+        confidence: toNumber(normalizedDocument.confidence, 0)
+      };
+    }
+  };
+
+  const runStructuringStep = async (label, callback) => {
+    console.info(`[MAHIR] ${label} başladı`);
+    const stepLog = MAHIR.logger.start(`StructuringAgent.${label}`);
+    try {
+      const value = await Promise.resolve(callback());
+      MAHIR.logger.finish(stepLog, true);
+      console.info(`[MAHIR] ${label} bitti`);
+      return value;
+    } catch (error) {
+      MAHIR.logger.finish(stepLog, false);
+      MAHIR.logger.error(`${label} tamamlanamadı`, { error: error.message });
+      throw error;
+    }
+  };
+
+  MAHIR.agents.StructuringAgent.execute = async (input = createMockDocumentOutput()) => {
+    MAHIR.events.emit("mahir:structuring:started", { inputSummary: utils.summarizePayload(input) });
+    try {
+      const documentOutput = await runStructuringStep("readDocument", () => structuringCore.readDocument(input));
+      const normalizedDocument = await runStructuringStep("normalize", () => structuringCore.normalize(documentOutput));
+      const questions = await runStructuringStep("buildQuestions", () => structuringCore.buildQuestions(normalizedDocument));
+      const exam = await runStructuringStep("buildExam", () => structuringCore.buildExam(normalizedDocument, questions));
+      const students = await runStructuringStep("buildStudents", () => structuringCore.buildStudents(normalizedDocument, questions));
+      const scoringModel = await runStructuringStep("buildScoringModel", () => structuringCore.buildScoringModel(questions, students));
+      const missingInformation = await runStructuringStep("detectMissingInformation", () => structuringCore.detectMissingInformation(normalizedDocument, questions, students, scoringModel));
+      const quality = await runStructuringStep("buildQuality", () => structuringCore.buildQuality(normalizedDocument, questions, students, missingInformation, scoringModel));
+      const output = await runStructuringStep("finalize", () => structuringCore.finalize({ exam, questions, students, scoringModel, missingInformation, quality, normalizedDocument }));
+      const validationResult = MAHIR.schemaRegistry.validate("StructuringOutput", output);
+
+      if (!validationResult.valid) {
+        const issue = {
+          id: utils.createId("validation-issue"),
+          severity: "blocking",
+          code: "STRUCTURING_OUTPUT_INVALID",
+          message: "StructuringOutput sözleşme doğrulaması başarısız oldu.",
+          sourceAgent: "StructuringAgent",
+          fieldPath: validationResult.errors[0]?.fieldPath || "StructuringOutput",
+          suggestion: "StructuringAgent çıktısı StructuringOutput sözleşmesine uygun hale getirilmelidir.",
+          errors: validationResult.errors,
+          warnings: validationResult.warnings
+        };
+        MAHIR.state.validationIssues.push(issue);
+        MAHIR.events.emit("mahir:structuring:error", { issue });
+        throw new Error(issue.message);
+      }
+
+      MAHIR.state.agentOutputs.structuring = output;
+      MAHIR.events.emit("mahir:structuring:completed", { output });
+      console.info("Structuring Agent Completed");
+      return output;
+    } catch (error) {
+      MAHIR.events.emit("mahir:structuring:error", { error });
+      throw error;
+    }
+  };
+
+  MAHIR.structuring = {
+    agent: MAHIR.agents.StructuringAgent,
+    core: structuringCore,
+    createMockDocumentOutput,
+    normalize: structuringCore.normalize,
+    run(input) {
+      return MAHIR.agents.StructuringAgent.execute(input);
+    }
+  };
+
+  MAHIR.logger.info("MAHIR Structuring Agent Core initialized", { version: "1.0.0" });
+  console.info("MAHIR Structuring Agent Core initialized");
+})();
 const preparationManager = (() => {
   const emptyText = "Henüz seçilmedi";
   const mtalSchoolType = "Mesleki ve Teknik Anadolu Lisesi";
