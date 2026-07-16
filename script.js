@@ -312,6 +312,515 @@
   console.info("MAHIR initialized");
 })();
 
+/* =========================================================
+   MAHIR AGENT CONTRACTS AND DATA SCHEMAS - FEATURE 24
+   ========================================================= */
+(() => {
+  const MAHIR = window.MAHIR;
+
+  if (!MAHIR) {
+    return;
+  }
+
+  const contractVersion = "1.0.0";
+  const utils = {
+    isPlainObject(value) {
+      return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+    },
+    isNonEmptyString(value) {
+      return typeof value === "string" && value.trim().length > 0;
+    },
+    isFiniteNumber(value) {
+      return typeof value === "number" && Number.isFinite(value);
+    },
+    isArray(value) {
+      return Array.isArray(value);
+    },
+    createId(prefix = "mahir") {
+      const randomId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      return `${prefix}-${randomId}`;
+    },
+    nowIso() {
+      return new Date().toISOString();
+    },
+    deepClone(value) {
+      if (typeof structuredClone === "function") {
+        return structuredClone(value);
+      }
+      return JSON.parse(JSON.stringify(value));
+    },
+    getByPath(source, path) {
+      if (!path) {
+        return source;
+      }
+      return path.split(".").reduce((current, key) => current == null ? undefined : current[key], source);
+    },
+    validateRequiredPaths(payload, requiredPaths = []) {
+      return requiredPaths.reduce((errors, path) => {
+        const value = utils.getByPath(payload, path);
+        if (value === undefined || value === null || value === "") {
+          errors.push({ fieldPath: path, message: `${path} zorunlu alanı eksik.` });
+        }
+        return errors;
+      }, []);
+    },
+    summarizePayload(payload) {
+      if (Array.isArray(payload)) {
+        return { type: "array", length: payload.length };
+      }
+      if (utils.isPlainObject(payload)) {
+        return { type: "object", keys: Object.keys(payload) };
+      }
+      return { type: typeof payload, value: payload };
+    }
+  };
+
+  const result = (errors = [], warnings = []) => ({ valid: errors.length === 0, errors, warnings });
+  const assertArray = (payload, path, errors) => {
+    const value = utils.getByPath(payload, path);
+    if (value !== undefined && !Array.isArray(value)) {
+      errors.push({ fieldPath: path, message: `${path} alanı dizi olmalıdır.` });
+    }
+  };
+  const assertObject = (payload, path, errors) => {
+    const value = utils.getByPath(payload, path);
+    if (value !== undefined && !utils.isPlainObject(value)) {
+      errors.push({ fieldPath: path, message: `${path} alanı nesne olmalıdır.` });
+    }
+  };
+  const teacherContextDefault = () => ({
+    educationLevel: "Lise",
+    schoolType: "Anadolu Lisesi",
+    programType: null,
+    field: null,
+    branch: null,
+    grade: "10",
+    courseType: "Ortak Ders",
+    course: "Türk Dili ve Edebiyatı",
+    customSchoolType: null,
+    customCourse: null
+  });
+  const uploadedDocumentDefault = () => ({
+    id: utils.createId("document"),
+    name: "ornek-sinav-verisi.csv",
+    type: "spreadsheet",
+    mimeType: "text/csv",
+    size: 2048,
+    source: "mock",
+    uploadedAt: utils.nowIso(),
+    checksum: "mock-checksum",
+    metadata: {}
+  });
+  const examQuestionDefault = (order = 1) => ({
+    id: `q${order}`,
+    order,
+    text: `${order}. soru örnek metni`,
+    maxScore: 10,
+    questionType: "open-ended",
+    answerKey: "Örnek cevap anahtarı",
+    learningOutcomeIds: [`TDE.${order}`],
+    confidence: 0.9
+  });
+  const studentRecordDefault = (order = 1) => ({
+    id: `student-${order}`,
+    studentNo: `${100 + order}`,
+    fullName: order === 1 ? "Ayşe Yılmaz" : "Mehmet Kaya",
+    answers: { q1: order === 1 ? 8 : 7, q2: order === 1 ? 7 : 6 },
+    totalScore: order === 1 ? 15 : 13,
+    metadata: {}
+  });
+  const evidenceItemDefault = () => ({
+    id: "evidence-1",
+    claim: "Öğrenciler temel çıkarım becerisinde güçlü görünmektedir.",
+    sourceType: "measurement",
+    sourceId: "q1",
+    metric: "averageScoreRate",
+    value: 0.75,
+    confidence: 0.85,
+    explanation: "Örnek ölçme verisi üzerinden oluşturulan kanıt maddesi."
+  });
+  const validationIssueDefault = () => ({
+    id: utils.createId("validation-issue"),
+    severity: "warning",
+    code: "MOCK_WARNING",
+    message: "Örnek uyarı kaydı.",
+    sourceAgent: "ValidationAgent",
+    fieldPath: "mock.path",
+    suggestion: "Öğretmen kontrolü ile tamamlanabilir."
+  });
+  const auditEntryDefault = () => ({
+    id: utils.createId("audit"),
+    timestamp: utils.nowIso(),
+    agent: "System",
+    action: "initialize",
+    status: "completed",
+    durationMs: 0,
+    inputSummary: {},
+    outputSummary: {},
+    errors: []
+  });
+
+  const dataTypes = {
+    TeacherContext: { name: "TeacherContext", version: contractVersion, createDefault: teacherContextDefault },
+    UploadedDocument: { name: "UploadedDocument", version: contractVersion, createDefault: uploadedDocumentDefault },
+    ExamQuestion: { name: "ExamQuestion", version: contractVersion, createDefault: examQuestionDefault },
+    StudentRecord: { name: "StudentRecord", version: contractVersion, createDefault: studentRecordDefault },
+    EvidenceItem: { name: "EvidenceItem", version: contractVersion, createDefault: evidenceItemDefault },
+    ValidationIssue: { name: "ValidationIssue", version: contractVersion, createDefault: validationIssueDefault },
+    AuditEntry: { name: "AuditEntry", version: contractVersion, createDefault: auditEntryDefault }
+  };
+
+  const makeDocumentOutput = () => ({
+    documents: [uploadedDocumentDefault()],
+    extractedText: ["Örnek sınav metni"],
+    detectedTables: [],
+    detectedQuestions: [examQuestionDefault(1), examQuestionDefault(2)],
+    detectedStudents: [studentRecordDefault(1), studentRecordDefault(2)],
+    ambiguities: []
+  });
+  const makeStructuringOutput = () => ({
+    exam: { id: "exam-1", title: "Türk Dili ve Edebiyatı Örnek Sınavı", maxScore: 20, metadata: {} },
+    questions: [examQuestionDefault(1), examQuestionDefault(2)],
+    students: [studentRecordDefault(1), studentRecordDefault(2)],
+    scoringModel: { maxScore: 20, method: "sum" },
+    ambiguities: []
+  });
+  const makeCurriculumOutput = () => ({
+    curriculumMatches: [
+      { questionId: "q1", learningOutcomeId: "TDE.1", confidence: 0.86 },
+      { questionId: "q2", learningOutcomeId: "TDE.2", confidence: 0.82 }
+    ],
+    unmatchedQuestions: [],
+    sourceReferences: [{ id: "src-1", title: "Örnek öğretim programı", type: "curriculum" }],
+    confidenceSummary: { average: 0.84 }
+  });
+  const makeMeasurementOutput = () => ({
+    classStatistics: { studentCount: 2, averageScore: 14, maxScore: 20 },
+    questionStatistics: [{ questionId: "q1", averageScore: 7.5, maxScore: 10 }, { questionId: "q2", averageScore: 6.5, maxScore: 10 }],
+    learningOutcomeStatistics: [{ learningOutcomeId: "TDE.1", successRate: 0.75 }],
+    distribution: { high: 1, medium: 1, low: 0 },
+    anomalies: []
+  });
+  const makePedagogyOutput = () => ({
+    strengths: ["Metin çıkarımı güçlüdür."],
+    developmentAreas: ["Kanıt kullanımı geliştirilebilir."],
+    misconceptions: [],
+    teachingSuggestions: ["Kısa kanıt temelli yazma etkinliği uygulanabilir."],
+    monitoringPlan: ["Bir sonraki sınavda aynı kazanım izlenir."]
+  });
+  const makeEvidenceOutput = () => ({ evidenceItems: [evidenceItemDefault()], unsupportedClaims: [], confidenceSummary: { average: 0.85 } });
+  const makeValidationOutput = () => ({ valid: true, issues: [], blockingIssues: [], warnings: [], approvalRequired: true });
+  const makeReportOutput = () => ({
+    title: "Maarif Modeli Temelli Sınav Analizi ve Değerlendirme Raporu",
+    executiveSummary: "Örnek yürütücü özet.",
+    generalEvaluation: "Örnek genel değerlendirme.",
+    questionAnalysis: [],
+    learningOutcomeEvaluation: [],
+    strengths: ["Metin çıkarımı güçlüdür."],
+    developmentAreas: ["Kanıt kullanımı geliştirilebilir."],
+    teachingSuggestions: ["Kısa kanıt temelli yazma etkinliği uygulanabilir."],
+    monitoringPlan: ["Bir sonraki sınavda aynı kazanım izlenir."],
+    sourceReferences: [{ id: "src-1", title: "Örnek öğretim programı" }],
+    teacherReviewStatus: "pending"
+  });
+  const createContract = ({ name, description, required, optional = [], defaultFactory, customValidate }) => ({
+    name,
+    version: contractVersion,
+    description,
+    required,
+    optional,
+    validate(payload) {
+      const errors = [];
+      const warnings = [];
+      if (!utils.isPlainObject(payload)) {
+        errors.push({ fieldPath: "payload", message: `${name} plain object bekler.` });
+        return result(errors, warnings);
+      }
+      errors.push(...utils.validateRequiredPaths(payload, required));
+      if (typeof customValidate === "function") {
+        const customResult = customValidate(payload);
+        errors.push(...(customResult?.errors || []));
+        warnings.push(...(customResult?.warnings || []));
+      }
+      return result(errors, warnings);
+    },
+    createDefault() {
+      return utils.deepClone(defaultFactory());
+    }
+  });
+
+  const contracts = {
+    DocumentInput: createContract({
+      name: "DocumentInput", description: "DocumentAgent için öğretmen bağlamı ve yüklenen dosya girdisi.",
+      required: ["teacherContext", "uploadedFiles"], defaultFactory: () => ({ teacherContext: teacherContextDefault(), uploadedFiles: [uploadedDocumentDefault()] }),
+      customValidate(payload) { const errors = []; assertObject(payload, "teacherContext", errors); assertArray(payload, "uploadedFiles", errors); return { errors, warnings: [] }; }
+    }),
+    DocumentOutput: createContract({
+      name: "DocumentOutput", description: "DocumentAgent tarafından çıkarılan ham belge ve algılama çıktısı.",
+      required: ["documents", "extractedText", "detectedTables", "detectedQuestions", "detectedStudents", "ambiguities"], defaultFactory: makeDocumentOutput,
+      customValidate(payload) { const errors = []; ["documents", "extractedText", "detectedTables", "detectedQuestions", "detectedStudents", "ambiguities"].forEach((path) => assertArray(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    StructuringInput: createContract({
+      name: "StructuringInput", description: "StructuringAgent için DocumentOutput girdisi.",
+      required: ["documents", "extractedText", "detectedQuestions", "detectedStudents"], optional: ["detectedTables", "ambiguities"], defaultFactory: makeDocumentOutput,
+      customValidate(payload) { const errors = []; ["documents", "extractedText", "detectedQuestions", "detectedStudents"].forEach((path) => assertArray(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    StructuringOutput: createContract({
+      name: "StructuringOutput", description: "Yapılandırılmış sınav, soru, öğrenci ve puanlama modeli.",
+      required: ["exam", "questions", "students", "scoringModel", "ambiguities"], defaultFactory: makeStructuringOutput,
+      customValidate(payload) { const errors = []; assertObject(payload, "exam", errors); assertObject(payload, "scoringModel", errors); ["questions", "students", "ambiguities"].forEach((path) => assertArray(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    CurriculumInput: createContract({
+      name: "CurriculumInput", description: "CurriculumAgent için öğretmen bağlamı ve soru listesi.",
+      required: ["teacherContext", "questions"], defaultFactory: () => ({ teacherContext: teacherContextDefault(), questions: [examQuestionDefault(1), examQuestionDefault(2)] }),
+      customValidate(payload) { const errors = []; assertObject(payload, "teacherContext", errors); assertArray(payload, "questions", errors); return { errors, warnings: [] }; }
+    }),
+    CurriculumOutput: createContract({
+      name: "CurriculumOutput", description: "Öğrenme çıktısı eşleştirme ve kaynak referansları.",
+      required: ["curriculumMatches", "unmatchedQuestions", "sourceReferences", "confidenceSummary"], defaultFactory: makeCurriculumOutput,
+      customValidate(payload) { const errors = []; ["curriculumMatches", "unmatchedQuestions", "sourceReferences"].forEach((path) => assertArray(payload, path, errors)); assertObject(payload, "confidenceSummary", errors); return { errors, warnings: [] }; }
+    }),
+    MeasurementInput: createContract({
+      name: "MeasurementInput", description: "MeasurementAgent için soru, öğrenci, puanlama ve müfredat eşleşmeleri.",
+      required: ["questions", "students", "scoringModel", "curriculumMatches"], defaultFactory: () => ({ questions: [examQuestionDefault(1), examQuestionDefault(2)], students: [studentRecordDefault(1), studentRecordDefault(2)], scoringModel: { maxScore: 20, method: "sum" }, curriculumMatches: makeCurriculumOutput().curriculumMatches }),
+      customValidate(payload) { const errors = []; ["questions", "students", "curriculumMatches"].forEach((path) => assertArray(payload, path, errors)); assertObject(payload, "scoringModel", errors); return { errors, warnings: [] }; }
+    }),
+    MeasurementOutput: createContract({
+      name: "MeasurementOutput", description: "Sınıf, soru, kazanım istatistikleri ve dağılımlar.",
+      required: ["classStatistics", "questionStatistics", "learningOutcomeStatistics", "distribution", "anomalies"], defaultFactory: makeMeasurementOutput,
+      customValidate(payload) { const errors = []; assertObject(payload, "classStatistics", errors); assertObject(payload, "distribution", errors); ["questionStatistics", "learningOutcomeStatistics", "anomalies"].forEach((path) => assertArray(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    PedagogyInput: createContract({
+      name: "PedagogyInput", description: "PedagogyAgent için öğretmen bağlamı, ölçme ve müfredat çıktısı.",
+      required: ["teacherContext", "measurementOutput", "curriculumOutput"], defaultFactory: () => ({ teacherContext: teacherContextDefault(), measurementOutput: makeMeasurementOutput(), curriculumOutput: makeCurriculumOutput() }),
+      customValidate(payload) { const errors = []; ["teacherContext", "measurementOutput", "curriculumOutput"].forEach((path) => assertObject(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    PedagogyOutput: createContract({
+      name: "PedagogyOutput", description: "Güçlü alanlar, gelişim alanları ve öğretim önerileri.",
+      required: ["strengths", "developmentAreas", "misconceptions", "teachingSuggestions", "monitoringPlan"], defaultFactory: makePedagogyOutput,
+      customValidate(payload) { const errors = []; ["strengths", "developmentAreas", "misconceptions", "teachingSuggestions", "monitoringPlan"].forEach((path) => assertArray(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    EvidenceInput: createContract({
+      name: "EvidenceInput", description: "EvidenceAgent için ölçme, pedagoji ve müfredat çıktıları.",
+      required: ["measurementOutput", "pedagogyOutput", "curriculumOutput"], defaultFactory: () => ({ measurementOutput: makeMeasurementOutput(), pedagogyOutput: makePedagogyOutput(), curriculumOutput: makeCurriculumOutput() }),
+      customValidate(payload) { const errors = []; ["measurementOutput", "pedagogyOutput", "curriculumOutput"].forEach((path) => assertObject(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    EvidenceOutput: createContract({
+      name: "EvidenceOutput", description: "Kanıt maddeleri, desteklenmeyen iddialar ve güven özeti.",
+      required: ["evidenceItems", "unsupportedClaims", "confidenceSummary"], defaultFactory: makeEvidenceOutput,
+      customValidate(payload) { const errors = []; ["evidenceItems", "unsupportedClaims"].forEach((path) => assertArray(payload, path, errors)); assertObject(payload, "confidenceSummary", errors); return { errors, warnings: [] }; }
+    }),
+    ValidationInput: createContract({
+      name: "ValidationInput", description: "ValidationAgent için önceki tüm ajan çıktıları.",
+      required: ["documentOutput", "structuringOutput", "curriculumOutput", "measurementOutput", "pedagogyOutput", "evidenceOutput"], defaultFactory: () => ({ documentOutput: makeDocumentOutput(), structuringOutput: makeStructuringOutput(), curriculumOutput: makeCurriculumOutput(), measurementOutput: makeMeasurementOutput(), pedagogyOutput: makePedagogyOutput(), evidenceOutput: makeEvidenceOutput() }),
+      customValidate(payload) { const errors = []; ["documentOutput", "structuringOutput", "curriculumOutput", "measurementOutput", "pedagogyOutput", "evidenceOutput"].forEach((path) => assertObject(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    ValidationOutput: createContract({
+      name: "ValidationOutput", description: "Bloklayıcı konular, uyarılar ve öğretmen onayı gereksinimi.",
+      required: ["valid", "issues", "blockingIssues", "warnings", "approvalRequired"], defaultFactory: makeValidationOutput,
+      customValidate(payload) { const errors = []; ["issues", "blockingIssues", "warnings"].forEach((path) => assertArray(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    ReportInput: createContract({
+      name: "ReportInput", description: "ReportAgent için rapor üretim bağlamı ve doğrulanmış ajan çıktıları.",
+      required: ["teacherContext", "structuredData", "curriculumOutput", "measurementOutput", "pedagogyOutput", "evidenceOutput", "validationOutput"], defaultFactory: () => ({ teacherContext: teacherContextDefault(), structuredData: makeStructuringOutput(), curriculumOutput: makeCurriculumOutput(), measurementOutput: makeMeasurementOutput(), pedagogyOutput: makePedagogyOutput(), evidenceOutput: makeEvidenceOutput(), validationOutput: makeValidationOutput() }),
+      customValidate(payload) { const errors = []; ["teacherContext", "structuredData", "curriculumOutput", "measurementOutput", "pedagogyOutput", "evidenceOutput", "validationOutput"].forEach((path) => assertObject(payload, path, errors)); return { errors, warnings: [] }; }
+    }),
+    ReportOutput: createContract({
+      name: "ReportOutput", description: "Öğretmen incelemesine hazır rapor taslağı bölümleri.",
+      required: ["title", "executiveSummary", "generalEvaluation", "questionAnalysis", "learningOutcomeEvaluation", "strengths", "developmentAreas", "teachingSuggestions", "monitoringPlan", "sourceReferences", "teacherReviewStatus"], defaultFactory: makeReportOutput,
+      customValidate(payload) { const errors = []; ["questionAnalysis", "learningOutcomeEvaluation", "strengths", "developmentAreas", "teachingSuggestions", "monitoringPlan", "sourceReferences"].forEach((path) => assertArray(payload, path, errors)); return { errors, warnings: [] }; }
+    })
+  };
+
+  const createSchemaRegistry = () => {
+    const registry = new Map();
+    return {
+      register(name, contract) { registry.set(name, contract); return contract; },
+      get(name) { return registry.get(name); },
+      has(name) { return registry.has(name); },
+      list() { return Array.from(registry.keys()); },
+      validate(name, payload) {
+        const contract = registry.get(name);
+        return contract ? contract.validate(payload) : result([{ fieldPath: name, message: `${name} sözleşmesi bulunamadı.` }], []);
+      }
+    };
+  };
+  const createAgentOutputs = () => ({
+    document: null,
+    structuring: null,
+    curriculum: null,
+    measurement: null,
+    pedagogy: null,
+    evidence: null,
+    validation: null,
+    report: null
+  });
+  const agentContracts = {
+    DocumentAgent: { input: "DocumentInput", output: "DocumentOutput", stateKey: "document" },
+    StructuringAgent: { input: "StructuringInput", output: "StructuringOutput", stateKey: "structuring" },
+    CurriculumAgent: { input: "CurriculumInput", output: "CurriculumOutput", stateKey: "curriculum" },
+    MeasurementAgent: { input: "MeasurementInput", output: "MeasurementOutput", stateKey: "measurement" },
+    PedagogyAgent: { input: "PedagogyInput", output: "PedagogyOutput", stateKey: "pedagogy" },
+    EvidenceAgent: { input: "EvidenceInput", output: "EvidenceOutput", stateKey: "evidence" },
+    ValidationAgent: { input: "ValidationInput", output: "ValidationOutput", stateKey: "validation" },
+    ReportAgent: { input: "ReportInput", output: "ReportOutput", stateKey: "report" }
+  };
+
+  const schemaRegistry = createSchemaRegistry();
+  Object.values(contracts).forEach((contract) => schemaRegistry.register(contract.name, contract));
+
+  MAHIR.version = "0.24.0";
+  MAHIR.utils = utils;
+  MAHIR.contracts = contracts;
+  MAHIR.dataTypes = dataTypes;
+  MAHIR.schemaRegistry = schemaRegistry;
+  MAHIR.state.contracts = contracts;
+  MAHIR.state.pipeline = MAHIR.state.pipeline || {};
+  MAHIR.state.pipeline.flow = Object.keys(agentContracts);
+  MAHIR.state.agentOutputs = MAHIR.state.agentOutputs || createAgentOutputs();
+  MAHIR.state.validationIssues = MAHIR.state.validationIssues || [];
+  MAHIR.state.auditLog = MAHIR.state.auditLog || [];
+
+  if (typeof MAHIR.logger.error !== "function") {
+    MAHIR.logger.error = (message, details = {}) => {
+      const entry = { id: utils.createId("mahir-log"), message, details, createdAt: utils.nowIso(), status: "error", success: false };
+      MAHIR.state.logs.push(entry);
+      return entry;
+    };
+  }
+
+  Object.entries(agentContracts).forEach(([agentName, config]) => {
+    const agent = MAHIR.agents[agentName];
+    if (!agent) {
+      return;
+    }
+    agent.contract = config;
+    agent.execute = () => {
+      agent.status = "executed";
+      return Promise.resolve(contracts[config.output].createDefault());
+    };
+  });
+
+  const composeInput = (agentName, initialInput) => {
+    const outputs = MAHIR.state.agentOutputs;
+    const factories = {
+      DocumentAgent: () => initialInput,
+      StructuringAgent: () => outputs.document,
+      CurriculumAgent: () => ({ teacherContext: initialInput.teacherContext, questions: outputs.structuring?.questions || [] }),
+      MeasurementAgent: () => ({ questions: outputs.structuring?.questions || [], students: outputs.structuring?.students || [], scoringModel: outputs.structuring?.scoringModel || {}, curriculumMatches: outputs.curriculum?.curriculumMatches || [] }),
+      PedagogyAgent: () => ({ teacherContext: initialInput.teacherContext, measurementOutput: outputs.measurement, curriculumOutput: outputs.curriculum }),
+      EvidenceAgent: () => ({ measurementOutput: outputs.measurement, pedagogyOutput: outputs.pedagogy, curriculumOutput: outputs.curriculum }),
+      ValidationAgent: () => ({ documentOutput: outputs.document, structuringOutput: outputs.structuring, curriculumOutput: outputs.curriculum, measurementOutput: outputs.measurement, pedagogyOutput: outputs.pedagogy, evidenceOutput: outputs.evidence }),
+      ReportAgent: () => ({ teacherContext: initialInput.teacherContext, structuredData: outputs.structuring, curriculumOutput: outputs.curriculum, measurementOutput: outputs.measurement, pedagogyOutput: outputs.pedagogy, evidenceOutput: outputs.evidence, validationOutput: outputs.validation })
+    };
+    return factories[agentName]();
+  };
+
+  const createIssue = (agentName, validationResult, phase) => ({
+    id: utils.createId("validation-issue"),
+    severity: "blocking",
+    code: `CONTRACT_${phase.toUpperCase()}_INVALID`,
+    message: `${agentName} ${phase} sözleşme doğrulaması başarısız oldu.`,
+    sourceAgent: agentName,
+    fieldPath: validationResult.errors[0]?.fieldPath || "payload",
+    suggestion: "Sözleşme zorunlu alanları tamamlanmalıdır.",
+    errors: validationResult.errors,
+    warnings: validationResult.warnings
+  });
+  const writeAudit = ({ agentName, status, durationMs, input, output, errors = [] }) => {
+    MAHIR.state.auditLog.push({
+      id: utils.createId("audit"),
+      timestamp: utils.nowIso(),
+      agent: agentName,
+      action: "execute",
+      status,
+      durationMs,
+      inputSummary: utils.summarizePayload(input),
+      outputSummary: utils.summarizePayload(output),
+      errors
+    });
+  };
+  const stopWithIssue = (agentName, validationResult, phase) => {
+    const issue = createIssue(agentName, validationResult, phase);
+    MAHIR.state.validationIssues.push(issue);
+    MAHIR.state.pipeline.status = "failed";
+    MAHIR.state.pipeline.currentAgent = agentName;
+    MAHIR.state.pipeline.completedAt = utils.nowIso();
+    MAHIR.orchestrator.status = "failed";
+    MAHIR.logger.error(issue.message, { issue });
+    MAHIR.events.emit("mahir:pipeline:error", { agent: agentName, phase, issue });
+    return { status: "failed", agent: agentName, phase, issue };
+  };
+
+  MAHIR.orchestrator.createMockInput = () => contracts.DocumentInput.createDefault();
+  MAHIR.orchestrator.run = async (initialInput = MAHIR.orchestrator.createMockInput()) => {
+    MAHIR.state.agentOutputs = createAgentOutputs();
+    MAHIR.state.validationIssues = [];
+    MAHIR.state.auditLog = [];
+    MAHIR.state.pipeline = { status: "running", currentAgent: null, flow: [...MAHIR.orchestrator.flow], startedAt: utils.nowIso(), completedAt: null };
+    MAHIR.orchestrator.status = "running";
+    MAHIR.events.emit("orchestrator:started", { flow: [...MAHIR.orchestrator.flow] });
+
+    for (const agentName of MAHIR.orchestrator.flow) {
+      const agent = MAHIR.agents[agentName];
+      const config = agentContracts[agentName];
+      const input = composeInput(agentName, initialInput);
+      MAHIR.state.pipeline.currentAgent = agentName;
+      const inputValidation = schemaRegistry.validate(config.input, input);
+      if (!inputValidation.valid) {
+        writeAudit({ agentName, status: "failed", durationMs: 0, input, output: null, errors: inputValidation.errors });
+        return stopWithIssue(agentName, inputValidation, "input");
+      }
+
+      console.info(`[MAHIR] ${agentName} başladı`);
+      const logEntry = MAHIR.logger.start(agentName);
+      MAHIR.events.emit("agent:started", { agent: agentName });
+      try {
+        await agent.initialize(input);
+        const output = await agent.execute(input);
+        await agent.validate(output);
+        await agent.export(output);
+        const outputValidation = schemaRegistry.validate(config.output, output);
+        if (!outputValidation.valid) {
+          MAHIR.logger.finish(logEntry, false);
+          writeAudit({ agentName, status: "failed", durationMs: logEntry.durationMs || 0, input, output, errors: outputValidation.errors });
+          return stopWithIssue(agentName, outputValidation, "output");
+        }
+        MAHIR.state.agentOutputs[config.stateKey] = output;
+        MAHIR.logger.finish(logEntry, true);
+        writeAudit({ agentName, status: "completed", durationMs: logEntry.durationMs || 0, input, output });
+        MAHIR.events.emit("agent:completed", { agent: agentName, log: logEntry });
+        MAHIR.events.emit("mahir:agent:completed", { agent: agentName, output });
+        console.info(`[MAHIR] ${agentName} bitti`);
+      } catch (error) {
+        MAHIR.logger.finish(logEntry, false);
+        const runtimeResult = result([{ fieldPath: agentName, message: error.message }], []);
+        writeAudit({ agentName, status: "failed", durationMs: logEntry.durationMs || 0, input, output: null, errors: runtimeResult.errors });
+        return stopWithIssue(agentName, runtimeResult, "runtime");
+      }
+    }
+
+    MAHIR.orchestrator.status = "completed";
+    MAHIR.state.pipeline.status = "completed";
+    MAHIR.state.pipeline.currentAgent = null;
+    MAHIR.state.pipeline.completedAt = utils.nowIso();
+    const completed = { status: "completed", flow: [...MAHIR.orchestrator.flow] };
+    MAHIR.events.emit("orchestrator:completed", completed);
+    return completed;
+  };
+  MAHIR.orchestrator.reset = () => {
+    MAHIR.orchestrator.status = "idle";
+    MAHIR.state.agentOutputs = createAgentOutputs();
+    MAHIR.state.validationIssues = [];
+    MAHIR.state.auditLog = [];
+    return Promise.all(MAHIR.orchestrator.flow.map((agentName) => MAHIR.agents[agentName]?.reset()));
+  };
+
+  MAHIR.logger.info("MAHIR contracts initialized", { contractCount: schemaRegistry.list().length });
+  console.info("MAHIR contracts initialized");
+})();
 const preparationManager = (() => {
   const emptyText = "Henüz seçilmedi";
   const mtalSchoolType = "Mesleki ve Teknik Anadolu Lisesi";
