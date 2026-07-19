@@ -1,0 +1,170 @@
+"""Minimal local file receiver for MAHIR frontend/backend integration.
+
+The receiver only detects that a file reached the Python backend and validates
+its filename extension. It does not save, read, analyze, OCR, or process the
+uploaded file content.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path, PurePosixPath, PureWindowsPath
+from urllib.parse import urlparse
+
+
+UPLOAD_PATH = "/mahir-upload"
+ALLOWED_EXTENSIONS = {
+    ".csv",
+    ".doc",
+    ".docx",
+    ".gif",
+    ".jpeg",
+    ".jpg",
+    ".pdf",
+    ".png",
+    ".webp",
+    ".xls",
+    ".xlsx",
+}
+
+
+@dataclass(frozen=True)
+class FileCheckResult:
+    """Filename and extension validation result."""
+
+    file_name: str
+    extension: str
+    is_allowed: bool
+
+
+class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
+    """Serve the prototype and receive a selected file from the browser."""
+
+    server_version = "MAHIRFileReceiver/0.1"
+
+    def end_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        super().end_headers()
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self.end_headers()
+
+    def do_POST(self) -> None:
+        if urlparse(self.path).path != UPLOAD_PATH:
+            self._send_json(404, {"ok": False, "message": "Bilinmeyen alıcı yolu."})
+            return
+
+        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        content_type = self.headers.get("Content-Type", "")
+
+        if content_length <= 0:
+            self._send_json(400, {"ok": False, "message": "Dosya verisi alınamadı."})
+            return
+
+        body = self.rfile.read(content_length)
+        file_name = extract_filename(body, content_type)
+        result = validate_file_name(file_name)
+
+        if result.is_allowed:
+            print(
+                f"[MAHIR] Dosya alındı: {result.file_name} | Uzantı: {result.extension}",
+                flush=True,
+            )
+            self._send_json(
+                200,
+                {
+                    "ok": True,
+                    "fileName": result.file_name,
+                    "extension": result.extension,
+                    "message": "Dosya backend tarafından algılandı.",
+                },
+            )
+            return
+
+        print(
+            f"[MAHIR] Dosya reddedildi: {result.file_name or 'adsız dosya'} | Uzantı: {result.extension or 'yok'}",
+            flush=True,
+        )
+        self._send_json(
+            400,
+            {
+                "ok": False,
+                "fileName": result.file_name,
+                "extension": result.extension,
+                "message": "Dosya uzantısı desteklenen biçimlerle eşleşmedi.",
+            },
+        )
+
+    def _send_json(self, status_code: int, payload: dict[str, object]) -> None:
+        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+
+def extract_filename(body: bytes, content_type: str) -> str:
+    """Extract a browser-supplied filename from multipart form data."""
+
+    boundary = _extract_boundary(content_type)
+
+    if not boundary:
+        return ""
+
+    for part in body.split(b"--" + boundary):
+        if b"Content-Disposition:" not in part:
+            continue
+
+        headers, _, _content = part.partition(b"\r\n\r\n")
+        header_text = headers.decode("utf-8", errors="replace")
+        match = re.search(r'filename="([^"]*)"', header_text)
+
+        if match:
+            return _clean_filename(match.group(1))
+
+    return ""
+
+
+def validate_file_name(file_name: str) -> FileCheckResult:
+    """Validate only the filename extension."""
+
+    clean_name = _clean_filename(file_name)
+    extension = Path(clean_name).suffix.lower()
+    return FileCheckResult(
+        file_name=clean_name,
+        extension=extension,
+        is_allowed=bool(clean_name and extension in ALLOWED_EXTENSIONS),
+    )
+
+
+def create_server(host: str = "127.0.0.1", port: int = 8000) -> ThreadingHTTPServer:
+    """Create a local server rooted at the project directory."""
+
+    project_root = Path(__file__).resolve().parents[2]
+
+    class ProjectHandler(MAHIRFileReceiverHandler):
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            super().__init__(*args, directory=str(project_root), **kwargs)
+
+    return ThreadingHTTPServer((host, port), ProjectHandler)
+
+
+def _extract_boundary(content_type: str) -> bytes:
+    match = re.search(r"boundary=([^;]+)", content_type)
+
+    if not match:
+        return b""
+
+    return match.group(1).strip().strip('"').encode("utf-8")
+
+
+def _clean_filename(file_name: str) -> str:
+    windows_name = PureWindowsPath(file_name or "").name
+    return PurePosixPath(windows_name).name

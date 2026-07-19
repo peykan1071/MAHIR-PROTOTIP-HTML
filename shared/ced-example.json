@@ -1,0 +1,63 @@
+{
+  "metadata": {
+    "ced_version": "0.1.0",
+    "created_at": "2026-07-19T00:00:00+03:00",
+    "source": "manual_prototype",
+    "language": "tr"
+  },
+  "assessment": {
+    "id": "assessment-001",
+    "title": "Sınav Analizi ve Değerlendirme Raporu Örnek Sınavı",
+    "course": "Türk Dili ve Edebiyatı",
+    "education_level": "Ortaöğretim",
+    "school_type": "Anadolu Lisesi",
+    "grade": "10",
+    "exam_type": "Yazılı Sınav",
+    "exam_date": null,
+    "question_count": 2,
+    "total_score": 100
+  },
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "text": "Örnek soru metni",
+      "max_score": 50,
+      "learning_outcome_ids": [],
+      "answer_key": null
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "text": "Örnek soru metni",
+      "max_score": 50,
+      "learning_outcome_ids": [],
+      "answer_key": null
+    }
+  ],
+  "student_results": [
+    {
+      "student_no": "101",
+      "full_name": "Ayşe Yılmaz",
+      "question_scores": [
+        {
+          "question_id": "q1",
+          "score": 42
+        },
+        {
+          "question_id": "q2",
+          "score": 40
+        }
+      ],
+      "answers": [],
+      "total_score": 82
+    }
+  ],
+  "validation": {
+    "valid": true,
+    "issues": [],
+    "warnings": [
+      "Bu dosya CED veri yapısını göstermek için hazırlanmış örnek kayıttır."
+    ]
+  }
+}

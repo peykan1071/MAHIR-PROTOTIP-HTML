@@ -2354,7 +2354,48 @@ const screenManager = (() => {
   };
 })();
 
+
+const fileUploadBridge = (() => {
+  const endpoint = window.location.protocol === "file:"
+    ? "http://127.0.0.1:8000/mahir-upload"
+    : "/mahir-upload";
+
+  const init = () => {
+    const fileInput = document.querySelector("#exam-file");
+
+    if (!fileInput || typeof FormData === "undefined" || typeof fetch === "undefined") {
+      return;
+    }
+
+    fileInput.addEventListener("change", () => {
+      const selectedFile = fileInput.files?.[0];
+
+      if (!selectedFile) {
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("exam-file", selectedFile);
+
+      fetch(endpoint, {
+        method: "POST",
+        body: formData
+      })
+        .then((response) => response.json().catch(() => ({})).then((payload) => ({ response, payload })))
+        .then(({ response, payload }) => {
+          const logMethod = response.ok ? "info" : "warn";
+          console[logMethod]("[MAHIR] Dosya backend alıcısına gönderildi.", payload);
+        })
+        .catch((error) => {
+          console.warn("[MAHIR] Dosya backend alıcısına gönderilemedi.", error);
+        });
+    });
+  };
+
+  return { init };
+})();
 document.addEventListener("DOMContentLoaded", () => {
   preparationManager.init();
   screenManager.init();
+  fileUploadBridge.init();
 });
