@@ -1,0 +1,24 @@
+MAHİR ANALİZ RAPORU
+
+1. Sınav Özeti
+- Sınav adı: Sample Exam CSV
+- Soru sayısı: 3
+- Toplam puan: 30
+- Öğrenci sayısı: 3
+
+2. Soru Bazlı Başarı
+- Soru 1 (q1): %66.67
+- Soru 2 (q2): %66.67
+- Soru 3 (q3): %100.00
+
+3. Öğrenme Çıktısı Bazlı Başarı
+- MAT.5.1: %83.33
+  Doğal sayılarla toplama ve çarpma işlemlerini yapar.
+- SOS.5.1: %66.67
+  Türkiye'nin başkentini ve temel coğrafi bilgilerini açıklar.
+
+4. Pedagojik Kararlar
+- MAT.5.1: %83.33 | Güçlü
+  Karar: Öğrenme çıktısı güçlü düzeydedir; pekiştirme etkinlikleriyle sürdürülmelidir.
+- SOS.5.1: %66.67 | Geliştirilmeli
+  Karar: Öğrenme çıktısı kısmen kazanılmıştır; hedefli tekrar ve ek örneklerle desteklenmelidir.
