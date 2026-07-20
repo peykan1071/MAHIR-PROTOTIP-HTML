@@ -1,0 +1,58 @@
+{
+  "student_results": [
+    {
+      "student_no": "101",
+      "full_name": "Ayşe Yılmaz",
+      "answers": [
+        {
+          "question_id": "q1",
+          "answer": "B"
+        },
+        {
+          "question_id": "q2",
+          "answer": "A"
+        },
+        {
+          "question_id": "q3",
+          "answer": "C"
+        }
+      ]
+    },
+    {
+      "student_no": "102",
+      "full_name": "Mehmet Kaya",
+      "answers": [
+        {
+          "question_id": "q1",
+          "answer": "B"
+        },
+        {
+          "question_id": "q2",
+          "answer": "C"
+        },
+        {
+          "question_id": "q3",
+          "answer": "C"
+        }
+      ]
+    },
+    {
+      "student_no": "103",
+      "full_name": "Zeynep Demir",
+      "answers": [
+        {
+          "question_id": "q1",
+          "answer": "A"
+        },
+        {
+          "question_id": "q2",
+          "answer": "A"
+        },
+        {
+          "question_id": "q3",
+          "answer": "C"
+        }
+      ]
+    }
+  ]
+}
