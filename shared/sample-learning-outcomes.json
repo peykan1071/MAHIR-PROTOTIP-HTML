@@ -1,0 +1,19 @@
+{
+  "learning_outcomes": [
+    {
+      "id": "MAT.5.1",
+      "title": "Doğal sayılarla toplama ve çarpma işlemlerini yapar.",
+      "keywords": ["2+2", "5x3", "kaçtır", "toplama", "çarpma"]
+    },
+    {
+      "id": "SOS.5.1",
+      "title": "Türkiye'nin başkentini ve temel coğrafi bilgilerini açıklar.",
+      "keywords": ["Türkiye", "başkenti", "Ankara"]
+    },
+    {
+      "id": "GEN.1",
+      "title": "Temel bilgi ve kavrama düzeyindeki soruları yanıtlar.",
+      "keywords": []
+    }
+  ]
+}
