@@ -2383,6 +2383,13 @@ const fileUploadBridge = (() => {
       });
     };
 
+    const showReport = (text) => {
+      const reportTarget = document.querySelector("#report-screen .summary-card p");
+      if (!reportTarget) return;
+      reportTarget.textContent = text;
+      reportTarget.style.whiteSpace = "pre-line";
+    };
+
     fileInput.addEventListener("change", () => {
       const selectedFile = fileInput.files?.[0];
 
@@ -2409,7 +2416,14 @@ const fileUploadBridge = (() => {
           const logMethod = response.ok ? "info" : "warn";
           const message = payload.message || (response.ok ? "Dosya başarıyla işlendi." : "Dosya işlenemedi.");
           window.clearInterval(progressTimer);
-          if (response.ok) showProgressStep(progressTexts.length - 1);
+          if (response.ok) {
+            showProgressStep(progressTexts.length - 1);
+            const reportText = payload.reportText || payload.report || payload.report_text;
+            const reportRequest = reportText ? Promise.resolve(reportText) : fetch(`/shared/report-example.txt?ts=${Date.now()}`).then((reportResponse) => reportResponse.ok ? reportResponse.text() : message);
+            reportRequest.then(showReport).catch(() => showReport(message));
+          } else {
+            showReport(message);
+          }
           console[logMethod]("[MAHIR] Dosya backend alıcısına gönderildi.", payload);
           showMessage(message);
         })
@@ -2417,6 +2431,7 @@ const fileUploadBridge = (() => {
           window.clearInterval(progressTimer);
           console.warn("[MAHIR] Dosya backend alıcısına gönderilemedi.", error);
           showMessage("Backend bağlantısı kurulamadı.");
+          showReport("Backend bağlantısı kurulamadı.");
         });
     });
   };
