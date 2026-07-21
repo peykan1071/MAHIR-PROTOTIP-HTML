@@ -2356,16 +2356,14 @@ const screenManager = (() => {
 
 
 const fileUploadBridge = (() => {
-  const endpoint = window.location.protocol === "file:"
-    ? "http://127.0.0.1:8000/mahir-upload"
-    : "/mahir-upload";
-
   const init = () => {
     const fileInput = document.querySelector("#exam-file");
 
     if (!fileInput || typeof FormData === "undefined" || typeof fetch === "undefined") {
       return;
     }
+
+    const statusMessage = fileInput.form?.querySelector(".notification-message");
 
     fileInput.addEventListener("change", () => {
       const selectedFile = fileInput.files?.[0];
@@ -2377,17 +2375,24 @@ const fileUploadBridge = (() => {
       const formData = new FormData();
       formData.append("exam-file", selectedFile);
 
-      fetch(endpoint, {
+      fetch("/mahir-upload", {
         method: "POST",
         body: formData
       })
         .then((response) => response.json().catch(() => ({})).then((payload) => ({ response, payload })))
         .then(({ response, payload }) => {
           const logMethod = response.ok ? "info" : "warn";
+          const message = payload.message || (response.ok ? "Dosya başarıyla işlendi." : "Dosya işlenemedi.");
           console[logMethod]("[MAHIR] Dosya backend alıcısına gönderildi.", payload);
+          if (statusMessage) {
+            statusMessage.textContent = message;
+          }
         })
         .catch((error) => {
           console.warn("[MAHIR] Dosya backend alıcısına gönderilemedi.", error);
+          if (statusMessage) {
+            statusMessage.textContent = "Backend bağlantısı kurulamadı.";
+          }
         });
     });
   };
