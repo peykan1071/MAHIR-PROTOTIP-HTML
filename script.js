@@ -2356,6 +2356,8 @@ const screenManager = (() => {
 
 
 const fileUploadBridge = (() => {
+  const progressTexts = ["✓ Dosya alındı", "✓ CSV okunuyor", "✓ CED oluşturuluyor", "✓ Program eşleştiriliyor", "✓ Ölçme analizi yapılıyor", "✓ Pedagojik analiz yapılıyor", "✓ Rapor hazırlanıyor", "✓ Tamamlandı"];
+
   const init = () => {
     const fileInput = document.querySelector("#exam-file");
 
@@ -2364,6 +2366,22 @@ const fileUploadBridge = (() => {
     }
 
     const statusMessage = fileInput.form?.querySelector(".notification-message");
+    let progressTimer;
+
+    const showMessage = (message) => {
+      const analysisMessage = document.querySelector("#analysis-screen .notification-message");
+      if (statusMessage) statusMessage.textContent = message;
+      if (analysisMessage) analysisMessage.textContent = message;
+    };
+
+    const showProgressStep = (activeIndex) => {
+      const list = document.querySelector("#analysis-screen .analysis-progress ol");
+      if (!list) return;
+      while (list.children.length < progressTexts.length) list.append(document.createElement("li"));
+      Array.from(list.children).forEach((item, index) => {
+        item.textContent = index <= activeIndex ? progressTexts[index] : progressTexts[index].replace("✓ ", "");
+      });
+    };
 
     fileInput.addEventListener("change", () => {
       const selectedFile = fileInput.files?.[0];
@@ -2373,7 +2391,14 @@ const fileUploadBridge = (() => {
       }
 
       const formData = new FormData();
+      let progressIndex = 0;
       formData.append("exam-file", selectedFile);
+      document.querySelector('[data-approval-action="confirm-data"]')?.click();
+      window.clearInterval(progressTimer);
+      showProgressStep(progressIndex);
+      progressTimer = window.setInterval(() => {
+        if (progressIndex < progressTexts.length - 2) showProgressStep(++progressIndex);
+      }, 500);
 
       fetch("/mahir-upload", {
         method: "POST",
@@ -2383,16 +2408,15 @@ const fileUploadBridge = (() => {
         .then(({ response, payload }) => {
           const logMethod = response.ok ? "info" : "warn";
           const message = payload.message || (response.ok ? "Dosya başarıyla işlendi." : "Dosya işlenemedi.");
+          window.clearInterval(progressTimer);
+          if (response.ok) showProgressStep(progressTexts.length - 1);
           console[logMethod]("[MAHIR] Dosya backend alıcısına gönderildi.", payload);
-          if (statusMessage) {
-            statusMessage.textContent = message;
-          }
+          showMessage(message);
         })
         .catch((error) => {
+          window.clearInterval(progressTimer);
           console.warn("[MAHIR] Dosya backend alıcısına gönderilemedi.", error);
-          if (statusMessage) {
-            statusMessage.textContent = "Backend bağlantısı kurulamadı.";
-          }
+          showMessage("Backend bağlantısı kurulamadı.");
         });
     });
   };
