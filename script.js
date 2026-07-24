@@ -2333,7 +2333,8 @@ const screenManager = (() => {
         }
 
         if (control.dataset.approvalAction === "confirm-data") {
-          setDataApprovalState(true);
+          document.dispatchEvent(new CustomEvent("mahir:confirm-data"));
+          return;
         }
 
         showScreen(control.dataset.targetScreen);
@@ -2350,7 +2351,10 @@ const screenManager = (() => {
 
   return {
     init,
-    showScreen
+    showScreen,
+    approveData() {
+      setDataApprovalState(true);
+    }
   };
 })();
 
@@ -2378,6 +2382,7 @@ const fileUploadBridge = (() => {
     }
 
     let selectedFile = null;
+    let structuredData = null;
     let previewUrl = null;
     let progressTimer;
 
@@ -2489,13 +2494,14 @@ const fileUploadBridge = (() => {
       reportTarget.style.whiteSpace = "pre-line";
     };
 
-    const editableCell = (value, label, type = "text") => {
+    const editableCell = (value, label, type = "text", field = "") => {
       const cell = document.createElement("td");
       const input = document.createElement("input");
       input.className = "validation-input";
       input.type = type;
       input.value = value ?? "";
       input.setAttribute("aria-label", label);
+      if (field) input.dataset.validationField = field;
       if (type === "number") input.step = "0.01";
       cell.append(input);
       return cell;
@@ -2503,6 +2509,7 @@ const fileUploadBridge = (() => {
 
     const renderValidationData = (data) => {
       if (!data) return;
+      structuredData = data;
       const questionBody = document.querySelector("[data-validation-questions]");
       const studentHead = document.querySelector("[data-validation-student-head]");
       const studentBody = document.querySelector("[data-validation-students]");
@@ -2513,12 +2520,15 @@ const fileUploadBridge = (() => {
       questionBody?.replaceChildren();
       questions.forEach((question) => {
         const row = document.createElement("tr");
+        row.dataset.questionRow = "";
         row.append(
-          editableCell(`${question.number}. Soru`, `${question.number}. soru numarası`),
-          editableCell(question.maxScore, `${question.number}. soru azami puanı`, "number"),
+          editableCell(question.number, `${question.number}. soru numarası`, "number", "number"),
+          editableCell(question.maxScore, `${question.number}. soru azami puanı`, "number", "maxScore"),
           editableCell(
-            [question.outcomeCode, question.outcomeDescription].filter(Boolean).join(" — "),
-            `${question.number}. soru öğrenme çıktısı`
+            question.outcomeCode,
+            `${question.number}. soru öğrenme çıktısı kodu`,
+            "text",
+            "outcomeCode"
           )
         );
         questionBody?.append(row);
@@ -2539,16 +2549,18 @@ const fileUploadBridge = (() => {
       studentBody?.replaceChildren();
       (data.students || []).forEach((student) => {
         const row = document.createElement("tr");
+        row.dataset.studentRow = "";
+        row.dataset.rowNumber = student.rowNumber;
         row.append(
-          editableCell(student.studentNo, `${student.fullName || student.rowNumber} okul numarası`),
-          editableCell(student.fullName, `${student.rowNumber}. öğrenci adı soyadı`)
+          editableCell(student.studentNo, `${student.fullName || student.rowNumber} okul numarası`, "text", "studentNo"),
+          editableCell(student.fullName, `${student.rowNumber}. öğrenci adı soyadı`, "text", "fullName")
         );
         questions.forEach((question, index) => {
-          row.append(editableCell(student.scores?.[index], `${student.fullName || student.rowNumber} S${question.number} puanı`, "number"));
+          row.append(editableCell(student.scores?.[index], `${student.fullName || student.rowNumber} S${question.number} puanı`, "number", "score"));
         });
         row.append(
-          editableCell(student.totalScore, `${student.fullName || student.rowNumber} toplam puanı`, "number"),
-          editableCell(student.attendance, `${student.fullName || student.rowNumber} katılım durumu`)
+          editableCell(student.totalScore, `${student.fullName || student.rowNumber} toplam puanı`, "number", "totalScore"),
+          editableCell(student.attendance, `${student.fullName || student.rowNumber} katılım durumu`, "text", "attendance")
         );
         studentBody?.append(row);
       });
@@ -2568,6 +2580,85 @@ const fileUploadBridge = (() => {
           warningList.append(item);
         });
       }
+    };
+
+    const numberValue = (input) => {
+      const value = input?.value.trim().replace(",", ".");
+      return value === "" ? null : Number(value);
+    };
+
+    const collectApprovedData = () => {
+      const questions = Array.from(document.querySelectorAll("[data-question-row]")).map((row) => ({
+        number: numberValue(row.querySelector('[data-validation-field="number"]')),
+        maxScore: numberValue(row.querySelector('[data-validation-field="maxScore"]')),
+        outcomeCode: row.querySelector('[data-validation-field="outcomeCode"]')?.value.trim() || ""
+      }));
+      const students = Array.from(document.querySelectorAll("[data-student-row]")).map((row) => ({
+        rowNumber: Number(row.dataset.rowNumber),
+        studentNo: row.querySelector('[data-validation-field="studentNo"]')?.value.trim() || "",
+        fullName: row.querySelector('[data-validation-field="fullName"]')?.value.trim() || "",
+        scores: Array.from(row.querySelectorAll('[data-validation-field="score"]')).map(numberValue),
+        totalScore: numberValue(row.querySelector('[data-validation-field="totalScore"]')),
+        attendance: row.querySelector('[data-validation-field="attendance"]')?.value.trim() || "Girdi"
+      }));
+      return { exam: structuredData?.exam || {}, questions, students };
+    };
+
+    const renderAnalysis = (analysis) => {
+      const summary = analysis.summary || {};
+      const reportSummary = document.querySelector("#report-screen .summary-card p");
+      const general = document.querySelector("#report-screen [aria-labelledby='general-evaluation-title'] p");
+      const analysisTable = document.querySelector("#report-screen [aria-labelledby='analysis-table-title'] p");
+      const outcomes = document.querySelector("#report-screen [aria-labelledby='learning-outcomes-title'] p");
+      const strong = document.querySelector("#report-screen [aria-labelledby='strong-areas-title'] p");
+      const development = document.querySelector("#report-screen [aria-labelledby='development-areas-title'] p");
+      const suggestions = document.querySelector("#report-screen [aria-labelledby='teaching-suggestions-title'] p");
+      const percent = (rate) => `%${((rate || 0) * 100).toFixed(2)}`;
+      const strongOutcomes = (analysis.outcomes || []).filter((item) => item.successRate >= 0.70);
+      const developmentOutcomes = (analysis.outcomes || []).filter((item) => item.successRate < 0.70);
+
+      if (reportSummary) reportSummary.textContent = `${summary.participatingStudentCount} öğrencinin ${summary.questionCount} soruya ait öğretmen onaylı puanları analiz edilmiştir.`;
+      if (general) general.textContent = `Sınıf ortalaması ${summary.classAverage}; genel başarı oranı ${percent(summary.classSuccessRate)} olarak hesaplanmıştır. Sınava katılmayan öğrenci sayısı ${summary.absentStudentCount}.`;
+      if (analysisTable) analysisTable.textContent = (analysis.questions || []).map((item) => `Soru ${item.number}: ${percent(item.successRate)}`).join(" · ");
+      if (outcomes) outcomes.textContent = (analysis.outcomes || []).map((item) => `${item.outcomeCode}: ${percent(item.successRate)} (${item.category})`).join(" · ");
+      if (strong) strong.textContent = strongOutcomes.length ? strongOutcomes.map((item) => `${item.outcomeCode} — ${percent(item.successRate)}`).join(" · ") : "Güçlü alan eşiğine ulaşan öğrenme çıktısı bulunmamaktadır.";
+      if (development) development.textContent = developmentOutcomes.length ? developmentOutcomes.map((item) => `${item.outcomeCode} — ${percent(item.successRate)}`).join(" · ") : "Öncelikli gelişim alanı belirlenmemiştir.";
+      if (suggestions) suggestions.textContent = (analysis.outcomes || []).map((item) => `${item.outcomeCode}: ${item.decision}`).join(" ");
+    };
+
+    const analyzeApprovedData = () => {
+      const approvalButton = document.querySelector('[data-approval-action="confirm-data"]');
+      if (!structuredData || !approvalButton) return;
+      approvalButton.disabled = true;
+      approvalButton.textContent = "Analiz Başlatılıyor…";
+      showMessage("Öğretmen onaylı veriler analiz motoruna aktarılıyor.");
+
+      fetch("/mahir-analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(collectApprovedData())
+      })
+        .then((response) => response.json().catch(() => ({})).then((payload) => ({ response, payload })))
+        .then(({ response, payload }) => {
+          if (!response.ok) throw new Error(payload.message || "Onaylanan veriler analiz edilemedi.");
+          renderAnalysis(payload.analysis || {});
+          showProgressStep(progressTexts.length - 1);
+          screenManager.approveData();
+          screenManager.showScreen("analysis-screen");
+          showMessage(payload.message, "success");
+        })
+        .catch((error) => {
+          const approvalMessage = document.querySelector("[data-approval-message]");
+          if (approvalMessage) {
+            approvalMessage.textContent = error.message;
+            approvalMessage.focus({ preventScroll: true });
+          }
+          showMessage(error.message, "error");
+        })
+        .finally(() => {
+          approvalButton.disabled = false;
+          approvalButton.textContent = "Verileri Onayla";
+        });
     };
 
     const uploadSelectedFile = () => {
@@ -2626,6 +2717,7 @@ const fileUploadBridge = (() => {
 
     removeButton?.addEventListener("click", clearFile);
     readButton.addEventListener("click", uploadSelectedFile);
+    document.addEventListener("mahir:confirm-data", analyzeApprovedData);
 
     ["dragenter", "dragover"].forEach((eventName) => {
       dropzone?.addEventListener(eventName, (event) => {
