@@ -291,7 +291,7 @@
             </ol>
           </nav>
           <h2 id="validation-title">Veri Onay</h2>
-          <p>Analiz başlamadan önce paylaşılan veri kapsamını ve örnek veri yapısını öğretmen kontrolünde gözden geçiriniz.</p>
+          <p>Analiz başlamadan önce Word belgesinden okunan alanları kontrol ediniz; gerekli hücreleri doğrudan düzeltebilirsiniz.</p>
         </header>
 
         <div class="data-confirmation-layout" aria-label="Veri onay katmanı">
@@ -307,28 +307,7 @@
                     <th scope="col">Öğrenme Çıktısı</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr>
-                    <td>1. Soru</td>
-                    <td>10</td>
-                    <td>Okuduğunu anlama ve çıkarım yapma</td>
-                  </tr>
-                  <tr>
-                    <td>2. Soru</td>
-                    <td>10</td>
-                    <td>Problem çözme stratejisi geliştirme</td>
-                  </tr>
-                  <tr>
-                    <td>3. Soru</td>
-                    <td>15</td>
-                    <td>Kavramlar arası ilişki kurma</td>
-                  </tr>
-                  <tr>
-                    <td>4. Soru</td>
-                    <td>15</td>
-                    <td>Kanıta dayalı açıklama yapma</td>
-                  </tr>
-                </tbody>
+                <tbody data-validation-questions></tbody>
               </table>
             </div>
           </article>
@@ -337,55 +316,17 @@
             <h3 id="student-data-title">Öğretmen Kontrolündeki Öğrenci Verisi</h3>
             <div class="table-wrap">
               <table class="data-table">
-                <caption>Örnek öğrenci puanları</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Öğrenci No</th>
-                    <th scope="col">Ad Soyad</th>
-                    <th scope="col">1. Soru</th>
-                    <th scope="col">2. Soru</th>
-                    <th scope="col">3. Soru</th>
-                    <th scope="col">4. Soru</th>
-                    <th scope="col">Toplam Puan</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>102</td>
-                    <td>Ayşe Yılmaz</td>
-                    <td>8</td>
-                    <td>10</td>
-                    <td>12</td>
-                    <td>13</td>
-                    <td>43</td>
-                  </tr>
-                  <tr>
-                    <td>117</td>
-                    <td>Mehmet Kaya</td>
-                    <td>6</td>
-                    <td>8</td>
-                    <td>11</td>
-                    <td>10</td>
-                    <td>35</td>
-                  </tr>
-                  <tr>
-                    <td>124</td>
-                    <td>Zeynep Demir</td>
-                    <td>10</td>
-                    <td>9</td>
-                    <td>14</td>
-                    <td>15</td>
-                    <td>48</td>
-                  </tr>
-                </tbody>
+                <caption>Word belgesinden okunan öğrenci puanları</caption>
+                <thead data-validation-student-head></thead>
+                <tbody data-validation-students></tbody>
               </table>
             </div>
           </article>
 
           <article class="data-scope-card" data-component="Summary Card" aria-labelledby="data-scope-title">
             <h3 id="data-scope-title">Paylaşılan Veri Kapsamı</h3>
-            <p>Bu prototipte ders, sınıf düzeyi, öğrenci bazlı puanlar, soru puan değerleri ve öğrenme çıktısı eşleştirmeleri öğretmen kontrolüne sunulur.</p>
-            <p>Daha kapsamlı değerlendirme için ek bilgiler paylaşabilirsiniz. Mevcut verilerle de analiz oluşturulabilir.</p>
+            <p data-validation-exam-summary>Henüz okunmuş bir Word belgesi bulunmuyor.</p>
+            <ul data-validation-warnings></ul>
           </article>
         </div>
 
