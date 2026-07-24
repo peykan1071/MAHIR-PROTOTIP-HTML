@@ -3,7 +3,8 @@
 The receiver detects that a file reached the Python backend, validates its
 filename extension, and triggers the existing backend reporting flow for CSV
 uploads. Word, PDF and image documents are accepted by the prototype and
-forwarded to the teacher-validation step; OCR remains a later integration.
+forwarded to the teacher-validation step; DOCX templates are parsed into
+teacher-reviewable structured data. OCR remains a later integration.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import urlparse
 
+from .docx_parser import parse_mahir_docx
 from .measurement_engine import build_measured_ced_document
 from .pedagogical_analysis import analyze_learning_outcomes
 from .program_mapper import load_learning_outcomes
@@ -94,7 +96,7 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 f"[MAHIR] Dosya alındı: {result.file_name} | Uzantı: {result.extension}",
                 flush=True,
             )
-            flow_ok, flow_message = run_existing_backend_flow(uploaded_file, result)
+            flow_ok, flow_message, structured_data = run_existing_backend_flow(uploaded_file, result)
 
             if flow_ok:
                 self._send_json(
@@ -104,6 +106,7 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                         "fileName": result.file_name,
                         "extension": result.extension,
                         "message": flow_message,
+                        "structuredData": structured_data,
                     },
                 )
                 return
@@ -143,11 +146,26 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
 
-def run_existing_backend_flow(uploaded_file: UploadedFile, file_check: FileCheckResult) -> tuple[bool, str]:
+def run_existing_backend_flow(
+    uploaded_file: UploadedFile, file_check: FileCheckResult
+) -> tuple[bool, str, dict[str, object] | None]:
     """Run CSV analysis or accept a prototype document for teacher validation."""
 
+    if file_check.extension == ".docx":
+        try:
+            structured_data = parse_mahir_docx(uploaded_file.content)
+            summary = structured_data["summary"]
+            return (
+                True,
+                f"Word belgesi okundu: {summary['questionCount']} soru ve "
+                f"{summary['studentCount']} öğrenci satırı öğretmen kontrolüne aktarıldı.",
+                structured_data,
+            )
+        except ValueError as error:
+            return False, str(error), None
+
     if file_check.extension != ".csv":
-        return True, "Belge alındı ve öğretmen kontrolüne hazırlandı."
+        return True, "Belge alındı ve öğretmen kontrolüne hazırlandı.", None
 
     project_root = Path(__file__).resolve().parents[2]
     temporary_dir = project_root / "backend" / ".tmp"
@@ -175,9 +193,9 @@ def run_existing_backend_flow(uploaded_file: UploadedFile, file_check: FileCheck
         )
         write_report(report_text, report_path)
         print(report_text, end="", flush=True)
-        return True, "Dosya başarıyla işlendi."
+        return True, "Dosya başarıyla işlendi.", None
     except (OSError, ValueError) as error:
-        return False, str(error)
+        return False, str(error), None
     finally:
         if uploaded_csv_path.exists():
             uploaded_csv_path.unlink()
