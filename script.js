@@ -2489,6 +2489,87 @@ const fileUploadBridge = (() => {
       reportTarget.style.whiteSpace = "pre-line";
     };
 
+    const editableCell = (value, label, type = "text") => {
+      const cell = document.createElement("td");
+      const input = document.createElement("input");
+      input.className = "validation-input";
+      input.type = type;
+      input.value = value ?? "";
+      input.setAttribute("aria-label", label);
+      if (type === "number") input.step = "0.01";
+      cell.append(input);
+      return cell;
+    };
+
+    const renderValidationData = (data) => {
+      if (!data) return;
+      const questionBody = document.querySelector("[data-validation-questions]");
+      const studentHead = document.querySelector("[data-validation-student-head]");
+      const studentBody = document.querySelector("[data-validation-students]");
+      const examSummary = document.querySelector("[data-validation-exam-summary]");
+      const warningList = document.querySelector("[data-validation-warnings]");
+      const questions = data.questions || [];
+
+      questionBody?.replaceChildren();
+      questions.forEach((question) => {
+        const row = document.createElement("tr");
+        row.append(
+          editableCell(`${question.number}. Soru`, `${question.number}. soru numarası`),
+          editableCell(question.maxScore, `${question.number}. soru azami puanı`, "number"),
+          editableCell(
+            [question.outcomeCode, question.outcomeDescription].filter(Boolean).join(" — "),
+            `${question.number}. soru öğrenme çıktısı`
+          )
+        );
+        questionBody?.append(row);
+      });
+
+      if (studentHead) {
+        const row = document.createElement("tr");
+        ["Öğrenci No", "Ad Soyad", ...questions.map((question) => `S${question.number}`), "Toplam", "Katılım"]
+          .forEach((label) => {
+            const header = document.createElement("th");
+            header.scope = "col";
+            header.textContent = label;
+            row.append(header);
+          });
+        studentHead.replaceChildren(row);
+      }
+
+      studentBody?.replaceChildren();
+      (data.students || []).forEach((student) => {
+        const row = document.createElement("tr");
+        row.append(
+          editableCell(student.studentNo, `${student.fullName || student.rowNumber} okul numarası`),
+          editableCell(student.fullName, `${student.rowNumber}. öğrenci adı soyadı`)
+        );
+        questions.forEach((question, index) => {
+          row.append(editableCell(student.scores?.[index], `${student.fullName || student.rowNumber} S${question.number} puanı`, "number"));
+        });
+        row.append(
+          editableCell(student.totalScore, `${student.fullName || student.rowNumber} toplam puanı`, "number"),
+          editableCell(student.attendance, `${student.fullName || student.rowNumber} katılım durumu`)
+        );
+        studentBody?.append(row);
+      });
+
+      if (examSummary) {
+        const exam = data.exam || {};
+        const identity = [exam.schoolName, exam.course, exam.classSection].filter(Boolean).join(" · ");
+        examSummary.textContent = `${identity || "Sınav bilgileri eksik"} — ${data.summary?.questionCount || 0} soru, ${data.summary?.studentCount || 0} öğrenci satırı okundu.`;
+      }
+
+      if (warningList) {
+        warningList.replaceChildren();
+        const warnings = data.warnings?.length ? data.warnings : ["Belge yapısında otomatik kontrol uyarısı bulunmadı."];
+        warnings.forEach((warning) => {
+          const item = document.createElement("li");
+          item.textContent = warning;
+          warningList.append(item);
+        });
+      }
+    };
+
     const uploadSelectedFile = () => {
       if (!selectedFile) return;
       const formData = new FormData();
@@ -2513,6 +2594,7 @@ const fileUploadBridge = (() => {
           const message = payload.message || (response.ok ? "Dosya başarıyla işlendi." : "Dosya işlenemedi.");
           window.clearInterval(progressTimer);
           if (response.ok) {
+            renderValidationData(payload.structuredData);
             showProgressStep(progressTexts.length - 1);
             const reportText = payload.reportText || payload.report || payload.report_text;
             const reportRequest = reportText ? Promise.resolve(reportText) : fetch(`/shared/report-example.txt?ts=${Date.now()}`).then((reportResponse) => reportResponse.ok ? reportResponse.text() : message);
