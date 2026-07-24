@@ -434,7 +434,13 @@
           <p>Bu bölüm rapor taslağındaki değerlendirmelerin dayanaklarını öğretmen kontrolüne sunar.</p>
         </aside>
 
-        <button class="secondary-button" data-component="Secondary Button" type="button">Raporu Gözden Geçir</button>
+        <div class="report-final-approval" data-pdf-exclude>
+          <label class="report-final-approval-label" for="final-report-approval">
+            <input id="final-report-approval" type="checkbox" data-final-report-approval>
+            Nihai raporu öğretmen olarak onaylıyorum.
+          </label>
+          <button class="primary-button" data-component="Primary Button" type="button" data-download-approved-pdf disabled aria-disabled="true">Onaylı Raporu PDF Olarak İndir</button>
+        </div>
       </section>
     </div>
   </main>
