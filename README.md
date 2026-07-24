@@ -4,6 +4,12 @@ MAHİR, "Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı" fikrine daya
 
 İlk geliştirme hedefi, "Sınav Analizi ve Değerlendirme Raporu" için sade, modern ve tek sayfalık bir HTML/CSS/JavaScript prototipi hazırlamaktır.
 
+## Word Şablonunu Okuma
+
+`MAHIR_Veri_Giris_Sablonu_Surum_1.docx` dosyası doldurulup Veri Ekleme ekranından
+yüklendiğinde sınav, soru ve öğrenci tabloları yerel Python servisi tarafından
+okunur. Sonuçlar analizden önce düzenlenebilir Veri Onay tablolarında gösterilir.
+
 ## Güncel Çalışan Akış
 
 Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır.
