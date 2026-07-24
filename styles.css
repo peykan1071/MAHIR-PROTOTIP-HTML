@@ -1609,3 +1609,19 @@ body:has(#welcome-screen.active-screen) .welcome-footer-social svg {
   color: #ffffff;
   background: var(--color-primary);
 }
+.validation-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 4.5rem;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid #c8d2dc;
+  border-radius: 0.4rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+.validation-input:focus {
+  border-color: #146c5a;
+  outline: 3px solid rgb(20 108 90 / 16%);
+}
