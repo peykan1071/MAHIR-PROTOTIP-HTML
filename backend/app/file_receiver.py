@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import urlparse
 
 from .docx_parser import parse_mahir_docx
+from .approved_data_analyzer import analyze_approved_data
 from .measurement_engine import build_measured_ced_document
 from .pedagogical_analysis import analyze_learning_outcomes
 from .program_mapper import load_learning_outcomes
@@ -24,6 +25,7 @@ from .reporting_engine import generate_report, write_report
 
 
 UPLOAD_PATH = "/mahir-upload"
+ANALYZE_PATH = "/mahir-analyze"
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 ALLOWED_EXTENSIONS = {
     ".csv",
@@ -73,7 +75,11 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
-        if urlparse(self.path).path != UPLOAD_PATH:
+        request_path = urlparse(self.path).path
+        if request_path == ANALYZE_PATH:
+            self._handle_analysis_request()
+            return
+        if request_path != UPLOAD_PATH:
             self._send_json(404, {"ok": False, "message": "Bilinmeyen alıcı yolu."})
             return
 
@@ -134,6 +140,28 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 "fileName": result.file_name,
                 "extension": result.extension,
                 "message": "Dosya uzantısı desteklenen biçimlerle eşleşmedi.",
+            },
+        )
+
+    def _handle_analysis_request(self) -> None:
+        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        if content_length <= 0 or content_length > MAX_UPLOAD_SIZE:
+            self._send_json(400, {"ok": False, "message": "Onaylanan veri alınamadı."})
+            return
+
+        try:
+            payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
+            result = analyze_approved_data(payload)
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+            self._send_json(422, {"ok": False, "message": str(error)})
+            return
+
+        self._send_json(
+            200,
+            {
+                "ok": True,
+                "message": "Öğretmen onaylı veriler analiz motoruna aktarıldı.",
+                "analysis": result,
             },
         )
 
