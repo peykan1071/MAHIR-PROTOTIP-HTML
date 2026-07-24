@@ -2356,22 +2356,121 @@ const screenManager = (() => {
 
 
 const fileUploadBridge = (() => {
-  const progressTexts = ["✓ Dosya alındı", "✓ CSV okunuyor", "✓ CED oluşturuluyor", "✓ Program eşleştiriliyor", "✓ Ölçme analizi yapılıyor", "✓ Pedagojik analiz yapılıyor", "✓ Rapor hazırlanıyor", "✓ Tamamlandı"];
+  const progressTexts = ["✓ Dosya alındı", "✓ Belge okunuyor", "✓ CED oluşturuluyor", "✓ Program eşleştiriliyor", "✓ Ölçme analizi yapılıyor", "✓ Pedagojik analiz yapılıyor", "✓ Rapor hazırlanıyor", "✓ Tamamlandı"];
+  const maxFileSize = 20 * 1024 * 1024;
+  const allowedExtensions = ["pdf", "doc", "docx", "jpg", "jpeg", "png", "webp"];
 
   const init = () => {
     const fileInput = document.querySelector("#exam-file");
+    const dropzone = document.querySelector("[data-upload-dropzone]");
+    const fileCard = document.querySelector("[data-uploaded-file-card]");
+    const filePreview = document.querySelector("[data-file-preview]");
+    const fileName = document.querySelector("[data-file-name]");
+    const fileType = document.querySelector("[data-file-type]");
+    const fileSize = document.querySelector("[data-file-size]");
+    const fileExtension = document.querySelector("[data-file-extension]");
+    const removeButton = document.querySelector("[data-remove-file]");
+    const readButton = document.querySelector("[data-read-document]");
+    const statusMessage = document.querySelector("[data-upload-status]");
 
-    if (!fileInput || typeof FormData === "undefined" || typeof fetch === "undefined") {
+    if (!fileInput || !readButton || typeof FormData === "undefined" || typeof fetch === "undefined") {
       return;
     }
 
-    const statusMessage = fileInput.form?.querySelector(".notification-message");
+    let selectedFile = null;
+    let previewUrl = null;
     let progressTimer;
 
-    const showMessage = (message) => {
+    const setStatus = (message, state = "") => {
+      if (!statusMessage) return;
+      statusMessage.textContent = message;
+      statusMessage.classList.toggle("is-error", state === "error");
+      statusMessage.classList.toggle("is-success", state === "success");
+    };
+
+    const showMessage = (message, state = "") => {
       const analysisMessage = document.querySelector("#analysis-screen .notification-message");
-      if (statusMessage) statusMessage.textContent = message;
+      setStatus(message, state);
       if (analysisMessage) analysisMessage.textContent = message;
+    };
+
+    const formatBytes = (bytes) => {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    const getExtension = (file) => file.name.split(".").pop()?.toLowerCase() || "";
+
+    const validateFile = (file) => {
+      if (!allowedExtensions.includes(getExtension(file))) {
+        return "Bu dosya türü desteklenmiyor. Word, PDF, JPG, PNG veya WEBP yükleyiniz.";
+      }
+      if (file.size > maxFileSize) {
+        return "Dosya 20 MB sınırını aşıyor. Daha küçük bir dosya yükleyiniz.";
+      }
+      if (file.size === 0) {
+        return "Dosya boş görünüyor. Lütfen başka bir dosya seçiniz.";
+      }
+      return "";
+    };
+
+    const clearPreviewUrl = () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+      }
+    };
+
+    const clearFile = () => {
+      selectedFile = null;
+      fileInput.value = "";
+      clearPreviewUrl();
+      fileCard?.setAttribute("hidden", "");
+      readButton.disabled = true;
+      readButton.setAttribute("aria-disabled", "true");
+      setStatus("Öğrenci T.C. kimlik numarası yüklemeyiniz. Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır.");
+    };
+
+    const renderPreview = (file) => {
+      if (!filePreview) return;
+      clearPreviewUrl();
+      filePreview.replaceChildren();
+      const extension = getExtension(file);
+
+      if (file.type.startsWith("image/")) {
+        previewUrl = URL.createObjectURL(file);
+        const image = document.createElement("img");
+        image.src = previewUrl;
+        image.alt = "";
+        filePreview.append(image);
+        return;
+      }
+
+      const badge = document.createElement("span");
+      badge.dataset.fileExtension = "";
+      badge.textContent = extension.toUpperCase();
+      filePreview.append(badge);
+    };
+
+    const selectFile = (file) => {
+      const error = validateFile(file);
+      if (error) {
+        clearFile();
+        setStatus(error, "error");
+        return;
+      }
+
+      selectedFile = file;
+      if (fileName) fileName.textContent = file.name;
+      if (fileType) fileType.textContent = file.type || `${getExtension(file).toUpperCase()} belgesi`;
+      if (fileSize) fileSize.textContent = formatBytes(file.size);
+      if (fileExtension) fileExtension.textContent = getExtension(file).toUpperCase();
+      renderPreview(file);
+      fileCard?.removeAttribute("hidden");
+      readButton.disabled = false;
+      readButton.setAttribute("aria-disabled", "false");
+      setStatus("Dosya hazır. “Verileri Oku ve Kontrol Et” düğmesiyle öğretmen onay ekranına geçebilirsiniz.", "success");
     };
 
     const showProgressStep = (activeIndex) => {
@@ -2390,17 +2489,14 @@ const fileUploadBridge = (() => {
       reportTarget.style.whiteSpace = "pre-line";
     };
 
-    fileInput.addEventListener("change", () => {
-      const selectedFile = fileInput.files?.[0];
-
-      if (!selectedFile) {
-        return;
-      }
-
+    const uploadSelectedFile = () => {
+      if (!selectedFile) return;
       const formData = new FormData();
       let progressIndex = 0;
       formData.append("exam-file", selectedFile);
-      document.querySelector('[data-approval-action="confirm-data"]')?.click();
+      readButton.disabled = true;
+      readButton.setAttribute("aria-disabled", "true");
+      readButton.textContent = "Belge Okunuyor…";
       window.clearInterval(progressTimer);
       showProgressStep(progressIndex);
       progressTimer = window.setInterval(() => {
@@ -2421,18 +2517,51 @@ const fileUploadBridge = (() => {
             const reportText = payload.reportText || payload.report || payload.report_text;
             const reportRequest = reportText ? Promise.resolve(reportText) : fetch(`/shared/report-example.txt?ts=${Date.now()}`).then((reportResponse) => reportResponse.ok ? reportResponse.text() : message);
             reportRequest.then(showReport).catch(() => showReport(message));
+            screenManager.showScreen("validation-screen");
           } else {
             showReport(message);
           }
           console[logMethod]("[MAHIR] Dosya backend alıcısına gönderildi.", payload);
-          showMessage(message);
+          showMessage(message, response.ok ? "success" : "error");
         })
         .catch((error) => {
           window.clearInterval(progressTimer);
           console.warn("[MAHIR] Dosya backend alıcısına gönderilemedi.", error);
-          showMessage("Backend bağlantısı kurulamadı.");
+          showMessage("Belge okuma servisine ulaşılamadı. Prototip sunucusunu çalıştırıp yeniden deneyiniz.", "error");
           showReport("Backend bağlantısı kurulamadı.");
+        })
+        .finally(() => {
+          readButton.disabled = false;
+          readButton.setAttribute("aria-disabled", "false");
+          readButton.textContent = "Verileri Oku ve Kontrol Et";
         });
+    };
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files?.[0];
+      if (file) selectFile(file);
+    });
+
+    removeButton?.addEventListener("click", clearFile);
+    readButton.addEventListener("click", uploadSelectedFile);
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      dropzone?.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.add("is-dragging");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      dropzone?.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.remove("is-dragging");
+      });
+    });
+
+    dropzone?.addEventListener("drop", (event) => {
+      const file = event.dataTransfer?.files?.[0];
+      if (file) selectFile(file);
     });
   };
 

@@ -4,6 +4,18 @@ MAHİR, "Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı" fikrine daya
 
 İlk geliştirme hedefi, "Sınav Analizi ve Değerlendirme Raporu" için sade, modern ve tek sayfalık bir HTML/CSS/JavaScript prototipi hazırlamaktır.
 
+## Güncel Çalışan Akış
+
+Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır.
+
+Yerel prototipi dosya alıcısıyla çalıştırmak için:
+
+```bash
+python3 backend/run_file_receiver.py
+```
+
+Ardından `http://127.0.0.1:8000/index.html` adresi açılır.
+
 ## Geliştirme Kuralları
 
 Bu projede geliştirme adım adım, küçük ve onaylı sürümler halinde yapılır. Her sprintte yalnızca belirlenen kapsam uygulanır; yapay zekâ, veritabanı, OCR, dosya okuma, PDF/Word üretimi ve sistem entegrasyonu ilk aşamada kapsam dışıdır.

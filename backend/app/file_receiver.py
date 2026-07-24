@@ -2,7 +2,8 @@
 
 The receiver detects that a file reached the Python backend, validates its
 filename extension, and triggers the existing backend reporting flow for CSV
-uploads. It does not add AI, OCR, API, database, or user-system behavior.
+uploads. Word, PDF and image documents are accepted by the prototype and
+forwarded to the teacher-validation step; OCR remains a later integration.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ from .reporting_engine import generate_report, write_report
 
 
 UPLOAD_PATH = "/mahir-upload"
+MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 ALLOWED_EXTENSIONS = {
     ".csv",
     ".doc",
@@ -79,6 +81,9 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         if content_length <= 0:
             self._send_json(400, {"ok": False, "message": "Dosya verisi alınamadı."})
             return
+        if content_length > MAX_UPLOAD_SIZE:
+            self._send_json(413, {"ok": False, "message": "Dosya 20 MB sınırını aşıyor."})
+            return
 
         body = self.rfile.read(content_length)
         uploaded_file = extract_uploaded_file(body, content_type)
@@ -98,7 +103,7 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                         "ok": True,
                         "fileName": result.file_name,
                         "extension": result.extension,
-                        "message": "Dosya başarıyla işlendi.",
+                        "message": flow_message,
                     },
                 )
                 return
@@ -139,10 +144,10 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
 
 
 def run_existing_backend_flow(uploaded_file: UploadedFile, file_check: FileCheckResult) -> tuple[bool, str]:
-    """Run the current CSV -> CED -> report backend flow for an uploaded CSV."""
+    """Run CSV analysis or accept a prototype document for teacher validation."""
 
     if file_check.extension != ".csv":
-        return False, "Mevcut backend akışı yalnız CSV dosyasıyla çalışır."
+        return True, "Belge alındı ve öğretmen kontrolüne hazırlandı."
 
     project_root = Path(__file__).resolve().parents[2]
     temporary_dir = project_root / "backend" / ".tmp"
