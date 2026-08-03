@@ -235,7 +235,7 @@
           <h2 id="data-entry-title">Veri Ekleme</h2>
         </header>
 
-        <p>Sınav yapısını belirleyiniz, soruları öğrenme çıktılarıyla eşleştiriniz ve öğrenci puanlarının bulunduğu veri evrakını yükleyiniz.</p>
+        <p>Sınav yapısını belirleyiniz; veriyi görsel grubu, Word/PDF tablosu, MAHİR şablonu veya elle giriş yoluyla ekleyiniz.</p>
 
         <form class="data-upload-form" aria-labelledby="data-entry-title" data-upload-form>
           <article class="exam-structure-card" aria-labelledby="exam-structure-title">
@@ -243,7 +243,7 @@
               <div>
                 <p class="data-entry-kicker">Sınav yapısı</p>
                 <h3 id="exam-structure-title">Soru, Puan ve Öğrenme Çıktısı Eşleştirmesi</h3>
-                <p>Öğrenci verisini yüklemeden önce sınavın soru ve puan yapısını öğretmen olarak tanımlayınız.</p>
+                <p>Azami puan zorunludur. Öğrenme çıktısı biliniyorsa seçilir; bilinmiyorsa soru bazlı analiz yapılır.</p>
               </div>
               <p class="score-total" data-score-total>Toplam puan: 0</p>
             </div>
@@ -261,7 +261,21 @@
             </p>
           </article>
 
-          <article class="template-download-card" aria-labelledby="template-download-title">
+          <article class="data-source-card" aria-labelledby="data-source-title">
+            <div>
+              <p class="data-entry-kicker">Veri giriş yolu</p>
+              <h3 id="data-source-title">Veriyi nasıl eklemek istiyorsunuz?</h3>
+              <p>Her yol aynı öğretmen onay ekranına bağlanır.</p>
+            </div>
+            <div class="data-source-options" role="radiogroup" aria-label="Veri giriş yolu">
+              <label><input type="radio" name="data-source" value="images" data-source-option checked> <span><strong>Görsel grubu</strong><small>En fazla 10 JPG, PNG veya WEBP</small></span></label>
+              <label><input type="radio" name="data-source" value="document" data-source-option> <span><strong>Word / PDF tablosu</strong><small>Öğretmenin kendi düzeni olabilir</small></span></label>
+              <label><input type="radio" name="data-source" value="template" data-source-option> <span><strong>MAHİR şablonu</strong><small>Önerilen yapılandırılmış giriş</small></span></label>
+              <label><input type="radio" name="data-source" value="manual" data-source-option> <span><strong>Elle veri girişi</strong><small>Dosya yüklemeden tabloyu doldurun</small></span></label>
+            </div>
+          </article>
+
+          <article class="template-download-card" aria-labelledby="template-download-title" data-template-card hidden>
             <div>
               <p class="data-entry-kicker">Önerilen yöntem</p>
               <h3 id="template-download-title">MAHİR Veri Giriş Şablonu – Sürüm 2</h3>
@@ -274,11 +288,11 @@
 
           <div class="upload-box document-upload-box" data-component="Upload Box" data-upload-dropzone role="group" aria-labelledby="upload-title">
             <div class="upload-symbol" aria-hidden="true">↑</div>
-            <h3 id="upload-title">Veri evrakını yükleyin</h3>
-            <p>MAHİR şablonunu, kendi hazırladığınız bir tabloyu veya sınav kâğıtlarındaki puanlama alanlarının fotoğrafını yükleyebilirsiniz.</p>
-            <label class="primary-button file-select-button" for="exam-file">Dosya Seç</label>
-            <input id="exam-file" class="visually-hidden-file-input" name="exam-file" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-            <p class="upload-rules">Word, PDF, JPG, PNG veya WEBP · En fazla 20 MB</p>
+            <h3 id="upload-title" data-upload-title>Görselleri yükleyin</h3>
+            <p data-upload-description>Aynı sınava ait en fazla 10 puanlama görselini tek grup olarak seçebilirsiniz.</p>
+            <label class="primary-button file-select-button" for="exam-file" data-file-select-label>Görselleri Seç</label>
+            <input id="exam-file" class="visually-hidden-file-input" name="exam-file" type="file" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+            <p class="upload-rules" data-upload-rules>JPG, PNG veya WEBP · En fazla 10 görsel · Dosya başına 20 MB</p>
           </div>
 
           <article class="uploaded-file-card" data-uploaded-file-card aria-live="polite" hidden>
@@ -299,7 +313,7 @@
 
           <div class="button-group data-entry-actions" aria-label="Veri ekleme işlemleri">
             <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="preparation-screen">Geri</button>
-            <button class="primary-button" data-component="Primary Button" type="button" data-read-document disabled aria-disabled="true">Verileri Oku ve Kontrol Et</button>
+            <button class="primary-button" data-component="Primary Button" type="button" data-read-document disabled aria-disabled="true">Görselleri Oku ve Kontrol Et</button>
           </div>
         </form>
 

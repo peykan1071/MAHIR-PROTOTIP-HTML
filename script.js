@@ -2385,7 +2385,8 @@ const fileUploadBridge = (() => {
       return;
     }
 
-    let selectedFile = null;
+    let selectedFiles = [];
+    let sourceMode = "images";
     let structuredData = null;
     let previewUrl = null;
     let progressTimer;
@@ -2410,11 +2411,11 @@ const fileUploadBridge = (() => {
       const questions = currentQuestionConfiguration();
       const total = questions.reduce((sum, question) => sum + question.maxScore, 0);
       if (scoreTotal) scoreTotal.textContent = `Toplam puan: ${total.toLocaleString("tr-TR")}`;
-      const incomplete = questions.some((question) => question.maxScore <= 0 || !question.outcomeCode);
+      const incomplete = questions.some((question) => question.maxScore <= 0);
       if (structureStatus) {
         structureStatus.textContent = incomplete
-          ? "Her soru için sıfırdan büyük bir azami puan ve öğrenme çıktısı seçiniz."
-          : `${questions.length} soru, ${total.toLocaleString("tr-TR")} toplam puan ve öğrenme çıktısı eşleştirmeleri hazır.`;
+          ? "Her soru için sıfırdan büyük bir azami puan giriniz."
+          : `${questions.length} soru ve ${total.toLocaleString("tr-TR")} toplam puan hazır. Öğrenme çıktısı seçilmeyen sorular soru bazında analiz edilir.`;
         structureStatus.classList.toggle("is-success", !incomplete);
         structureStatus.classList.toggle("is-error", incomplete);
       }
@@ -2448,11 +2449,10 @@ const fileUploadBridge = (() => {
         const outcomeField = document.createElement("label");
         outcomeField.textContent = "Öğrenme Çıktısı";
         const outcomeSelect = document.createElement("select");
-        outcomeSelect.required = true;
         outcomeSelect.dataset.questionOutcome = "";
         const placeholder = document.createElement("option");
         placeholder.value = "";
-        placeholder.textContent = learningOutcomes.length ? "Öğrenme çıktısı seçiniz" : "Resmî öğrenme çıktısı verisi bekleniyor";
+        placeholder.textContent = learningOutcomes.length ? "İsteğe bağlı — öğrenme çıktısı seçiniz" : "İsteğe bağlı — çıktı verisi bulunmuyor";
         outcomeSelect.append(placeholder);
         learningOutcomes.forEach((outcome) => {
           const option = document.createElement("option");
@@ -2518,7 +2518,7 @@ const fileUploadBridge = (() => {
     };
 
     const clearFile = () => {
-      selectedFile = null;
+      selectedFiles = [];
       fileInput.value = "";
       clearPreviewUrl();
       fileCard?.setAttribute("hidden", "");
@@ -2548,24 +2548,54 @@ const fileUploadBridge = (() => {
       filePreview.append(badge);
     };
 
-    const selectFile = (file) => {
-      const error = validateFile(file);
+    const selectFiles = (files) => {
+      const candidates = Array.from(files || []);
+      const error = candidates.length > 10 ? "Bir görsel grubunda en fazla 10 dosya seçebilirsiniz." : candidates.map(validateFile).find(Boolean);
       if (error) {
         clearFile();
         setStatus(error, "error");
         return;
       }
 
-      selectedFile = file;
-      if (fileName) fileName.textContent = file.name;
-      if (fileType) fileType.textContent = file.type || `${getExtension(file).toUpperCase()} belgesi`;
-      if (fileSize) fileSize.textContent = formatBytes(file.size);
-      if (fileExtension) fileExtension.textContent = getExtension(file).toUpperCase();
-      renderPreview(file);
+      selectedFiles = candidates;
+      const firstFile = candidates[0];
+      if (fileName) fileName.textContent = candidates.length === 1 ? firstFile.name : `${candidates.length} görsel seçildi`;
+      if (fileType) fileType.textContent = candidates.length === 1 ? (firstFile.type || `${getExtension(firstFile).toUpperCase()} belgesi`) : "Görsel grubu";
+      if (fileSize) fileSize.textContent = formatBytes(candidates.reduce((sum, file) => sum + file.size, 0));
+      if (fileExtension) fileExtension.textContent = candidates.length === 1 ? getExtension(firstFile).toUpperCase() : String(candidates.length);
+      renderPreview(firstFile);
       fileCard?.removeAttribute("hidden");
       readButton.disabled = false;
       readButton.setAttribute("aria-disabled", "false");
-      setStatus("Dosya hazır. “Verileri Oku ve Kontrol Et” düğmesiyle öğretmen onay ekranına geçebilirsiniz.", "success");
+      setStatus(`${candidates.length} dosya hazır. Okunan alanlar öğretmen onayına sunulacaktır.`, "success");
+    };
+
+    const configureSourceMode = (mode) => {
+      sourceMode = mode;
+      clearFile();
+      const title = document.querySelector("[data-upload-title]");
+      const description = document.querySelector("[data-upload-description]");
+      const rules = document.querySelector("[data-upload-rules]");
+      const label = document.querySelector("[data-file-select-label]");
+      const templateCard = document.querySelector("[data-template-card]");
+      const dropzone = document.querySelector("[data-upload-dropzone]");
+      templateCard?.toggleAttribute("hidden", mode !== "template");
+      dropzone?.toggleAttribute("hidden", mode === "manual");
+      if (mode === "manual") {
+        readButton.disabled = false;
+        readButton.setAttribute("aria-disabled", "false");
+        readButton.textContent = "Elle Giriş Tablosunu Aç";
+        setStatus("Soru sayınıza göre boş öğrenci tablosu hazırlanacak; verileri öğretmen olarak doğrudan girebilirsiniz.", "success");
+        return;
+      }
+      const images = mode === "images";
+      fileInput.multiple = images;
+      fileInput.accept = images ? ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" : ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      if (title) title.textContent = images ? "Görselleri yükleyin" : "Veri evrakını yükleyin";
+      if (description) description.textContent = images ? "Aynı sınava ait en fazla 10 puanlama görselini tek grup olarak seçebilirsiniz." : "MAHİR şablonunu veya öğretmen tarafından hazırlanmış Word/PDF tablosunu seçiniz.";
+      if (rules) rules.textContent = images ? "JPG, PNG veya WEBP · En fazla 10 görsel · Dosya başına 20 MB" : "Word veya PDF · En fazla 20 MB";
+      if (label) label.textContent = images ? "Görselleri Seç" : "Dosya Seç";
+      readButton.textContent = images ? "Görselleri Oku ve Kontrol Et" : "Verileri Oku ve Kontrol Et";
     };
 
     const showReport = (text) => {
@@ -2738,13 +2768,22 @@ const fileUploadBridge = (() => {
     };
 
     const uploadSelectedFile = () => {
-      if (!selectedFile) return;
       if (!updateStructureStatus()) {
         setStatus("Sınav yapısındaki eksik alanları tamamlayınız.", "error");
         return;
       }
+      if (sourceMode === "manual") {
+        renderValidationData({ exam: {}, students: [], warnings: ["Veriler elle girilecektir."], summary: {} });
+        screenManager.showScreen("validation-screen");
+        return;
+      }
+      if (!selectedFiles.length) return;
+      if (selectedFiles.length > 1) {
+        setStatus("10’ar görsellik grup seçimi hazırdır; OCR grup birleştirme bağlantısı sonraki geliştirme adımında etkinleştirilecektir.", "error");
+        return;
+      }
       const formData = new FormData();
-      formData.append("exam-file", selectedFile);
+      formData.append("exam-file", selectedFiles[0]);
       document.dispatchEvent(new CustomEvent("mahir:report-reset"));
       readButton.disabled = true;
       readButton.setAttribute("aria-disabled", "true");
@@ -2790,12 +2829,12 @@ const fileUploadBridge = (() => {
     };
 
     fileInput.addEventListener("change", () => {
-      const file = fileInput.files?.[0];
-      if (file) selectFile(file);
+      if (fileInput.files?.length) selectFiles(fileInput.files);
     });
 
     removeButton?.addEventListener("click", clearFile);
     readButton.addEventListener("click", uploadSelectedFile);
+    document.querySelectorAll("[data-source-option]").forEach((option) => option.addEventListener("change", () => configureSourceMode(option.value)));
     questionCountInput?.addEventListener("input", renderQuestionConfiguration);
     questionConfiguration?.addEventListener("input", updateStructureStatus);
     questionConfiguration?.addEventListener("change", updateStructureStatus);
@@ -2817,9 +2856,9 @@ const fileUploadBridge = (() => {
     });
 
     dropzone?.addEventListener("drop", (event) => {
-      const file = event.dataTransfer?.files?.[0];
-      if (file) selectFile(file);
+      if (event.dataTransfer?.files?.length) selectFiles(event.dataTransfer.files);
     });
+    configureSourceMode("images");
   };
 
   return { init };
