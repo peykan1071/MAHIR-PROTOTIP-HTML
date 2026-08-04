@@ -1873,6 +1873,19 @@ const preparationManager = (() => {
 
   const getValue = (fieldName) => (fields[fieldName]?.value || "").trim();
 
+  const visibleCourseName = () => getValue("course") === otherOption
+    ? getValue("otherCourse")
+    : getValue("course");
+
+  const publishContext = () => {
+    window.MAHIRPreparationContext = {
+      courseName: visibleCourseName()
+    };
+    document.dispatchEvent(new CustomEvent("mahir:preparation-context-changed", {
+      detail: window.MAHIRPreparationContext
+    }));
+  };
+
   const isMtalSelected = () => getValue("schoolType") === mtalSchoolType;
 
   const populateSelect = (fieldName, options, disabled = false) => {
@@ -2047,6 +2060,7 @@ const preparationManager = (() => {
   const refresh = () => {
     updateSummary();
     updateNextButton();
+    publishContext();
   };
 
   const handleStageChange = () => {
@@ -2380,6 +2394,9 @@ const fileUploadBridge = (() => {
     const questionConfiguration = document.querySelector("[data-question-configuration]");
     const scoreTotal = document.querySelector("[data-score-total]");
     const structureStatus = document.querySelector("[data-exam-structure-status]");
+    const assessmentComponent = document.querySelector("[data-assessment-component]");
+    const languageAssessmentField = document.querySelector("[data-language-assessment-field]");
+    const componentWeightNote = document.querySelector("[data-component-weight-note]");
 
     if (!fileInput || !readButton || typeof FormData === "undefined" || typeof fetch === "undefined") {
       return;
@@ -2392,6 +2409,56 @@ const fileUploadBridge = (() => {
     let progressTimer;
     let learningOutcomes = [];
     const reportRuntime = window.MAHIRReportRuntime = window.MAHIRReportRuntime || {};
+    const componentLabels = {
+      written: "Yazılı Sınav",
+      listening: "Dinleme/İzleme Sınavı",
+      speaking: "Konuşma Sınavı",
+      performance: "Performans Çalışması"
+    };
+    const profiles = {
+      "tde-70-15-15": {
+        title: "Türk Dili ve Edebiyatı",
+        weights: { written: 0.70, listening: 0.15, speaking: 0.15 }
+      },
+      "language-50-25-25": {
+        title: "Türkçe ve yabancı dil",
+        weights: { written: 0.50, listening: 0.25, speaking: 0.25 }
+      }
+    };
+    const normalizeCourseName = (value) => String(value || "").normalize("NFKC").toLocaleLowerCase("tr-TR").trim().replace(/\s+/g, " ");
+    const tdeCourses = new Set(["Türk Dili ve Edebiyatı", "Seçmeli Türk Dili ve Edebiyatı"].map(normalizeCourseName));
+    const languageCourses = new Set([
+      "Türkçe", "Yabancı Dil", "Birinci Yabancı Dil", "İkinci Yabancı Dil",
+      "İngilizce", "Almanca", "Fransızca", "Arapça", "Mesleki Arapça", "Rusça",
+      "İspanyolca", "İtalyanca", "Çince", "Japonca", "Farsça"
+    ].map(normalizeCourseName));
+    const profileIdForCourse = (courseName) => {
+      const normalized = normalizeCourseName(courseName);
+      if (tdeCourses.has(normalized)) return "tde-70-15-15";
+      if (languageCourses.has(normalized)) return "language-50-25-25";
+      return null;
+    };
+
+    const currentCourseName = () => window.MAHIRPreparationContext?.courseName || "";
+    const currentProfileId = () => profileIdForCourse(currentCourseName());
+
+    const updateComponentNote = () => {
+      const component = assessmentComponent?.value || "written";
+      const profileId = currentProfileId();
+      const profile = profiles[profileId];
+      const enabled = Boolean(profile);
+      if (languageAssessmentField) languageAssessmentField.hidden = !enabled;
+      if (assessmentComponent && !enabled) assessmentComponent.value = "written";
+      if (!componentWeightNote) return;
+      componentWeightNote.hidden = !enabled;
+      if (!enabled) {
+        componentWeightNote.textContent = "";
+      } else if (component === "performance") {
+        componentWeightNote.textContent = "Performans çalışması ayrı analiz edilir; yazılı–dinleme–konuşma ağırlıklı sınav puanına katılmaz.";
+      } else {
+        componentWeightNote.textContent = `${profile.title} sınav puanında ${componentLabels[component]} %${profile.weights[component] * 100} ağırlığındadır. Her bileşen 100 puan üzerinden değerlendirilir.`;
+      }
+    };
 
     const currentQuestionConfiguration = () => Array.from(questionConfiguration?.querySelectorAll("[data-question-config-row]") || []).map((row, index) => {
       const outcomeSelect = row.querySelector("[data-question-outcome]");
@@ -2723,7 +2790,18 @@ const fileUploadBridge = (() => {
         scores: Array.from(row.querySelectorAll('[data-validation-field="score"]')).map(numberValue),
         totalScore: numberValue(row.querySelector('[data-validation-field="totalScore"]'))
       }));
-      return { exam: structuredData?.exam || {}, questions, students };
+      const componentType = assessmentComponent?.value || "written";
+      const profileId = currentProfileId();
+      return {
+        exam: {
+          ...(structuredData?.exam || {}),
+          courseName: currentCourseName(),
+          componentType: profileId ? componentType : "written",
+          weightingProfileId: profileId && componentType !== "performance" ? profileId : null
+        },
+        questions,
+        students
+      };
     };
 
     const renderAnalysis = (analysis) => {
@@ -2838,6 +2916,9 @@ const fileUploadBridge = (() => {
     questionCountInput?.addEventListener("input", renderQuestionConfiguration);
     questionConfiguration?.addEventListener("input", updateStructureStatus);
     questionConfiguration?.addEventListener("change", updateStructureStatus);
+    assessmentComponent?.addEventListener("change", updateComponentNote);
+    document.addEventListener("mahir:preparation-context-changed", updateComponentNote);
+    updateComponentNote();
     loadLearningOutcomes();
     document.addEventListener("mahir:confirm-data", analyzeApprovedData);
 

@@ -248,6 +248,14 @@
               <p class="score-total" data-score-total>Toplam puan: 0</p>
             </div>
             <div class="exam-count-grid">
+              <label data-language-assessment-field hidden>Değerlendirme Türü
+                <select data-assessment-component required>
+                  <option value="written">Yazılı Sınav</option>
+                  <option value="listening">Dinleme/İzleme Sınavı</option>
+                  <option value="speaking">Konuşma Sınavı</option>
+                  <option value="performance">Performans Çalışması</option>
+                </select>
+              </label>
               <label>Öğrenci Sayısı
                 <input type="number" min="1" max="100" step="1" value="35" data-student-count required>
               </label>
@@ -255,6 +263,7 @@
                 <input type="number" min="1" max="20" step="1" value="10" data-question-count required>
               </label>
             </div>
+            <p class="preparation-helper" data-component-weight-note hidden></p>
             <div class="question-configuration-list" data-question-configuration></div>
             <p class="notification-message exam-structure-status" data-exam-structure-status aria-live="polite">
               Her soru için azami puanı ve öğrenme çıktısını seçiniz.

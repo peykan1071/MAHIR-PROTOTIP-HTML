@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
+from .assessment_profiles import COMPONENT_LABELS, PERFORMANCE, PROFILES, WRITTEN, profile_for_course
+
 
 def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
     """Validate approved browser data and return deterministic analysis results."""
@@ -12,6 +14,20 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
     questions = payload.get("questions")
     students = payload.get("students")
     exam = payload.get("exam") or {}
+    component_type = str(exam.get("componentType") or WRITTEN).strip()
+    if component_type not in COMPONENT_LABELS:
+        raise ValueError("Değerlendirme bileşeni yazılı, dinleme/izleme, konuşma veya performans olmalıdır.")
+    profile_id = str(exam.get("weightingProfileId") or "").strip()
+    if profile_id and profile_id not in PROFILES:
+        raise ValueError("Seçilen değerlendirme ağırlık profili tanınmıyor.")
+    if component_type == PERFORMANCE and profile_id:
+        raise ValueError("Performans çalışması dil dersi sınav puanı ağırlık hesabına katılamaz.")
+    course_name = str(exam.get("courseName") or exam.get("course") or "").strip()
+    course_profile = profile_for_course(course_name)
+    if profile_id and (course_profile is None or course_profile.id != profile_id):
+        raise ValueError("Seçilen ağırlık profili bu ders için kullanılamaz.")
+    if course_profile is None and component_type != WRITTEN:
+        raise ValueError("Dinleme/izleme, konuşma ve performans bileşenleri yalnız dil dersi profilinde kullanılabilir.")
     if not isinstance(questions, list) or not questions:
         raise ValueError("Analiz için en az bir soru bulunmalıdır.")
     if not isinstance(students, list) or not students:
@@ -61,7 +77,13 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
     average = sum(student["calculatedTotal"] for student in participating) / len(participating)
     exam_max = sum(question["maxScore"] for question in normalized_questions)
     return {
-        "exam": exam,
+        "exam": {
+            **exam,
+            "componentType": component_type,
+            "componentLabel": COMPONENT_LABELS[component_type],
+            "weightingProfileId": profile_id or None,
+            "componentWeight": PROFILES[profile_id].weights.get(component_type) if profile_id else None,
+        },
         "summary": {
             "questionCount": len(normalized_questions),
             "studentCount": len(students),
