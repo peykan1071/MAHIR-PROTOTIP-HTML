@@ -12,16 +12,23 @@ WORD_NAMESPACE = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/
 
 
 def parse_mahir_docx(content: bytes) -> dict[str, object]:
-    """Return exam, question and student data found in a MAHIR DOCX template."""
+    """Return teacher-reviewable data from a DOCX without requiring a template."""
 
     tables = _read_tables(content)
-    if len(tables) < 5:
-        raise ValueError("Belge, MAHİR Veri Giriş Şablonu tablo yapısıyla eşleşmiyor.")
+    exam_table = _find_exam_table(tables)
+    question_table = _find_table(tables, {"soru no", "azami puan"})
+    student_table = _find_student_table(tables)
 
-    exam = _parse_exam(tables[1])
-    questions = _parse_questions(tables[3])
-    students = _parse_students(tables[4], questions)
+    exam = _parse_exam(exam_table or [])
+    questions = _parse_questions(question_table or [])
+    students = _parse_students_flexible(student_table or [])
     warnings = _build_warnings(exam, questions, students)
+
+    if not student_table:
+        warnings.append(
+            "Word belgesindeki öğrenci ve puan alanları otomatik olarak ayırt edilemedi. "
+            "Bilgileri öğretmen kontrol ekranında tamamlayınız."
+        )
 
     return {
         "exam": exam,
@@ -34,6 +41,38 @@ def parse_mahir_docx(content: bytes) -> dict[str, object]:
             "warningCount": len(warnings),
         },
     }
+
+
+def _find_table(
+    tables: list[list[list[str]]], required_labels: set[str]
+) -> list[list[str]] | None:
+    for table in tables:
+        if not table:
+            continue
+        labels = {_normalise_label(cell) for cell in table[0]}
+        if required_labels.issubset(labels):
+            return table
+    return None
+
+
+def _find_exam_table(tables: list[list[list[str]]]) -> list[list[str]] | None:
+    for table in tables:
+        labels = {_normalise_label(cell) for row in table for cell in row}
+        if len(labels & {"il", "ilce", "okul adi", "ders", "sinif sube"}) >= 2:
+            return table
+    return None
+
+
+def _find_student_table(tables: list[list[list[str]]]) -> list[list[str]] | None:
+    for table in tables:
+        if not table:
+            continue
+        labels = {_normalise_label(cell) for cell in table[0]}
+        has_name = any("ad soyad" in label or "adi soyadi" in label for label in labels)
+        has_score = any(re.fullmatch(r"(?:s|soru) ?\d+", label) for label in labels)
+        if has_name and has_score:
+            return table
+    return None
 
 
 def _read_tables(content: bytes) -> list[list[list[str]]]:
@@ -140,6 +179,48 @@ def _parse_students(
     return students
 
 
+def _parse_students_flexible(rows: list[list[str]]) -> list[dict[str, object]]:
+    """Read a student-score table by its headings rather than column positions."""
+
+    if not rows:
+        return []
+    headings = [_normalise_label(cell) for cell in rows[0]]
+
+    def find_index(predicate) -> int | None:
+        return next((index for index, label in enumerate(headings) if predicate(label)), None)
+
+    row_index = find_index(lambda label: label in {"sira", "sira no"})
+    number_index = find_index(lambda label: label in {"okul no", "ogrenci no", "numara", "no"})
+    name_index = find_index(lambda label: "ad soyad" in label or "adi soyadi" in label)
+    total_index = find_index(lambda label: label in {"toplam", "toplam puan", "puan"})
+    score_indexes = [
+        index for index, label in enumerate(headings)
+        if re.fullmatch(r"(?:s|soru) ?\d+", label)
+    ]
+    students = []
+
+    for source_row in rows[1:]:
+        row = source_row + [""] * max(0, len(headings) - len(source_row))
+        scores = [_number(row[index]) for index in score_indexes]
+        student_no = row[number_index].strip() if number_index is not None else ""
+        full_name = row[name_index].strip() if name_index is not None else ""
+        total_score = _number(row[total_index]) if total_index is not None else None
+        if not (student_no or full_name or any(score is not None for score in scores) or total_score is not None):
+            continue
+        students.append(
+            {
+                "rowNumber": _integer(row[row_index]) if row_index is not None else len(students) + 1,
+                "studentNo": student_no,
+                "fullName": full_name,
+                "scores": scores,
+                "totalScore": total_score,
+                "calculatedTotal": round(sum(score or 0 for score in scores), 2),
+                "control": "",
+            }
+        )
+    return students
+
+
 def _build_warnings(
     exam: dict[str, object],
     questions: list[dict[str, object]],
@@ -164,7 +245,6 @@ def _build_warnings(
             warnings.append(f"{student['rowNumber']}. öğrenci satırında ad soyad boş.")
         if (
             student["totalScore"] is not None
-            and student["attendance"].casefold() not in {"g", "girmedi", "katilmadi"}
             and abs(float(student["totalScore"]) - float(student["calculatedTotal"])) > 0.01
         ):
             warnings.append(

@@ -2,6 +2,22 @@
 
 Bu belge, MAHİR projesinin geliştirme kurallarını, sürüm yönetimini, dosya düzenini ve çalışma disiplinini tanımlar. Amaç, prototipin küçük, anlaşılır, öğretmen kontrollü ve sürdürülebilir adımlarla ilerlemesini sağlamaktır.
 
+> **Güncel kapsam notu (03.08.2026):** Aşağıdaki bağlayıcı ilkeler, prototipin ilk iskeletini anlatan eski kapsam maddelerinden önce gelir. Eski belgede kapsam dışı sayılan dosya okuma ile Word/PDF çıktı özellikleri sonraki sürümlerde kullanıcı onayıyla geliştirilmiştir.
+
+## Bağlayıcı Prototip Sınırı
+
+MAHİR; sınav verilerini okuyan, öğretmen doğrulamasından geçiren, sonuçları resmî öğrenme çıktıları ve becerilerle ilişkilendirerek analiz eden ve tek bir **Sınav Sonuçları Analiz Raporu** oluşturan kamu evrakı temelli karar destek ajanıdır.
+
+- Prototipte idareci modülü ve başka evrak türü bulunmaz.
+- MAHİR etkinlik, kaynak, kitap sayfası, öğretim yöntemi veya telafi programı önermez.
+- MAHİR yalnız güçlü alanları, gelişim ihtiyacını, kapsamı ve öncelik düzeyini kanıtlarıyla belirler.
+- Soru–puan–öğrenme çıktısı eşleştirmesini öğretmen Veri Ekleme aşamasında yapar.
+- Okunan öğrenci verisi, öğretmenin belirttiği öğrenci sayısı kadar satırda doğrulanır; okunamayan alan öğretmen tarafından düzeltilmeden analiz yapılamaz.
+- Öğretmen onayı olmadan analiz verisi kesinleşmez ve nihai çıktı alınamaz.
+- Ekran, Word ve PDF raporları A–H başlıkları, sırası ve içerik modeli bakımından aynı kalır.
+- Rapor ön izlemesi tek sütunlu ve bütün bölümleri eşit genişlikte olur.
+- F bölümü **“Gelişim İhtiyaçları ve Değerlendirme Sonuçları”** başlığını taşır.
+
 ## 1. Proje Adı ve Amacı
 
 Proje adı: MAHİR - Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı

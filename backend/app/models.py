@@ -36,6 +36,9 @@ class CEDAssessment:
     exam_date: str | None = None
     question_count: int | None = None
     total_score: float | None = None
+    component_type: str | None = None
+    assessment_group_id: str | None = None
+    weighting_profile_id: str | None = None
 
 
 @dataclass(slots=True)

@@ -82,10 +82,10 @@ def _build_decision_note(rate: float) -> str:
     category = _categorize_rate(rate)
 
     if category == "Güçlü":
-        return "Öğrenme çıktısı güçlü düzeydedir; pekiştirme etkinlikleriyle sürdürülmelidir."
+        return "Öğrenme çıktısında güçlü yeterlilik düzeyi tespit edilmiştir."
     if category == "Geliştirilmeli":
-        return "Öğrenme çıktısı kısmen kazanılmıştır; hedefli tekrar ve ek örneklerle desteklenmelidir."
-    return "Öğrenme çıktısı kritik düzeydedir; yeniden öğretim ve yakın izleme planlanmalıdır."
+        return "Öğrenme çıktısında gelişim ihtiyacı bulunduğu tespit edilmiştir."
+    return "Öğrenme çıktısında öncelikli gelişim ihtiyacı bulunduğu tespit edilmiştir."
 
 
 def _format_rate(rate: float) -> str:

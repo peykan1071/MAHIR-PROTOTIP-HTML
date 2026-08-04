@@ -3,8 +3,9 @@
 The receiver detects that a file reached the Python backend, validates its
 filename extension, and triggers the existing backend reporting flow for CSV
 uploads. Word, PDF and image documents are accepted by the prototype and
-forwarded to the teacher-validation step; DOCX templates are parsed into
-teacher-reviewable structured data. OCR remains a later integration.
+forwarded to the teacher-validation step; DOCX tables are parsed when their
+headings can be recognised. A fixed MAHIR template is never required. OCR
+remains a later integration.
 """
 
 from __future__ import annotations
@@ -177,7 +178,7 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
 def run_existing_backend_flow(
     uploaded_file: UploadedFile, file_check: FileCheckResult
 ) -> tuple[bool, str, dict[str, object] | None]:
-    """Run CSV analysis or accept a prototype document for teacher validation."""
+    """Accept supported documents and forward their data for teacher validation."""
 
     if file_check.extension == ".docx":
         try:
@@ -190,7 +191,20 @@ def run_existing_backend_flow(
                 structured_data,
             )
         except ValueError as error:
-            return False, str(error), None
+            # A readable Word package may still contain an unfamiliar teacher-made
+            # layout. Do not reject it merely because it is not a MAHIR template.
+            return (
+                True,
+                "Word belgesi alındı. Alanlar otomatik okunamadığı için bilgiler "
+                "öğretmen kontrol ekranında tamamlanacaktır.",
+                {
+                    "exam": {},
+                    "questions": [],
+                    "students": [],
+                    "warnings": [str(error)],
+                    "summary": {"questionCount": 0, "studentCount": 0, "warningCount": 1},
+                },
+            )
 
     if file_check.extension != ".csv":
         return True, "Belge alındı ve öğretmen kontrolüne hazırlandı.", None
