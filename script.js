@@ -2412,8 +2412,7 @@ const fileUploadBridge = (() => {
     const componentLabels = {
       written: "Yazılı Sınav",
       listening: "Dinleme/İzleme Sınavı",
-      speaking: "Konuşma Sınavı",
-      performance: "Performans Çalışması"
+      speaking: "Konuşma Sınavı"
     };
     const profiles = {
       "tde-70-15-15": {
@@ -2453,8 +2452,6 @@ const fileUploadBridge = (() => {
       componentWeightNote.hidden = !enabled;
       if (!enabled) {
         componentWeightNote.textContent = "";
-      } else if (component === "performance") {
-        componentWeightNote.textContent = "Performans çalışması ayrı analiz edilir; yazılı–dinleme–konuşma ağırlıklı sınav puanına katılmaz.";
       } else {
         componentWeightNote.textContent = `${profile.title} sınav puanında ${componentLabels[component]} %${profile.weights[component] * 100} ağırlığındadır. Her bileşen 100 puan üzerinden değerlendirilir.`;
       }
@@ -2797,7 +2794,7 @@ const fileUploadBridge = (() => {
           ...(structuredData?.exam || {}),
           courseName: currentCourseName(),
           componentType: profileId ? componentType : "written",
-          weightingProfileId: profileId && componentType !== "performance" ? profileId : null
+          weightingProfileId: profileId
         },
         questions,
         students

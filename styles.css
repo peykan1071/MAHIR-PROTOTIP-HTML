@@ -261,6 +261,11 @@ input[type="checkbox"] {
   gap: 7px;
 }
 
+/* Author styles must not override the native hidden state. */
+.exam-count-grid label[hidden] {
+  display: none;
+}
+
 .exam-count-grid input,
 .question-configuration-row input,
 .question-configuration-row select {

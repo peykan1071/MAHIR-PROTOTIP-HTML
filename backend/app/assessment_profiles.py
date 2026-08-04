@@ -14,7 +14,6 @@ import unicodedata
 WRITTEN = "written"
 LISTENING = "listening"
 SPEAKING = "speaking"
-PERFORMANCE = "performance"
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +87,6 @@ COMPONENT_LABELS = {
     WRITTEN: "Yazılı Sınav",
     LISTENING: "Dinleme/İzleme Sınavı",
     SPEAKING: "Konuşma Sınavı",
-    PERFORMANCE: "Performans Çalışması",
 }
 
 

@@ -46,6 +46,21 @@ class AssessmentProfileTests(unittest.TestCase):
                 }
             )
 
+    def test_performance_is_not_an_exam_type(self):
+        with self.assertRaisesRegex(ValueError, "Sınav türü"):
+            analyze_approved_data(
+                {
+                    "exam": {
+                        "courseName": "Türk Dili ve Edebiyatı",
+                        "componentType": "performance",
+                    },
+                    "questions": [{"number": 1, "maxScore": 100}],
+                    "students": [
+                        {"studentNo": "1", "fullName": "Örnek Öğrenci", "scores": [80]}
+                    ],
+                }
+            )
+
     def test_foreign_language_accepts_matching_profile(self):
         result = analyze_approved_data(
             {
