@@ -1879,7 +1879,8 @@ const preparationManager = (() => {
 
   const publishContext = () => {
     window.MAHIRPreparationContext = {
-      courseName: visibleCourseName()
+      courseName: visibleCourseName(),
+      grade: getValue("grade")
     };
     document.dispatchEvent(new CustomEvent("mahir:preparation-context-changed", {
       detail: window.MAHIRPreparationContext
@@ -2397,6 +2398,7 @@ const fileUploadBridge = (() => {
     const assessmentComponent = document.querySelector("[data-assessment-component]");
     const languageAssessmentField = document.querySelector("[data-language-assessment-field]");
     const componentWeightNote = document.querySelector("[data-component-weight-note]");
+    const programDataStatus = document.querySelector("[data-program-data-status]");
 
     if (!fileInput || !readButton || typeof FormData === "undefined" || typeof fetch === "undefined") {
       return;
@@ -2408,6 +2410,9 @@ const fileUploadBridge = (() => {
     let previewUrl = null;
     let progressTimer;
     let learningOutcomes = [];
+    let programLearningOutcomes = [];
+    let activeProgramId = "";
+    let programRequestSequence = 0;
     const reportRuntime = window.MAHIRReportRuntime = window.MAHIRReportRuntime || {};
     const componentLabels = {
       written: "Yazılı Sınav",
@@ -2440,7 +2445,25 @@ const fileUploadBridge = (() => {
     };
 
     const currentCourseName = () => window.MAHIRPreparationContext?.courseName || "";
+    const currentGrade = () => window.MAHIRPreparationContext?.grade || "";
     const currentProfileId = () => profileIdForCourse(currentCourseName());
+    const currentProgram = () => window.MAHIRProgramCatalog?.resolve(currentCourseName(), currentGrade()) || null;
+
+    const setProgramStatus = (message, state = "") => {
+      if (!programDataStatus) return;
+      programDataStatus.hidden = !message;
+      programDataStatus.textContent = message;
+      programDataStatus.classList.toggle("is-error", state === "error");
+      programDataStatus.classList.toggle("is-success", state === "success");
+    };
+
+    const applyComponentOutcomeFilter = () => {
+      learningOutcomes = window.MAHIRProgramCatalog?.filterOutcomes(
+        programLearningOutcomes,
+        assessmentComponent?.value || "written"
+      ) || [];
+      renderQuestionConfiguration();
+    };
 
     const updateComponentNote = () => {
       const component = assessmentComponent?.value || "written";
@@ -2458,6 +2481,7 @@ const fileUploadBridge = (() => {
           ? "Genel değerlendirme; aynı değerlendirme grubundaki yazılı, dinleme/izleme ve konuşma bileşenlerinden elde edilen öğrenme kanıtlarını, öğrenme çıktılarını ve alan becerilerini birlikte yorumlar. Üç bileşen tamamlanmadan kesinleştirilmez."
           : `${profile.title} değerlendirme sonucunda ${componentLabels[component]} %${profile.weights[component] * 100} ağırlığındadır. Her bileşen 100 puan üzerinden değerlendirilir.`;
       }
+      applyComponentOutcomeFilter();
     };
 
     const currentQuestionConfiguration = () => Array.from(questionConfiguration?.querySelectorAll("[data-question-config-row]") || []).map((row, index) => {
@@ -2470,6 +2494,8 @@ const fileUploadBridge = (() => {
         outcomeDescription: selected?.title || "",
         outcomeTheme: selected?.theme || "",
         outcomeSkill: selected?.skill || "",
+        parentOutcomeCode: selected?.parentCode || selected?.code || "",
+        parentOutcomeDescription: selected?.parentTitle || selected?.title || "",
         outcomeKey: selected?.id || outcomeSelect?.value || ""
       };
     });
@@ -2515,6 +2541,7 @@ const fileUploadBridge = (() => {
         scoreLabel.append(scoreInput);
         const outcomeField = document.createElement("label");
         outcomeField.textContent = "Öğrenme Çıktısı";
+        outcomeField.hidden = !activeProgramId || (assessmentComponent?.value || "written") === "general";
         const outcomeSelect = document.createElement("select");
         outcomeSelect.dataset.questionOutcome = "";
         const placeholder = document.createElement("option");
@@ -2524,7 +2551,7 @@ const fileUploadBridge = (() => {
         learningOutcomes.forEach((outcome) => {
           const option = document.createElement("option");
           option.value = outcome.id;
-          option.textContent = [outcome.theme, outcome.code, outcome.title].filter(Boolean).join(" — ");
+          option.textContent = [outcome.theme, outcome.parentCode, outcome.code, outcome.title].filter(Boolean).join(" — ");
           option.selected = saved.outcomeKey === outcome.id;
           outcomeSelect.append(option);
         });
@@ -2535,13 +2562,37 @@ const fileUploadBridge = (() => {
       updateStructureStatus();
     };
 
-    const loadLearningOutcomes = () => fetch("shared/pilot/tde9/learning-outcomes-template.json")
-      .then((response) => response.ok ? response.json() : { learning_outcomes: [] })
-      .then((payload) => {
-        learningOutcomes = Array.isArray(payload.learning_outcomes) ? payload.learning_outcomes : [];
+    const loadLearningOutcomes = () => {
+      const requestId = ++programRequestSequence;
+      const program = currentProgram();
+      activeProgramId = program?.id || "";
+      programLearningOutcomes = [];
+      learningOutcomes = [];
+      if (!program) {
+        setProgramStatus(
+          currentCourseName() && currentGrade()
+            ? "Bu derse ait öğretim programı ve öğrenme çıktıları henüz MAHİR’e tanımlanmamıştır. Soru ve puan bilgileriyle soru bazlı değerlendirmeye devam edebilirsiniz."
+            : ""
+        );
         renderQuestionConfiguration();
+        return Promise.resolve();
+      }
+      setProgramStatus("Öğretim programı verileri yükleniyor.");
+      return fetch(program.dataUrl)
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("Program verisi okunamadı.")))
+      .then((payload) => {
+        if (requestId !== programRequestSequence) return;
+        programLearningOutcomes = Array.isArray(payload.learning_outcomes) ? payload.learning_outcomes : [];
+        setProgramStatus("9. sınıf Türk Dili ve Edebiyatı öğretim programı verileri hazır.", "success");
+        applyComponentOutcomeFilter();
       })
-      .catch(renderQuestionConfiguration);
+      .catch(() => {
+        if (requestId !== programRequestSequence) return;
+        activeProgramId = "";
+        setProgramStatus("Öğretim programı verileri yüklenemedi. Öğrenme çıktısı seçmeden soru bazlı değerlendirmeye devam edebilirsiniz.", "error");
+        renderQuestionConfiguration();
+      });
+    };
 
     const setStatus = (message, state = "") => {
       if (!statusMessage) return;
@@ -2797,6 +2848,8 @@ const fileUploadBridge = (() => {
           exam: {
             ...(structuredData?.exam || {}),
             courseName: currentCourseName(),
+            grade: currentGrade(),
+            programId: currentProgram()?.id || null,
             componentType,
             weightingProfileId: profileId,
             assessmentScope: "language-composite"
@@ -2808,6 +2861,8 @@ const fileUploadBridge = (() => {
         exam: {
           ...(structuredData?.exam || {}),
           courseName: currentCourseName(),
+          grade: currentGrade(),
+          programId: currentProgram()?.id || null,
           componentType: profileId ? componentType : "written",
           weightingProfileId: profileId,
           assessmentScope: componentType === "general" ? "language-composite" : "component"
@@ -2936,7 +2991,10 @@ const fileUploadBridge = (() => {
     questionConfiguration?.addEventListener("input", updateStructureStatus);
     questionConfiguration?.addEventListener("change", updateStructureStatus);
     assessmentComponent?.addEventListener("change", updateComponentNote);
-    document.addEventListener("mahir:preparation-context-changed", updateComponentNote);
+    document.addEventListener("mahir:preparation-context-changed", () => {
+      updateComponentNote();
+      loadLearningOutcomes();
+    });
     updateComponentNote();
     loadLearningOutcomes();
     document.addEventListener("mahir:confirm-data", analyzeApprovedData);

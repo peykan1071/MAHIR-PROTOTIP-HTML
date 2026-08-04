@@ -266,6 +266,11 @@ input[type="checkbox"] {
   display: none;
 }
 
+.question-configuration-row label[hidden],
+.program-data-status[hidden] {
+  display: none;
+}
+
 .exam-count-grid input,
 .question-configuration-row input,
 .question-configuration-row select {

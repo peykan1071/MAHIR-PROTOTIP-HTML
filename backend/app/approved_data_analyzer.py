@@ -13,6 +13,7 @@ from .assessment_profiles import (
     build_general_evaluation,
     profile_for_course,
 )
+from .program_catalog import validate_question_program_context
 
 
 def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
@@ -47,6 +48,8 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Analiz için en az bir soru bulunmalıdır.")
     if not isinstance(students, list) or not students:
         raise ValueError("Analiz için en az bir öğrenci bulunmalıdır.")
+
+    validate_question_program_context(course_name, exam.get("grade"), questions)
 
     normalized_questions = [_normalize_question(item, index) for index, item in enumerate(questions, 1)]
     participating = [
@@ -137,6 +140,9 @@ def _normalize_question(item: Any, fallback_number: int) -> dict[str, Any]:
         "outcomeDescription": str(item.get("outcomeDescription") or "").strip(),
         "outcomeTheme": str(item.get("outcomeTheme") or "").strip(),
         "outcomeSkill": str(item.get("outcomeSkill") or "").strip(),
+        "parentOutcomeCode": str(item.get("parentOutcomeCode") or "").strip(),
+        "parentOutcomeDescription": str(item.get("parentOutcomeDescription") or "").strip(),
+        "outcomeKey": str(item.get("outcomeKey") or "").strip(),
     }
 
 

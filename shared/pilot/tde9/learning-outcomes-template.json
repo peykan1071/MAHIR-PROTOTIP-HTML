@@ -8,36 +8,88 @@
   "learning_outcomes": [
     { "id": "tema1-tde1-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE1.1", "title": "“Sözün İnceliği” temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebilme", "skill": "Dinleme/İzleme" },
     { "id": "tema1-tde1-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE1.2", "title": "“Sözün İnceliği” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema1-tde2-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE2.1", "title": "“Sözün İnceliği” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma" },
-    { "id": "tema1-tde2-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE2.2", "title": "“Sözün İnceliği” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma" },
+    { "id": "tema1-tde2-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE2.1", "title": "“Sözün İnceliği” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma", "processComponents": [
+      { "code": "TDE2.1.1", "title": "İnceler ve görüş oluşturur." },
+      { "code": "TDE2.1.2", "title": "Seçim yapar." }
+    ] },
+    { "id": "tema1-tde2-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE2.2", "title": "“Sözün İnceliği” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma", "processComponents": [
+      { "code": "TDE2.2.1", "title": "Ön bilgilerle bağlantı kurar." },
+      { "code": "TDE2.2.2", "title": "Tahmin eder." },
+      { "code": "TDE2.2.3", "title": "Karşılaştırır." },
+      { "code": "TDE2.2.4", "title": "Çıkarım yapar." },
+      { "code": "TDE2.2.5", "title": "Sınıflandırır." }
+    ] },
     { "id": "tema1-tde3-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE3.1", "title": "Söyleyişin inceliğini kullanarak akıcı bir konuşma süreci yönetebilme", "skill": "Konuşma" },
     { "id": "tema1-tde3-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE3.2", "title": "Muhatabını ikna etmek için söyleyiş inceliklerine yer veren bir konuşma içeriği oluşturabilme", "skill": "Konuşma" },
     { "id": "tema1-tde3-3", "theme": "1. Tema: Sözün İnceliği", "code": "TDE3.3", "title": "Muhatabını ikna etmek için söyleyiş inceliklerine yer veren bir konuşmada kural uygulayabilme", "skill": "Konuşma" },
     { "id": "tema1-tde3-4", "theme": "1. Tema: Sözün İnceliği", "code": "TDE3.4", "title": "Söyleyiş inceliğinin konuşmasına etkisini yansıtabilme", "skill": "Konuşma" },
-    { "id": "tema1-tde4-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.1", "title": "Edebî söyleyişin inceliğini yansıtmak için paragraf düzeyindeki bir yazısında süreci yönetebilme", "skill": "Yazma" },
-    { "id": "tema1-tde4-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.2", "title": "Edebî söyleyişin inceliğini yansıtan metinlerden edindiği söz varlığını kullanarak yazısına içerik oluşturabilme", "skill": "Yazma" },
-    { "id": "tema1-tde4-3", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.3", "title": "Edebî söyleyişin inceliğini yansıttığı yazısında kural uygulayabilme", "skill": "Yazma" },
-    { "id": "tema1-tde4-4", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.4", "title": "Edebî söyleyişin inceliğini yansıttığı yazısına yönelik değerlendirmelerini yansıtabilme", "skill": "Yazma" },
+    { "id": "tema1-tde4-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.1", "title": "Edebî söyleyişin inceliğini yansıtmak için paragraf düzeyindeki bir yazısında süreci yönetebilme", "skill": "Yazma", "processComponents": [
+      { "code": "TDE4.1.1", "title": "Seçim yapar." }, { "code": "TDE4.1.2", "title": "İlişkiyi sürdürür." }
+    ] },
+    { "id": "tema1-tde4-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.2", "title": "Edebî söyleyişin inceliğini yansıtan metinlerden edindiği söz varlığını kullanarak yazısına içerik oluşturabilme", "skill": "Yazma", "processComponents": [
+      { "code": "TDE4.2.1", "title": "Ön bilgilerle bağlantı kurar." }, { "code": "TDE4.2.2", "title": "Tahmin eder." },
+      { "code": "TDE4.2.3", "title": "Karşılaştırır." }, { "code": "TDE4.2.4", "title": "Sınıflandırır." },
+      { "code": "TDE4.2.5", "title": "Yeniden ifade eder." }, { "code": "TDE4.2.6", "title": "Tepki verir." },
+      { "code": "TDE4.2.7", "title": "Görsel ögeleri kullanır." }, { "code": "TDE4.2.8", "title": "Sunar." }
+    ] },
+    { "id": "tema1-tde4-3", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.3", "title": "Edebî söyleyişin inceliğini yansıttığı yazısında kural uygulayabilme", "skill": "Yazma", "processComponents": [
+      { "code": "TDE4.3.1", "title": "Plan hazırlar." }, { "code": "TDE4.3.2", "title": "Düşünceyi geliştirme yollarını kullanır." },
+      { "code": "TDE4.3.3", "title": "Uygun söz varlığı kullanır." }, { "code": "TDE4.3.4", "title": "İletileri açık ve örtük biçimde ifade eder." },
+      { "code": "TDE4.3.5", "title": "Türkçe dil yapılarını uygular." }, { "code": "TDE4.3.6", "title": "Bağdaşıklık ögelerini kullanır." },
+      { "code": "TDE4.3.7", "title": "Yazım kurallarını uygular." }, { "code": "TDE4.3.8", "title": "Noktalama kurallarını uygular." }
+    ] },
+    { "id": "tema1-tde4-4", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.4", "title": "Edebî söyleyişin inceliğini yansıttığı yazısına yönelik değerlendirmelerini yansıtabilme", "skill": "Yazma", "processComponents": [
+      { "code": "TDE4.4.1", "title": "Kendini değerlendirir." }, { "code": "TDE4.4.2", "title": "Tepki verir." }
+    ] },
 
     { "id": "tema2-tde1-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE1.1", "title": "“Anlam Arayışı” temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebilme", "skill": "Dinleme/İzleme" },
     { "id": "tema2-tde1-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE1.2", "title": "“Anlam Arayışı” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema2-tde2-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE2.1", "title": "“Anlam Arayışı” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma" },
-    { "id": "tema2-tde2-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE2.2", "title": "“Anlam Arayışı” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma" },
+    { "id": "tema2-tde2-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE2.1", "title": "“Anlam Arayışı” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma", "processComponents": [
+      { "code": "TDE2.1.1", "title": "İnceler ve görüş oluşturur." }, { "code": "TDE2.1.2", "title": "Seçim yapar." }
+    ] },
+    { "id": "tema2-tde2-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE2.2", "title": "“Anlam Arayışı” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma", "processComponents": [
+      { "code": "TDE2.2.1", "title": "Ön bilgilerle bağlantı kurar." }, { "code": "TDE2.2.2", "title": "Tahmin eder." },
+      { "code": "TDE2.2.3", "title": "Çıkarım yapar." }, { "code": "TDE2.2.4", "title": "Karşılaştırır." },
+      { "code": "TDE2.2.5", "title": "Sınıflandırır." }, { "code": "TDE2.2.6", "title": "Tepki verir." }
+    ] },
     { "id": "tema2-tde3-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE3.1", "title": "Konusunu ana düşünce etrafında detaylandırdığı akıcı bir konuşma sürecini yönetebilme", "skill": "Konuşma" },
     { "id": "tema2-tde3-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE3.2", "title": "Konusunu ana düşünce etrafında detaylandırdığı konuşma içeriğini oluşturabilme", "skill": "Konuşma" },
     { "id": "tema2-tde3-3", "theme": "2. Tema: Anlam Arayışı", "code": "TDE3.3", "title": "Konusunu ana fikir etrafında detaylandırdığı konuşmasında kural uygulayabilme", "skill": "Konuşma" },
     { "id": "tema2-tde3-4", "theme": "2. Tema: Anlam Arayışı", "code": "TDE3.4", "title": "Konuşmasının içeriğinde kullandığı unsurların konuşmasına olan etkisini yansıtabilme", "skill": "Konuşma" },
-    { "id": "tema2-tde4-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.1", "title": "Konu zenginliği ve çeşitliliğini sağlayan edebî metinlerde yazma sürecini yönetebilme", "skill": "Yazma" },
-    { "id": "tema2-tde4-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.2", "title": "Yazısını zenginleştirecek içerik oluşturabilme", "skill": "Yazma" },
-    { "id": "tema2-tde4-3", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.3", "title": "Konu zenginliği ve çeşitliliğini sağlayan yazısında kural uygulayabilme", "skill": "Yazma" },
-    { "id": "tema2-tde4-4", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.4", "title": "Yazısına yönelik değerlendirmelerini konu ve diğer yazma unsurları bağlamında yansıtabilme", "skill": "Yazma" },
+    { "id": "tema2-tde4-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.1", "title": "Konu zenginliği ve çeşitliliğini sağlayan edebî metinlerde yazma sürecini yönetebilme", "skill": "Yazma", "processComponents": [
+      { "code": "TDE4.1.1", "title": "Seçim yapar." }, { "code": "TDE4.1.2", "title": "İlişkiyi sürdürür." }
+    ] },
+    { "id": "tema2-tde4-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.2", "title": "Yazısını zenginleştirecek içerik oluşturabilme", "skill": "Yazma", "processComponents": [
+      { "code": "TDE4.2.1", "title": "Ön bilgilerle bağlantı kurar." }, { "code": "TDE4.2.2", "title": "Tahmin eder." },
+      { "code": "TDE4.2.3", "title": "Karşılaştırır." }, { "code": "TDE4.2.4", "title": "Sınıflandırır." },
+      { "code": "TDE4.2.5", "title": "Yeniden ifade eder." }, { "code": "TDE4.2.6", "title": "Tepki verir." },
+      { "code": "TDE4.2.7", "title": "Görsel ögeleri kullanır." }, { "code": "TDE4.2.8", "title": "Sunar." }
+    ] },
+    { "id": "tema2-tde4-3", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.3", "title": "Konu zenginliği ve çeşitliliğini sağlayan yazısında kural uygulayabilme", "skill": "Yazma", "processComponents": [
+      { "code": "TDE4.3.1", "title": "Plan hazırlar." }, { "code": "TDE4.3.2", "title": "Düşünceyi geliştirme yollarını kullanır." },
+      { "code": "TDE4.3.3", "title": "Uygun söz varlığı kullanır." }, { "code": "TDE4.3.4", "title": "İletileri açık ve örtük biçimde ifade eder." },
+      { "code": "TDE4.3.5", "title": "Türkçe dil yapılarını uygular." }, { "code": "TDE4.3.6", "title": "Bağdaşıklık ögelerini kullanır." },
+      { "code": "TDE4.3.7", "title": "Yazım kurallarını uygular." }, { "code": "TDE4.3.8", "title": "Noktalama kurallarını uygular." }
+    ] },
+    { "id": "tema2-tde4-4", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.4", "title": "Yazısına yönelik değerlendirmelerini konu ve diğer yazma unsurları bağlamında yansıtabilme", "skill": "Yazma", "processComponents": [
+      { "code": "TDE4.4.1", "title": "Kendini değerlendirir." }, { "code": "TDE4.4.2", "title": "Tepki verir." }
+    ] },
 
     { "id": "tema3-tde1-1", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE1.1", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde dinleme/izlemeyi yönetebilme", "skill": "Dinleme/İzleme" },
     { "id": "tema3-tde1-2", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE1.2", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Dinleme/İzleme" },
     { "id": "tema3-tde1-3", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE1.3", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinleri çözümleyebilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema3-tde2-1", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE2.1", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma" },
-    { "id": "tema3-tde2-2", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE2.2", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma" },
-    { "id": "tema3-tde2-3", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE2.3", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinleri çözümleyebilme", "skill": "Okuma" },
+    { "id": "tema3-tde2-1", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE2.1", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma", "processComponents": [
+      { "code": "TDE2.1.1", "title": "İnceler ve görüş oluşturur." }, { "code": "TDE2.1.2", "title": "Seçim yapar." }
+    ] },
+    { "id": "tema3-tde2-2", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE2.2", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma", "processComponents": [
+      { "code": "TDE2.2.1", "title": "Ön bilgilerle bağlantı kurar." }, { "code": "TDE2.2.2", "title": "Tahmin eder." },
+      { "code": "TDE2.2.3", "title": "Çıkarım yapar." }, { "code": "TDE2.2.4", "title": "Karşılaştırır." },
+      { "code": "TDE2.2.5", "title": "Sınıflandırır." }, { "code": "TDE2.2.6", "title": "Tepki verir." }
+    ] },
+    { "id": "tema3-tde2-3", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE2.3", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinleri çözümleyebilme", "skill": "Okuma", "processComponents": [
+      { "code": "TDE2.3.1", "title": "Parçaları belirler." }, { "code": "TDE2.3.2", "title": "Parçalar arasındaki ilişkileri belirler." },
+      { "code": "TDE2.3.3", "title": "Parçalar arasındaki etkileşimleri belirler." }
+    ] },
     { "id": "tema3-tde3-1", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE3.1", "title": "Edebî metinlerde yapısal inceliklere odaklanan akıcı bir konuşma sürecini yönetebilme", "skill": "Konuşma" },
     { "id": "tema3-tde3-2", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE3.2", "title": "Benzetme, karşılaştırma yaparak yapısal özellikleri ortaya koyduğu bir konuşma içeriği oluşturabilme", "skill": "Konuşma" },
     { "id": "tema3-tde3-3", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE3.3", "title": "Benzetme, karşılaştırma yaparak yapısal özellikleri ortaya koyduğu bir konuşmada kural uygulayabilme", "skill": "Konuşma" },

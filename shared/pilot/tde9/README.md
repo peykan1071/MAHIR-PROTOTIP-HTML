@@ -1,6 +1,6 @@
 # 9. Sınıf Türk Dili ve Edebiyatı Ortak Yazılı Pilot Veri Paketi
 
-Bu klasör, 9. sınıf Türk Dili ve Edebiyatı ortak yazılı pilotu için gerçek verilerin sonradan yerleştirileceği standart veri paketi iskeletidir.
+Bu klasör, 9. sınıf Türk Dili ve Edebiyatı ortak yazılı pilotunun ders-sınıf kapsamlı program veri paketidir.
 
 ## Pilotun Amacı
 
@@ -9,7 +9,7 @@ Pilot veri paketi, MAHİR backend akışının gerçek sınav verileriyle denene
 ## Dosyaların Görevi
 
 - `exam-template.csv`: Sınav sorularının yerleştirileceği CSV şablonudur. Başlık sırası `question_no,question_text,correct_answer,points` biçiminde korunmalıdır.
-- `learning-outcomes-template.json`: Öğretim programı öğrenme çıktılarının yerleştirileceği JSON şablonudur.
+- `learning-outcomes-template.json`: Dört temadaki alan becerilerini ve öğrenme çıktılarını; resmî konu-soru dağılım tablolarında bulunan süreç bileşenleriyle birlikte saklar. Aynı kod farklı temalarda farklı bağlam taşıdığı için her kayıt tema kimliğiyle tutulur.
 - `student-results-template.json`: Anonim öğrenci cevap ve sonuçlarının yerleştirileceği JSON şablonudur.
 
 ## Veri Gizliliği
@@ -27,3 +27,11 @@ Soru kimlikleri backend akışı içinde `q1`, `q2`, `q3` biçiminde oluşturula
 ## Uyumluluk
 
 Dosya biçimleri mevcut CED veri modeli ve backend akışıyla uyumlu olmalıdır. Başlık adları, JSON anahtarları ve alan yapıları değiştirilmemelidir.
+
+## Kapsam ve Kaynak İlkesi
+
+- Program profili yalnız `Türk Dili ve Edebiyatı + 9. sınıf` eşleşmesinde açılır.
+- Dört tema belgesi ana öğrenme çıktısı havuzunu oluşturur.
+- Ortak Metin, programlar arası bileşenlerin kavramsal açıklama kaynağıdır.
+- 1. ve 2. dönem konu-soru dağılım tabloları, ortak yazılılarda kullanılan süreç bileşenlerini ve senaryo kapsamını doğrular.
+- Resmî belgede bulunmayan ders, sınıf, sınav veya süreç bileşeni için veri üretilmez.
