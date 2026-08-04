@@ -5,7 +5,14 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
-from .assessment_profiles import COMPONENT_LABELS, PROFILES, WRITTEN, profile_for_course
+from .assessment_profiles import (
+    COMPONENT_LABELS,
+    GENERAL,
+    PROFILES,
+    WRITTEN,
+    build_general_evaluation,
+    profile_for_course,
+)
 
 
 def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
@@ -26,6 +33,16 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Seçilen ağırlık profili bu ders için kullanılamaz.")
     if course_profile is None and component_type != WRITTEN:
         raise ValueError("Dinleme/izleme ve konuşma sınavları yalnız dil dersi profilinde kullanılabilir.")
+    if component_type == GENERAL:
+        if course_profile is None:
+            raise ValueError("Genel dil değerlendirmesi yalnız dil dersi profilinde kullanılabilir.")
+        component_analyses = payload.get("componentAnalyses")
+        if not isinstance(component_analyses, dict):
+            raise ValueError(
+                "Genel değerlendirme için yazılı, dinleme/izleme ve konuşma bileşenlerine ait "
+                "onaylanmış öğrenme kanıtları gereklidir."
+            )
+        return build_general_evaluation(course_profile.id, component_analyses)
     if not isinstance(questions, list) or not questions:
         raise ValueError("Analiz için en az bir soru bulunmalıdır.")
     if not isinstance(students, list) or not students:
@@ -47,7 +64,13 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
         earned = sum(student["scores"][question_index] for student in participating)
         possible = question["maxScore"] * len(participating)
         rate = earned / possible if possible else 0.0
-        question_results.append({**question, "earnedScore": earned, "possibleScore": possible, "successRate": rate})
+        question_results.append({
+            **question,
+            "earnedScore": earned,
+            "possibleScore": possible,
+            "realizationRate": rate,
+            "successRate": rate,
+        })
         outcome_key = " | ".join(
             value for value in (question["outcomeTheme"], question["outcomeCode"]) if value
         ) or f"Soru {question['number']}"
@@ -67,6 +90,8 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
                 "earnedScore": totals["earned"],
                 "possibleScore": totals["possible"],
                 "successRate": rate,
+                "realizationRate": rate,
+                "developmentLevel": _category(rate),
                 "category": _category(rate),
                 "decision": _decision(rate),
             }
@@ -89,6 +114,7 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
             "absentStudentCount": 0,
             "examMaxScore": exam_max,
             "classAverage": round(average, 2),
+            "classLearningLevel": average / exam_max if exam_max else 0.0,
             "classSuccessRate": average / exam_max if exam_max else 0.0,
         },
         "questions": question_results,
@@ -169,19 +195,19 @@ def _number(value: Any, default: float | int | None = None) -> float:
 
 def _category(rate: float) -> str:
     if rate >= 0.85:
-        return "Çok güçlü"
+        return "Beklenen düzeyin üzerinde gelişmiş"
     if rate >= 0.70:
-        return "Güçlü"
+        return "Beklenen düzeyde gelişmiş"
     if rate >= 0.50:
-        return "Gelişmekte"
-    return "Destek gerekli"
+        return "Gelişimi sürmekte"
+    return "İlave destek gerektiriyor"
 
 
 def _decision(rate: float) -> str:
     if rate >= 0.85:
-        return "Öğrenme çıktısında güçlü yeterlilik düzeyi tespit edilmiştir."
+        return "Öğrenme çıktısına ilişkin kanıtlar beklenen düzeyin üzerinde gelişim göstermektedir."
     if rate >= 0.70:
-        return "Öğrenme çıktısında yeterlilik sağlanmış, gelişimin izlenmesine ihtiyaç bulunduğu değerlendirilmiştir."
+        return "Öğrenme çıktısına ilişkin kanıtlar beklenen düzeydedir; gelişim izlenmelidir."
     if rate >= 0.50:
-        return "Öğrenme çıktısında gelişim ihtiyacı bulunduğu tespit edilmiştir."
-    return "Öğrenme çıktısında öncelikli gelişim ihtiyacı bulunduğu tespit edilmiştir."
+        return "Öğrenme çıktısının gerçekleşme düzeyini geliştirecek öğrenme yaşantılarına ihtiyaç vardır."
+    return "Öğrenme çıktısına ilişkin öğrenme kanıtları ilave desteğe ihtiyaç olduğunu göstermektedir."

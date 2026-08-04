@@ -508,7 +508,7 @@
     developmentAreas: ["Kanıt kullanımı geliştirilebilir."],
     misconceptions: [],
     teachingSuggestions: ["Kısa kanıt temelli yazma etkinliği uygulanabilir."],
-    monitoringPlan: ["Bir sonraki sınavda aynı kazanım izlenir."]
+    monitoringPlan: ["Bir sonraki değerlendirmede aynı öğrenme çıktısı izlenir."]
   });
   const makeEvidenceOutput = () => ({ evidenceItems: [evidenceItemDefault()], unsupportedClaims: [], confidenceSummary: { average: 0.85 } });
   const makeValidationOutput = () => ({ valid: true, issues: [], blockingIssues: [], warnings: [], approvalRequired: true });
@@ -521,7 +521,7 @@
     strengths: ["Metin çıkarımı güçlüdür."],
     developmentAreas: ["Kanıt kullanımı geliştirilebilir."],
     teachingSuggestions: ["Kısa kanıt temelli yazma etkinliği uygulanabilir."],
-    monitoringPlan: ["Bir sonraki sınavda aynı kazanım izlenir."],
+    monitoringPlan: ["Bir sonraki değerlendirmede aynı öğrenme çıktısı izlenir."],
     sourceReferences: [{ id: "src-1", title: "Örnek öğretim programı" }],
     teacherReviewStatus: "pending"
   });
@@ -588,7 +588,7 @@
       customValidate(payload) { const errors = []; ["questions", "students", "curriculumMatches"].forEach((path) => assertArray(payload, path, errors)); assertObject(payload, "scoringModel", errors); return { errors, warnings: [] }; }
     }),
     MeasurementOutput: createContract({
-      name: "MeasurementOutput", description: "Sınıf, soru, kazanım istatistikleri ve dağılımlar.",
+      name: "MeasurementOutput", description: "Sınıf, soru ve öğrenme çıktısı istatistikleri ile dağılımlar.",
       required: ["classStatistics", "questionStatistics", "learningOutcomeStatistics", "distribution", "anomalies"], defaultFactory: makeMeasurementOutput,
       customValidate(payload) { const errors = []; assertObject(payload, "classStatistics", errors); assertObject(payload, "distribution", errors); ["questionStatistics", "learningOutcomeStatistics", "anomalies"].forEach((path) => assertArray(payload, path, errors)); return { errors, warnings: [] }; }
     }),
@@ -2412,7 +2412,8 @@ const fileUploadBridge = (() => {
     const componentLabels = {
       written: "Yazılı Sınav",
       listening: "Dinleme/İzleme Sınavı",
-      speaking: "Konuşma Sınavı"
+      speaking: "Konuşma Sınavı",
+      general: "Genel Değerlendirme"
     };
     const profiles = {
       "tde-70-15-15": {
@@ -2453,7 +2454,9 @@ const fileUploadBridge = (() => {
       if (!enabled) {
         componentWeightNote.textContent = "";
       } else {
-        componentWeightNote.textContent = `${profile.title} sınav puanında ${componentLabels[component]} %${profile.weights[component] * 100} ağırlığındadır. Her bileşen 100 puan üzerinden değerlendirilir.`;
+        componentWeightNote.textContent = component === "general"
+          ? "Genel değerlendirme; aynı değerlendirme grubundaki yazılı, dinleme/izleme ve konuşma bileşenlerinden elde edilen öğrenme kanıtlarını, öğrenme çıktılarını ve alan becerilerini birlikte yorumlar. Üç bileşen tamamlanmadan kesinleştirilmez."
+          : `${profile.title} değerlendirme sonucunda ${componentLabels[component]} %${profile.weights[component] * 100} ağırlığındadır. Her bileşen 100 puan üzerinden değerlendirilir.`;
       }
     };
 
@@ -2789,12 +2792,25 @@ const fileUploadBridge = (() => {
       }));
       const componentType = assessmentComponent?.value || "written";
       const profileId = currentProfileId();
+      if (componentType === "general") {
+        return {
+          exam: {
+            ...(structuredData?.exam || {}),
+            courseName: currentCourseName(),
+            componentType,
+            weightingProfileId: profileId,
+            assessmentScope: "language-composite"
+          },
+          componentAnalyses: reportRuntime.languageComponentAnalyses || {}
+        };
+      }
       return {
         exam: {
           ...(structuredData?.exam || {}),
           courseName: currentCourseName(),
           componentType: profileId ? componentType : "written",
-          weightingProfileId: profileId
+          weightingProfileId: profileId,
+          assessmentScope: componentType === "general" ? "language-composite" : "component"
         },
         questions,
         students
@@ -2823,10 +2839,16 @@ const fileUploadBridge = (() => {
         .then((response) => response.json().catch(() => ({})).then((payload) => ({ response, payload })))
         .then(({ response, payload }) => {
           if (!response.ok) throw new Error(payload.message || "Onaylanan veriler analiz edilemedi.");
-          renderAnalysis(payload.analysis || {});
+          const analysis = payload.analysis || {};
+          const selectedComponent = assessmentComponent?.value || "written";
+          if (selectedComponent !== "general" && currentProfileId()) {
+            reportRuntime.languageComponentAnalyses = reportRuntime.languageComponentAnalyses || {};
+            reportRuntime.languageComponentAnalyses[selectedComponent] = analysis;
+          }
+          renderAnalysis(analysis);
           screenManager.approveData();
           screenManager.showScreen("analysis-screen");
-          showMessage("Analiz tamamlandı. Sınav sonuçları analiz raporu görüntülenmeye hazırdır.", "success");
+          showMessage("Analiz tamamlandı. Öğrenme kanıtlarına dayalı değerlendirme raporu görüntülenmeye hazırdır.", "success");
         })
         .catch((error) => {
           const approvalMessage = document.querySelector("[data-approval-message]");

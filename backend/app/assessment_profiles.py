@@ -14,6 +14,7 @@ import unicodedata
 WRITTEN = "written"
 LISTENING = "listening"
 SPEAKING = "speaking"
+GENERAL = "general"
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +88,62 @@ COMPONENT_LABELS = {
     WRITTEN: "Yazılı Sınav",
     LISTENING: "Dinleme/İzleme Sınavı",
     SPEAKING: "Konuşma Sınavı",
+    GENERAL: "Genel Değerlendirme",
 }
+
+REQUIRED_COMPONENTS = (WRITTEN, LISTENING, SPEAKING)
+
+
+def build_general_evaluation(
+    profile_id: str, component_analyses: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    """Combine three language components without reducing evidence to one score."""
+
+    profile = PROFILES.get(profile_id)
+    if profile is None:
+        raise ValueError(f"Bilinmeyen değerlendirme ağırlık profili: {profile_id}")
+    missing = [key for key in REQUIRED_COMPONENTS if key not in component_analyses]
+    if missing:
+        return {
+            "assessmentScope": "language-composite",
+            "complete": False,
+            "missingComponents": missing,
+            "missingComponentLabels": [COMPONENT_LABELS[key] for key in missing],
+            "notice": "Genel değerlendirme, tüm bileşenlere ait öğrenme kanıtları tamamlandığında kesinleştirilebilir.",
+        }
+
+    component_scores: dict[str, dict[str, float]] = {}
+    skill_evidence: list[dict[str, Any]] = []
+    for component in REQUIRED_COMPONENTS:
+        analysis = component_analyses[component]
+        students = analysis.get("students") or []
+        component_scores[component] = {
+            str(student.get("studentNo")): float(student.get("calculatedTotal", 0))
+            for student in students
+            if student.get("studentNo") not in (None, "")
+        }
+        for outcome in analysis.get("outcomes") or []:
+            skill_evidence.append(
+                {
+                    "componentType": component,
+                    "componentLabel": COMPONENT_LABELS[component],
+                    "learningOutcomeCode": outcome.get("outcomeCode", ""),
+                    "fieldSkill": outcome.get("outcomeSkill", ""),
+                    "realizationRate": outcome.get("realizationRate", outcome.get("successRate", 0.0)),
+                    "developmentLevel": outcome.get("developmentLevel", outcome.get("category", "")),
+                }
+            )
+
+    composite = calculate_composite_scores(profile_id, component_scores)
+    return {
+        **composite,
+        "assessmentScope": "language-composite",
+        "componentEvidence": skill_evidence,
+        "notice": (
+            "Ağırlıklı sonuç sayısal değerlendirme sonucunu; bileşen kanıtları ise "
+            "öğrenme çıktılarının gerçekleşme düzeyi ile gelişmiş ve desteklenmesi gereken becerileri gösterir."
+        ),
+    }
 
 
 def calculate_composite_scores(

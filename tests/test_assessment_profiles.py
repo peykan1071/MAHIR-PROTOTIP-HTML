@@ -3,7 +3,11 @@
 import unittest
 
 from backend.app.approved_data_analyzer import analyze_approved_data
-from backend.app.assessment_profiles import calculate_composite_scores, profile_for_course
+from backend.app.assessment_profiles import (
+    build_general_evaluation,
+    calculate_composite_scores,
+    profile_for_course,
+)
 
 
 class AssessmentProfileTests(unittest.TestCase):
@@ -76,6 +80,33 @@ class AssessmentProfileTests(unittest.TestCase):
             }
         )
         self.assertEqual(result["exam"]["componentWeight"], 0.25)
+
+    def test_general_evaluation_requires_all_language_components(self):
+        result = build_general_evaluation(
+            "tde-70-15-15",
+            {
+                "written": {"students": [{"studentNo": "1", "calculatedTotal": 80}], "outcomes": []},
+                "listening": {"students": [{"studentNo": "1", "calculatedTotal": 100}], "outcomes": []},
+            },
+        )
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["missingComponentLabels"], ["Konuşma Sınavı"])
+
+    def test_general_evaluation_preserves_skill_evidence(self):
+        components = {}
+        for component, score, skill in (
+            ("written", 80, "Okuma"),
+            ("listening", 100, "Dinleme/İzleme"),
+            ("speaking", 60, "Konuşma"),
+        ):
+            components[component] = {
+                "students": [{"studentNo": "1", "calculatedTotal": score}],
+                "outcomes": [{"outcomeCode": "ÖÇ.1", "outcomeSkill": skill, "realizationRate": score / 100}],
+            }
+        result = build_general_evaluation("tde-70-15-15", components)
+        self.assertTrue(result["complete"])
+        self.assertEqual(result["studentScores"], {"1": 80.0})
+        self.assertEqual(len(result["componentEvidence"]), 3)
 
 
 if __name__ == "__main__":
