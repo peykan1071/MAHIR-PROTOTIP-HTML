@@ -431,6 +431,11 @@ input[type="checkbox"] {
   border-color: var(--color-border);
 }
 
+.uploaded-files-list {
+  display: grid;
+  gap: 12px;
+}
+
 .file-preview {
   display: grid;
   place-items: center;

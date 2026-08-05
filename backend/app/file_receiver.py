@@ -28,6 +28,8 @@ from .reporting_engine import generate_report, write_report
 UPLOAD_PATH = "/mahir-upload"
 ANALYZE_PATH = "/mahir-analyze"
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
+MAX_FILES_PER_UPLOAD = 10
+MAX_REQUEST_SIZE = MAX_UPLOAD_SIZE * MAX_FILES_PER_UPLOAD
 ALLOWED_EXTENSIONS = {
     ".csv",
     ".doc",
@@ -90,28 +92,47 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         if content_length <= 0:
             self._send_json(400, {"ok": False, "message": "Dosya verisi alınamadı."})
             return
-        if content_length > MAX_UPLOAD_SIZE:
+        if content_length > MAX_REQUEST_SIZE:
             self._send_json(413, {"ok": False, "message": "Dosya 20 MB sınırını aşıyor."})
             return
 
         body = self.rfile.read(content_length)
-        uploaded_file = extract_uploaded_file(body, content_type)
-        result = validate_file_name(uploaded_file.file_name)
+        uploaded_files = extract_uploaded_files(body, content_type)
 
-        if result.is_allowed:
+        if not uploaded_files:
+            self._send_json(400, {"ok": False, "message": "Dosya verisi alınamadı."})
+            return
+        if len(uploaded_files) > MAX_FILES_PER_UPLOAD:
+            self._send_json(400, {"ok": False, "message": "Bir görsel grubunda en fazla 10 dosya seçebilirsiniz."})
+            return
+
+        oversized = next((f for f in uploaded_files if len(f.content) > MAX_UPLOAD_SIZE), None)
+        if oversized is not None:
+            self._send_json(
+                413,
+                {"ok": False, "fileName": oversized.file_name, "message": "Dosya 20 MB sınırını aşıyor."},
+            )
+            return
+
+        results = [validate_file_name(f.file_name) for f in uploaded_files]
+        invalid = next((r for r in results if not r.is_allowed), None)
+
+        if invalid is None:
             print(
-                f"[MAHIR] Dosya alındı: {result.file_name} | Uzantı: {result.extension}",
+                f"[MAHIR] {len(uploaded_files)} dosya alındı: "
+                + ", ".join(f"{r.file_name} ({r.extension})" for r in results),
                 flush=True,
             )
-            flow_ok, flow_message, structured_data = run_existing_backend_flow(uploaded_file, result)
+            flow_ok, flow_message, structured_data = run_existing_backend_flow(uploaded_files, results)
 
             if flow_ok:
                 self._send_json(
                     200,
                     {
                         "ok": True,
-                        "fileName": result.file_name,
-                        "extension": result.extension,
+                        "fileName": results[0].file_name,
+                        "extension": results[0].extension,
+                        "fileCount": len(uploaded_files),
                         "message": flow_message,
                         "structuredData": structured_data,
                     },
@@ -123,23 +144,23 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 500,
                 {
                     "ok": False,
-                    "fileName": result.file_name,
-                    "extension": result.extension,
+                    "fileName": results[0].file_name,
+                    "extension": results[0].extension,
                     "message": flow_message,
                 },
             )
             return
 
         print(
-            f"[MAHIR] Dosya reddedildi: {result.file_name or 'adsız dosya'} | Uzantı: {result.extension or 'yok'}",
+            f"[MAHIR] Dosya reddedildi: {invalid.file_name or 'adsız dosya'} | Uzantı: {invalid.extension or 'yok'}",
             flush=True,
         )
         self._send_json(
             400,
             {
                 "ok": False,
-                "fileName": result.file_name,
-                "extension": result.extension,
+                "fileName": invalid.file_name,
+                "extension": invalid.extension,
                 "message": "Dosya uzantısı desteklenen biçimlerle eşleşmedi.",
             },
         )
@@ -176,9 +197,19 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
 
 
 def run_existing_backend_flow(
-    uploaded_file: UploadedFile, file_check: FileCheckResult
+    uploaded_files: list[UploadedFile], file_checks: list[FileCheckResult]
 ) -> tuple[bool, str, dict[str, object] | None]:
     """Accept supported documents and forward their data for teacher validation."""
+
+    if len(uploaded_files) > 1:
+        # No OCR/field-merge parsing exists yet across a group of images (it
+        # does not exist for a single image either) - forward the whole group
+        # the same way a single unrecognised document is accepted today, and
+        # let the teacher complete the validation screen manually.
+        return True, f"{len(uploaded_files)} görsel alındı ve öğretmen kontrolüne hazırlandı.", None
+
+    uploaded_file = uploaded_files[0]
+    file_check = file_checks[0]
 
     if file_check.extension == ".docx":
         try:
@@ -247,14 +278,15 @@ def run_existing_backend_flow(
             pass
 
 
-def extract_uploaded_file(body: bytes, content_type: str) -> UploadedFile:
-    """Extract browser-supplied filename and content from multipart form data."""
+def extract_uploaded_files(body: bytes, content_type: str) -> list[UploadedFile]:
+    """Extract every browser-supplied file from multipart form data."""
 
     boundary = _extract_boundary(content_type)
 
     if not boundary:
-        return UploadedFile(file_name="", content=b"")
+        return []
 
+    files: list[UploadedFile] = []
     for part in body.split(b"--" + boundary):
         if b"Content-Disposition:" not in part:
             continue
@@ -264,9 +296,16 @@ def extract_uploaded_file(body: bytes, content_type: str) -> UploadedFile:
         match = re.search(r'filename="([^"]*)"', header_text)
 
         if match:
-            return UploadedFile(file_name=_clean_filename(match.group(1)), content=content.rstrip(b"\r\n"))
+            files.append(UploadedFile(file_name=_clean_filename(match.group(1)), content=content.rstrip(b"\r\n")))
 
-    return UploadedFile(file_name="", content=b"")
+    return files
+
+
+def extract_uploaded_file(body: bytes, content_type: str) -> UploadedFile:
+    """Extract the first browser-supplied file from multipart form data."""
+
+    files = extract_uploaded_files(body, content_type)
+    return files[0] if files else UploadedFile(file_name="", content=b"")
 
 
 def extract_filename(body: bytes, content_type: str) -> str:
