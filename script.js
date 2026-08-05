@@ -2381,13 +2381,7 @@ const fileUploadBridge = (() => {
   const init = () => {
     const fileInput = document.querySelector("#exam-file");
     const dropzone = document.querySelector("[data-upload-dropzone]");
-    const fileCard = document.querySelector("[data-uploaded-file-card]");
-    const filePreview = document.querySelector("[data-file-preview]");
-    const fileName = document.querySelector("[data-file-name]");
-    const fileType = document.querySelector("[data-file-type]");
-    const fileSize = document.querySelector("[data-file-size]");
-    const fileExtension = document.querySelector("[data-file-extension]");
-    const removeButton = document.querySelector("[data-remove-file]");
+    const filesList = document.querySelector("[data-uploaded-files-list]");
     const readButton = document.querySelector("[data-read-document]");
     const statusMessage = document.querySelector("[data-upload-status]");
     const studentCountInput = document.querySelector("[data-student-count]");
@@ -2407,7 +2401,7 @@ const fileUploadBridge = (() => {
     let selectedFiles = [];
     let sourceMode = "images";
     let structuredData = null;
-    let previewUrl = null;
+    let previewUrls = [];
     let progressTimer;
     let learningOutcomes = [];
     let programLearningOutcomes = [];
@@ -2628,69 +2622,108 @@ const fileUploadBridge = (() => {
       return "";
     };
 
-    const clearPreviewUrl = () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-        previewUrl = null;
-      }
+    const clearPreviewUrls = () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      previewUrls = [];
     };
 
-    const clearFile = () => {
+    const isSameFile = (a, b) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
+
+    const removeFileAt = (index) => {
+      selectedFiles.splice(index, 1);
+      renderFilesList();
+    };
+
+    const buildFileRow = (file, index) => {
+      const item = document.createElement("article");
+      item.className = "uploaded-file-card";
+
+      const preview = document.createElement("div");
+      preview.className = "file-preview";
+      preview.setAttribute("aria-hidden", "true");
+      const extension = getExtension(file);
+      if (file.type.startsWith("image/")) {
+        const url = URL.createObjectURL(file);
+        previewUrls.push(url);
+        const image = document.createElement("img");
+        image.src = url;
+        image.alt = "";
+        preview.append(image);
+      } else {
+        const badge = document.createElement("span");
+        badge.dataset.fileExtension = "";
+        badge.textContent = extension.toUpperCase();
+        preview.append(badge);
+      }
+
+      const details = document.createElement("div");
+      details.className = "uploaded-file-details";
+      const name = document.createElement("h3");
+      name.textContent = file.name;
+      const meta = document.createElement("p");
+      const typeSpan = document.createElement("span");
+      typeSpan.textContent = file.type || `${extension.toUpperCase()} belgesi`;
+      meta.append(typeSpan, document.createTextNode(` · ${formatBytes(file.size)}`));
+      details.append(name, meta);
+
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "secondary-button remove-file-button";
+      removeButton.textContent = "Dosyayı Kaldır";
+      removeButton.addEventListener("click", () => removeFileAt(index));
+
+      item.append(preview, details, removeButton);
+      return item;
+    };
+
+    const renderFilesList = () => {
+      clearPreviewUrls();
+      if (filesList) {
+        filesList.replaceChildren();
+        selectedFiles.forEach((file, index) => filesList.append(buildFileRow(file, index)));
+        filesList.toggleAttribute("hidden", selectedFiles.length === 0);
+      }
+      const hasFiles = selectedFiles.length > 0;
+      readButton.disabled = !hasFiles;
+      readButton.setAttribute("aria-disabled", String(!hasFiles));
+      setStatus(
+        hasFiles
+          ? `${selectedFiles.length} dosya hazır. Okunan alanlar öğretmen onayına sunulacaktır.`
+          : "Öğrenci T.C. kimlik numarası yüklemeyiniz. Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır.",
+        hasFiles ? "success" : ""
+      );
+    };
+
+    const clearAllFiles = () => {
       selectedFiles = [];
       fileInput.value = "";
-      clearPreviewUrl();
-      fileCard?.setAttribute("hidden", "");
-      readButton.disabled = true;
-      readButton.setAttribute("aria-disabled", "true");
-      setStatus("Öğrenci T.C. kimlik numarası yüklemeyiniz. Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır.");
-    };
-
-    const renderPreview = (file) => {
-      if (!filePreview) return;
-      clearPreviewUrl();
-      filePreview.replaceChildren();
-      const extension = getExtension(file);
-
-      if (file.type.startsWith("image/")) {
-        previewUrl = URL.createObjectURL(file);
-        const image = document.createElement("img");
-        image.src = previewUrl;
-        image.alt = "";
-        filePreview.append(image);
-        return;
-      }
-
-      const badge = document.createElement("span");
-      badge.dataset.fileExtension = "";
-      badge.textContent = extension.toUpperCase();
-      filePreview.append(badge);
+      renderFilesList();
     };
 
     const selectFiles = (files) => {
-      const candidates = Array.from(files || []);
-      const error = candidates.length > 10 ? "Bir görsel grubunda en fazla 10 dosya seçebilirsiniz." : candidates.map(validateFile).find(Boolean);
+      const incoming = Array.from(files || []);
+      if (!incoming.length) return;
+
+      const accumulate = fileInput.multiple;
+      const existing = accumulate ? selectedFiles : [];
+      const newFiles = incoming.filter((file) => !existing.some((current) => isSameFile(current, file)));
+      const merged = [...existing, ...newFiles];
+
+      const error = merged.length > 10 ? "Bir görsel grubunda en fazla 10 dosya seçebilirsiniz." : newFiles.map(validateFile).find(Boolean);
       if (error) {
-        clearFile();
+        fileInput.value = "";
         setStatus(error, "error");
         return;
       }
 
-      selectedFiles = candidates;
-      const firstFile = candidates[0];
-      if (fileName) fileName.textContent = candidates.length === 1 ? firstFile.name : `${candidates.length} görsel seçildi`;
-      if (fileType) fileType.textContent = candidates.length === 1 ? (firstFile.type || `${getExtension(firstFile).toUpperCase()} belgesi`) : "Görsel grubu";
-      if (fileSize) fileSize.textContent = formatBytes(candidates.reduce((sum, file) => sum + file.size, 0));
-      if (fileExtension) fileExtension.textContent = candidates.length === 1 ? getExtension(firstFile).toUpperCase() : String(candidates.length);
-      renderPreview(firstFile);
-      fileCard?.removeAttribute("hidden");
-      readButton.disabled = false;
-      readButton.setAttribute("aria-disabled", "false");
-      setStatus(`${candidates.length} dosya hazır. Okunan alanlar öğretmen onayına sunulacaktır.`, "success");
+      selectedFiles = merged;
+      fileInput.value = "";
+      renderFilesList();
     };
 
     const configureSourceMode = (mode) => {
       sourceMode = mode;
-      clearFile();
+      clearAllFiles();
       const title = document.querySelector("[data-upload-title]");
       const description = document.querySelector("[data-upload-description]");
       const rules = document.querySelector("[data-upload-rules]");
@@ -2930,12 +2963,8 @@ const fileUploadBridge = (() => {
         return;
       }
       if (!selectedFiles.length) return;
-      if (selectedFiles.length > 1) {
-        setStatus("10’ar görsellik grup seçimi hazırdır; OCR grup birleştirme bağlantısı sonraki geliştirme adımında etkinleştirilecektir.", "error");
-        return;
-      }
       const formData = new FormData();
-      formData.append("exam-file", selectedFiles[0]);
+      selectedFiles.forEach((file) => formData.append("exam-file", file));
       document.dispatchEvent(new CustomEvent("mahir:report-reset"));
       readButton.disabled = true;
       readButton.setAttribute("aria-disabled", "true");
@@ -2984,7 +3013,6 @@ const fileUploadBridge = (() => {
       if (fileInput.files?.length) selectFiles(fileInput.files);
     });
 
-    removeButton?.addEventListener("click", clearFile);
     readButton.addEventListener("click", uploadSelectedFile);
     document.querySelectorAll("[data-source-option]").forEach((option) => option.addEventListener("change", () => configureSourceMode(option.value)));
     questionCountInput?.addEventListener("input", renderQuestionConfiguration);
