@@ -1,161 +1,106 @@
-﻿# MAHIR-PROTOTIP-HTML
+# MAHİR
 
-MAHİR, "Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı" fikrine dayanan, Türkçe çalışan ve öğretmen kontrollü bir eğitim evrakı prototipidir.
+**Maarif Anlayışıyla Hizmet İzleme ve Raporlama Ajanı**
 
-İlk geliştirme hedefi, "Sınav Analizi ve Değerlendirme Raporu" için sade, modern ve tek sayfalık bir HTML/CSS/JavaScript prototipi hazırlamaktır.
+MAHİR; sınav verilerini öğrenme kanıtına dönüştürerek öğretmenlere kaynak temelli analiz, pedagojik değerlendirme ve raporlama desteği sunmak amacıyla geliştirilen, öğretmen kontrollü çok ajanlı yapay zekâ prototipidir.
 
-## Word Şablonunu Okuma
+Bu depo, MAHİR Takımı tarafından TEKNOFEST 2026 Yapay Zekâ Dil Ajanları Yarışması kapsamında geliştirilen çalışan prototipi içermektedir.
 
-`MAHIR_Veri_Giris_Sablonu_Surum_1.docx` dosyası doldurulup Veri Ekleme ekranından
-yüklendiğinde sınav, soru ve öğrenci tabloları yerel Python servisi tarafından
-okunur. Sonuçlar analizden önce düzenlenebilir Veri Onay tablolarında gösterilir.
+> Ayrıntılı proje yaklaşımı, mevcut sınırlar ve gelecek vizyonu için: [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)
+
+## Problem
+
+Okullarda sınavlar, ortak yazılılar, soru analizleri, zümre çalışmaları ve resmî raporlar için çok sayıda veri üretilmektedir. Bu veriler çoğu zaman farklı belge ve süreçlere dağılmakta; öğretmen aynı veriyi tekrar işlemek zorunda kalabilmekte ve ortaya çıkan verinin öğrenmeyi geliştirecek bilgiye dönüştürülmesi güçleşmektedir.
+
+MAHİR bu sorunu yalnızca evrak yükü olarak değil, **eğitim verisinin anlamlandırılması** problemi olarak ele alır.
+
+## Çözüm Yaklaşımı
+
+MAHİR'in yaklaşımı üç temel ilkeye dayanır:
+
+- **İnsan denetimi:** Sistem analiz eder ve önerir; öğretmen inceler, düzeltir ve nihai onayı verir.
+- **Kaynak temellilik:** Öğrenme çıktıları ve pedagojik değerlendirmeler resmî programlar ve güvenilir eğitim kaynaklarıyla ilişkilendirilir.
+- **Açıklanabilirlik:** Analiz sonucunun hangi veri ve öğrenme çıktısından üretildiğinin izlenebilir olması hedeflenir.
+
+Sistem; veri doğrulama, program eşleştirme, ölçme-değerlendirme, pedagojik analiz ve raporlama görevlerini ayrıştırılmış bileşenler üzerinden yürütmek üzere geliştirilmektedir.
 
 ## Güncel Çalışan Akış
 
-Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır.
-
-Yerel prototipi dosya alıcısıyla çalıştırmak için:
-
-```bash
-python3 backend/run_file_receiver.py
+```text
+Veri Girişi
+    ↓
+Doğrulama
+    ↓
+Standart Eğitim Veri Modeli (CED)
+    ↓
+Program / Öğrenme Çıktısı Eşleştirme
+    ↓
+Ölçme ve Değerlendirme
+    ↓
+Pedagojik Analiz
+    ↓
+Öğretmen Kontrolü
+    ↓
+Raporlama
 ```
 
-Ardından `http://127.0.0.1:8000/index.html` adresi açılır.
+Prototipte CSV ve Word tabanlı veri giriş akışları bulunmaktadır. PDF ve görüntü tabanlı belge işleme, OCR, doğal dilde veri kabulü, MAHİR Index üzerinden resmî kaynaklara erişen RAG yapısı ve ajan orkestrasyonu geliştirme ve bütünleştirme aşamasındadır.
 
-## Geliştirme Kuralları
+## Pilot Kapsamı
 
-Bu projede geliştirme adım adım, küçük ve onaylı sürümler halinde yapılır. Her sprintte yalnızca belirlenen kapsam uygulanır; yapay zekâ, veritabanı, OCR, dosya okuma, PDF/Word üretimi ve sistem entegrasyonu ilk aşamada kapsam dışıdır.
+- **Ana pilot:** 9. Sınıf Türk Dili ve Edebiyatı
+- **Doğrulama pilotu:** Fen Bilimleri
 
-Ayrıntılı geliştirme kuralları, sürümleme sistemi, dosya düzeni ve kontrol listeleri için bkz. [DEVELOPMENT_CHARTER.md](DEVELOPMENT_CHARTER.md).
+İlk sürümün odağı sınav analizi ve raporlamadır. Prototip henüz tüm öğretmen evraklarını, tüm dersleri ve tüm kademeleri kapsayan tamamlanmış bir ürün değildir.
 
-## Sprint 1 - v1.1
+## Teknoloji Yığını
 
-MAHİR Kurumsal Giriş Ekranı için yalnızca HTML iskeleti oluşturulmuştur.
+- **Frontend:** HTML, CSS, JavaScript
+- **Backend:** Python
+- **Veri modeli:** CED (Canonical Education Document)
+- **Sürüm ve ekip çalışması:** Git / GitHub
 
-Bu sürümde oluşturulan ana bölümler:
+## Depo Yapısı
 
-- Header
-- Hero
-- Information Cards
-- Primary Button Area
-- Values Band
-- Footer
+```text
+assets/      Görsel ve arayüz varlıkları
+backend/     Veri işleme, doğrulama, analiz ve raporlama bileşenleri
+docs/        Mimari ve proje dokümantasyonu
+shared/      Ortak veri, örnekler ve pilot veri paketleri
+index.html   Ana web arayüzü
+script.js    Frontend davranışları ve entegrasyon akışı
+styles.css   Arayüz stilleri
+```
 
-Bu sprintte tasarım, renk, responsive yapı, animasyon, logo, ikon, bayrak, hero görseli, framework veya dış kütüphane eklenmemiştir.
+## Yerel Çalıştırma
 
-## Sprint 1 - v1.2
+Proje kök dizininde:
 
-v1.1'de oluşturulan semantik HTML iskeleti korunarak yalnızca sayfa yerleşimi oluşturulmuştur.
+```bash
+python backend/run_file_receiver.py
+```
 
-Bu sürümde yapılan layout düzenlemeleri:
+Ardından tarayıcıda:
 
-- Header, Hero, Information Cards, Primary Button Area, Values Band ve Footer akışı kuruldu.
-- Hero alanı iki sütunlu yerleşime alındı; sağ sütun boş bırakıldı.
-- Information Cards alanı üç eşit kart düzenine alındı.
-- Primary Button Area sayfa ortasında konumlandırıldı.
-- Values Band dört sütunlu yatay yapıya alındı.
-- Footer sayfanın alt alanında sade biçimde konumlandırıldı.
+```text
+http://127.0.0.1:8000/index.html
+```
 
-Bu sprintte renk, gölge, border-radius, gradient, animasyon, responsive yapı, font değişikliği, logo, ikon, bayrak, görsel, framework veya dış kütüphane eklenmemiştir.
-## Sprint 1 - v1.3
+adresini açın.
 
-v1.1 HTML iskeleti ve v1.2 layout düzeni korunarak yalnızca tipografi hiyerarşisi oluşturulmuştur.
+## Geliştirme Disiplini
 
-Bu sürümde yapılan tipografi düzenlemeleri:
+MAHİR küçük, kontrollü ve izlenebilir geliştirme adımlarıyla ilerletilmektedir. Ana dal korunur; değişiklikler görev dallarında geliştirilir, kod/doküman incelemesinden geçirilir ve Pull Request üzerinden ana dala alınır.
 
-- Sistem fontları tanımlandı.
-- Ana başlık, alt başlık ve açıklama metinleri için okunabilir font ölçüleri ve satır yükseklikleri ayarlandı.
-- Kart başlıkları ve küçük açıklamalar için sade bir metin hiyerarşisi kuruldu.
-- Buton metni daha güçlü görünecek şekilde düzenlendi.
+Ayrıntılı geliştirme kuralları için: [DEVELOPMENT_CHARTER.md](DEVELOPMENT_CHARTER.md)
 
-Bu sprintte HTML yapısı, JavaScript, renk sistemi, logo, ikon, bayrak, hero görseli, gölge, gradient, border-radius, animasyon, responsive yapı, framework veya dış kütüphane eklenmemiştir.
-## Sprint 1 - v1.4
+Sürüm ve geliştirme geçmişi için: [CHANGELOG.md](CHANGELOG.md)
 
-Kurumsal görsel varlık klasör yapısı hazırlanmıştır. Bu sürümde görseller HTML'ye bağlanmamış, görseller için CSS yazılmamış ve yeni görsel/ikon dosyası üretilmemiştir.
+## Takım
 
-Oluşturulan varlık klasörleri:
+**MAHİR Takımı**
 
-- `assets/`
-- `assets/logo/`
-- `assets/hero/`
-- `assets/flag/`
-- `assets/icons/`
-
-### MAHİR UI Kit Varlık Adlandırma Standardı
-
-Genel kurallar:
-
-- Dosya adları küçük harfle yazılır.
-- Türkçe karakter kullanılmaz.
-- Kelimeler tire işaretiyle ayrılır.
-- MAHİR'e ait kurumsal varlıklarda `mahir-` öneki kullanılır.
-- Varlıklar kullanım alanına göre ilgili alt klasöre yerleştirilir.
-- Belirsiz `yeni`, `son`, `final` gibi adlar kullanılmaz.
-
-Önerilen varlık dosya adları:
-
-Logo:
-
-- `assets/logo/mahir-logo.png`
-
-Hero:
-
-- `assets/hero/mahir-hero-teacher.png`
-
-Bayrak:
-
-- `assets/flag/mahir-kurumsal-bayrak.png`
-
-İkonlar:
-
-- `assets/icons/document.png`
-- `assets/icons/chart.png`
-- `assets/icons/brain.png`
-- `assets/icons/clipboard.png`
-- `assets/icons/shield-check.png`
-- `assets/icons/upload-file.png`
-- `assets/icons/sparkles.png`
-- `assets/icons/report-file.png`
-- `assets/icons/trust.png`
-- `assets/icons/target.png`
-- `assets/icons/analytics.png`
-- `assets/icons/teacher-control.png`
-
-Bu sprintte `index.html`, `styles.css` ve `script.js` dosyaları değiştirilmemiştir.
-## Sprint 1 - v1.5
-
-MAHİR UI Kit görsel varlıklarının standart dosya adlarıyla `assets` klasör yapısına yerleştirilmesi hedeflenmiştir.
-
-Bu sprint için beklenen dosya yolları:
-
-Logo:
-
-- `assets/logo/mahir-logo.png`
-
-Hero:
-
-- `assets/hero/mahir-hero-teacher.png`
-
-Bayrak:
-
-- `assets/flag/mahir-kurumsal-bayrak.png`
-
-İkonlar:
-
-- `assets/icons/document.png`
-- `assets/icons/chart.png`
-- `assets/icons/brain.png`
-- `assets/icons/clipboard.png`
-- `assets/icons/shield-check.png`
-- `assets/icons/upload-file.png`
-- `assets/icons/sparkles.png`
-- `assets/icons/report-file.png`
-- `assets/icons/trust.png`
-- `assets/icons/target.png`
-- `assets/icons/analytics.png`
-- `assets/icons/teacher-control.png`
-
-Kontrol notu: Bu kontrol sırasında varlık dosyaları henüz klasörlere eklenmemiş görünmektedir. Görseller HTML'ye bağlanmamış, CSS yazılmamış, yeni görsel/ikon üretilmemiş ve `index.html`, `styles.css`, `script.js` dosyaları değiştirilmemiştir.
-## Sprint 1 / Task 03
-
-Project management documents oluşturuldu.
+- Zülal Ülker Daştan — Türk Dili ve Edebiyatı
+- Hakan Ergül — Matematik
+- Gonca Ergül — Fen Bilimleri
+- Lokman Daştan — Din Kültürü ve Ahlak Bilgisi
