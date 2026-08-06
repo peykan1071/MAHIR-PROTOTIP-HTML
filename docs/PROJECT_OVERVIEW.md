@@ -1,4 +1,8 @@
-# MAHİR Proje Genel Bakışı
+# MAHİR – Proje Genel Bakışı
+
+**Maarif Anlayışıyla Hizmet İzleme ve Raporlama Ajanı**
+
+MAHİR; sınav verilerini öğrenme kanıtına dönüştürerek öğretmenlere kaynak temelli analiz, pedagojik değerlendirme ve raporlama desteği sunmak amacıyla geliştirilen çok ajanlı bir yapay zekâ prototipidir.
 
 ## 1. MAHİR’in Açılımı
 
@@ -50,3 +54,12 @@ Finalde bütün vizyonu eksiksiz tamamlanmış gibi sunmak yerine, dar kapsamlı
 Ana pilotumuz **9. sınıf Türk Dili ve Edebiyatı**, farklı kademe ve disiplinlerde doğrulama pilotumuz **Fen Bilimleri** olacaktır.
 
 Hedefimiz; çalışan prototipi çok ajanlı mimari, MAHİR Index ve güvenlik ilkeleriyle bütünleşmiş, jüri önünde canlı olarak gösterilebilen bir MVP düzeyine taşımaktır.
+
+## Pilot Kapsamı
+
+- **Ana pilot:** 9. Sınıf Türk Dili ve Edebiyatı
+- **Doğrulama pilotu:** Fen Bilimleri
+
+### Gösterilecek Uçtan Uca Akış
+
+**Veri Girişi → Doğrulama → Sınav Analizi → Öğrenme Çıktısı Analizi → Kaynak Temelli Pedagojik Öneriler → Öğretmen Onayı → Word / PDF Rapor**
