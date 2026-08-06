@@ -31,6 +31,15 @@ if [[ -z "${MAHIR_OCR_SHARED_SECRET:-}" ]]; then
   exit 1
 fi
 
+if [[ -z "$(gcloud config get-value project 2>/dev/null)" ]]; then
+  echo "Bir GCP projesi seçili değil. Önce şunlardan birini yapın:" >&2
+  echo "  - Mevcut projelerinizi görmek için: gcloud projects list" >&2
+  echo "  - Birini seçmek için:               gcloud config set project PROJE_ID" >&2
+  echo "  - Yeni proje açmak için:            gcloud projects create PROJE_ID" >&2
+  echo "Projede faturalandırma (billing) da etkin olmalı - GPU'lu Cloud Run ücretli bir kaynaktır (bkz. Cloud Console > Billing)." >&2
+  exit 1
+fi
+
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
 
 gcloud run deploy "$SERVICE_NAME" \
