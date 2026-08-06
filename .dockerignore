@@ -1,0 +1,17 @@
+.git
+.gitignore
+*.md
+assets/
+colab/
+docs/
+tests/
+shared/
+index.html
+script.js
+styles.css
+Lib/
+Include/
+Scripts/
+pyvenv.cfg
+**/__pycache__/
+**/*.pyc

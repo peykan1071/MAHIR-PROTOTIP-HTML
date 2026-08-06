@@ -44,7 +44,6 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregi
 
 gcloud run deploy "$SERVICE_NAME" \
   --source . \
-  --dockerfile cloud-run/Dockerfile \
   --region "$REGION" \
   --gpu=1 \
   --gpu-type=nvidia-l4 \

@@ -1,6 +1,7 @@
 # MAHIR OCR işçisi (PaddleOCR-VL) için Google Cloud Run (GPU) imajı.
-# Dağıtım: bkz. cloud-run/deploy.sh. Bu Dockerfile repo kökünden derlenir
-# (`gcloud run deploy --source .`), o yüzden COPY yolları repo köküne göredir.
+# Dağıtım: bkz. cloud-run/deploy.sh. `gcloud run deploy --source .` kaynak
+# kökünde bu adla bir Dockerfile bulunca otomatik onu kullanır (özel yol
+# vermenin bir bayrağı yok), o yüzden bu dosya repo kökünde duruyor.
 
 FROM python:3.13-slim
 
