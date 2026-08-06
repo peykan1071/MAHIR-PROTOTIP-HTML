@@ -4,13 +4,15 @@ The receiver detects that a file reached the Python backend, validates its
 filename extension, and triggers the existing backend reporting flow for CSV
 uploads. Word, PDF and image documents are accepted by the prototype and
 forwarded to the teacher-validation step; DOCX tables are parsed when their
-headings can be recognised. A fixed MAHIR template is never required. OCR
-remains a later integration.
+headings can be recognised, and image groups are OCR'd by a remote MAHIR
+backend (see `remote_ocr_client.py`) when `MAHIR_OCR_REMOTE_URL` is set - no
+OCR pipeline runs on this machine. A fixed MAHIR template is never required.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -43,6 +45,8 @@ ALLOWED_EXTENSIONS = {
     ".xls",
     ".xlsx",
 }
+IMAGE_EXTENSIONS = {".gif", ".jpeg", ".jpg", ".png", ".webp"}
+MAHIR_OCR_REMOTE_URL = os.environ.get("MAHIR_OCR_REMOTE_URL", "")
 
 
 @dataclass(frozen=True)
@@ -201,11 +205,14 @@ def run_existing_backend_flow(
 ) -> tuple[bool, str, dict[str, object] | None]:
     """Accept supported documents and forward their data for teacher validation."""
 
+    if all(check.extension in IMAGE_EXTENSIONS for check in file_checks):
+        return run_image_group_ocr(uploaded_files)
+
     if len(uploaded_files) > 1:
-        # No OCR/field-merge parsing exists yet across a group of images (it
-        # does not exist for a single image either) - forward the whole group
-        # the same way a single unrecognised document is accepted today, and
-        # let the teacher complete the validation screen manually.
+        # No field-merge parsing exists across a group of non-image documents -
+        # forward the whole group the same way a single unrecognised document
+        # is accepted today, and let the teacher complete the validation screen
+        # manually.
         return True, f"{len(uploaded_files)} görsel alındı ve öğretmen kontrolüne hazırlandı.", None
 
     uploaded_file = uploaded_files[0]
@@ -276,6 +283,17 @@ def run_existing_backend_flow(
             temporary_dir.rmdir()
         except OSError:
             pass
+
+
+def run_image_group_ocr(uploaded_files: list[UploadedFile]) -> tuple[bool, str, dict[str, object] | None]:
+    """Send an all-image upload group to the remote MAHIR OCR backend, if configured."""
+
+    if not MAHIR_OCR_REMOTE_URL:
+        return True, f"{len(uploaded_files)} görsel alındı ve öğretmen kontrolüne hazırlandı.", None
+
+    from .remote_ocr_client import run_remote_image_group_ocr
+
+    return run_remote_image_group_ocr(uploaded_files, MAHIR_OCR_REMOTE_URL)
 
 
 def extract_uploaded_files(body: bytes, content_type: str) -> list[UploadedFile]:

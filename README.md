@@ -12,7 +12,7 @@ okunur. Sonuçlar analizden önce düzenlenebilir Veri Onay tablolarında göste
 
 ## Güncel Çalışan Akış
 
-Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır.
+Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır. Görsel grubu olarak yüklenen puanlama fotoğrafları (en fazla 10 adet, her biri tek öğrencilik puan tablosu), `MAHIR_OCR_REMOTE_URL` tanımlıysa uzaktaki bir OCR sunucusuna (bkz. aşağıdaki "Google Colab ile OCR") gönderilip öğrenci satırlarına dönüştürülür; tanımlı değilse görseller OCR yapılmadan öğretmen kontrolüne bırakılır.
 
 Yerel prototipi dosya alıcısıyla çalıştırmak için:
 
@@ -20,7 +20,23 @@ Yerel prototipi dosya alıcısıyla çalıştırmak için:
 python3 backend/run_file_receiver.py
 ```
 
-Ardından `http://127.0.0.1:8000/index.html` adresi açılır.
+Ardından `http://127.0.0.1:8000/index.html` adresi açılır. Bu yerel sunucunun PaddleOCR'a ya da başka bir üçüncü parti pakete ihtiyacı yoktur (düz `python3` yeterlidir) — OCR hiçbir zaman bu makinede çalışmaz.
+
+### Google Colab ile OCR
+
+Görsel puan tablolarının OCR ile okunması, ayrı bir "OCR işçisi" (`backend/run_ocr_worker.py`) üzerinden çalışır ve bu işçinin gerçek bir GPU'ya ihtiyacı vardır. Kendi bilgisayarınızda GPU yoksa (veya yeterli VRAM yoksa) bu işçiyi ücretsiz bir Google Colab GPU'sunda çalıştırabilirsiniz:
+
+1. `colab/mahir_ocr_colab.ipynb`'yi [Google Colab](https://colab.research.google.com/)'da açın, çalışma zamanı türünü **T4 GPU** yapın, tüm hücreleri sırayla çalıştırın.
+2. Not defteri repoyu Colab'a klonlar, yalnızca OCR için gereken paketleri (`paddleocr`, `paddlepaddle-gpu`, `paddlex`) kurar, `backend/run_ocr_worker.py`'yi başlatır ve `cloudflared` ile dışa açık bir tünel kurar.
+3. Son hücrede basılan `https://xxxx.trycloudflare.com` adresini kopyalayın.
+4. Kendi bilgisayarınızda bu adresi kullanarak yerel sunucuyu başlatın:
+
+```bash
+set MAHIR_OCR_REMOTE_URL=https://xxxx.trycloudflare.com
+python3 backend/run_file_receiver.py
+```
+
+Sınırlamalar: Colab oturumu boşta kalınca veya ~12 saat sonra kapanır; kapanırsa not defterini yeniden çalıştırıp yeni adresi `MAHIR_OCR_REMOTE_URL` olarak güncellemeniz gerekir. `MAHIR_OCR_REMOTE_URL` tanımlı değilken görsel yüklemeleri OCR yapılmadan kabul edilir; sunucu çökmez.
 
 ## Geliştirme Kuralları
 
