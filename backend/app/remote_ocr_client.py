@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import urllib.error
 import urllib.request
 import uuid
@@ -17,6 +18,7 @@ import uuid
 from .file_receiver import UploadedFile
 
 _REMOTE_TIMEOUT_SECONDS = 300
+_SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
 
 
 def run_remote_image_group_ocr(
@@ -26,11 +28,15 @@ def run_remote_image_group_ocr(
 
     boundary = uuid.uuid4().hex
     body = _build_multipart_body(uploaded_files, boundary)
+    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    shared_secret = os.environ.get("MAHIR_OCR_SHARED_SECRET", "")
+    if shared_secret:
+        headers[_SHARED_SECRET_HEADER] = shared_secret
     request = urllib.request.Request(
         remote_url.rstrip("/") + "/mahir-upload",
         data=body,
         method="POST",
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        headers=headers,
     )
 
     try:

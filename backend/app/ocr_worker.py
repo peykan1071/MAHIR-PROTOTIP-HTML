@@ -11,7 +11,9 @@ needs no special-casing for what it's talking to.
 
 from __future__ import annotations
 
+import hmac
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import ocr_engine
@@ -25,6 +27,7 @@ from .file_receiver import (
 )
 
 UPLOAD_PATH = "/mahir-upload"
+SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
 
 
 class OCRWorkerHandler(BaseHTTPRequestHandler):
@@ -43,6 +46,13 @@ class OCRWorkerHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         if self.path != UPLOAD_PATH:
             self._send_json(404, {"ok": False, "message": "Bilinmeyen alıcı yolu."})
+            return
+
+        expected_secret = os.environ.get("MAHIR_OCR_SHARED_SECRET", "")
+        if expected_secret and not hmac.compare_digest(
+            self.headers.get(SHARED_SECRET_HEADER, ""), expected_secret
+        ):
+            self._send_json(401, {"ok": False, "message": "Yetkisiz istek."})
             return
 
         content_length = int(self.headers.get("Content-Length", "0") or "0")
