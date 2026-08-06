@@ -48,7 +48,10 @@ image = (
         "paddlepaddle-gpu==3.3.1",
         index_url="https://www.paddlepaddle.org.cn/packages/stable/cu126/",
     )
-    .env({"PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK": "True"})
+    # OMP_NUM_THREADS>1, bu paddlepaddle-gpu wheel'inin (OpenBLAS ile derlenmiş
+    # olabilir) çoklu iş parçacığını güvenle desteklememesi yüzünden predict()
+    # çağrısını sessizce kilitleyebiliyor (kendi uyarı mesajı bunu söylüyor).
+    .env({"PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK": "True", "OMP_NUM_THREADS": "1"})
     .add_local_dir("backend", "/srv/backend", copy=True)
     .run_function(_warm_up_pipeline, gpu="T4")
 )
