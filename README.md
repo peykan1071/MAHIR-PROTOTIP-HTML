@@ -1,161 +1,180 @@
-﻿# MAHIR-PROTOTIP-HTML
+# MAHİR
 
-MAHİR, "Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı" fikrine dayanan, Türkçe çalışan ve öğretmen kontrollü bir eğitim evrakı prototipidir.
+> Öğretmen kontrolünü merkeze alan, sınav verilerini öğrenme kanıtlarına dönüştüren Türkçe eğitim karar destek prototipi.
 
-İlk geliştirme hedefi, "Sınav Analizi ve Değerlendirme Raporu" için sade, modern ve tek sayfalık bir HTML/CSS/JavaScript prototipi hazırlamaktır.
+MAHİR; öğretmenin sınav verilerini yapılandırmasına, doğrulamasına, öğrenme çıktılarıyla ilişkilendirmesine ve sonuçları standart bir **Sınav Sonuçları Analiz Raporu** olarak üretmesine yardımcı olur.
 
-## Word Şablonunu Okuma
+Proje, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması – Senaryo 1: Kamu Evrak ve Resmî Yazışma Süreçleri İçin Çok Ajanlı Destek** kapsamında geliştirilmektedir.
 
-`MAHIR_Veri_Giris_Sablonu_Surum_1.docx` dosyası doldurulup Veri Ekleme ekranından
-yüklendiğinde sınav, soru ve öğrenci tabloları yerel Python servisi tarafından
-okunur. Sonuçlar analizden önce düzenlenebilir Veri Onay tablolarında gösterilir.
+> **Temel ilke:** MAHİR önerir ve kanıt sunar; nihai değerlendirme ile onay öğretmene aittir.
 
-## Güncel Çalışan Akış
+## Problem ve çözüm
 
-Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır.
+Sınav sonrası değerlendirme; öğrenci puanlarının kontrolü, soru ve öğrenme çıktısı düzeyinde hesaplama, pedagojik yorumlama ve resmî raporlama gibi birbirine bağlı işlemler içerir. Bu süreç öğretmen için zaman alıcıdır ve farklı belge biçimleri arasında veri kaybı riski taşır.
 
-Yerel prototipi dosya alıcısıyla çalıştırmak için:
+MAHİR bu akışı tek bir öğretmen kontrollü süreçte birleştirir:
 
-```bash
-python3 backend/run_file_receiver.py
+```mermaid
+flowchart LR
+    A["Sınav verisi"] --> B["Öğretmen doğrulaması"]
+    B --> C["Kurallı analiz"]
+    C --> D["Öğrenme kanıtları"]
+    D --> E["Rapor onayı"]
+    E --> F["Word / PDF"]
 ```
 
-Ardından `http://127.0.0.1:8000/index.html` adresi açılır.
+## Çalışan prototipte neler var?
 
-## Geliştirme Kuralları
+- Kademe, okul türü, sınıf ve ders bağlamının adım adım seçilmesi
+- Soru sayısı, puan dağılımı ve öğrenme çıktısı eşleştirmesinin öğretmen tarafından tanımlanması
+- Word belgelerindeki tanınabilir tabloların okunarak veri onay ekranına aktarılması
+- PDF, görsel ve elektronik tablo dosyalarının kabul edilerek öğretmen doğrulama akışına alınması
+- Elle veri girişi seçeneği
+- Okunamayan veya eksik alanların analiz öncesinde düzeltilmesini zorunlu kılan doğrulamalar
+- Soru, sınıf ve öğrenme çıktısı düzeyinde deterministik başarı hesaplamaları
+- Ders–sınıf–program eşleşmesini hem arayüzde hem arka uçta denetleyen kurallar
+- Dil derslerinde yazılı, dinleme/izleme ve konuşma bileşenlerinin ayrı ele alınması
+- Öğretmen onayından sonra kilitlenen A–H yapısındaki rapor
+- Tarayıcıda Word ve PDF çıktısı üretimi
+- Açık öğrenci listesi ve ham sınav verisini dışarıda bırakan yerel çalışma yedeği
 
-Bu projede geliştirme adım adım, küçük ve onaylı sürümler halinde yapılır. Her sprintte yalnızca belirlenen kapsam uygulanır; yapay zekâ, veritabanı, OCR, dosya okuma, PDF/Word üretimi ve sistem entegrasyonu ilk aşamada kapsam dışıdır.
+## TDE 9 pilotu
 
-Ayrıntılı geliştirme kuralları, sürümleme sistemi, dosya düzeni ve kontrol listeleri için bkz. [DEVELOPMENT_CHARTER.md](DEVELOPMENT_CHARTER.md).
+İlk doğrulama alanı **9. sınıf Türk Dili ve Edebiyatı** dersidir.
 
-## Sprint 1 - v1.1
+Pilot veri paketinde:
 
-MAHİR Kurumsal Giriş Ekranı için yalnızca HTML iskeleti oluşturulmuştur.
+- dört temaya yayılmış **54 öğrenme çıktısı**,
+- resmî dönem ve senaryo tablolarında doğrulanan **66 süreç bileşeni**,
+- Dinleme/İzleme, Okuma, Konuşma ve Yazma alan becerileri,
+- tema bağlamını koruyan ders–sınıf kapsamlı kayıt yapısı
 
-Bu sürümde oluşturulan ana bölümler:
+bulunur.
 
-- Header
-- Hero
-- Information Cards
-- Primary Button Area
-- Values Band
-- Footer
+TDE kodları yalnız **Türk Dili ve Edebiyatı + 9. sınıf** profili seçildiğinde açılır. Başka bir derse TDE kodu gönderilmesi arka uç tarafından da reddedilir. Ayrıntılar için [TDE 9 pilot veri paketi](shared/pilot/tde9/README.md) incelenebilir.
 
-Bu sprintte tasarım, renk, responsive yapı, animasyon, logo, ikon, bayrak, hero görseli, framework veya dış kütüphane eklenmemiştir.
+## Sistem sınırı ve doğruluk yaklaşımı
 
-## Sprint 1 - v1.2
+MAHİR’in mevcut analiz motoru kurallı ve deterministiktir:
 
-v1.1'de oluşturulan semantik HTML iskeleti korunarak yalnızca sayfa yerleşimi oluşturulmuştur.
+- Başarı oranlarını LLM değil, uygulama kodu hesaplar.
+- Program kodları serbest metinden uydurulmaz; tanımlı ders–sınıf kataloğundan alınır.
+- Öğretmenin düzeltmediği eksik veya okunamayan veriyle analiz tamamlanmaz.
+- Nihai Word/PDF çıktıları öğretmen onayı verilmeden etkinleşmez.
 
-Bu sürümde yapılan layout düzenlemeleri:
+Bu yaklaşım, ileride eklenecek yapay zekâ katmanının hesaplama ve resmî kod üretme yerine, doğrulanmış kanıtları yorumlama görevinde kalmasını sağlar.
 
-- Header, Hero, Information Cards, Primary Button Area, Values Band ve Footer akışı kuruldu.
-- Hero alanı iki sütunlu yerleşime alındı; sağ sütun boş bırakıldı.
-- Information Cards alanı üç eşit kart düzenine alındı.
-- Primary Button Area sayfa ortasında konumlandırıldı.
-- Values Band dört sütunlu yatay yapıya alındı.
-- Footer sayfanın alt alanında sade biçimde konumlandırıldı.
+## Güncel geliştirme durumu
 
-Bu sprintte renk, gölge, border-radius, gradient, animasyon, responsive yapı, font değişikliği, logo, ikon, bayrak, görsel, framework veya dış kütüphane eklenmemiştir.
-## Sprint 1 - v1.3
+| Katman | Durum |
+|---|---|
+| Tek sayfalık öğretmen akışı | Çalışıyor |
+| TDE 9 program kataloğu | Çalışıyor |
+| DOCX tablo okuma | Çalışıyor |
+| Öğretmen veri doğrulaması | Çalışıyor |
+| Kurallı sınav ve öğrenme çıktısı analizi | Çalışıyor |
+| Word/PDF rapor üretimi | Çalışıyor |
+| Çoklu görsel OCR ve grup birleştirme | Geliştirme aşamasında |
+| Kalıcı ilişkisel veritabanı | Planlandı |
+| Ortak Metin parçalama ve RAG dizini | Planlandı |
+| Sağlayıcıdan bağımsız LLM API katmanı | Planlandı |
+| Kullanıcı hesabı, yetkilendirme ve kurumsal entegrasyon | Prototip sonrası |
 
-v1.1 HTML iskeleti ve v1.2 layout düzeni korunarak yalnızca tipografi hiyerarşisi oluşturulmuştur.
+Bu tablo özellikle prototipte çalışan özelliklerle yol haritasını birbirinden ayırır; henüz tamamlanmayan bir bileşen çalışıyormuş gibi sunulmaz.
 
-Bu sürümde yapılan tipografi düzenlemeleri:
+## Yerel kurulum
 
-- Sistem fontları tanımlandı.
-- Ana başlık, alt başlık ve açıklama metinleri için okunabilir font ölçüleri ve satır yükseklikleri ayarlandı.
-- Kart başlıkları ve küçük açıklamalar için sade bir metin hiyerarşisi kuruldu.
-- Buton metni daha güçlü görünecek şekilde düzenlendi.
+### Gereksinimler
 
-Bu sprintte HTML yapısı, JavaScript, renk sistemi, logo, ikon, bayrak, hero görseli, gölge, gradient, border-radius, animasyon, responsive yapı, framework veya dış kütüphane eklenmemiştir.
-## Sprint 1 - v1.4
+- Python 3.10 veya üzeri
+- Güncel bir masaüstü tarayıcı
+- Depoyu indirmek için Git
 
-Kurumsal görsel varlık klasör yapısı hazırlanmıştır. Bu sürümde görseller HTML'ye bağlanmamış, görseller için CSS yazılmamış ve yeni görsel/ikon dosyası üretilmemiştir.
+### Çalıştırma
 
-Oluşturulan varlık klasörleri:
+```bash
+git clone https://github.com/peykan1071/MAHIR-PROTOTIP-HTML.git
+cd MAHIR-PROTOTIP-HTML
+python backend/run_file_receiver.py
+```
 
-- `assets/`
-- `assets/logo/`
-- `assets/hero/`
-- `assets/flag/`
-- `assets/icons/`
+Windows'ta `python` komutu tanınmıyorsa:
 
-### MAHİR UI Kit Varlık Adlandırma Standardı
+```powershell
+py backend/run_file_receiver.py
+```
 
-Genel kurallar:
+Ardından tarayıcıda şu adres açılır:
 
-- Dosya adları küçük harfle yazılır.
-- Türkçe karakter kullanılmaz.
-- Kelimeler tire işaretiyle ayrılır.
-- MAHİR'e ait kurumsal varlıklarda `mahir-` öneki kullanılır.
-- Varlıklar kullanım alanına göre ilgili alt klasöre yerleştirilir.
-- Belirsiz `yeni`, `son`, `final` gibi adlar kullanılmaz.
+```text
+http://127.0.0.1:8000/index.html
+```
 
-Önerilen varlık dosya adları:
+Sunucuyu durdurmak için terminalde `Ctrl+C` kullanılabilir.
 
-Logo:
+## Testler
 
-- `assets/logo/mahir-logo.png`
+Python doğrulamalarını çalıştırmak için:
 
-Hero:
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
 
-- `assets/hero/mahir-hero-teacher.png`
+Node.js kuruluysa tarayıcıdan bağımsız JavaScript kontrolleri de çalıştırılabilir:
 
-Bayrak:
+```bash
+node tests/program-catalog.test.js
+node tests/workspace-backup.test.js
+```
 
-- `assets/flag/mahir-kurumsal-bayrak.png`
+## Proje yapısı
 
-İkonlar:
+```text
+MAHIR-PROTOTIP-HTML/
+├── index.html                 # Ekranların semantik yapısı
+├── styles.css                 # Arayüz ve rapor görünümü
+├── script.js                  # Kullanıcı akışı ve ön yüz bağlantıları
+├── assets/js/                 # Program kataloğu, yedekleme ve çıktı üreticileri
+├── backend/app/               # Belge okuma, doğrulama ve analiz motorları
+├── shared/pilot/tde9/         # TDE 9 pilot program verileri
+├── shared/templates/          # Veri giriş ve rapor şablonları
+├── tests/                     # Python ve JavaScript kontrolleri
+└── docs/                      # Mimari ve geliştirme belgeleri
+```
 
-- `assets/icons/document.png`
-- `assets/icons/chart.png`
-- `assets/icons/brain.png`
-- `assets/icons/clipboard.png`
-- `assets/icons/shield-check.png`
-- `assets/icons/upload-file.png`
-- `assets/icons/sparkles.png`
-- `assets/icons/report-file.png`
-- `assets/icons/trust.png`
-- `assets/icons/target.png`
-- `assets/icons/analytics.png`
-- `assets/icons/teacher-control.png`
+## Veri güvenliği
 
-Bu sprintte `index.html`, `styles.css` ve `script.js` dosyaları değiştirilmemiştir.
-## Sprint 1 - v1.5
+- Depoya gerçek öğrenci adı, T.C. kimlik numarası veya okul numarası eklenmemelidir.
+- Pilot verilerinde `P001`, `P002` gibi takma kimlikler kullanılmalıdır.
+- Mevcut sürüm yerel prototiptir; üretim ortamına yönelik kimlik doğrulama, yetkilendirme, kayıt politikası ve KVKK uyumluluk kontrolleri ayrıca tamamlanmalıdır.
+- Gelecekte haricî bir LLM API’si kullanıldığında doğrudan kişisel veriler modele gönderilmeyecektir.
 
-MAHİR UI Kit görsel varlıklarının standart dosya adlarıyla `assets` klasör yapısına yerleştirilmesi hedeflenmiştir.
+## Kaynak ilkesi
 
-Bu sprint için beklenen dosya yolları:
+Program verileri, **Türkiye Yüzyılı Maarif Modeli** kapsamındaki resmî ders programları, Ortak Metin ve konu-soru dağılım tabloları esas alınarak yapılandırılır. Resmî belgede bulunmayan ders, sınıf, sınav veya süreç bileşeni için veri üretilmez.
 
-Logo:
+- [Türkiye Yüzyılı Maarif Modeli](https://tymm.meb.gov.tr/)
+- [TDE 9 pilot veri paketi ve kaynak kullanım ilkeleri](shared/pilot/tde9/README.md)
+- [Proje geliştirme ilkeleri](DEVELOPMENT_CHARTER.md)
+- [Değişiklik günlüğü](CHANGELOG.md)
 
-- `assets/logo/mahir-logo.png`
+## Yol haritası
 
-Hero:
+1. Çoklu görsel yükleme, OCR doğrulama ve grup birleştirme
+2. Yapısal veriler için ilişkisel veritabanı
+3. Ortak Metin’in anlam temelli parçalara ayrılması ve vektör dizini
+4. Kaynak gösteren RAG katmanı
+5. Sağlayıcıdan bağımsız LLM bağlantısı
+6. Anonim pilot verilerle uçtan uca doğrulama
+7. Kurumsal güvenlik ve entegrasyon hazırlıkları
 
-- `assets/hero/mahir-hero-teacher.png`
+## Ekip
 
-Bayrak:
+- **Zülal Ülker Daştan** — Takım kaptanı, Türk Dili ve Edebiyatı
+- **Lokman Daştan** — Din Kültürü ve Ahlak Bilgisi
+- **Gonca Ergül** — Fen Bilimleri
+- **Hakan Ergül** — Matematik
 
-- `assets/flag/mahir-kurumsal-bayrak.png`
+---
 
-İkonlar:
-
-- `assets/icons/document.png`
-- `assets/icons/chart.png`
-- `assets/icons/brain.png`
-- `assets/icons/clipboard.png`
-- `assets/icons/shield-check.png`
-- `assets/icons/upload-file.png`
-- `assets/icons/sparkles.png`
-- `assets/icons/report-file.png`
-- `assets/icons/trust.png`
-- `assets/icons/target.png`
-- `assets/icons/analytics.png`
-- `assets/icons/teacher-control.png`
-
-Kontrol notu: Bu kontrol sırasında varlık dosyaları henüz klasörlere eklenmemiş görünmektedir. Görseller HTML'ye bağlanmamış, CSS yazılmamış, yeni görsel/ikon üretilmemiş ve `index.html`, `styles.css`, `script.js` dosyaları değiştirilmemiştir.
-## Sprint 1 / Task 03
-
-Project management documents oluşturuldu.
+**MAHİR**, öğretmenin mesleki kararını devralmak için değil; kanıtı görünür, analizi izlenebilir ve raporlamayı yönetilebilir kılmak için geliştirilmektedir.
