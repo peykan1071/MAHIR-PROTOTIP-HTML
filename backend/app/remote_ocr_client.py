@@ -1,11 +1,9 @@
-"""Forward an image group to a remote MAHIR backend for OCR instead of
-running PaddleOCR-VL locally.
+"""Forward an image group to a remote MAHIR OCR worker instead of running
+PaddleOCR-VL locally.
 
-The remote side is expected to be the same `run_file_receiver.py` server
-(e.g. running in a Google Colab notebook with GPU support), reached through
-a tunnel such as cloudflared. Requests mimic exactly what the browser
-already sends to `/mahir-upload`, so the remote server needs no special
-code path - it is the same app, just running somewhere with more VRAM.
+The remote side is expected to be `ocr_worker.py` (see `cloud-run/Dockerfile`
+for how it's deployed). It speaks the same `/mahir-upload` request/response
+shape as the local file receiver.
 """
 
 from __future__ import annotations
@@ -38,6 +36,14 @@ def run_remote_image_group_ocr(
     try:
         with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        # The worker still answers with its usual {"ok", "message", ...} JSON body even on a
+        # non-2xx status - surface that message instead of the generic "HTTP Error 500" text.
+        try:
+            payload = json.loads(error.read().decode("utf-8"))
+            return False, str(payload.get("message") or error), None
+        except (ValueError, UnicodeDecodeError):
+            return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as error:
         return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None
 

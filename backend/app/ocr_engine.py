@@ -1,11 +1,10 @@
 """Read a single-student exam score table from a photographed image via PaddleOCR-VL.
 
 This module only runs on the remote OCR worker (see `ocr_worker.py`, meant to
-be started on a machine with a real GPU - e.g. a Google Colab notebook, see
-`colab/mahir_ocr_colab.ipynb`). The local MAHIR file receiver never imports
-this module; it forwards image uploads over HTTP instead (see
-`remote_ocr_client.py`), so a teacher's machine never needs PaddleOCR
-installed.
+be started on a machine with a real GPU - see `cloud-run/Dockerfile`). The
+local MAHIR file receiver never imports this module; it forwards image
+uploads over HTTP instead (see `remote_ocr_client.py`), so a teacher's
+machine never needs PaddleOCR installed.
 
 Each uploaded image is expected to show one handwritten score table per the
 MAHIR paper template: a student-number column, one column per question, and
@@ -50,10 +49,25 @@ def _get_pipeline():
 
     global _pipeline
     if _pipeline is None:
+        # Model dosyaları zaten önbellekte (bkz. Dockerfile) olsa bile PaddleX, her
+        # pipeline kurulumunda uzak model kaynaklarına (BOS/HuggingFace/ModelScope/
+        # AIStudio) bir bağlantı kontrolü yapıp dakikalarca bekletebiliyor. Bu
+        # kontrolü kapatıyoruz.
+        os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
+
         from paddleocr import PaddleOCRVL
+        from paddlex.utils import deps as paddlex_deps
+
+        # paddlex.utils.deps.is_dep_available("paddlepaddle") is @lru_cache'd; if
+        # anything calls it before paddlepaddle-gpu is fully importable, the
+        # negative result sticks for the rest of the process and every engine
+        # ("paddle_static", "paddle_dynamic") reports itself unavailable forever
+        # after. Clear it right before use so this process's first real check
+        # reflects the truth.
+        paddlex_deps.is_dep_available.cache_clear()
 
         device = os.environ.get("MAHIR_OCR_DEVICE", "gpu")
-        _pipeline = PaddleOCRVL(device=device)
+        _pipeline = PaddleOCRVL(device=device, engine="paddle_dynamic")
     return _pipeline
 
 
