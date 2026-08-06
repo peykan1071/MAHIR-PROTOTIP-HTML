@@ -12,7 +12,7 @@ okunur. Sonuçlar analizden önce düzenlenebilir Veri Onay tablolarında göste
 
 ## Güncel Çalışan Akış
 
-Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır. Görsel grubu olarak yüklenen puanlama fotoğrafları (en fazla 10 adet, her biri tek öğrencilik puan tablosu), `MAHIR_OCR_REMOTE_URL` tanımlıysa uzaktaki bir OCR sunucusuna (bkz. aşağıdaki "Google Colab ile OCR") gönderilip öğrenci satırlarına dönüştürülür; tanımlı değilse görseller OCR yapılmadan öğretmen kontrolüne bırakılır.
+Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır. Görsel grubu olarak yüklenen puanlama fotoğrafları (en fazla 10 adet, her biri tek öğrencilik puan tablosu), `MAHIR_OCR_REMOTE_URL` tanımlıysa uzaktaki bir OCR sunucusuna (bkz. aşağıdaki "Google Cloud Run ile OCR") gönderilip öğrenci satırlarına dönüştürülür; tanımlı değilse görseller OCR yapılmadan öğretmen kontrolüne bırakılır.
 
 Yerel prototipi dosya alıcısıyla çalıştırmak için:
 
@@ -22,21 +22,31 @@ python3 backend/run_file_receiver.py
 
 Ardından `http://127.0.0.1:8000/index.html` adresi açılır. Bu yerel sunucunun PaddleOCR'a ya da başka bir üçüncü parti pakete ihtiyacı yoktur (düz `python3` yeterlidir) — OCR hiçbir zaman bu makinede çalışmaz.
 
-### Google Colab ile OCR
+### Google Cloud Run ile OCR
 
-Görsel puan tablolarının OCR ile okunması, ayrı bir "OCR işçisi" (`backend/run_ocr_worker.py`) üzerinden çalışır ve bu işçinin gerçek bir GPU'ya ihtiyacı vardır. Kendi bilgisayarınızda GPU yoksa (veya yeterli VRAM yoksa) bu işçiyi ücretsiz bir Google Colab GPU'sunda çalıştırabilirsiniz:
+Görsel puan tablolarının OCR ile okunması, ayrı bir "OCR işçisi" (`backend/run_ocr_worker.py`) üzerinden çalışır ve bu işçinin gerçek bir GPU'ya ihtiyacı vardır. Bu işçi, kendi Google Cloud hesabınıza bağlı, **7/24 hazır ve kararlı bir adresi olan** bir Cloud Run servisi olarak çalışır (NVIDIA L4 GPU, saniye başına faturalandırma, boştayken sıfıra ölçeklenip ücret kesilmez).
 
-1. `colab/mahir_ocr_colab.ipynb`'yi [Google Colab](https://colab.research.google.com/)'da açın, çalışma zamanı türünü **T4 GPU** yapın, tüm hücreleri sırayla çalıştırın.
-2. Not defteri repoyu Colab'a klonlar, yalnızca OCR için gereken paketleri (`paddleocr`, `paddlepaddle-gpu`, `paddlex`) kurar, `backend/run_ocr_worker.py`'yi başlatır ve `cloudflared` ile dışa açık bir tünel kurar.
-3. Son hücrede basılan `https://xxxx.trycloudflare.com` adresini kopyalayın.
-4. Kendi bilgisayarınızda bu adresi kullanarak yerel sunucuyu başlatın:
+**Tek seferlik kurulum ve dağıtım** ([Google Cloud Shell](https://shell.cloud.google.com)'de - tarayıcıdan, kurulum gerektirmeyen ücretsiz bir terminal, gcloud ve Docker hazır gelir):
 
 ```bash
-set MAHIR_OCR_REMOTE_URL=https://xxxx.trycloudflare.com
+git clone --branch ocr-isleri <repo-url> mahir && cd mahir
+export MAHIR_OCR_SHARED_SECRET="uzun-rastgele-bir-parola"
+./cloud-run/deploy.sh
+```
+
+Komut bittiğinde ekrana basılan **Service URL** (`https://mahir-ocr-worker-xxxx.a.run.app` gibi) kararlıdır - bir daha değişmez, tekrar dağıtım yapana kadar aynı kalır. Kendi bilgisayarınızda bu adresi ve az önce belirlediğiniz parolayı kullanarak yerel sunucuyu başlatın:
+
+```bash
+set MAHIR_OCR_REMOTE_URL=https://mahir-ocr-worker-xxxx.a.run.app
+set MAHIR_OCR_SHARED_SECRET=uzun-rastgele-bir-parola
 python3 backend/run_file_receiver.py
 ```
 
-Sınırlamalar: Colab oturumu boşta kalınca veya ~12 saat sonra kapanır; kapanırsa not defterini yeniden çalıştırıp yeni adresi `MAHIR_OCR_REMOTE_URL` olarak güncellemeniz gerekir. `MAHIR_OCR_REMOTE_URL` tanımlı değilken görsel yüklemeleri OCR yapılmadan kabul edilir; sunucu çökmez.
+(PowerShell'de `set` yerine `$env:MAHIR_OCR_REMOTE_URL = "..."` kullanın.)
+
+`MAHIR_OCR_SHARED_SECRET`, servis adresi herkese açık olduğu için isteklerin `X-MAHIR-OCR-Key` başlığıyla doğrulanmasını sağlar - istemci ve işçi tarafında aynı parola tanımlı olmalı; hiçbiri tanımlı değilse (yerel geliştirme/test) doğrulama yapılmaz. `MAHIR_OCR_REMOTE_URL` tanımlı değilken görsel yüklemeleri OCR yapılmadan kabul edilir; sunucu çökmez.
+
+Sınırlamalar: `--min-instances=0` ile boşta kalan servis sıfıra ölçeklenir; bir süre sonra gelen ilk istek konteyneri yeniden başlatıp modelleri yükler (soğuk başlangıç, birkaç dakika sürebilir) - `run_ocr_worker.py` bu süreyi istek beklemeden önce tüketir. Kesin Cloud Run GPU maliyeti için `gcloud`'un resmi fiyat hesaplayıcısını kontrol edin.
 
 ## Geliştirme Kuralları
 
