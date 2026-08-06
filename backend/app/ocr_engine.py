@@ -69,9 +69,12 @@ def _get_pipeline():
 
         device = os.environ.get("MAHIR_OCR_DEVICE", "gpu")
         # paddle_dynamic (eager) her adımı Python üzerinden dispatch ediyor - token
-        # token üretim yapan bir VLM için bu çok yavaş. paddle_static (derlenmiş
-        # graf) daha hızlı olmalı; MAHIR_OCR_ENGINE ile eskiye dönülebilir.
-        engine = os.environ.get("MAHIR_OCR_ENGINE", "paddle_static")
+        # token üretim yapan bir VLM için bu çok yavaş. PaddleOCR-VL-1.6-0.9B
+        # yalnızca paddle_dynamic/transformers/genai_client destekliyor
+        # (paddle_static desteklenmiyor - denendi, ValueError verdi);
+        # transformers'ın KV-cache'li generate() yolu daha hızlı olabilir.
+        # MAHIR_OCR_ENGINE ile eskiye dönülebilir.
+        engine = os.environ.get("MAHIR_OCR_ENGINE", "transformers")
         _pipeline = PaddleOCRVL(device=device, engine=engine)
     return _pipeline
 
