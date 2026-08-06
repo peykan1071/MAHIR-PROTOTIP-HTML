@@ -51,6 +51,8 @@ python3 backend/run_file_receiver.py
 
 (PowerShell'de `set` yerine `$env:MAHIR_OCR_REMOTE_URL = "..."` kullanın.)
 
+**Önemli**: `MAHIR_OCR_REMOTE_URL` ve `MAHIR_OCR_SHARED_SECRET`, **aynı terminal penceresinde ve `run_file_receiver.py`'yi başlatmadan önce** ayarlanmalıdır. Bunları bir pencerede ayarlayıp sunucuyu başka bir pencerede (veya zaten açık bir pencerede, sunucuyu yeniden başlatmadan) çalıştırırsanız değişkenler sessizce yok sayılır - sunucu hata vermez, sadece OCR'sız "pass-through" moduna düşer. Bunu şu şekilde ayırt edebilirsiniz: tarayıcının Ağ (Network) sekmesinde `/mahir-upload` yanıtına bakınca `"structuredData": null` ve `"message": "N görsel alındı ve öğretmen kontrolüne hazırlandı."` görüyorsanız (OCR sonucu değil, sadece "alındı" onayı), env değişkenleri devreye girmemiş demektir - sunucuyu durdurup aynı pencerede env değişkenlerini tekrar ayarlayıp yeniden başlatın.
+
 `MAHIR_OCR_SHARED_SECRET`, servis adresi herkese açık olduğu için isteklerin `X-MAHIR-OCR-Key` başlığıyla doğrulanmasını sağlar - istemci ve işçi tarafında aynı parola tanımlı olmalı; hiçbiri tanımlı değilse (yerel geliştirme/test) doğrulama yapılmaz. `MAHIR_OCR_REMOTE_URL` tanımlı değilken görsel yüklemeleri OCR yapılmadan kabul edilir; sunucu çökmez.
 
 Sınırlamalar: Boşta kalan servis bir süre sonra sıfıra ölçeklenir; gelen ilk istek konteyneri yeniden başlatıp pipeline'ı GPU'ya yükler (soğuk başlangıç, model dosyaları imaja gömülü olduğu için saniyeler-birkaç dakika sürebilir) - `run_ocr_worker.py` bu süreyi istek beklemeden önce tüketir. Kesin maliyet için [modal.com/pricing](https://modal.com/pricing) sayfasını kontrol edin.
