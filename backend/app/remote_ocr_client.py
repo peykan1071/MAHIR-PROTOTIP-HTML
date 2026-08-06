@@ -1,8 +1,8 @@
 """Forward an image group to a remote MAHIR OCR worker instead of running
 PaddleOCR-VL locally.
 
-The remote side is expected to be `ocr_worker.py` (see `cloud-run/Dockerfile`
-for how it's deployed). It speaks the same `/mahir-upload` request/response
+The remote side is expected to be `ocr_worker.py` (see `modal_app.py` for
+how it's deployed). It speaks the same `/mahir-upload` request/response
 shape as the local file receiver.
 """
 

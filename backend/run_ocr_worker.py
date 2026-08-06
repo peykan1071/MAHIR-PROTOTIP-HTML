@@ -1,5 +1,5 @@
 """Run the MAHIR OCR worker (PaddleOCR-VL) - meant for a GPU machine, see
-`cloud-run/Dockerfile`.
+`modal_app.py`.
 """
 
 from __future__ import annotations

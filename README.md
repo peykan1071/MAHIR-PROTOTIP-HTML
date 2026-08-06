@@ -12,7 +12,7 @@ okunur. Sonuçlar analizden önce düzenlenebilir Veri Onay tablolarında göste
 
 ## Güncel Çalışan Akış
 
-Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır. Görsel grubu olarak yüklenen puanlama fotoğrafları (en fazla 10 adet, her biri tek öğrencilik puan tablosu), `MAHIR_OCR_REMOTE_URL` tanımlıysa uzaktaki bir OCR sunucusuna (bkz. aşağıdaki "Google Cloud Run ile OCR") gönderilip öğrenci satırlarına dönüştürülür; tanımlı değilse görseller OCR yapılmadan öğretmen kontrolüne bırakılır.
+Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır. Görsel grubu olarak yüklenen puanlama fotoğrafları (en fazla 10 adet, her biri tek öğrencilik puan tablosu), `MAHIR_OCR_REMOTE_URL` tanımlıysa uzaktaki bir OCR sunucusuna (bkz. aşağıdaki "Modal ile OCR") gönderilip öğrenci satırlarına dönüştürülür; tanımlı değilse görseller OCR yapılmadan öğretmen kontrolüne bırakılır.
 
 Yerel prototipi dosya alıcısıyla çalıştırmak için:
 
@@ -22,22 +22,29 @@ python3 backend/run_file_receiver.py
 
 Ardından `http://127.0.0.1:8000/index.html` adresi açılır. Bu yerel sunucunun PaddleOCR'a ya da başka bir üçüncü parti pakete ihtiyacı yoktur (düz `python3` yeterlidir) — OCR hiçbir zaman bu makinede çalışmaz.
 
-### Google Cloud Run ile OCR
+### Modal ile OCR
 
-Görsel puan tablolarının OCR ile okunması, ayrı bir "OCR işçisi" (`backend/run_ocr_worker.py`) üzerinden çalışır ve bu işçinin gerçek bir GPU'ya ihtiyacı vardır. Bu işçi, kendi Google Cloud hesabınıza bağlı, **7/24 hazır ve kararlı bir adresi olan** bir Cloud Run servisi olarak çalışır (NVIDIA L4 GPU, saniye başına faturalandırma, boştayken sıfıra ölçeklenip ücret kesilmez).
+Görsel puan tablolarının OCR ile okunması, ayrı bir "OCR işçisi" (`backend/run_ocr_worker.py`) üzerinden çalışır ve bu işçinin gerçek bir GPU'ya ihtiyacı vardır. Bu işçi, kendi hesabınıza bağlı, **7/24 hazır ve kararlı bir adresi olan** bir [Modal](https://modal.com) fonksiyonu olarak çalışır (T4 GPU, saniye başına faturalandırma, boştayken sıfıra ölçeklenip ücret kesilmez - Modal her ay $30 ücretsiz kredi veriyor, bu kişisel/seyrek kullanım için genelde tüm faturayı karşılar).
 
-**Tek seferlik kurulum ve dağıtım** ([Google Cloud Shell](https://shell.cloud.google.com)'de - tarayıcıdan, kurulum gerektirmeyen ücretsiz bir terminal, gcloud ve Docker hazır gelir):
+**Tek seferlik kurulum** (kendi bilgisayarınızda - Modal'ın kendi build sistemi imajı uzakta derlediği için Docker kurmanıza gerek yoktur):
+
+```bash
+pip install modal
+modal setup   # tarayıcıdan Modal hesabınızla giriş yapmanızı ister
+```
+
+**Dağıtım:**
 
 ```bash
 git clone --branch ocr-isleri <repo-url> mahir && cd mahir
 export MAHIR_OCR_SHARED_SECRET="uzun-rastgele-bir-parola"
-./cloud-run/deploy.sh
+modal deploy modal_app.py
 ```
 
-Komut bittiğinde ekrana basılan **Service URL** (`https://mahir-ocr-worker-xxxx.a.run.app` gibi) kararlıdır - bir daha değişmez, tekrar dağıtım yapana kadar aynı kalır. Kendi bilgisayarınızda bu adresi ve az önce belirlediğiniz parolayı kullanarak yerel sunucuyu başlatın:
+(PowerShell'de `export` yerine `$env:MAHIR_OCR_SHARED_SECRET = "..."` kullanın.) İlk dağıtım, modelleri (~2 GB) indirip imaja gömdüğü için birkaç dakika sürer; komut bitince ekrana basılan **Web URL** (`https://<kullanıcı-adınız>--mahir-ocr-worker-ocr-worker.modal.run` gibi) kararlıdır - bir daha değişmez, tekrar dağıtım yapana kadar aynı kalır. Kendi bilgisayarınızda bu adresi ve az önce belirlediğiniz parolayı kullanarak yerel sunucuyu başlatın:
 
 ```bash
-set MAHIR_OCR_REMOTE_URL=https://mahir-ocr-worker-xxxx.a.run.app
+set MAHIR_OCR_REMOTE_URL=https://xxxx.modal.run
 set MAHIR_OCR_SHARED_SECRET=uzun-rastgele-bir-parola
 python3 backend/run_file_receiver.py
 ```
@@ -46,7 +53,7 @@ python3 backend/run_file_receiver.py
 
 `MAHIR_OCR_SHARED_SECRET`, servis adresi herkese açık olduğu için isteklerin `X-MAHIR-OCR-Key` başlığıyla doğrulanmasını sağlar - istemci ve işçi tarafında aynı parola tanımlı olmalı; hiçbiri tanımlı değilse (yerel geliştirme/test) doğrulama yapılmaz. `MAHIR_OCR_REMOTE_URL` tanımlı değilken görsel yüklemeleri OCR yapılmadan kabul edilir; sunucu çökmez.
 
-Sınırlamalar: `--min-instances=0` ile boşta kalan servis sıfıra ölçeklenir; bir süre sonra gelen ilk istek konteyneri yeniden başlatıp modelleri yükler (soğuk başlangıç, birkaç dakika sürebilir) - `run_ocr_worker.py` bu süreyi istek beklemeden önce tüketir. Kesin Cloud Run GPU maliyeti için `gcloud`'un resmi fiyat hesaplayıcısını kontrol edin.
+Sınırlamalar: Boşta kalan servis bir süre sonra sıfıra ölçeklenir; gelen ilk istek konteyneri yeniden başlatıp pipeline'ı GPU'ya yükler (soğuk başlangıç, model dosyaları imaja gömülü olduğu için saniyeler-birkaç dakika sürebilir) - `run_ocr_worker.py` bu süreyi istek beklemeden önce tüketir. Kesin maliyet için [modal.com/pricing](https://modal.com/pricing) sayfasını kontrol edin.
 
 ## Geliştirme Kuralları
 
