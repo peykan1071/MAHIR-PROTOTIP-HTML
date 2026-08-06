@@ -68,7 +68,11 @@ def _get_pipeline():
         paddlex_deps.is_dep_available.cache_clear()
 
         device = os.environ.get("MAHIR_OCR_DEVICE", "gpu")
-        _pipeline = PaddleOCRVL(device=device, engine="paddle_dynamic")
+        # paddle_dynamic (eager) her adımı Python üzerinden dispatch ediyor - token
+        # token üretim yapan bir VLM için bu çok yavaş. paddle_static (derlenmiş
+        # graf) daha hızlı olmalı; MAHIR_OCR_ENGINE ile eskiye dönülebilir.
+        engine = os.environ.get("MAHIR_OCR_ENGINE", "paddle_static")
+        _pipeline = PaddleOCRVL(device=device, engine=engine)
     return _pipeline
 
 
