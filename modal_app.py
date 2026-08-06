@@ -61,7 +61,14 @@ else:
     _shared_secret = modal.Secret.from_dict({})
 
 
-@app.function(image=image, gpu="T4", secrets=[_shared_secret], timeout=600)
+@app.function(
+    image=image,
+    gpu="T4",
+    cpu=4.0,
+    memory=8192,
+    secrets=[_shared_secret],
+    timeout=900,
+)
 @modal.web_server(8000, startup_timeout=300)
 def ocr_worker() -> None:
     # Modelleri yeniden indirmiyor (imaja gömülü); yine de pipeline'ı bu

@@ -29,6 +29,7 @@ from __future__ import annotations
 import os
 import re
 import tempfile
+import time
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
 from pathlib import Path
@@ -110,8 +111,13 @@ def _run_ocr(image_bytes: bytes, extension: str) -> str:
 def _predict_on_worker(tmp_path: str) -> str:
     """Runs on the OCR worker thread: the only place `pipeline.predict` may be called from."""
 
+    started = time.monotonic()
+    print(f"[ocr_engine] predict başlıyor: {tmp_path}", flush=True)
+
     pipeline = _get_pipeline()
+    print(f"[ocr_engine] pipeline hazır (+{time.monotonic() - started:.1f}s), predict() çağrılıyor", flush=True)
     results = list(pipeline.predict(tmp_path))
+    print(f"[ocr_engine] predict() bitti (+{time.monotonic() - started:.1f}s)", flush=True)
     if not results:
         raise ValueError("OCR sonucu alınamadı.")
 
