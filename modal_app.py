@@ -49,8 +49,9 @@ image = (
         index_url="https://www.paddlepaddle.org.cn/packages/stable/cu126/",
     )
     # PaddleOCR-VL-1.6-0.9B'nin "transformers" motoru için gerekli - paddle_dynamic
-    # (eager) motorundan çok daha yavaş token token üretim yapıyordu.
-    .pip_install("transformers")
+    # (eager) motorundan çok daha yavaş token token üretim yapıyordu. torchvision
+    # olmadan AutoImageProcessor ImportError veriyor.
+    .pip_install("transformers", "torchvision")
     # OMP_NUM_THREADS>1, bu paddlepaddle-gpu wheel'inin (OpenBLAS ile derlenmiş
     # olabilir) çoklu iş parçacığını güvenle desteklememesi yüzünden predict()
     # çağrısını sessizce kilitleyebiliyor (kendi uyarı mesajı bunu söylüyor).
