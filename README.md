@@ -10,7 +10,7 @@ Proje, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması – Sena
 
 ## Problem ve çözüm
 
-Sınav sonrası değerlendirme; öğrenci puanlarının kontrolü, soru ve öğrenme çıktısı düzeyinde hesaplama, pedagojik yorumlama ve resmî raporlama gibi birbirine bağlı işlemler içerir. Bu süreç öğretmen için zaman alıcıdır ve farklı belge biçimleri arasında veri kaybı riski taşır.
+Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır. Görsel grubu olarak yüklenen puanlama fotoğrafları (en fazla 10 adet, her biri tek öğrencilik puan tablosu), `MAHIR_OCR_REMOTE_URL` tanımlıysa uzaktaki bir OCR sunucusuna (bkz. aşağıdaki "Modal ile OCR") gönderilip öğrenci satırlarına dönüştürülür; tanımlı değilse görseller OCR yapılmadan öğretmen kontrolüne bırakılır.
 
 MAHİR bu akışı tek bir öğretmen kontrollü süreçte birleştirir:
 
@@ -23,7 +23,48 @@ flowchart LR
     E --> F["Word / PDF"]
 ```
 
-## Çalışan prototipte neler var?
+Ardından `http://127.0.0.1:8000/index.html` adresi açılır. Bu yerel sunucunun PaddleOCR'a ya da başka bir üçüncü parti pakete ihtiyacı yoktur (düz `python3` yeterlidir) — OCR hiçbir zaman bu makinede çalışmaz.
+
+### Modal ile OCR
+
+Görsel puan tablolarının OCR ile okunması, ayrı bir "OCR işçisi" (`backend/run_ocr_worker.py`) üzerinden çalışır ve bu işçinin gerçek bir GPU'ya ihtiyacı vardır. Bu işçi, kendi hesabınıza bağlı, **7/24 hazır ve kararlı bir adresi olan** bir [Modal](https://modal.com) fonksiyonu olarak çalışır (T4 GPU, saniye başına faturalandırma, boştayken sıfıra ölçeklenip ücret kesilmez - Modal her ay $30 ücretsiz kredi veriyor, bu kişisel/seyrek kullanım için genelde tüm faturayı karşılar).
+
+**Tek seferlik kurulum** (kendi bilgisayarınızda - Modal'ın kendi build sistemi imajı uzakta derlediği için Docker kurmanıza gerek yoktur):
+
+```bash
+pip install modal
+modal setup   # tarayıcıdan Modal hesabınızla giriş yapmanızı ister
+```
+
+**Dağıtım:**
+
+```bash
+git clone --branch ocr-isleri <repo-url> mahir && cd mahir
+export MAHIR_OCR_SHARED_SECRET="uzun-rastgele-bir-parola"
+modal deploy modal_app.py
+```
+
+(PowerShell'de `export` yerine `$env:MAHIR_OCR_SHARED_SECRET = "..."` kullanın.) İlk dağıtım, modelleri (~2 GB) indirip imaja gömdüğü için birkaç dakika sürer; komut bitince ekrana basılan **Web URL** (`https://<kullanıcı-adınız>--mahir-ocr-worker-ocr-worker.modal.run` gibi) kararlıdır - bir daha değişmez, tekrar dağıtım yapana kadar aynı kalır. Kendi bilgisayarınızda bu adresi ve az önce belirlediğiniz parolayı kullanarak yerel sunucuyu başlatın:
+
+```bash
+set MAHIR_OCR_REMOTE_URL=https://xxxx.modal.run
+set MAHIR_OCR_SHARED_SECRET=uzun-rastgele-bir-parola
+python3 backend/run_file_receiver.py
+```
+
+(PowerShell'de `set` yerine `$env:MAHIR_OCR_REMOTE_URL = "..."` kullanın.)
+
+**Önemli**: `MAHIR_OCR_REMOTE_URL` ve `MAHIR_OCR_SHARED_SECRET`, **aynı terminal penceresinde ve `run_file_receiver.py`'yi başlatmadan önce** ayarlanmalıdır. Bunları bir pencerede ayarlayıp sunucuyu başka bir pencerede (veya zaten açık bir pencerede, sunucuyu yeniden başlatmadan) çalıştırırsanız değişkenler sessizce yok sayılır - sunucu hata vermez, sadece OCR'sız "pass-through" moduna düşer. Bunu şu şekilde ayırt edebilirsiniz: tarayıcının Ağ (Network) sekmesinde `/mahir-upload` yanıtına bakınca `"structuredData": null` ve `"message": "N görsel alındı ve öğretmen kontrolüne hazırlandı."` görüyorsanız (OCR sonucu değil, sadece "alındı" onayı), env değişkenleri devreye girmemiş demektir - sunucuyu durdurup aynı pencerede env değişkenlerini tekrar ayarlayıp yeniden başlatın.
+
+`MAHIR_OCR_SHARED_SECRET`, servis adresi herkese açık olduğu için isteklerin `X-MAHIR-OCR-Key` başlığıyla doğrulanmasını sağlar - istemci ve işçi tarafında aynı parola tanımlı olmalı; hiçbiri tanımlı değilse (yerel geliştirme/test) doğrulama yapılmaz. `MAHIR_OCR_REMOTE_URL` tanımlı değilken görsel yüklemeleri OCR yapılmadan kabul edilir; sunucu çökmez.
+
+Sınırlamalar: Boşta kalan servis bir süre sonra sıfıra ölçeklenir; gelen ilk istek konteyneri yeniden başlatıp pipeline'ı GPU'ya yükler (soğuk başlangıç, model dosyaları imaja gömülü olduğu için saniyeler-birkaç dakika sürebilir) - `run_ocr_worker.py` bu süreyi istek beklemeden önce tüketir. Kesin maliyet için [modal.com/pricing](https://modal.com/pricing) sayfasını kontrol edin.
+
+## Geliştirme Kuralları
+
+Bu projede geliştirme adım adım, küçük ve onaylı sürümler halinde yapılır. Her sprintte yalnızca belirlenen kapsam uygulanır; yapay zekâ, veritabanı, OCR, dosya okuma, PDF/Word üretimi ve sistem entegrasyonu ilk aşamada kapsam dışıdır.
+
+Ayrıntılı geliştirme kuralları, sürümleme sistemi, dosya düzeni ve kontrol listeleri için bkz. [DEVELOPMENT_CHARTER.md](DEVELOPMENT_CHARTER.md).
 
 - Kademe, okul türü, sınıf ve ders bağlamının adım adım seçilmesi
 - Soru sayısı, puan dağılımı ve öğrenme çıktısı eşleştirmesinin öğretmen tarafından tanımlanması
