@@ -271,6 +271,44 @@
             </p>
           </article>
 
+          <article class="report-context-card" aria-labelledby="report-context-title" data-report-context-card>
+            <div class="exam-structure-heading">
+              <div>
+                <p class="data-entry-kicker">Rapor kimliği ve bağlamı</p>
+                <h3 id="report-context-title">Sınav ve Belge Bilgileri</h3>
+                <p>MAHİR belgede bulunan alanları otomatik doldurur; yalnız boş veya şüpheli alanları öğretmen tamamlar. Bu bilgiler raporun A ve H bölümlerine aynen aktarılır.</p>
+              </div>
+              <label class="document-type-control">Belge Türü
+                <select data-document-type>
+                  <option value="auto">MAHİR otomatik belirlesin</option>
+                  <option value="mahir-template">Doldurulmuş MAHİR şablonu</option>
+                  <option value="score-table">Öğrenci soru puan çizelgesi</option>
+                  <option value="handwritten-table">Elle hazırlanmış tablo</option>
+                </select>
+              </label>
+            </div>
+            <p class="notification-message context-status" data-context-status aria-live="polite">Belge henüz okunmadı. Rapor için gerekli alanları şimdi doldurabilir veya belge okunduktan sonra yalnız eksik alanları tamamlayabilirsiniz.</p>
+            <div class="report-context-grid" data-report-context-form>
+              <label>İl <input type="text" data-exam-field="province" data-required-context autocomplete="address-level1"></label>
+              <label>İlçe <input type="text" data-exam-field="district" data-required-context autocomplete="address-level2"></label>
+              <label>Okul/Kurum Adı <input type="text" data-exam-field="schoolName" data-required-context></label>
+              <label>Öğretmenin Adı Soyadı <input type="text" data-exam-field="teacherName" data-required-context autocomplete="name"></label>
+              <label>Eğitim Öğretim Yılı <input type="text" data-exam-field="academicYear" data-required-context placeholder="2026-2027"></label>
+              <label>Sınıf/Şube <input type="text" data-exam-field="classSection" data-required-context placeholder="9/A"></label>
+              <label>Dönem <select data-exam-field="term" data-required-context><option value="">Seçiniz</option><option>1. Dönem</option><option>2. Dönem</option></select></label>
+              <label>Sınav Tarihi <input type="date" data-exam-field="examDate" data-required-context></label>
+              <label>Öğretim Programı <input type="text" data-exam-field="teachingProgram" data-required-context></label>
+              <label>Ölçme ve Değerlendirme Dayanağı <input type="text" data-exam-field="assessmentBasis" data-required-context></label>
+              <label>Senaryo / Örnek Evrak <input type="text" data-exam-field="scenarioInfo" placeholder="Varsa belirtiniz"></label>
+              <label>Diğer Dayanaklar <input type="text" data-exam-field="otherSources" placeholder="Varsa belirtiniz"></label>
+              <label>Belge / Rapor No <input type="text" data-exam-field="documentNo" data-required-context></label>
+              <label>İletim / Onay Bilgisi <input type="text" data-exam-field="approvalInfo" data-required-context placeholder="Örn. Okul Müdürlüğüne sunulacaktır."></label>
+            </div>
+            <div class="button-group context-actions" data-context-actions hidden>
+              <button class="primary-button" type="button" data-return-saved-groups>Kaydedilen Verilere Dön</button>
+            </div>
+          </article>
+
           <article class="data-source-card" aria-labelledby="data-source-title">
             <div>
               <p class="data-entry-kicker">Veri giriş yolu</p>
@@ -299,7 +337,7 @@
           <div class="upload-box document-upload-box" data-component="Upload Box" data-upload-dropzone role="group" aria-labelledby="upload-title">
             <div class="upload-symbol" aria-hidden="true">↑</div>
             <h3 id="upload-title" data-upload-title>Görselleri yükleyin</h3>
-            <p data-upload-description>Aynı sınava ait en fazla 10 puanlama görselini tek grup olarak seçebilirsiniz.</p>
+            <p data-upload-description>Aynı sınava ait en fazla 10 öğrenci soru puan çizelgesini tek grup olarak seçebilirsiniz.</p>
             <label class="primary-button file-select-button" for="exam-file" data-file-select-label>Görselleri Seç</label>
             <input id="exam-file" class="visually-hidden-file-input" name="exam-file" type="file" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
             <p class="upload-rules" data-upload-rules>JPG, PNG veya WEBP · En fazla 10 görsel · Dosya başına 20 MB</p>
@@ -330,8 +368,8 @@
               <li>Rapor</li>
             </ol>
           </nav>
-          <h2 id="validation-title">Veri Onay</h2>
-          <p>Analiz başlamadan önce Word belgesinden okunan alanları kontrol ediniz; gerekli hücreleri doğrudan düzeltebilirsiniz.</p>
+          <h2 id="validation-title">Veri Kontrolü ve Grup Kaydı</h2>
+          <p>Okunan okul numaralarını ve soru puanlarını kontrol ediniz. Hatalı hücreleri düzelttikten sonra bu grubu kaydedebilir, yeni bir grup ekleyebilir veya tüm veri girişini tamamlayabilirsiniz.</p>
         </header>
 
         <div class="data-confirmation-layout" aria-label="Veri onay katmanı">
@@ -357,7 +395,7 @@
             <h3 id="student-data-title">Öğretmen Kontrolündeki Öğrenci Verisi</h3>
             <div class="table-wrap">
               <table class="data-table">
-                <caption>Word belgesinden okunan öğrenci puanları</caption>
+                <caption>Belgeden okunan öğrenci soru puanları</caption>
                 <thead data-validation-student-head></thead>
                 <tbody data-validation-students></tbody>
               </table>
@@ -369,15 +407,46 @@
             <p data-validation-exam-summary>Henüz okunmuş bir Word belgesi bulunmuyor.</p>
             <ul data-validation-warnings></ul>
           </article>
+
+          <article class="saved-groups-card" data-component="Summary Card" aria-labelledby="saved-groups-title">
+            <h3 id="saved-groups-title">Kaydedilen Gruplar</h3>
+            <p data-saved-groups-summary>Henüz kaydedilmiş öğrenci grubu bulunmuyor.</p>
+            <ol data-saved-groups-list></ol>
+          </article>
+
+          <article class="validation-errors-card" data-validation-errors-card aria-labelledby="validation-errors-title" hidden>
+            <h3 id="validation-errors-title">Toplu Kontrol Sonucu</h3>
+            <p data-validation-errors-summary></p>
+            <ol data-validation-errors></ol>
+          </article>
+
+          <article class="post-save-card" data-post-save-actions aria-labelledby="post-save-title" hidden>
+            <h3 id="post-save-title">Bu grubun verileri kaydedildi</h3>
+            <p data-post-save-summary></p>
+            <div class="button-group">
+              <button class="secondary-button" type="button" data-add-image-group>Yeni Görsel Grubu Ekle</button>
+              <button class="primary-button" type="button" data-finish-data-entry>Veri Girişini Tamamla</button>
+            </div>
+          </article>
+
+          <article class="final-data-review-card" data-final-data-review aria-labelledby="final-data-review-title" hidden>
+            <h3 id="final-data-review-title">Nihai Veri Özeti</h3>
+            <p data-final-data-summary></p>
+            <p><strong>Gerçekten tüm öğrenci verilerini eklediniz mi?</strong> Açık onayınızdan önce analiz başlatılmayacaktır.</p>
+            <div class="button-group">
+              <button class="secondary-button" type="button" data-return-to-data>Verilere Dön ve Düzenle</button>
+              <button class="primary-button" type="button" data-confirm-final-analysis>Verileri Onayla ve Analize Geç</button>
+            </div>
+          </article>
         </div>
 
         <p class="notification-message" data-component="Notification Message" data-approval-message aria-live="polite" tabindex="-1">
-          Analize geçmek için paylaşılan veri kapsamını gözden geçirip öğretmen onayıyla işaretleyiniz.
+          Bu gruptaki bütün sorunlar tek kontrolde listelenecektir.
         </p>
 
         <div class="button-group" aria-label="Veri onay işlemleri">
           <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="data-entry-screen" data-reset-data-approval="true">Düzenle</button>
-          <button class="primary-button" data-component="Primary Button" type="button" data-target-screen="analysis-screen" data-approval-action="confirm-data">Verileri Onayla</button>
+          <button class="primary-button" data-component="Primary Button" type="button" data-save-current-group>Bu Grubun Verilerini Kaydet</button>
         </div>
       </section>
       <section id="analysis-screen" class="screen hidden-screen" aria-labelledby="analysis-title" data-screen="analysis" data-screen-state="hidden" aria-hidden="true" hidden>

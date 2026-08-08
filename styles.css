@@ -228,6 +228,86 @@ input[type="checkbox"] {
   background: #fbfefe;
 }
 
+.report-context-card,
+.saved-groups-card,
+.validation-errors-card,
+.post-save-card,
+.final-data-review-card {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #b9dfe1;
+  border-radius: 12px;
+  background: #fbfefe;
+}
+
+.report-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.report-context-grid label,
+.document-type-control {
+  display: grid;
+  gap: 7px;
+  color: var(--color-secondary);
+  font-weight: 700;
+}
+
+.report-context-grid input,
+.report-context-grid select,
+.document-type-control select {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-text);
+  font-weight: 400;
+}
+
+.report-context-grid .is-auto-filled {
+  border-color: #72aeb2;
+  background: #f0f9f9;
+}
+
+.context-actions {
+  justify-content: flex-end;
+}
+
+.validation-errors-card {
+  border-color: #d58b82;
+  background: #fff8f7;
+}
+
+.validation-errors-card h3,
+.validation-errors-card p,
+.post-save-card h3,
+.post-save-card p,
+.final-data-review-card h3,
+.final-data-review-card p {
+  margin: 0;
+}
+
+.validation-error-link {
+  min-height: 0;
+  width: auto;
+  padding: 4px 0;
+  border: 0;
+  color: #8a2e23;
+  background: transparent;
+  text-align: left;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.post-save-card,
+.final-data-review-card {
+  border-color: #72aeb2;
+  background: #f2fbf6;
+}
+
 .exam-structure-heading {
   display: flex;
   justify-content: space-between;
@@ -1780,6 +1860,19 @@ body:has(#welcome-screen.active-screen) .welcome-footer-social svg {
 .validation-input:focus {
   border-color: #146c5a;
   outline: 3px solid rgb(20 108 90 / 16%);
+}
+
+.validation-input.is-invalid,
+[data-exam-field].is-invalid {
+  border-color: #b23b2d;
+  background: #fff4f2;
+  box-shadow: 0 0 0 3px rgb(178 59 45 / 12%);
+}
+
+@media (max-width: 720px) {
+  .report-context-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .report-final-approval {

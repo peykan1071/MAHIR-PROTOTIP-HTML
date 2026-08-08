@@ -68,9 +68,9 @@ def _find_student_table(tables: list[list[list[str]]]) -> list[list[str]] | None
         if not table:
             continue
         labels = {_normalise_label(cell) for cell in table[0]}
-        has_name = any("ad soyad" in label or "adi soyadi" in label for label in labels)
+        has_number = any(label in {"okul no", "ogrenci no", "numara", "no"} for label in labels)
         has_score = any(re.fullmatch(r"(?:s|soru) ?\d+", label) for label in labels)
-        if has_name and has_score:
+        if has_number and has_score:
             return table
     return None
 
@@ -120,6 +120,12 @@ def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
         "examDate": values.get("sinav tarihi", ""),
         "totalMaxScore": _number(values.get("toplam puan", "")),
         "teacherName": values.get("ogretmenin adi soyadi", ""),
+        "teachingProgram": values.get("ogretim programi", ""),
+        "assessmentBasis": values.get("olcme ve degerlendirme dayanagi", ""),
+        "scenarioInfo": values.get("senaryo ornek evrak", ""),
+        "otherSources": values.get("diger dayanaklar", ""),
+        "documentNo": values.get("belge rapor no", "") or values.get("belge sayfa no", ""),
+        "approvalInfo": values.get("iletim onay bilgisi", ""),
         "documentPage": values.get("belge sayfa no", ""),
     }
 
@@ -155,19 +161,18 @@ def _parse_students(
         padded = row + [""] * (16 - len(row))
         scores = [_number(value) for value in padded[3 : 3 + question_count]]
         student_no = padded[1].strip()
-        full_name = padded[2].strip()
+        # Ad-soyad, veri minimizasyonu gereği öğrenci analiz modeline alınmaz.
         total_score = _number(padded[13])
         attendance = padded[14].strip()
         control = padded[15].strip()
 
-        if not (student_no or full_name or any(score is not None for score in scores) or attendance):
+        if not (student_no or any(score is not None for score in scores) or attendance):
             continue
 
         students.append(
             {
                 "rowNumber": _integer(padded[0]) or len(students) + 1,
                 "studentNo": student_no,
-                "fullName": full_name,
                 "scores": scores,
                 "totalScore": total_score,
                 "calculatedTotal": round(sum(score or 0 for score in scores), 2),
@@ -191,7 +196,6 @@ def _parse_students_flexible(rows: list[list[str]]) -> list[dict[str, object]]:
 
     row_index = find_index(lambda label: label in {"sira", "sira no"})
     number_index = find_index(lambda label: label in {"okul no", "ogrenci no", "numara", "no"})
-    name_index = find_index(lambda label: "ad soyad" in label or "adi soyadi" in label)
     total_index = find_index(lambda label: label in {"toplam", "toplam puan", "puan"})
     score_indexes = [
         index for index, label in enumerate(headings)
@@ -203,15 +207,13 @@ def _parse_students_flexible(rows: list[list[str]]) -> list[dict[str, object]]:
         row = source_row + [""] * max(0, len(headings) - len(source_row))
         scores = [_number(row[index]) for index in score_indexes]
         student_no = row[number_index].strip() if number_index is not None else ""
-        full_name = row[name_index].strip() if name_index is not None else ""
         total_score = _number(row[total_index]) if total_index is not None else None
-        if not (student_no or full_name or any(score is not None for score in scores) or total_score is not None):
+        if not (student_no or any(score is not None for score in scores) or total_score is not None):
             continue
         students.append(
             {
                 "rowNumber": _integer(row[row_index]) if row_index is not None else len(students) + 1,
                 "studentNo": student_no,
-                "fullName": full_name,
                 "scores": scores,
                 "totalScore": total_score,
                 "calculatedTotal": round(sum(score or 0 for score in scores), 2),
@@ -241,14 +243,12 @@ def _build_warnings(
             warnings.append(f"{question['number']}. sorunun azami puanı boş.")
 
     for student in students:
-        if not student["fullName"]:
-            warnings.append(f"{student['rowNumber']}. öğrenci satırında ad soyad boş.")
         if (
             student["totalScore"] is not None
             and abs(float(student["totalScore"]) - float(student["calculatedTotal"])) > 0.01
         ):
             warnings.append(
-                f"{student['fullName'] or student['rowNumber']}. satırında yazılan toplam "
+                f"{student['rowNumber']}. satırında yazılan toplam "
                 f"({student['totalScore']}) ile hesaplanan toplam ({student['calculatedTotal']}) farklı."
             )
     return warnings
