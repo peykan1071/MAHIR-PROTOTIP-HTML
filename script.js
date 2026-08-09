@@ -2369,6 +2369,9 @@ const screenManager = (() => {
     showScreen,
     approveData() {
       setDataApprovalState(true);
+    },
+    revokeDataApproval() {
+      setDataApprovalState(false);
     }
   };
 })();
@@ -2394,12 +2397,10 @@ const fileUploadBridge = (() => {
     const componentWeightNote = document.querySelector("[data-component-weight-note]");
     const programDataStatus = document.querySelector("[data-program-data-status]");
     const contextStatus = document.querySelector("[data-context-status]");
-    const documentTypeSelect = document.querySelector("[data-document-type]");
     const saveGroupButton = document.querySelector("[data-save-current-group]");
     const addGroupButton = document.querySelector("[data-add-image-group]");
-    const finishEntryButton = document.querySelector("[data-finish-data-entry]");
-    const returnToDataButton = document.querySelector("[data-return-to-data]");
     const confirmFinalButton = document.querySelector("[data-confirm-final-analysis]");
+    const returnToUploadButton = document.querySelector("[data-return-to-upload]");
 
     if (!fileInput || !readButton || typeof FormData === "undefined" || typeof fetch === "undefined") {
       return;
@@ -2514,7 +2515,10 @@ const fileUploadBridge = (() => {
         const detected = readAliasedValue(exam, examFieldAliases[field] || [field]);
         const rawValue = detected || automaticDefaults[field] || "";
         const value = input.type === "date" ? normalizeDateInputValue(rawValue) : rawValue;
-        if (!usefulValue(input.value) && value) {
+        const teacherEdited = input.dataset.valueSource === "teacher";
+        const shouldUseDetectedValue = Boolean(detected && !teacherEdited);
+        const shouldUseDefaultValue = Boolean(!detected && !usefulValue(input.value) && value);
+        if (shouldUseDetectedValue || shouldUseDefaultValue) {
           input.value = value;
           input.dataset.valueSource = detected ? "document" : "context";
           input.classList.add("is-auto-filled");
@@ -2523,32 +2527,27 @@ const fileUploadBridge = (() => {
       refreshContextStatus();
     };
 
-    const inferDocumentType = (data = {}) => {
-      if (documentTypeSelect?.value && documentTypeSelect.value !== "auto") return documentTypeSelect.value;
+    const hasDetectedMahirTemplate = (data = {}) => {
       const exam = data.exam || {};
       const populatedMetadata = Object.values(examFieldAliases).filter((aliases) => readAliasedValue(exam, aliases)).length;
-      if (sourceMode === "template" || populatedMetadata >= 5) return "mahir-template";
+      return populatedMetadata >= 5 && (data.students || []).length > 0;
+    };
+
+    const inferDocumentType = (data = {}) => {
+      const exam = data.exam || {};
+      const populatedMetadata = Object.values(examFieldAliases).filter((aliases) => readAliasedValue(exam, aliases)).length;
+      if (hasDetectedMahirTemplate(data) || populatedMetadata >= 5) return "mahir-template";
+      if (sourceMode === "template") return "unrecognized-template";
       if (sourceMode === "manual") return "handwritten-table";
       return "score-table";
     };
 
     const documentTypeLabel = (type) => ({
       "mahir-template": "Doldurulmuş MAHİR şablonu",
+      "unrecognized-template": "Şablon yapısı doğrulanamayan belge",
       "score-table": "Öğrenci soru puan çizelgesi",
       "handwritten-table": "Elle hazırlanmış tablo"
     }[type] || "Tanımlanamayan belge");
-
-    const validateContext = () => {
-      const errors = [];
-      contextInputs().forEach((input) => {
-        input.classList.remove("is-invalid");
-        if (input.hasAttribute("data-required-context") && !usefulValue(input.value)) {
-          input.classList.add("is-invalid");
-          errors.push({ message: `Rapor bilgisi — ${input.closest("label")?.childNodes?.[0]?.textContent.trim() || input.dataset.examField} alanı boş.`, input });
-        }
-      });
-      return errors;
-    };
 
     const setProgramStatus = (message, state = "") => {
       if (!programDataStatus) return;
@@ -2892,6 +2891,7 @@ const fileUploadBridge = (() => {
       const studentBody = document.querySelector("[data-validation-students]");
       const examSummary = document.querySelector("[data-validation-exam-summary]");
       const warningList = document.querySelector("[data-validation-warnings]");
+      const documentReadGuidance = document.querySelector("[data-document-read-guidance]");
       const questions = currentQuestionConfiguration();
       const expectedStudentCount = Math.max(1, Number(studentCountInput?.value) || 1);
       const parsedStudents = (data.students || []).map((student, index) => ({
@@ -2901,14 +2901,32 @@ const fileUploadBridge = (() => {
         scores: Array.from({ length: questions.length }, (_, scoreIndex) => student.scores?.[scoreIndex] ?? null),
         totalScore: student.totalScore ?? null
       }));
-      const emptyRowCount = sourceMode === "manual" && !options.finalReview ? expectedStudentCount : Math.max(parsedStudents.length, selectedFiles.length || 1);
-      const students = parsedStudents.length ? parsedStudents : Array.from({ length: emptyRowCount }, (_, index) => ({
-        rowNumber: index + 1,
-        studentNo: "",
-        technicalId: `Ö-${String(savedGroups.reduce((sum, group) => sum + group.students.length, 0) + index + 1).padStart(3, "0")}`,
-        scores: Array(questions.length).fill(null),
-        totalScore: null
-      }));
+      const templateCouldNotBeRead = sourceMode === "template" && !hasDetectedMahirTemplate(data);
+      const targetRowCount = options.finalReview
+        ? parsedStudents.length
+        : sourceMode === "images"
+          ? Math.max(parsedStudents.length, selectedFiles.length || 1)
+          : Math.max(parsedStudents.length, expectedStudentCount);
+      const students = [...parsedStudents];
+      const savedStudentCount = savedGroups.reduce((sum, group) => sum + group.students.length, 0);
+      while (students.length < targetRowCount) {
+        const index = students.length;
+        students.push({
+          rowNumber: index + 1,
+          studentNo: "",
+          technicalId: `Ö-${String(savedStudentCount + index + 1).padStart(3, "0")}`,
+          scores: Array(questions.length).fill(null),
+          totalScore: null
+        });
+      }
+
+      if (documentReadGuidance) {
+        documentReadGuidance.hidden = !templateCouldNotBeRead;
+        documentReadGuidance.classList.toggle("is-error", templateCouldNotBeRead);
+        documentReadGuidance.textContent = templateCouldNotBeRead
+          ? `Yüklenen belgede MAHİR şablonuna uygun öğrenci tablosu bulunamadı. Öğrenci numaraları ve soru puanları otomatik okunamadı. Dosya yükleme aşamasına dönerek doğru belgeyi seçebilir veya aşağıda açılan ${expectedStudentCount} boş satırı elle tamamlayabilirsiniz.`
+          : "";
+      }
       structuredData = {
         ...data,
         exam: { ...(data.exam || {}), ...contextData, documentType: detectedDocumentType },
@@ -3045,14 +3063,13 @@ const fileUploadBridge = (() => {
       if (summary) summary.textContent = savedGroups.length
         ? `${savedGroups.length} grup içinde ${total}/${expected} öğrenci kaydı korunuyor.`
         : "Henüz kaydedilmiş öğrenci grubu bulunmuyor.";
+      document.querySelector("[data-saved-groups-card]")?.toggleAttribute("hidden", savedGroups.length === 0);
       list?.replaceChildren();
       savedGroups.forEach((group, index) => {
         const item = document.createElement("li");
         item.textContent = `${index + 1}. Grup — ${group.students.length} öğrenci`;
         list?.append(item);
       });
-      const contextActions = document.querySelector("[data-context-actions]");
-      contextActions?.toggleAttribute("hidden", savedGroups.length === 0);
     };
 
     const clearValidationErrors = () => {
@@ -3138,6 +3155,8 @@ const fileUploadBridge = (() => {
         errors.push({ message: `Bu grup kaydedilirse öğrenci sayısı ${alreadySaved + students.length} olacak; başlangıçta belirtilen toplam ${expected}.`, input: null });
       }
       if (errors.length) {
+        document.querySelector("[data-post-save-actions]")?.setAttribute("hidden", "");
+        document.querySelector("[data-final-data-review]")?.setAttribute("hidden", "");
         showValidationErrors(errors);
         return;
       }
@@ -3152,18 +3171,17 @@ const fileUploadBridge = (() => {
       renderSavedGroups();
       clearValidationErrors();
       if (saveGroupButton) saveGroupButton.hidden = true;
+      if (total === expected) {
+        showFinalReview();
+        return;
+      }
       const postSave = document.querySelector("[data-post-save-actions]");
       const postSummary = document.querySelector("[data-post-save-summary]");
       postSave?.removeAttribute("hidden");
-      if (postSummary) postSummary.textContent = `Şu ana kadar ${total} öğrenci kaydı eklendi. Başlangıçta belirtilen toplam öğrenci sayısı ${expected}. Başka öğrenci verisi ekleyebilir veya veri girişini tamamlayabilirsiniz.`;
-      if (finishEntryButton) {
-        finishEntryButton.disabled = total !== expected;
-        finishEntryButton.setAttribute("aria-disabled", String(total !== expected));
-      }
+      if (postSummary) postSummary.textContent = `${total}/${expected} öğrenci verisi başarıyla kaydedildi. Önceki kayıtlar korunarak yeni görsel grubunu ekleyebilirsiniz.`;
+      if (addGroupButton) addGroupButton.hidden = sourceMode !== "images" || total >= expected;
       const approvalMessage = document.querySelector("[data-approval-message]");
-      if (approvalMessage) approvalMessage.textContent = total === expected
-        ? "Öğrenci sayısı tamamlandı. Yine de analizden önce nihai veri özeti ve açık öğretmen onayı gösterilecektir."
-        : `${expected - total} öğrenci kaydı daha eklenmeden analize geçilemez.`;
+      if (approvalMessage) approvalMessage.textContent = `${expected - total} öğrenci kaydı daha eklenmeden analiz onayı gösterilmeyecektir.`;
     };
 
     const startNewGroup = () => {
@@ -3171,9 +3189,32 @@ const fileUploadBridge = (() => {
       structuredData = null;
       clearFile();
       document.querySelector("[data-post-save-actions]")?.setAttribute("hidden", "");
+      document.querySelector("[data-final-data-review]")?.setAttribute("hidden", "");
       if (saveGroupButton) saveGroupButton.hidden = false;
       screenManager.showScreen("data-entry-screen");
       setStatus(`Önceki ${savedGroups.length} grup korunuyor. ${currentGroupNumber}. grup için en fazla 10 yeni görsel seçebilirsiniz.`, "success");
+    };
+
+    const returnToUpload = () => {
+      finalReviewMode = false;
+      structuredData = null;
+      clearValidationErrors();
+      document.querySelector("[data-post-save-actions]")?.setAttribute("hidden", "");
+      document.querySelector("[data-final-data-review]")?.setAttribute("hidden", "");
+      screenManager.showScreen("data-entry-screen");
+      setStatus("Yüklediğiniz dosya korunuyor. Dosyayı kaldırıp başka bir belge seçebilir veya aynı belgeyi yeniden okutabilirsiniz.");
+    };
+
+    const invalidateAnalysisAfterApprovedDataEdit = () => {
+      if (!finalReviewMode || !reportRuntime.analysis) return;
+      reportRuntime.analysis = null;
+      reportRuntime.report = null;
+      screenManager.revokeDataApproval();
+      document.dispatchEvent(new CustomEvent("mahir:report-reset"));
+      const approvalMessage = document.querySelector("[data-approval-message]");
+      if (approvalMessage) {
+        approvalMessage.textContent = "Onaylanan öğrenci verileri değiştirildi. Eski analiz ve rapor geçersiz sayıldı; verileri yeniden onaylayıp analize geçiniz.";
+      }
     };
 
     const showFinalReview = () => {
@@ -3181,14 +3222,6 @@ const fileUploadBridge = (() => {
       const allStudents = savedGroups.flatMap((group) => group.students);
       if (allStudents.length !== expected) {
         showValidationErrors([{ message: `Veri girişi tamamlanamaz: ${allStudents.length}/${expected} öğrenci kaydı bulunuyor.`, input: null }]);
-        return;
-      }
-      const contextErrors = validateContext();
-      if (contextErrors.length) {
-        showValidationErrors(contextErrors);
-        if (contextStatus) contextStatus.textContent = `Analizden önce ${contextErrors.length} zorunlu rapor bilgisini tamamlayınız.`;
-        screenManager.showScreen("data-entry-screen");
-        document.querySelector("[data-report-context-card]")?.scrollIntoView({ behavior: "smooth", block: "start" });
         return;
       }
       const merged = {
@@ -3201,7 +3234,7 @@ const fileUploadBridge = (() => {
       };
       renderValidationData(merged, { finalReview: true });
       const summary = document.querySelector("[data-final-data-summary]");
-      if (summary) summary.textContent = `${savedGroups.length} kaydedilmiş grup birleştirildi: ${allStudents.length} öğrenci, ${merged.questions.length} soru. Rapor kimlik ve bağlam bilgileri tamamlandı.`;
+      if (summary) summary.textContent = `${savedGroups.length} kaydedilmiş grup birleştirildi: ${allStudents.length} öğrenci, ${merged.questions.length} soru. Sınav ve belge bilgileri rapor aşamasında kontrol edilecektir.`;
       const approvalMessage = document.querySelector("[data-approval-message]");
       if (approvalMessage) approvalMessage.textContent = "Tüm verileri gözden geçiriniz. Açık onay verilmeden analiz başlamaz.";
     };
@@ -3218,8 +3251,7 @@ const fileUploadBridge = (() => {
       if (!structuredData || !approvalButton) return;
       const approvedData = collectApprovedData();
       const studentErrors = validateStudents(approvedData.students || [], false);
-      const contextErrors = validateContext();
-      const errors = [...studentErrors, ...contextErrors];
+      const errors = [...studentErrors];
       if (errors.length) {
         showValidationErrors(errors);
         return;
@@ -3269,6 +3301,8 @@ const fileUploadBridge = (() => {
     };
 
     const uploadSelectedFile = () => {
+      const selectedSource = document.querySelector('[data-source-option]:checked')?.value;
+      if (selectedSource && selectedSource !== sourceMode) sourceMode = selectedSource;
       if (!updateStructureStatus()) {
         setStatus("Sınav yapısındaki eksik alanları tamamlayınız.", "error");
         return;
@@ -3357,17 +3391,22 @@ const fileUploadBridge = (() => {
         structuredData.exam = { ...(structuredData.exam || {}), ...collectContextData() };
         reportRuntime.structuredData = structuredData;
         reportRuntime.exam = structuredData.exam;
+        if (reportRuntime.analysis) {
+          window.MAHIRReportExport?.syncOutputHeader(document.querySelector("#report-screen"));
+          document.dispatchEvent(new CustomEvent("mahir:report-reset"));
+        }
       }
     }));
     saveGroupButton?.addEventListener("click", saveCurrentGroup);
     addGroupButton?.addEventListener("click", startNewGroup);
-    finishEntryButton?.addEventListener("click", showFinalReview);
+    returnToUploadButton?.addEventListener("click", returnToUpload);
     confirmFinalButton?.addEventListener("click", analyzeApprovedData);
-    returnToDataButton?.addEventListener("click", () => {
-      document.querySelector("[data-student-row]")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      document.querySelector("[data-student-row] .validation-input")?.focus({ preventScroll: true });
+    document.querySelector("[data-validation-students]")?.addEventListener("input", invalidateAnalysisAfterApprovedDataEdit);
+    document.querySelector('[data-target-screen="report-screen"]')?.addEventListener("click", () => {
+      populateContextFields(structuredData?.exam || {});
+      refreshContextStatus();
+      window.MAHIRReportExport?.syncOutputHeader(document.querySelector("#report-screen"));
     });
-    document.querySelector("[data-return-saved-groups]")?.addEventListener("click", showFinalReview);
     updateComponentNote();
     loadLearningOutcomes();
     populateContextFields();
@@ -3389,7 +3428,7 @@ const fileUploadBridge = (() => {
     dropzone?.addEventListener("drop", (event) => {
       if (event.dataTransfer?.files?.length) selectFiles(event.dataTransfer.files);
     });
-    configureSourceMode("images");
+    configureSourceMode(document.querySelector('[data-source-option]:checked')?.value || "images");
   };
 
   return { init };
@@ -3401,6 +3440,7 @@ const reportApprovalManager = (() => {
   let downloadButton;
   let reportScreen;
   let outputMessage;
+  let returnToAnalysisButton;
 
   const actionButtons = () => [wordButton, downloadButton].filter(Boolean);
 
@@ -3439,6 +3479,10 @@ const reportApprovalManager = (() => {
     reportScreen.querySelectorAll("article, aside").forEach((section) => {
       section.dataset.reportLocked = String(isApproved);
     });
+    if (returnToAnalysisButton) {
+      returnToAnalysisButton.disabled = isApproved;
+      returnToAnalysisButton.setAttribute("aria-disabled", String(isApproved));
+    }
 
     if (!isApproved) {
       setButtonsEnabled(false);
@@ -3510,6 +3554,7 @@ const reportApprovalManager = (() => {
     wordButton = document.querySelector("[data-download-approved-word]");
     downloadButton = document.querySelector("[data-download-approved-pdf]");
     outputMessage = document.querySelector("[data-output-validation-message]");
+    returnToAnalysisButton = document.querySelector("[data-return-to-analysis]");
     if (!reportScreen || !approvalInput || !wordButton || !downloadButton) return;
 
     resetApproval();

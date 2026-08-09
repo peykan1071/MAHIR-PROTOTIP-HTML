@@ -308,6 +308,11 @@ input[type="checkbox"] {
   background: #f2fbf6;
 }
 
+.student-save-actions {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
 .exam-structure-heading {
   display: flex;
   justify-content: space-between;
