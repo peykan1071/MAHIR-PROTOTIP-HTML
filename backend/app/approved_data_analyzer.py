@@ -152,10 +152,9 @@ def _normalize_student(
     if not isinstance(item, dict):
         raise ValueError(f"{fallback_row}. öğrenci verisi geçersiz.")
     student_no = str(item.get("studentNo") or "").strip()
-    full_name = str(item.get("fullName") or "").strip()
-    if not student_no or not full_name or "okunamadı" in {student_no.casefold(), full_name.casefold()}:
+    if not student_no or student_no.casefold() == "okunamadı":
         raise ValueError(
-            f"{fallback_row}. öğrenci satırındaki okunamayan veya boş kimlik alanlarını düzeltiniz."
+            f"{fallback_row}. öğrenci satırındaki okunamayan veya boş okul numarasını düzeltiniz."
         )
     scores = item.get("scores")
     if not isinstance(scores, list) or len(scores) != len(questions):
@@ -181,7 +180,6 @@ def _normalize_student(
     return {
         "rowNumber": item.get("rowNumber") or fallback_row,
         "studentNo": student_no,
-        "fullName": full_name,
         "scores": normalized_scores,
         "calculatedTotal": calculated_total,
         "attendance": "",

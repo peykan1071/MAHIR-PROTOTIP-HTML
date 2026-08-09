@@ -44,7 +44,7 @@
   };
 
   const normalizeText = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
-  const isUseful = (value) => normalizeText(value) && !/^belirtilmedi$/i.test(normalizeText(value));
+  const isUseful = (value) => /[\p{L}\p{N}]/u.test(normalizeText(value)) && !/^belirtilmedi$/i.test(normalizeText(value));
 
   const normalizeForCompare = (value) => normalizeText(value)
     .toLocaleLowerCase("tr-TR")
@@ -102,6 +102,12 @@
   const getAnalysis = () => runtime().analysis || {};
 
   const dateText = () => new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date());
+  const displayDate = (value) => {
+    const text = normalizeText(value);
+    const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return text;
+    return `${match[3]}.${match[2]}.${match[1]}`;
+  };
 
   const formatNumber = (value, digits = 2) => {
     const number = Number(value);
@@ -226,7 +232,7 @@
       { label: "Sınıf/Şube", value: wordClass || context.gradeLevel, source: wordClass ? "word" : "context", required: true },
       { label: "Dönem", value: valueFrom(exam, ["term"]) },
       { label: "Sınav Türü", value: valueFrom(exam, ["examType"]) },
-      { label: "Sınav Tarihi", value: valueFrom(exam, ["examDate"]) },
+      { label: "Sınav Tarihi", value: displayDate(valueFrom(exam, ["examDate"])) },
       { label: "Rapor Tarihi", value: dateText() },
       { label: "Analiz Edilen Öğrenci Sayısı", value: summary.participatingStudentCount ? String(summary.participatingStudentCount) : "", required: true }
     ].filter((item) => isUseful(item.value));
@@ -256,6 +262,15 @@
     if (!isUseful(valueFrom(exam, ["teacherName", "teacher", "teacherFullName"]))) missing.push("Öğretmenin Adı Soyadı");
     if (!isUseful(valueFrom(exam, ["course"]) || context.course)) missing.push("Ders");
     if (!isUseful(valueFrom(exam, ["classSection", "grade", "className"]) || context.gradeLevel)) missing.push("Sınıf/Şube");
+    if (!isUseful(valueFrom(exam, ["province", "city"]))) missing.push("İl");
+    if (!isUseful(valueFrom(exam, ["district", "town"]))) missing.push("İlçe");
+    if (!isUseful(valueFrom(exam, ["academicYear", "educationYear"]))) missing.push("Eğitim Öğretim Yılı");
+    if (!isUseful(valueFrom(exam, ["term"]))) missing.push("Dönem");
+    if (!isUseful(valueFrom(exam, ["examDate"]))) missing.push("Sınav Tarihi");
+    if (!isUseful(valueFrom(exam, ["teachingProgram", "curriculumName"]))) missing.push("Öğretim Programı");
+    if (!isUseful(valueFrom(exam, ["assessmentBasis", "measurementBasis"]))) missing.push("Ölçme ve Değerlendirme Dayanağı");
+    if (!isUseful(valueFrom(exam, ["documentNo", "reportNo"]))) missing.push("Belge / Rapor No");
+    if (!isUseful(valueFrom(exam, ["approvalInfo", "transmissionInfo"]))) missing.push("İletim / Onay Bilgisi");
     if (!summary.participatingStudentCount) missing.push("Analiz Edilen Öğrenci Sayısı");
 
     const conflicts = [
@@ -369,14 +384,15 @@
 
   const buildSourceBlock = () => {
     const context = getContext();
+    const exam = getExam();
     const sourceScope = context.sourceScope || [];
     return {
       heading: "G. ANALİZDE ESAS ALINAN EĞİTİM BAĞLAMI VE KAYNAKLAR",
       paragraphs: ["Bu rapor; seçilen eğitim bağlamı, ilgili öğretim programı, ölçme ve değerlendirme esasları ile doğrulanmış sınav verileri esas alınarak hazırlanmıştır."],
       tables: [[
         ["Eğitim Bağlamı", sourceScope.join(" / "), "İnceleme Kapsamı", "Öğretmen tarafından onaylanan sınav verileri"],
-        ["Öğretim Programı", sourceScope.find((item) => /program/i.test(item)) || "", "Ölçme ve Değerlendirme Dayanağı", sourceScope.find((item) => /ölçme|değerlendirme/i.test(item)) || ""],
-        ["Senaryo / Örnek Evrak", sourceScope.find((item) => /senaryo|örnek/i.test(item)) || "", "Diğer Dayanaklar", sourceScope.filter((item) => !/program|ölçme|değerlendirme|senaryo|örnek/i.test(item)).join(" / ")]
+        ["Öğretim Programı", valueFrom(exam, ["teachingProgram", "curriculumName"]), "Ölçme ve Değerlendirme Dayanağı", valueFrom(exam, ["assessmentBasis", "measurementBasis"])],
+        ["Senaryo / Örnek Evrak", valueFrom(exam, ["scenarioInfo", "scenario", "sampleDocument"]) || "Bulunmuyor", "Diğer Dayanaklar", valueFrom(exam, ["otherSources", "otherReferences"]) || "Bulunmuyor"]
       ]]
     };
   };

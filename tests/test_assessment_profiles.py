@@ -81,6 +81,17 @@ class AssessmentProfileTests(unittest.TestCase):
         )
         self.assertEqual(result["exam"]["componentWeight"], 0.25)
 
+    def test_student_name_is_not_required_or_returned(self):
+        result = analyze_approved_data(
+            {
+                "exam": {"courseName": "Fen Bilimleri", "componentType": "written"},
+                "questions": [{"number": 1, "maxScore": 100}],
+                "students": [{"studentNo": "Ö-001", "scores": [80]}],
+            }
+        )
+        self.assertEqual(result["students"][0]["studentNo"], "Ö-001")
+        self.assertNotIn("fullName", result["students"][0])
+
     def test_general_evaluation_requires_all_language_components(self):
         result = build_general_evaluation(
             "tde-70-15-15",
