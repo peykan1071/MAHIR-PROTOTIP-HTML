@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -29,6 +30,7 @@ from .reporting_engine import generate_report, write_report
 
 UPLOAD_PATH = "/mahir-upload"
 ANALYZE_PATH = "/mahir-analyze"
+OCR_WARMUP_PATH = "/mahir-ocr-warmup"
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 MAX_FILES_PER_UPLOAD = 10
 MAX_REQUEST_SIZE = MAX_UPLOAD_SIZE * MAX_FILES_PER_UPLOAD
@@ -80,6 +82,35 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.end_headers()
+
+    def do_GET(self) -> None:
+        """Serve the prototype, but intercept the OCR warm-up ping first.
+
+        The browser can't call the remote worker itself (it never learns
+        `MAHIR_OCR_REMOTE_URL`, and the worker is on another origin), so the
+        ping is proxied here. It must return *immediately*: the remote call
+        blocks for 30-50 s while a cold container loads its models, and the
+        teacher is still picking files - nothing may wait on it.
+        """
+
+        if urlparse(self.path).path != OCR_WARMUP_PATH:
+            super().do_GET()
+            return
+
+        if not MAHIR_OCR_REMOTE_URL:
+            # OCR'sız yerel geliştirme: ısıtılacak uzak bir işçi yok.
+            self._send_json(200, {"ok": True, "started": False})
+            return
+
+        from .remote_ocr_client import warm_up_remote_ocr
+
+        threading.Thread(
+            target=warm_up_remote_ocr,
+            args=(MAHIR_OCR_REMOTE_URL,),
+            name="ocr-warmup",
+            daemon=True,
+        ).start()
+        self._send_json(200, {"ok": True, "started": True})
 
     def do_POST(self) -> None:
         request_path = urlparse(self.path).path

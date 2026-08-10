@@ -19,6 +19,10 @@ from .file_receiver import UploadedFile
 
 _REMOTE_TIMEOUT_SECONDS = 300
 _SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
+# `ocr_worker.WARMUP_PATH` ile aynı olmalı - burada elle tekrarlanıyor çünkü bu
+# modül öğretmenin makinesinde çalışıyor ve PaddleOCR bağımlısı `ocr_worker`i
+# import edemez (modül docstring'i).
+WARMUP_PATH = "/mahir-warmup"
 
 
 def run_remote_image_group_ocr(
@@ -58,6 +62,28 @@ def run_remote_image_group_ocr(
         str(payload.get("message", "")),
         payload.get("structuredData"),
     )
+
+
+def warm_up_remote_ocr(remote_url: str) -> bool:
+    """Ask the remote worker to load its models now, before any real upload.
+
+    A cold Modal container spends 30-50 s booting and loading PaddleOCR-VL onto
+    the GPU, against only 7-12 s of actual OCR (measured, see `modal app logs
+    mahir-ocr-worker`). Calling this the moment the teacher picks files moves
+    that preparation off the wait that follows "Verileri Oku ve Kontrol Et".
+
+    Never raises: a warm-up is best-effort by definition, and a failed one must
+    stay invisible - the upload that follows works exactly as before, just
+    slower. Returns whether the remote reported itself ready, for tests/logs.
+    """
+
+    request = urllib.request.Request(remote_url.rstrip("/") + WARMUP_PATH, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:  # noqa: BLE001 - ısıtma en iyi çaba; hiçbir hata dışarı sızmamalı.
+        return False
+    return bool(payload.get("ok"))
 
 
 def _build_multipart_body(uploaded_files: list[UploadedFile], boundary: str) -> bytes:

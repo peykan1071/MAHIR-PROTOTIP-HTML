@@ -2807,6 +2807,24 @@ const fileUploadBridge = (() => {
       renderFilesList();
     };
 
+    // Uzak OCR işçisinin soğuk başlangıcı ölçülen sürenin %75-85'i (konteyner
+    // açılışı + modelleri GPU'ya yükleme ~30-50 sn; asıl OCR yalnızca 7-12 sn).
+    // Öğretmen dosyalarını seçer seçmez bu hazırlığı başlatıyoruz ki "Verileri
+    // Oku"ya bastığında büyük ölçüde bitmiş olsun. Ateşle-unut: yanıtı
+    // beklenmez, hatası yutulur - ısıtma başarısız olsa da yükleme eskisi gibi
+    // (yalnızca daha yavaş) çalışır.
+    // Tek seferlik değil, kısılmış: öğretmen aynı oturumda ikinci bir grup
+    // yüklediğinde konteyner çoktan kapanmış olabilir, o yüzden yeniden
+    // ısıtılabilmeli - ama her dosya seçiminde tekrar tekrar değil.
+    const OCR_WARM_UP_THROTTLE_MS = 30000;
+    let ocrWarmUpAt = 0;
+    const warmUpOcr = () => {
+      const now = Date.now();
+      if (now - ocrWarmUpAt < OCR_WARM_UP_THROTTLE_MS) return;
+      ocrWarmUpAt = now;
+      fetch("/mahir-ocr-warmup").catch(() => {});
+    };
+
     const selectFiles = (files) => {
       const incoming = Array.from(files || []);
       if (!incoming.length) return;
@@ -2826,6 +2844,7 @@ const fileUploadBridge = (() => {
       selectedFiles = merged;
       fileInput.value = "";
       renderFilesList();
+      warmUpOcr();
     };
 
     const configureSourceMode = (mode) => {
@@ -3318,17 +3337,25 @@ const fileUploadBridge = (() => {
       readButton.setAttribute("aria-disabled", "true");
       readButton.textContent = selectedFiles.length > 1 ? `${selectedFiles.length} Belge Okunuyor…` : "Belge Okunuyor…";
 
-      const uploadFile = (file) => {
+      // Dosya başına ayrı istek DEĞİL, hepsi tek istekte: her istek uzak OCR
+      // işçisinde ayrı bir konteyner açtırıyordu, yani N fotoğraf = N kez
+      // (ölçülen) 30-50 sn'lik model yükleme. Hem yerel alıcı hem uzak işçi bir
+      // istekteki görsel grubunu tek çağrıda işliyor (file_receiver.py
+      // run_image_group_ocr / ocr_worker.py _run_image_group_ocr) ve ikisinin de
+      // sınırı 10 dosya - arayüzün kendi sınırıyla aynı.
+      const uploadFileGroup = (files) => {
         const formData = new FormData();
-        formData.append("exam-file", file);
+        files.forEach((file) => formData.append("exam-file", file));
         return fetch("/mahir-upload", { method: "POST", body: formData })
           .then((response) => response.json().catch(() => ({})).then((payload) => {
-            if (!response.ok) throw new Error(payload.message || `${file.name} işlenemedi.`);
+            if (!response.ok) throw new Error(payload.message || `${files.length} belge işlenemedi.`);
             return payload;
           }));
       };
 
-      Promise.all(selectedFiles.map(uploadFile))
+      // Tek elemanlı liste: aşağıdaki birleştirme mantığı olduğu gibi kalıyor,
+      // böylece yanıt sözleşmesi ve renderValidationData girdisi değişmiyor.
+      uploadFileGroup(selectedFiles).then((payload) => [payload])
         .then((payloads) => {
           const mergedData = payloads.reduce((merged, payload) => {
             const data = payload.structuredData || {};
