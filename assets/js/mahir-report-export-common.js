@@ -369,16 +369,26 @@
   const buildDevelopmentNeedsBlock = () => {
     const outcomes = getAnalysis().outcomes || [];
     const targets = outcomes.filter((item) => Number(item.successRate) < 0.70);
-    const rows = targets.map((item, index) => [
-      String(index + 1),
-      `${item.outcomeCode || "Öğrenme Çıktısı"} (${formatPercent(item.successRate)})`,
-      normalizeText(item.decision),
-      Number(item.successRate) < 0.50 ? "Öncelikli" : "Gelişim ihtiyacı"
-    ]);
+    // ragContext yalnızca kayıtlı bir programda (bkz. backend/app/program_catalog.py)
+    // ve RAG servisi yapılandırılmışsa dolu gelir - kapsam dışı derslerde sütun
+    // hiç eklenmez, tablo bugünküyle birebir aynı kalır.
+    const hasRagContext = targets.some((item) => isUseful(item.ragContext));
+    const rows = targets.map((item, index) => {
+      const row = [
+        String(index + 1),
+        `${item.outcomeCode || "Öğrenme Çıktısı"} (${formatPercent(item.successRate)})`,
+        normalizeText(item.decision),
+        Number(item.successRate) < 0.50 ? "Öncelikli" : "Gelişim ihtiyacı"
+      ];
+      if (hasRagContext) row.push(normalizeText(item.ragContext));
+      return row;
+    });
+    const header = ["Sıra", "Tespit Edilen İhtiyaç", "Değerlendirme Sonucu", "Öncelik Düzeyi"];
+    if (hasRagContext) header.push("Kavramsal Bağlam");
     return {
       heading: "F. GELİŞİM İHTİYAÇLARI VE DEĞERLENDİRME SONUÇLARI",
       paragraphs: ["Bu bölüm uygulanacak etkinlik, kaynak, yöntem veya telafi programını belirlemez; yalnızca öğretmen onaylı sınav verilerinden hareketle gelişim ihtiyacını gösterir."],
-      tables: [[["Sıra", "Tespit Edilen İhtiyaç", "Değerlendirme Sonucu", "Öncelik Düzeyi"], ...rows]]
+      tables: [[header, ...rows]]
     };
   };
 

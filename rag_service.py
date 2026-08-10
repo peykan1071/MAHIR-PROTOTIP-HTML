@@ -28,6 +28,8 @@ ve `RAGInference.close` içindeki yorumlar.
 
 from __future__ import annotations
 
+import hmac
+import os
 import tempfile
 import uuid
 from pathlib import Path
@@ -42,6 +44,18 @@ if TYPE_CHECKING:
     from qdrant_client import QdrantClient
     from sentence_transformers import SentenceTransformer
     from vllm import LLM
+
+try:
+    from fastapi import Request
+    from fastapi.responses import JSONResponse
+except ImportError:  # yalnızca "pip install modal" yapılmış yerel makinede olabilir -
+    # @modal.fastapi_endpoint yalnızca konteyner İÇİNDE gerçekten çağrılır
+    # (inference_image, fastapi'yi vllm üzerinden zaten transitive içerir).
+    # `from __future__ import annotations` sayesinde bu adlar yalnızca
+    # RAGInference.web_query'nin imza belirtiminde string olarak kalır -
+    # burada gerçek bir sınıf olmaları şart değil.
+    Request = object  # type: ignore[assignment,misc]
+    JSONResponse = None  # type: ignore[assignment,misc]
 
 APP_NAME = "turkish-rag-system"
 
@@ -110,6 +124,15 @@ inference_image = (
 
 app = modal.App(APP_NAME)
 
+_SHARED_SECRET_HEADER = "X-MAHIR-RAG-Key"
+
+if modal.is_local():
+    _shared_secret = modal.Secret.from_dict(
+        {"MAHIR_RAG_SHARED_SECRET": os.environ.get("MAHIR_RAG_SHARED_SECRET", "")}
+    )
+else:
+    _shared_secret = modal.Secret.from_dict({})
+
 
 @app.function(
     image=indexing_image,
@@ -118,9 +141,20 @@ app = modal.App(APP_NAME)
     volumes=VOLUMES,
     timeout=600,
 )
-def index_pdf(pdf_bytes: bytes, document_name: str) -> tuple[bool, str, dict[str, object] | None]:
+def index_pdf(
+    pdf_bytes: bytes, document_name: str, program_id: str
+) -> tuple[bool, str, dict[str, object] | None]:
     """PDF baytlarını Docling ile ayrıştırır, HybridChunker ile parçalara
     ayırır, bge-m3 ile gömer ve Qdrant'a yazar.
+
+    `program_id`, hangi ders-sınıf programına ait olduğunu işaretler (örn.
+    `backend/app/program_catalog.py`'deki "tde-9-tymm") - MAHİR tek derslik
+    değil (60+ ders seçilebiliyor) ve tek program (TDE9) bile birden fazla
+    referans belgesi gerektiriyor, bu yüzden getirim zamanında (RAGInference)
+    yanlış ders/temanın içeriğiyle karışmaması için her parça bu alanla
+    etiketlenir. Bu fonksiyon `program_id`'yi doğrulamaz (düz string olarak
+    alır, `document_name` gibi) - katalog-farkındalığı `backend/app/`
+    katmanında kalır, bu dosya kasıtlı olarak backend'i import etmez.
 
     Dönüş, `backend/app/remote_ocr_client.py`nin `run_remote_image_group_ocr`
     ile aynı (ok, mesaj, structuredData) kalıbını izler - bu fonksiyon Modal
@@ -132,6 +166,8 @@ def index_pdf(pdf_bytes: bytes, document_name: str) -> tuple[bool, str, dict[str
         return False, "PDF verisi boş.", None
     if len(pdf_bytes) > MAX_PDF_SIZE_BYTES:
         return False, "PDF 20 MB sınırını aşıyor.", None
+    if not program_id or not program_id.strip():
+        return False, "program_id boş olamaz.", None
 
     # Baytları geçici dosyaya yaz - ocr_engine.py'nin _run_ocr'ıyla aynı desen.
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_file:
@@ -211,6 +247,7 @@ def index_pdf(pdf_bytes: bytes, document_name: str) -> tuple[bool, str, dict[str
                         "text": chunk.text,
                         "contextualized_text": contextualized_text,
                         "document_name": document_name,
+                        "program_id": program_id,
                         "headings": list(getattr(chunk.meta, "headings", None) or []),
                         "chunk_index": index,
                     },
@@ -251,6 +288,7 @@ def index_pdf(pdf_bytes: bytes, document_name: str) -> tuple[bool, str, dict[str
     volumes=VOLUMES,
     scaledown_window=300,  # GPU soğuk başlangıcının sık tetiklenmesini (churn) önler.
     timeout=300,
+    secrets=[_shared_secret],
 )
 class RAGInference:
     """bge-m3, Qdrant ve vLLM/Qwen2.5-7B-Instruct'ı bir arada bellekte tutan
@@ -308,8 +346,56 @@ class RAGInference:
             self._qdrant.close()
 
     @modal.method()
-    def query(self, question: str, top_k: int = DEFAULT_TOP_K) -> tuple[bool, str, dict[str, object] | None]:
-        """Soruyu göm, Qdrant'tan en yakın parçaları getir, Qwen2.5 ile Türkçe yanıt üret."""
+    def query(
+        self, question: str, top_k: int = DEFAULT_TOP_K, program_id: str | None = None
+    ) -> tuple[bool, str, dict[str, object] | None]:
+        """Soruyu göm, Qdrant'tan en yakın parçaları getir, Qwen2.5 ile Türkçe yanıt üret.
+
+        SDK/`.remote()` üzerinden çağıranlar için giriş noktası - asıl iş
+        `_run_query`'de. `web_query` (HTTP giriş noktası) da aynı yardımcıyı
+        çağırır, böylece iki giriş noktası arasında mantık kopyalanmaz.
+        `program_id` verilirse yalnızca o programa etiketlenmiş parçalarda
+        arama yapılır; `None` ise (ör. `main()`'in ad-hoc testleri) bugüne
+        kadarki filtresiz davranış aynen korunur.
+        """
+
+        return self._run_query(question, top_k, program_id)
+
+    @modal.fastapi_endpoint(method="POST")
+    async def web_query(self, request: Request) -> JSONResponse:
+        """HTTP giriş noktası - `backend/app/rag_client.py` bunu çağırır.
+
+        `_run_query`'nin (ok, mesaj, veri) sözleşmesini `ocr_worker.py`'deki
+        ile aynı {"ok", "message", "structuredData"} zarfına sarar. Modal her
+        `@modal.fastapi_endpoint` metoduna TEK, TAM bir URL üretir (path
+        eklenecek bir taban değil) - `remote_ocr_client.py`'nin
+        "+ /mahir-upload" deseni burada yok.
+        """
+
+        expected_secret = os.environ.get("MAHIR_RAG_SHARED_SECRET", "")
+        if expected_secret and not hmac.compare_digest(
+            request.headers.get(_SHARED_SECRET_HEADER, ""), expected_secret
+        ):
+            return JSONResponse({"ok": False, "message": "Yetkisiz istek."}, status_code=401)
+
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 - okunamayan istek gövdesi 500'e değil 400'e düşmeli.
+            return JSONResponse({"ok": False, "message": "İstek gövdesi okunamadı."}, status_code=400)
+
+        question = str((body or {}).get("question") or "").strip()
+        if not question:
+            return JSONResponse({"ok": False, "message": "Soru boş olamaz."}, status_code=400)
+        program_id = (body or {}).get("programId") or None
+        top_k = int((body or {}).get("topK") or DEFAULT_TOP_K)
+
+        ok, message, data = self._run_query(question, top_k, program_id)
+        return JSONResponse({"ok": ok, "message": message, "structuredData": data}, status_code=200 if ok else 500)
+
+    def _run_query(
+        self, question: str, top_k: int, program_id: str | None
+    ) -> tuple[bool, str, dict[str, object] | None]:
+        """`query`/`web_query`'nin ortak mantığı: göm, filtrelenmiş getirim, üret."""
 
         if not question or not question.strip():
             return False, "Soru boş olamaz.", None
@@ -339,12 +425,25 @@ class RAGInference:
 
         no_answer: dict[str, object] = {"answer": "Bu bilgi belgede bulunmuyor.", "sources": []}
 
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        # program_id verilirse yalnızca o programa etiketli parçalarda ara -
+        # MAHİR tek derslik değil (60+ ders), aynı öğrenme çıktısı kodu farklı
+        # temalarda farklı anlama gelebiliyor; filtresiz getirim yanlış
+        # dersin/temanın içeriğini sessizce karıştırabilir.
+        query_filter = (
+            Filter(must=[FieldCondition(key="program_id", match=MatchValue(value=program_id))])
+            if program_id
+            else None
+        )
+
         try:
             if not self._qdrant.collection_exists(QDRANT_COLLECTION_NAME):
                 return True, "Bu bilgi belgede bulunmuyor.", no_answer
             hits = self._qdrant.query_points(
                 collection_name=QDRANT_COLLECTION_NAME,
                 query=query_vector,
+                query_filter=query_filter,
                 limit=top_k,
                 with_payload=True,
             ).points
@@ -392,26 +491,27 @@ class RAGInference:
 
 
 @app.local_entrypoint()
-def main(pdf_path: str, question: str = "Bu belge ne hakkında?") -> None:
+def main(pdf_path: str, program_id: str, question: str = "Bu belge ne hakkında?") -> None:
     """Uçtan uca örnek kullanım:
 
-        modal run rag_service.py --pdf-path C:\\yol\\ornek.pdf --question "..."
+        modal run rag_service.py --pdf-path C:\\yol\\ornek.pdf --program-id tde-9-tymm --question "..."
 
     Bu fonksiyon yalnızca örnektir; hiçbir mevcut MAHIR backend dosyası bunu
-    çağırmaz (proje kapsam kararı: yalnızca örnek kod, canlı entegrasyon yok).
+    çağırmaz (proje kapsam kararı: yalnızca örnek kod, canlı entegrasyon yok -
+    canlı entegrasyon `backend/app/rag_client.py` + `web_query` üzerinden).
     """
 
     pdf_bytes = Path(pdf_path).read_bytes()
     document_name = Path(pdf_path).name
 
-    print(f"[rag_service] '{document_name}' dizine ekleniyor...", flush=True)
-    index_ok, index_message, index_data = index_pdf.remote(pdf_bytes, document_name)
+    print(f"[rag_service] '{document_name}' ({program_id}) dizine ekleniyor...", flush=True)
+    index_ok, index_message, index_data = index_pdf.remote(pdf_bytes, document_name, program_id)
     print(f"[rag_service] index_pdf: ok={index_ok} mesaj={index_message} veri={index_data}", flush=True)
     if not index_ok:
         return
 
     print(f"[rag_service] Soru soruluyor: {question!r}", flush=True)
-    query_ok, query_message, query_data = RAGInference().query.remote(question)
+    query_ok, query_message, query_data = RAGInference().query.remote(question, DEFAULT_TOP_K, program_id)
     print(f"[rag_service] query: ok={query_ok} mesaj={query_message}", flush=True)
     if query_ok and query_data:
         print(f"[rag_service] Yanıt: {query_data['answer']}", flush=True)
@@ -428,6 +528,10 @@ def main(pdf_path: str, question: str = "Bu belge ne hakkında?") -> None:
 #     rag = modal.Cls.from_name("turkish-rag-system", "RAGInference")
 #
 #     with open("belge.pdf", "rb") as f:
-#         ok, message, data = index_pdf.remote(f.read(), "belge.pdf")
+#         ok, message, data = index_pdf.remote(f.read(), "belge.pdf", "tde-9-tymm")
 #
-#     ok, message, data = rag().query.remote("Soru metni")
+#     ok, message, data = rag().query.remote("Soru metni", 5, "tde-9-tymm")
+#
+# Ya da MAHIR'in kendi backend'inden (yalnızca stdlib, modal SDK gerekmez):
+# `modal deploy` sonrası basılan web_query URL'ini MAHIR_RAG_REMOTE_URL olarak
+# ayarlayın, `backend/app/rag_client.py`'deki query_rag_context(...) çağırsın.

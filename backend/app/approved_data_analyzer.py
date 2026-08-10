@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections import defaultdict
 from typing import Any
 
@@ -13,7 +14,15 @@ from .assessment_profiles import (
     build_general_evaluation,
     profile_for_course,
 )
-from .program_catalog import validate_question_program_context
+from .program_catalog import ProgramProfile, validate_question_program_context
+
+_DEFAULT_MAHIR_RAG_REMOTE_URL = "https://hakanergul--turkish-rag-system-raginference-web-query.modal.run"
+# Varsayılan, deploy edilmiş RAG servisinin adresi olarak koda gömülü - terminalde
+# her seferinde MAHIR_RAG_REMOTE_URL ayarlamaya gerek yok. Farklı bir deploy'a
+# (ör. test ortamı) işaret etmek gerekirse env var yine de bunu geçersiz kılar.
+MAHIR_RAG_REMOTE_URL = os.environ.get("MAHIR_RAG_REMOTE_URL", _DEFAULT_MAHIR_RAG_REMOTE_URL)
+_RAG_WEAK_THRESHOLD = 0.70  # assets/js/mahir-report-export-common.js:buildDevelopmentNeedsBlock ile aynı eşik
+_RAG_NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
 
 
 def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
@@ -49,7 +58,7 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(students, list) or not students:
         raise ValueError("Analiz için en az bir öğrenci bulunmalıdır.")
 
-    validate_question_program_context(course_name, exam.get("grade"), questions)
+    program = validate_question_program_context(course_name, exam.get("grade"), questions)
 
     normalized_questions = [_normalize_question(item, index) for index, item in enumerate(questions, 1)]
     participating = [
@@ -99,6 +108,8 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
                 "decision": _decision(rate),
             }
         )
+
+    _attach_rag_context(outcome_results, program)
 
     average = sum(student["calculatedTotal"] for student in participating) / len(participating)
     exam_max = sum(question["maxScore"] for question in normalized_questions)
@@ -215,3 +226,69 @@ def _decision(rate: float) -> str:
     if rate >= 0.50:
         return "Öğrenme çıktısının gerçekleşme düzeyini geliştirecek öğrenme yaşantılarına ihtiyaç vardır."
     return "Öğrenme çıktısına ilişkin öğrenme kanıtları ilave desteğe ihtiyaç olduğunu göstermektedir."
+
+
+def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramProfile | None) -> None:
+    """Attach a short RAG-grounded conceptual explanation to each weak outcome.
+
+    Mutates `outcome_results` in place, adding a `ragContext` field (empty
+    string when unavailable) to every outcome so the field's presence is
+    always predictable regardless of which path was taken. Calls
+    `rag_client.query_rag_context` sequentially, once per weak outcome (see
+    module docstring history / rag_service.py for why not parallel: RAGInference
+    has no @modal.concurrent, so simultaneous calls would spin up separate
+    cold containers instead of reusing one warm one). Never raises: any
+    failure, timeout, or "not found in the document" answer just leaves
+    `ragContext` empty, so a RAG problem can never block the teacher's
+    analysis response. Only attempted for a resolved program (`program is
+    not None`) - MAHİR covers 60+ courses but only registered programs have
+    any indexed reference material, so unregistered courses would otherwise
+    pay a ~112s cold-start wait for a query guaranteed to return nothing.
+    """
+
+    for outcome in outcome_results:
+        outcome["ragContext"] = ""
+
+    if not MAHIR_RAG_REMOTE_URL or program is None:
+        return
+
+    from .rag_client import query_rag_context
+
+    for outcome in outcome_results:
+        if float(outcome.get("successRate") or 0.0) >= _RAG_WEAK_THRESHOLD:
+            continue
+        question = _build_rag_question(outcome)
+        if not question:
+            continue
+        try:
+            ok, _message, data = query_rag_context(question, program.id, MAHIR_RAG_REMOTE_URL)
+        except Exception:  # noqa: BLE001 - bir RAG/ağ sorunu analiz yanıtını asla kesmemeli.
+            continue
+        if not ok or not data:
+            continue
+        answer = str(data.get("answer") or "").strip()
+        if not answer or not data.get("sources") or answer == _RAG_NO_ANSWER_TEXT:
+            continue
+        outcome["ragContext"] = answer
+
+
+def _build_rag_question(outcome: dict[str, Any]) -> str:
+    """Build a RAG question from theme + code + skill together - never code
+    alone, since the same code (e.g. TDE1.2) means a different learning
+    outcome in each of the four TDE9 themes. Deliberately descriptive
+    ("what does it cover", "briefly explain") rather than prescriptive
+    ("how should it be taught") - MAHİR does not suggest activities, methods,
+    or remedial programs (DEVELOPMENT_CHARTER.md), this question wording is
+    the point where that constraint is actually enforced."""
+
+    parts = [
+        str(part)
+        for part in (outcome.get("outcomeTheme"), outcome.get("outcomeCode"), outcome.get("outcomeSkill"))
+        if part
+    ]
+    if not parts:
+        return ""
+    return (
+        f"{' - '.join(parts)} öğrenme çıktısı hangi temel kavram ve becerileri "
+        "kapsar? Bu kazanımın konusunu kısaca açıkla."
+    )
