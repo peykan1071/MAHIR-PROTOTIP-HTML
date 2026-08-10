@@ -360,7 +360,11 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
 # "gereklidir", zorunluluk kipi "-malıdır") elenmeli.
 _RECOMMENDATION_PATTERN = re.compile(
     r"öneri|tavsiye|telafi|gerekmekte|gerekiyor|\bgerekir\b|gereklid[ıi]r"
-    r"|ihtiyaç duyul|şartt[ıi]r|mal[ıi]d[ıi]r\b|melid[ıi]r\b",
+    r"|ihtiyaç duyul|şartt[ıi]r|mal[ıi]d[ıi]r\b|melid[ıi]r\b"
+    # "eksikliği giderme ihtiyacı ortaya çıkmaktadır" gibi kapanışlar: MAHİR'in
+    # kendi terimi olan "gelişim ihtiyacı" elenmemeli, bu yüzden tetikleyici
+    # "ihtiyaç" değil, telafiyi anlatan "gider-" kökü.
+    r"|giderme|giderilme|gidermek|giderilmesi",
     re.IGNORECASE,
 )
 
@@ -386,6 +390,9 @@ def _strip_recommendation_sentences(answer: str) -> tuple[str, int]:
 # bu yüzden yalnızca burada, sınavın karışık-case "outcomeTheme" alanını o
 # etikete eşleştirmek için Türkçe-doğru büyütme uygulanıyor.
 _TURKISH_UPPER_MAP = str.maketrans({"i": "İ", "ı": "I"})
+# Ters yön: str.lower() "İ" için birleşik noktalı bir "i̇" üretip fiil
+# eşleşmesini bozuyor (bkz. _bloom_level_for).
+_TURKISH_LOWER_MAP = str.maketrans({"İ": "i", "I": "ı"})
 
 
 def _normalize_theme_for_rag(raw_theme: str) -> str:
@@ -425,6 +432,34 @@ def _outcome_identity_parts(outcome: dict[str, Any]) -> list[str]:
     ]
 
 
+# TDE9 kataloğundaki (shared/pilot/tde9/learning-outcomes-template.json) 55
+# kazanımın TAMAMI yalnızca şu beş fiille bitiyor: oluşturabilme (17),
+# yönetebilme (16), yansıtabilme (10), uygulayabilme (8), çözümleyebilme (4).
+# Küme kapalı ve küçük olduğu için bilişsel basamağı modele tahmin ettirmek
+# yerine burada, tek ve gözden geçirilebilir bir yerde sabitliyoruz: canlı
+# ölçümde model kazanım fiilinin kendisini ("Yönetebilme") basamak adı sanıp
+# "altı Bloom basamağından en yüksek düzey" diye niteleyebiliyordu. Eşleşme
+# bulunamazsa (yeni bir ders/program eklendiğinde) alan hiç gönderilmez ve
+# basamağı model kendi seçer - eski davranış korunur.
+_BLOOM_LEVELS_BY_VERB = (
+    ("çözümleyebilme", "Analiz"),        # tahlil etme, ögeler arası ilişki kurma
+    ("yansıtabilme", "Değerlendirme"),   # öğrendiğini gözden geçirme, öz değerlendirme
+    ("yönetebilme", "Uygulama"),         # strateji seçip süreci izleme/denetleme
+    ("uygulayabilme", "Uygulama"),
+    ("oluşturabilme", "Anlama"),         # metinden anlam kurma, yorumlama, çıkarım
+)
+
+
+def _bloom_level_for(description: str) -> str:
+    """Kazanım metnindeki fiilden Bloom basamağını çöz; bulunamazsa boş string."""
+
+    lowered = description.translate(_TURKISH_LOWER_MAP).lower()
+    for verb, level in _BLOOM_LEVELS_BY_VERB:
+        if verb in lowered:
+            return level
+    return ""
+
+
 def _build_rag_retrieval_query(outcome: dict[str, Any]) -> str:
     """Vektör getiriminde gömülecek metin - üretim talimatından KASITLI olarak
     ayrı tutuluyor (bkz. `_build_rag_question`). Başarı oranı ve "teşhis et"
@@ -453,8 +488,11 @@ def _build_rag_question(outcome: dict[str, Any]) -> str:
     # Burada hesaplayıp soruya gömüyoruz; rag_service.py'nin SYSTEM_PROMPT'u
     # (madde 4) bu etiketi aynen kullanmakla yükümlü.
     severity = "Kritik" if success_rate < _RAG_CRITICAL_THRESHOLD else "Orta"
+    bloom_level = _bloom_level_for(" ".join(parts))
+    bloom_text = f"Bu kazanımın bilişsel düzeyi: {bloom_level}. " if bloom_level else ""
     return (
         f"{' - '.join(parts)} öğrenme çıktısında öğrenciler {percent_text} "
-        f"başarı oranı gösterdi. Bu oran için şiddet etiketi: {severity}. "
+        f"başarı oranı gösterdi. {bloom_text}"
+        f"Bu oran için şiddet etiketi: {severity}. "
         "Bu kazanımın bilişsel düzeyini bu başarı oranıyla kıyaslayarak teşhis et."
     )

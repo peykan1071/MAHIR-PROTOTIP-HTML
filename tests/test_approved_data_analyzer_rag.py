@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from backend.app.approved_data_analyzer import (
+    _bloom_level_for,
     _build_rag_question,
     _build_rag_retrieval_query,
     _normalize_theme_for_rag,
@@ -214,6 +215,17 @@ class RecommendationStrippingTests(unittest.TestCase):
         self.assertEqual(dropped, 1)
         self.assertEqual(answer, "Kazanım için gerekli olan bilişsel yeterlilik kazandırılamamıştır.")
 
+    def test_remediation_need_closing_is_dropped_but_gelisim_ihtiyaci_is_kept(self):
+        # "eksikliği giderme ihtiyacı ortaya çıkmaktadır" canlı ölçümde hem
+        # prompt'tan hem de desenden kaçtı. Tetikleyici "ihtiyaç" OLAMAZ:
+        # "gelişim ihtiyacı" MAHİR'in raporundaki kendi terimi.
+        answer, dropped = _strip_recommendation_sentences(
+            "Bu eksikliği giderme ihtiyacı ortaya çıkmaktadır. "
+            "Bu kazanımda net bir gelişim ihtiyacı vardır."
+        )
+        self.assertEqual(dropped, 1)
+        self.assertEqual(answer, "Bu kazanımda net bir gelişim ihtiyacı vardır.")
+
     def test_diagnostic_gerektirir_is_not_dropped(self):
         # "gerektirir" teşhis dilinde meşru - "gerekir"le karıştırılmamalı.
         answer, dropped = _strip_recommendation_sentences(
@@ -232,6 +244,55 @@ class RecommendationStrippingTests(unittest.TestCase):
             with patch("backend.app.rag_client.query_rag_context", return_value=canned):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
+
+
+class BloomLevelTests(unittest.TestCase):
+    # TDE9 kataloğundaki 55 kazanımın tamamı beş fiilden biriyle bitiyor;
+    # basamağı modele bıraktığımızda fiilin kendisini basamak adı sanıyordu.
+    def test_each_catalog_verb_maps_to_a_bloom_step(self):
+        cases = {
+            "metinlerde anlam oluşturabilme": "Anlama",
+            "metinlerde okumayı yönetebilme": "Uygulama",
+            "öğrendiklerini yansıtabilme": "Değerlendirme",
+            "yazım kurallarını uygulayabilme": "Uygulama",
+            "metinleri çözümleyebilme": "Analiz",
+        }
+        for description, expected in cases.items():
+            with self.subTest(description=description):
+                self.assertEqual(_bloom_level_for(description), expected)
+
+    def test_capitalised_turkish_verb_still_matches(self):
+        # str.lower() "İ" için birleşik noktalı bir karakter üretiyor.
+        self.assertEqual(_bloom_level_for("METİNLERDE ANLAM OLUŞTURABİLME"), "Anlama")
+
+    def test_unknown_verb_yields_empty_and_question_omits_the_field(self):
+        self.assertEqual(_bloom_level_for("bir şeyler yapar"), "")
+        question = _build_rag_question({
+            "outcomeTheme": "1. Tema: Sözün İnceliği",
+            "outcomeCode": "XYZ1.1",
+            "outcomeDescription": "bir şeyler yapar",
+            "successRate": 0.4,
+        })
+        self.assertNotIn("bilişsel düzeyi:", question)
+        self.assertIn("şiddet etiketi: Kritik", question)
+
+    def test_known_verb_is_injected_into_question(self):
+        question = _build_rag_question({
+            "outcomeTheme": "1. Tema: Sözün İnceliği",
+            "outcomeCode": "TDE1.2",
+            "outcomeDescription": "metinlerde anlam oluşturabilme",
+            "successRate": 0.4,
+        })
+        self.assertIn("Bu kazanımın bilişsel düzeyi: Anlama.", question)
+
+    def test_bloom_level_is_absent_from_retrieval_query(self):
+        retrieval_query = _build_rag_retrieval_query({
+            "outcomeTheme": "1. Tema: Sözün İnceliği",
+            "outcomeCode": "TDE1.2",
+            "outcomeDescription": "metinlerde anlam oluşturabilme",
+            "successRate": 0.4,
+        })
+        self.assertNotIn("bilişsel düzeyi:", retrieval_query)
 
 
 class RagQuestionSeverityTests(unittest.TestCase):
