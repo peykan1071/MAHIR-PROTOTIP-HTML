@@ -22,7 +22,10 @@ import urllib.request
 
 _REMOTE_TIMEOUT_SECONDS = 300
 _SHARED_SECRET_HEADER = "X-MAHIR-RAG-Key"
-_DEFAULT_TOP_K = 5
+# Parçalar 512 token ve getirim zaten tek bir temaya (≈8-9 PDF sayfası)
+# kısıtlı olduğundan, daha büyük bir k konu dışına çıkma riski getirmeden
+# modele kazanımın kendi metninden daha fazlasını verir.
+_DEFAULT_TOP_K = 8
 
 
 def query_rag_context(
@@ -32,6 +35,7 @@ def query_rag_context(
     top_k: int = _DEFAULT_TOP_K,
     grade: str | None = None,
     theme: str | None = None,
+    retrieval_query: str | None = None,
 ) -> tuple[bool, str, dict[str, object] | None]:
     """POST a grounded question to a remote RAG query endpoint and relay its response.
 
@@ -41,6 +45,13 @@ def query_rag_context(
     directly, no normalization risk); `theme` is best-effort (the exam's
     `outcomeTheme` text must be normalized to match the indexed theme label -
     see `approved_data_analyzer.py::_normalize_theme_for_rag`).
+
+    `retrieval_query`, if given, is what gets embedded for the vector search
+    while `question` still goes to the LLM. They are separated on purpose:
+    `question` carries the success rate and a "diagnose this" imperative, and
+    neither has any counterpart in the curriculum PDF - embedding them drags
+    the query vector away from the curriculum prose. Omit it and the remote
+    embeds `question`, i.e. exactly the previous behaviour.
 
     Returns the same (ok, message, structuredData) tuple shape as
     `run_remote_image_group_ocr`. Never raises for expected failure modes
@@ -54,6 +65,8 @@ def query_rag_context(
         body_payload["grade"] = grade
     if theme:
         body_payload["theme"] = theme
+    if retrieval_query:
+        body_payload["retrievalQuery"] = retrieval_query
     body = json.dumps(body_payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     shared_secret = os.environ.get("MAHIR_RAG_SHARED_SECRET", "")

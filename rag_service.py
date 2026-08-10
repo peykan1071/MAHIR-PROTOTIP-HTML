@@ -99,39 +99,61 @@ SYSTEM_PROMPT = (
     "öğrenme eksikliğini, risk düzeyini ve bilişsel tıkanma noktasını "
     "kanıta dayalı ve eleştirel bir gözle teşhis etmektir.\n\n"
     "TEMEL İLKELER:\n"
-    "1) Teşhisini yalnızca BAĞLAM'a ve verilen başarı oranına dayandır; "
-    "sınav sorusunun tam metnini veya ders kitabını görmediğini unutma, "
-    "soru içeriği hakkında spekülasyon yapma. BAĞLAM bu kazanımın "
-    "bilişsel düzeyini belirlemek için yetersizse, YANITININ TAMAMI OLARAK "
-    'yalnızca şu cümleyi yaz ve başka HİÇBİR ŞEY ekleme: "Bu bilgi '
-    'belgede bulunmuyor." Bu cümleyi yazdıysan, ardından teşhis/kıyas '
-    "eklemeye devam ETME.\n"
+    "1) Teşhisini yalnızca BAĞLAM'a, SORU'da verilen kazanım metnine ve "
+    "başarı oranına dayandır; sınav sorusunun tam metnini veya ders kitabını "
+    "görmediğini unutma, soru içeriği hakkında spekülasyon yapma. BAĞLAM sana "
+    "zaten ders, sınıf düzeyi ve tema filtresinden geçirilerek verilir - yani "
+    "önüne gelen metin HER ZAMAN sorulan kazanımın ait olduğu temaya aittir. "
+    "Kazanımın bilişsel düzeyini, SORU'daki kazanım metninin fiilinden "
+    "(ör. \"yönetebilme\", \"anlam oluşturabilme\", \"karşılaştırabilme\", "
+    '"değerlendirebilme") ve BAĞLAM\'daki açıklamalardan ÇIKARMAKLA '
+    "YÜKÜMLÜSÜN; bilişsel düzey BAĞLAM'da açıkça \"Bloom\" etiketiyle "
+    "yazmıyor diye teşhisten kaçınma. Yalnızca BAĞLAM bu kazanıma dair "
+    "hiçbir bilgi içermiyorsa, YANITININ TAMAMI OLARAK yalnızca şu cümleyi "
+    'yaz ve başka HİÇBİR ŞEY ekleme: "Bu bilgi belgede bulunmuyor." Bu '
+    "cümleyi yazdıysan, ardından teşhis/kıyas eklemeye devam ETME; teşhis "
+    "yazacaksan da bu cümleyi hiç kullanma.\n"
     "2) Eleştirel ve gerçekçi ol: yüzeysel teselliler (\"geçerli bir puan\", "
     '"gelişime açık" gibi yuvarlak ifadeler) yasak. Düşük başarı oranını '
     "doğrudan öğrenme kaybı veya kazanımın kavranamadığı şeklinde net "
     "teşhis et.\n"
-    "3) BAĞLAM'dan çıkardığın kazanımın bilişsel düzeyini (Hatırlama, "
-    "Uygulama, Analiz vb.) verilen başarı oranıyla kıyasla; basit bir "
-    "kazanımda düşük puan ile üst düzey bir kazanımda düşük puanı farklı "
-    "risk gruplarına ayır. Bu prompt yalnızca başarı oranı %70'in altındaki "
-    "kazanımlar için çalıştırılır - eksikliğin şiddetini şu eşiklere göre "
-    "belirt: başarı oranı %50'nin altındaysa Kritik, %50-69 arasındaysa "
-    "Orta (Hafif etiketini kullanma, bu aralıkta hiçbir durum hafif "
-    "sayılmaz). Bu kazanım genellikle sonraki/ileri düzey kazanımların "
-    "temelini oluşturduğundan, eksikliğin sonraki öğrenmelere sarmal "
-    "(kümülatif) bir risk oluşturup oluşturmadığını da teşhisine kısaca "
-    "ekle - yalnızca bu riski TEŞHİS ET, nasıl giderileceğini önerme "
-    "(madde 4).\n"
-    "4) Yalnızca teşhis koy, çözüm önerme: etkinlik, kaynak, öğretim "
-    "yöntemi veya telafi programı önerme; yalnızca durumu, eksikliği ve "
-    "risk düzeyini kanıtlarıyla belirle - bu kural istisnasızdır.\n\n"
+    "3) Bilişsel düzeyi ADLANDIRIRKEN yalnızca şu altı Bloom basamağından "
+    "BİRİNİ kullan: Hatırlama, Anlama, Uygulama, Analiz, Değerlendirme, "
+    "Yaratma. Kazanım metnindeki fiili (\"anlam oluşturabilme\", "
+    '"yönetebilme", "değerlendirebilme" gibi) bilişsel düzeyin ADI olarak '
+    "TEKRARLAMA - o fiilin karşılık geldiği basamağı seç ve yalnızca o "
+    "basamağın adını yaz. Sonra bu basamağı başarı oranıyla kıyasla: alt "
+    "basamaktaki (Hatırlama/Anlama) bir kazanımda düşük puan ile üst "
+    "basamaktaki (Analiz/Değerlendirme/Yaratma) bir kazanımda düşük puanı "
+    "farklı risk gruplarına ayır.\n"
+    "4) Eksikliğin ŞİDDET etiketi sana SORU'nun içinde hazır verilir "
+    "(\"Bu oran için şiddet etiketi: ...\"). O etiketi kendin yeniden "
+    "hesaplama, yumuşatma veya sertleştirme; yanıtının içinde şu kalıbı "
+    "AYNEN, bir kez kullan: \"Eksikliğin şiddeti: <etiket>.\" Sana \"Orta\" "
+    "verildiyse hiçbir yerde \"kritik\" kelimesini KULLANMA; \"Kritik\" "
+    "verildiyse hiçbir yerde \"orta\" deme. \"Hafif\" kelimesini hiçbir "
+    "durumda kullanma - bu prompt yalnızca başarı oranı %70'in altındaki "
+    "kazanımlar için çalıştırılır, bu aralıkta hiçbir durum hafif sayılmaz. "
+    "Bu kazanım genellikle sonraki/ileri düzey kazanımların temelini "
+    "oluşturduğundan, eksikliğin sonraki öğrenmelere sarmal (kümülatif) bir "
+    "risk oluşturup oluşturmadığını da teşhisine kısaca ekle - yalnızca bu "
+    "riski TEŞHİS ET, nasıl giderileceğini önerme (madde 5).\n"
+    "5) Yalnızca teşhis koy, ÇÖZÜM ÖNERME - bu kural istisnasızdır ve "
+    "yanıtının SON cümlesi dâhil her cümlesi için geçerlidir. Etkinlik, "
+    "kaynak, ders, öğretim yöntemi, çalışma veya telafi programı önerme. "
+    "Şu ifadeleri hiç kullanma: \"önerilir\", \"tavsiye edilir\", "
+    "\"gerekmektedir\", \"gerekir\", \"gereklidir\", \"ihtiyaç duyulmaktadır\", "
+    "\"yapılmalıdır\", \"verilmelidir\", "
+    "\"geliştirilmelidir\", \"desteklenmelidir\". Ne YAPILMASI gerektiğini "
+    "değil, yalnızca NE OLDUĞUNU yaz: durumu, eksikliği ve risk düzeyini "
+    "kanıtlarıyla belirle ve orada bitir.\n\n"
     "Yanıtını Türkçe, tek bir akıcı paragraf hâlinde (madde işareti, başlık "
     "veya markdown biçimlendirmesi kullanmadan) yaz; şunları kısaca "
-    "kapsasın: (a) kazanımın bilişsel düzeyi ile başarı oranının "
-    "karşılaştırması ve bu kazanıma özgü eksiklik teşhisi, (b) eksikliğin "
-    "şiddeti (Kritik/Orta) ve bilgi düzeyinden mi yoksa üst düzey beceri "
-    "eksikliğinden mi kaynaklandığı, (c) eksikliğin sonraki kazanımlara "
-    "olası sarmal riski."
+    "kapsasın: (a) kazanımın bilişsel düzeyi (altı Bloom basamağından biriyle "
+    "adlandırılmış) ile başarı oranının karşılaştırması ve bu kazanıma özgü "
+    "eksiklik teşhisi, (b) SORU'da verilen şiddet etiketi ve eksikliğin bilgi "
+    "düzeyinden mi yoksa üst düzey beceri eksikliğinden mi kaynaklandığı, "
+    "(c) eksikliğin sonraki kazanımlara olası sarmal riski."
 )
 
 rag_storage_volume = modal.Volume.from_name("rag-storage", create_if_missing=True)
@@ -649,6 +671,7 @@ class RAGInference:
         program_id: str | None = None,
         grade: str | None = None,
         theme: str | None = None,
+        retrieval_query: str | None = None,
     ) -> tuple[bool, str, dict[str, object] | None]:
         """Soruyu göm, Qdrant'tan en yakın parçaları getir, Qwen2.5 ile Türkçe yanıt üret.
 
@@ -660,10 +683,11 @@ class RAGInference:
         kadarki filtresiz davranış aynen korunur. `grade`/`theme` verilirse
         ek güvenlik/hassasiyet filtresi olarak `program_id`'ye eklenir (bkz.
         `_run_query`, `index_pdf`'in yazdığı `grade`/`theme` alanlarıyla
-        eşleşir).
+        eşleşir). `retrieval_query` verilirse vektör aramasında `question`
+        yerine o gömülür (LLM yine `question`'ı görür) - bkz. `_run_query`.
         """
 
-        return self._run_query(question, top_k, program_id, grade, theme)
+        return self._run_query(question, top_k, program_id, grade, theme, retrieval_query)
 
     @modal.fastapi_endpoint(method="POST")
     async def web_query(self, request: Request) -> JSONResponse:
@@ -694,8 +718,9 @@ class RAGInference:
         top_k = int((body or {}).get("topK") or DEFAULT_TOP_K)
         grade = (body or {}).get("grade") or None
         theme = (body or {}).get("theme") or None
+        retrieval_query = str((body or {}).get("retrievalQuery") or "").strip() or None
 
-        ok, message, data = self._run_query(question, top_k, program_id, grade, theme)
+        ok, message, data = self._run_query(question, top_k, program_id, grade, theme, retrieval_query)
         return JSONResponse({"ok": ok, "message": message, "structuredData": data}, status_code=200 if ok else 500)
 
     def _run_query(
@@ -705,8 +730,18 @@ class RAGInference:
         program_id: str | None,
         grade: str | None = None,
         theme: str | None = None,
+        retrieval_query: str | None = None,
     ) -> tuple[bool, str, dict[str, object] | None]:
-        """`query`/`web_query`'nin ortak mantığı: göm, filtrelenmiş getirim, üret."""
+        """`query`/`web_query`'nin ortak mantığı: göm, filtrelenmiş getirim, üret.
+
+        `retrieval_query` verilirse gömülen (aranan) metin odur, LLM'e giden
+        soru yine `question` olur. Çağıran taraf (bkz.
+        `approved_data_analyzer.py::_build_rag_retrieval_query`) getirim
+        sorgusuna yalnızca kazanımın kendi içeriğini koyar; `question`'daki
+        başarı oranı ve "teşhis et" emri müfredat metninde hiçbir karşılığı
+        olmayan, sorgu vektörünü müfredat düzyazısından uzaklaştıran gürültü.
+        Verilmezse `question` gömülür - eski davranış birebir korunur.
+        """
 
         if not question or not question.strip():
             return False, "Soru boş olamaz.", None
@@ -729,7 +764,8 @@ class RAGInference:
             return False, f"Belge dizini tazelenemedi: {error}", None
 
         try:
-            query_vector = self._embedder.encode([question], normalize_embeddings=True)[0].tolist()
+            embedded_text = (retrieval_query or "").strip() or question
+            query_vector = self._embedder.encode([embedded_text], normalize_embeddings=True)[0].tolist()
         except Exception as error:  # noqa: BLE001 - gömme üçüncü parti bir ML çağrısı; tek bir
             # sorgu tüm servis konteynerini çökertmemeli.
             return False, f"Soru gömülemedi: {error}", None

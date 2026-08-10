@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from collections import defaultdict
@@ -23,7 +24,14 @@ _DEFAULT_MAHIR_RAG_REMOTE_URL = "https://hakanergul--turkish-rag-system-raginfer
 # (ör. test ortamı) işaret etmek gerekirse env var yine de bunu geçersiz kılar.
 MAHIR_RAG_REMOTE_URL = os.environ.get("MAHIR_RAG_REMOTE_URL", _DEFAULT_MAHIR_RAG_REMOTE_URL)
 _RAG_WEAK_THRESHOLD = 0.70  # assets/js/mahir-report-export-common.js:buildDevelopmentNeedsBlock ile aynı eşik
+_RAG_CRITICAL_THRESHOLD = 0.50  # aynı dosyadaki "Öncelikli" / Kritik eşiği
 _RAG_NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
+
+# ragContext'in boş kalmasının SEKİZ farklı sebebi var ve hepsi aynı boş stringi
+# üretiyor - raporda "bazı satırlar boş" görüntüsünün hangisinden kaynaklandığı
+# aksi hâlde ayırt edilemiyor. Her dal sunucu loguna tek satır sebep kodu yazar;
+# API yanıtı ve rapor bilinçli olarak değişmez (öğretmen teknik mesaj görmemeli).
+_logger = logging.getLogger(__name__)
 
 
 def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
@@ -71,7 +79,7 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
 
     question_results = []
     outcome_totals: dict[str, dict[str, Any]] = defaultdict(
-        lambda: {"earned": 0.0, "possible": 0.0, "skill": ""}
+        lambda: {"earned": 0.0, "possible": 0.0, "skill": "", "description": "", "parentDescription": ""}
     )
     for question_index, question in enumerate(normalized_questions):
         earned = sum(student["scores"][question_index] for student in participating)
@@ -90,6 +98,17 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
         outcome_totals[outcome_key]["earned"] += earned
         outcome_totals[outcome_key]["possible"] += possible
         outcome_totals[outcome_key]["skill"] = question["outcomeSkill"]
+        # Kazanımın tam metni (ör. "«Sözün İnceliği» temasında ele alınan
+        # metinlerde dinlemeyi/izlemeyi yönetebilme") RAG için iki açıdan
+        # kritik: müfredat PDF'iyle aynı dilde yazıldığı için çıplak bir koddan
+        # çok daha iyi bir getirim anahtarı, ve kazanımın bilişsel fiilinin
+        # ("yönetebilme", "değerlendirebilme") geçtiği tek yer - rag_service.py'nin
+        # SYSTEM_PROMPT'u modelden tam olarak bu düzeyi sınıflandırmasını istiyor.
+        # Süreç bileşeni seçildiyse (bkz. assets/js/mahir-program-catalog.js
+        # filterOutcomes) üst kazanımın metni de taşınır; ikisi birlikte tek bir
+        # bileşenin dar ifadesinden daha eksiksiz bir bağlam veriyor.
+        outcome_totals[outcome_key]["description"] = question["outcomeDescription"]
+        outcome_totals[outcome_key]["parentDescription"] = question["parentOutcomeDescription"]
 
     outcome_results = []
     for outcome_key, totals in outcome_totals.items():
@@ -100,6 +119,8 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
                 "outcomeCode": code if separator else outcome_key,
                 "outcomeTheme": theme if separator else "",
                 "outcomeSkill": totals["skill"],
+                "outcomeDescription": totals["description"],
+                "parentOutcomeDescription": totals["parentDescription"],
                 "earnedScore": totals["earned"],
                 "possibleScore": totals["possible"],
                 "successRate": rate,
@@ -250,16 +271,22 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
     for outcome in outcome_results:
         outcome["ragContext"] = ""
 
-    if not MAHIR_RAG_REMOTE_URL or program is None:
+    if not MAHIR_RAG_REMOTE_URL:
+        _logger.info("RAG atlandı: sebep=yapilandirilmamis")
+        return
+    if program is None:
+        _logger.info("RAG atlandı: sebep=program-yok")
         return
 
     from .rag_client import query_rag_context
 
     for outcome in outcome_results:
+        code = str(outcome.get("outcomeCode") or "?")
         if float(outcome.get("successRate") or 0.0) >= _RAG_WEAK_THRESHOLD:
             continue
         question = _build_rag_question(outcome)
         if not question:
+            _logger.info("RAG atlandı: cikti=%s sebep=soru-bos", code)
             continue
         theme = _normalize_theme_for_rag(str(outcome.get("outcomeTheme") or ""))
         if not theme:
@@ -269,17 +296,30 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
             # kazanıma karşılık geldiği için (bkz. rag_service.py index_pdf
             # docstring'i) yanlış temadan "kaynaklı" görünen bir teşhis vermek,
             # hiç teşhis vermemekten daha kötü.
+            _logger.info("RAG atlandı: cikti=%s sebep=tema-cozulemedi", code)
             continue
         try:
-            ok, _message, data = query_rag_context(
-                question, program.id, MAHIR_RAG_REMOTE_URL, grade=program.grade, theme=theme
+            ok, message, data = query_rag_context(
+                question,
+                program.id,
+                MAHIR_RAG_REMOTE_URL,
+                grade=program.grade,
+                theme=theme,
+                retrieval_query=_build_rag_retrieval_query(outcome),
             )
         except Exception:  # noqa: BLE001 - bir RAG/ağ sorunu analiz yanıtını asla kesmemeli.
+            _logger.exception("RAG atlandı: cikti=%s sebep=istisna", code)
             continue
         if not ok or not data:
+            _logger.info("RAG atlandı: cikti=%s sebep=uzak-hata mesaj=%s", code, message)
             continue
         answer = str(data.get("answer") or "").strip()
-        if not answer or not data.get("sources"):
+        sources = data.get("sources") or []
+        if not answer or not sources:
+            # Kaynak listesi boşsa getirim hiç isabet vermemiştir (bkz.
+            # rag_service.py::_run_query'nin `no_answer` dönüşü) - filtrelerden
+            # (program_id/grade/theme_key) biri tutmamış demektir.
+            _logger.info("RAG atlandı: cikti=%s sebep=kaynak-yok tema=%s", code, theme)
             continue
         # startswith + kırpma, tam eşleşme değil: gerçek dizin karşısında
         # doğrulandı (bkz. proje hafızası) - model doğru bağlamla beslendiğinde
@@ -292,8 +332,52 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
         if answer.startswith(_RAG_NO_ANSWER_TEXT):
             answer = answer[len(_RAG_NO_ANSWER_TEXT):].strip()
         if not answer:
+            _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti tema=%s", code, theme)
             continue
+        answer, dropped = _strip_recommendation_sentences(answer)
+        if dropped:
+            _logger.warning("RAG önerisi kırpıldı: cikti=%s cumle=%d", code, dropped)
+        if not answer:
+            _logger.info("RAG atlandı: cikti=%s sebep=tamami-oneri tema=%s", code, theme)
+            continue
+        _logger.info(
+            "RAG dolduruldu: cikti=%s sebep=basarili kaynak=%d",
+            code,
+            len(sources) if isinstance(sources, list) else -1,
+        )
         outcome["ragContext"] = answer
+
+
+# DEVELOPMENT_CHARTER.md: "MAHİR ... öğretim yöntemi veya telafi programı
+# önermez". Bu kısıt rag_service.py'nin SYSTEM_PROMPT'unda (madde 5) yazılı ama
+# 7B'lik bir modelde prompt tek başına güvence değil - canlı ölçümde 8 yanıtın
+# 2'si "... programları önerilir" / "... eğitim verilmesi gerekmektedir" gibi
+# öneri cümleleriyle bitti. Bu yüzden kod tarafında da cümle düzeyinde bir
+# emniyet ağı var. Tetikleyiciler kasıtlı olarak dar tutuldu - teşhis dilinde
+# meşru olan biçimler elenmemeli: "gerektirir" ("bu kazanım analiz becerisi
+# gerektirir") ve "gerekli olan" ("gerekli olan yeteneklerin kazandırılmadığı")
+# kalmalı; yalnızca reçete yazan biçimler ("gerekir", "gerekmektedir",
+# "gereklidir", zorunluluk kipi "-malıdır") elenmeli.
+_RECOMMENDATION_PATTERN = re.compile(
+    r"öneri|tavsiye|telafi|gerekmekte|gerekiyor|\bgerekir\b|gereklid[ıi]r"
+    r"|ihtiyaç duyul|şartt[ıi]r|mal[ıi]d[ıi]r\b|melid[ıi]r\b",
+    re.IGNORECASE,
+)
+
+
+def _strip_recommendation_sentences(answer: str) -> tuple[str, int]:
+    """Öneri içeren cümleleri at; (kalan metin, atılan cümle sayısı) döndür.
+
+    Yanıt tek bir akıcı paragraf olduğundan (bkz. SYSTEM_PROMPT çıktı biçimi)
+    cümleler birbirinden büyük ölçüde bağımsız - bir cümleyi düşürmek kalan
+    teşhisi bozmuyor. Hepsi öneriyse boş string döner ve çağıran taraf çıktıyı
+    tamamen atar; charter ihlali içeren bir metni raporlamaktansa hücreyi boş
+    bırakmak doğrusu.
+    """
+
+    sentences = re.split(r"(?<=[.!?])\s+", answer)
+    kept = [sentence for sentence in sentences if not _RECOMMENDATION_PATTERN.search(sentence)]
+    return " ".join(kept).strip(), len(sentences) - len(kept)
 
 
 # Standart Unicode .upper() Türkçe 'i'/'ı' ayrımını kaybediyor (ikisi de düz
@@ -314,28 +398,63 @@ def _normalize_theme_for_rag(raw_theme: str) -> str:
     return without_prefix.translate(_TURKISH_UPPER_MAP).upper()
 
 
-def _build_rag_question(outcome: dict[str, Any]) -> str:
-    """Build a RAG question from theme + code + skill together - never code
-    alone, since the same code (e.g. TDE1.2) means a different learning
-    outcome in each of the four TDE9 themes. Includes the actual success
-    rate so the RAG system prompt (rag_service.py) can compare the outcome's
-    Bloom's-taxonomy cognitive level against the score, per the analyst-style
-    diagnostic framing. Deliberately asks for a diagnosis, never "how should
-    this be taught" - MAHİR does not suggest activities, methods, or
-    remedial programs (DEVELOPMENT_CHARTER.md), this question wording is the
-    point where that constraint is actually enforced."""
+def _outcome_identity_parts(outcome: dict[str, Any]) -> list[str]:
+    """Tema + kod + kazanım metni + beceri - kod TEK BAŞINA asla yeterli değil,
+    aynı kod (ör. TDE1.2) dört TDE9 temasının her birinde farklı bir kazanıma
+    karşılık geliyor. Kazanım metni (`outcomeDescription`, süreç bileşeni
+    seçilmişse ayrıca üst kazanımın metni) müfredat PDF'iyle aynı dilde yazıldığı
+    için hem getirimin hem de bilişsel düzey teşhisinin asıl dayanağı."""
 
-    parts = [
+    descriptions = [
+        str(value)
+        for value in (outcome.get("outcomeDescription"), outcome.get("parentOutcomeDescription"))
+        if value
+    ]
+    # Süreç bileşeni seçilmemişse script.js parentOutcomeDescription'ı kazanım
+    # metninin kendisiyle dolduruyor - aynı cümleyi iki kez göndermeyelim.
+    unique_descriptions = list(dict.fromkeys(descriptions))
+    return [
         str(part)
-        for part in (outcome.get("outcomeTheme"), outcome.get("outcomeCode"), outcome.get("outcomeSkill"))
+        for part in (
+            outcome.get("outcomeTheme"),
+            outcome.get("outcomeCode"),
+            *unique_descriptions,
+            outcome.get("outcomeSkill"),
+        )
         if part
     ]
+
+
+def _build_rag_retrieval_query(outcome: dict[str, Any]) -> str:
+    """Vektör getiriminde gömülecek metin - üretim talimatından KASITLI olarak
+    ayrı tutuluyor (bkz. `_build_rag_question`). Başarı oranı ve "teşhis et"
+    emri müfredat PDF'inde hiçbir karşılığı olmayan, sorgu vektörünü müfredat
+    düzyazısından uzaklaştıran gürültü; getirim sorgusu yalnızca kazanımın
+    kendi içeriğini taşır."""
+
+    return " - ".join(_outcome_identity_parts(outcome))
+
+
+def _build_rag_question(outcome: dict[str, Any]) -> str:
+    """LLM'e sorulan soru (getirim sorgusu değil - o `_build_rag_retrieval_query`).
+    Kazanımın kimliğine ek olarak gerçek başarı oranını da taşır ki
+    rag_service.py'nin SYSTEM_PROMPT'u kazanımın Bloom bilişsel düzeyini bu
+    oranla kıyaslayabilsin. Kasıtlı olarak TEŞHİS ister, asla "bu nasıl
+    öğretilmeli" demez - MAHİR etkinlik, yöntem veya telafi programı önermez
+    (DEVELOPMENT_CHARTER.md); bu kısıtın fiilen uygulandığı yer bu ifade."""
+
+    parts = _outcome_identity_parts(outcome)
     if not parts:
         return ""
     success_rate = float(outcome.get("successRate") or 0.0)
     percent_text = f"%{round(success_rate * 100)}"
+    # Şiddet etiketi eşiğe dayalı, tamamen belirlenimci bir karar - modele
+    # bıraktığımızda %55'lik vakaların yarısına "Kritik" dediği ölçüldü.
+    # Burada hesaplayıp soruya gömüyoruz; rag_service.py'nin SYSTEM_PROMPT'u
+    # (madde 4) bu etiketi aynen kullanmakla yükümlü.
+    severity = "Kritik" if success_rate < _RAG_CRITICAL_THRESHOLD else "Orta"
     return (
         f"{' - '.join(parts)} öğrenme çıktısında öğrenciler {percent_text} "
-        "başarı oranı gösterdi. Bu kazanımın bilişsel düzeyini bu başarı "
-        "oranıyla kıyaslayarak teşhis et."
+        f"başarı oranı gösterdi. Bu oran için şiddet etiketi: {severity}. "
+        "Bu kazanımın bilişsel düzeyini bu başarı oranıyla kıyaslayarak teşhis et."
     )
