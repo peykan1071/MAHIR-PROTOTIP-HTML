@@ -26,9 +26,21 @@ _DEFAULT_TOP_K = 5
 
 
 def query_rag_context(
-    question: str, program_id: str, remote_url: str, top_k: int = _DEFAULT_TOP_K
+    question: str,
+    program_id: str,
+    remote_url: str,
+    top_k: int = _DEFAULT_TOP_K,
+    grade: str | None = None,
+    theme: str | None = None,
 ) -> tuple[bool, str, dict[str, object] | None]:
     """POST a grounded question to a remote RAG query endpoint and relay its response.
+
+    `grade`/`theme`, if given, are forwarded as extra (AND) retrieval filters
+    alongside `program_id` - see `rag_service.py::_run_query`. `grade` is the
+    high-confidence filter (matches `program_catalog.ProgramProfile.grade`
+    directly, no normalization risk); `theme` is best-effort (the exam's
+    `outcomeTheme` text must be normalized to match the indexed theme label -
+    see `approved_data_analyzer.py::_normalize_theme_for_rag`).
 
     Returns the same (ok, message, structuredData) tuple shape as
     `run_remote_image_group_ocr`. Never raises for expected failure modes
@@ -37,7 +49,12 @@ def query_rag_context(
     treat this the same way regardless of failure cause.
     """
 
-    body = json.dumps({"question": question, "programId": program_id, "topK": top_k}).encode("utf-8")
+    body_payload: dict[str, object] = {"question": question, "programId": program_id, "topK": top_k}
+    if grade:
+        body_payload["grade"] = grade
+    if theme:
+        body_payload["theme"] = theme
+    body = json.dumps(body_payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     shared_secret = os.environ.get("MAHIR_RAG_SHARED_SECRET", "")
     if shared_secret:

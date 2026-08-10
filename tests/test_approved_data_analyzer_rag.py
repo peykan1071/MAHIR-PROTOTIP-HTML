@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import patch
 
-from backend.app.approved_data_analyzer import analyze_approved_data
+from backend.app.approved_data_analyzer import _normalize_theme_for_rag, analyze_approved_data
 
 _FAKE_REMOTE_URL = "https://fake.example/web_query"
 
@@ -67,10 +67,13 @@ class RagContextAttachmentTests(unittest.TestCase):
                 result = analyze_approved_data(_weak_tde_payload())
         mock_query.assert_called_once()
         called_question, called_program_id, called_url = mock_query.call_args[0]
+        called_kwargs = mock_query.call_args[1]
         self.assertIn("Sözün İnceliği", called_question)
         self.assertIn("TDE1.2", called_question)
         self.assertEqual(called_program_id, "tde-9-tymm")
         self.assertEqual(called_url, _FAKE_REMOTE_URL)
+        self.assertEqual(called_kwargs["grade"], "9")
+        self.assertEqual(called_kwargs["theme"], "SÖZÜN İNCELİĞİ")
         self.assertEqual(result["outcomes"][0]["ragContext"], "Bu kazanım dinleme becerisini kapsar.")
 
     def test_no_answer_in_document_leaves_ragcontext_empty(self):
@@ -94,6 +97,18 @@ class RagContextAttachmentTests(unittest.TestCase):
             with patch("backend.app.rag_client.query_rag_context", side_effect=RuntimeError("boom")):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
+
+
+class NormalizeThemeForRagTests(unittest.TestCase):
+    def test_strips_tema_prefix_and_uppercases(self):
+        self.assertEqual(_normalize_theme_for_rag("1. Tema: Sözün İnceliği"), "SÖZÜN İNCELİĞİ")
+
+    def test_turkish_dotted_and_dotless_i_both_uppercase_correctly(self):
+        # Standart Unicode .upper() Türkçe 'i'/'ı' ayrımını kaybediyor (ikisi de
+        # düz "I"ya dönüşür) - rag_service.py'nin PDF'ten çıkardığı tema
+        # etiketleriyle eşleşmesi için 'i' -> 'İ', 'ı' -> 'I' olmalı.
+        self.assertEqual(_normalize_theme_for_rag("Dilin Zenginliği"), "DİLİN ZENGİNLİĞİ")
+        self.assertEqual(_normalize_theme_for_rag("Anlamın Yapı Taşları"), "ANLAMIN YAPI TAŞLARI")
 
 
 if __name__ == "__main__":

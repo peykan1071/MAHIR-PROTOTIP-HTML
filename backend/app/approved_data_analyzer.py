@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections import defaultdict
 from typing import Any
 
@@ -260,8 +261,11 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
         question = _build_rag_question(outcome)
         if not question:
             continue
+        theme = _normalize_theme_for_rag(str(outcome.get("outcomeTheme") or ""))
         try:
-            ok, _message, data = query_rag_context(question, program.id, MAHIR_RAG_REMOTE_URL)
+            ok, _message, data = query_rag_context(
+                question, program.id, MAHIR_RAG_REMOTE_URL, grade=program.grade, theme=theme
+            )
         except Exception:  # noqa: BLE001 - bir RAG/ağ sorunu analiz yanıtını asla kesmemeli.
             continue
         if not ok or not data:
@@ -274,6 +278,24 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
         if not answer or not data.get("sources") or answer.startswith(_RAG_NO_ANSWER_TEXT):
             continue
         outcome["ragContext"] = answer
+
+
+# Standart Unicode .upper() Türkçe 'i'/'ı' ayrımını kaybediyor (ikisi de düz
+# "I"ya dönüşüyor) - rag_service.py'nin PDF'ten çıkardığı tema etiketleri
+# (ör. "SÖZÜN İNCELİĞİ") zaten belgedeki doğru büyük/küçük harfle saklanıyor,
+# bu yüzden yalnızca burada, sınavın karışık-case "outcomeTheme" alanını o
+# etikete eşleştirmek için Türkçe-doğru büyütme uygulanıyor.
+_TURKISH_UPPER_MAP = str.maketrans({"i": "İ", "ı": "I"})
+
+
+def _normalize_theme_for_rag(raw_theme: str) -> str:
+    """`"1. Tema: Sözün İnceliği"` -> `"SÖZÜN İNCELİĞİ"` - rag_service.py'nin
+    `index_pdf`'in PDF'ten çıkardığı ham tema etiketiyle (bkz. `_run_query`'nin
+    `theme` filtresi) eşleşmesi için "N. Tema:" önekini atıp Türkçe-doğru
+    büyük harfe çevirir."""
+
+    without_prefix = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", raw_theme, flags=re.IGNORECASE).strip()
+    return without_prefix.translate(_TURKISH_UPPER_MAP).upper()
 
 
 def _build_rag_question(outcome: dict[str, Any]) -> str:

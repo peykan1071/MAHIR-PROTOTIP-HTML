@@ -29,7 +29,9 @@ ve `RAGInference.close` içindeki yorumlar.
 from __future__ import annotations
 
 import hmac
+import io
 import os
+import re
 import tempfile
 import uuid
 from pathlib import Path
@@ -71,6 +73,16 @@ HF_CACHE_DIR = "/root/.cache/huggingface"
 CHUNK_MAX_TOKENS = 512
 DEFAULT_TOP_K = 5
 MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024  # backend/app/file_receiver.py ile aynı sınır
+
+# MEB müfredat PDF'lerindeki hiyerarşi başlıkları - tdeogr.pdf üzerinde tüm
+# 5 sınıf düzeyi ve 20 sınıf×tema kombinasyonu için elle doğrulandı. Satırın
+# TAMAMINI kaplayan bağımsız bir metin satırı arıyoruz (`^...$`, MULTILINE) -
+# bu, İçindekiler'deki aynı metni (satır sonunda sayfa numarasıyla birlikte
+# geldiği için `$` ile eşleşmiyor) doğal olarak eler. Desenler eşleşmezse
+# index_pdf SINIF/tema-bölme adımını atlar - yalnızca bu belge yapısına özgü
+# kalır, genel kod bozulmaz.
+GRADE_HEADING_PATTERN = re.compile(r"^\s*(HAZIRLIK SINIFI TEMALARI|\d+\.\s*SINIF TEMALARI)\s*$", re.MULTILINE)
+TEMA_HEADING_PATTERN = re.compile(r"^\s*\d+\.\s*TEMA\s*:\s*(.+?)\s*$", re.MULTILINE)
 
 # Öğrenme Analitiği / Bloom taksonomisi tabanlı teşhis prompt'u - yalnızca
 # TEŞHİS (kanıtlarıyla eksiklik/risk tespiti), asla ÇÖZÜM/YÖNTEM önerisi değil
@@ -131,7 +143,7 @@ indexing_image = (
     # Docling'in PDF/görüntü işleme alt katmanının (OpenCV tabanlı) ihtiyaç
     # duyduğu sistem kütüphaneleri - debian_slim imajında varsayılan olarak yok.
     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
-    .pip_install("qdrant-client", "sentence-transformers")
+    .pip_install("qdrant-client", "sentence-transformers", "pypdf")
     .pip_install("docling")
     .env({"HF_HOME": HF_CACHE_DIR})
 )
@@ -168,6 +180,168 @@ else:
     _shared_secret = modal.Secret.from_dict({})
 
 
+def _slice_pdf_pages(pdf_bytes: bytes, start_page: int, end_page: int) -> bytes:
+    """1-indeksli/dahil `[start_page, end_page]` sayfa aralığını yeni, bağımsız
+    bir bellek-içi PDF'e kopyalar (`pypdf.PdfWriter`). Sayfa numaraları belge
+    sınırları dışındaysa `IndexError` verir - çağıran taraf yakalar."""
+
+    from pypdf import PdfReader, PdfWriter
+
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    writer = PdfWriter()
+    for page_number in range(start_page, end_page + 1):
+        writer.add_page(reader.pages[page_number - 1])  # pypdf 0-indeksli
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def _find_heading_pages(pdf_bytes: bytes, pattern: re.Pattern[str]) -> list[tuple[int, str]]:
+    """`pattern`'a uyan başlıkları tüm sayfalarda arar; aynı başlık metni
+    birden fazla sayfada eşleşirse yalnızca EN SON (en yüksek sayfa numaralı)
+    eşleşmeyi tutar - `tdeogr.pdf`'te doğrulandı: hem İçindekiler'deki
+    girişler (aynı metin ama satır sonunda sayfa numarasıyla, bu yüzden zaten
+    `pattern`'ın `$` çapasıyla elenir) hem de "1.5 Programın Yapısı"
+    bölümünün örnek/önizleme amaçlı tekrarladığı bir tema başlığı (s.30, gerçek
+    başlangıcı s.32) her zaman gerçek bölümden ÖNCE gelir, bu yüzden "en son
+    eşleşme kazanır" kuralı güvenilir. Sonuç, sayfa numarasına göre artan
+    sırada `(sayfa, başlık_metni)` listesi olarak döner."""
+
+    from pypdf import PdfReader
+
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    last_page_for_label: dict[str, int] = {}
+    for page_index, page in enumerate(reader.pages):
+        match = pattern.search(page.extract_text() or "")
+        if match:
+            label = (match.group(1) if pattern.groups else match.group(0)).strip()
+            last_page_for_label[label] = page_index + 1  # üzerine yaz -> son (en büyük) sayfa kalır
+
+    return sorted(((page, label) for label, page in last_page_for_label.items()), key=lambda item: item[0])
+
+
+def _sections_from_heading_pages(
+    heading_pages: list[tuple[int, str]], total_pages: int
+) -> list[tuple[str | None, int, int]]:
+    """`_find_heading_pages` çıktısını `(etiket, başlangıç_sayfa, bitiş_sayfa)`
+    (1-indeksli/dahil) üçlülerinden oluşan, tüm belgeyi/aralığı kapsayan bir
+    listeye çevirir. Hiç başlık bulunamazsa tüm aralığı tek, etiketsiz
+    (`None`) bir bölüm olarak döndürür - bölme yalnızca desene uyan
+    belgelerde devreye girer, genel davranışı bozmaz."""
+
+    if not heading_pages:
+        return [(None, 1, total_pages)]
+
+    sections: list[tuple[str | None, int, int]] = []
+    for index, (start_page, label) in enumerate(heading_pages):
+        end_page = heading_pages[index + 1][0] - 1 if index + 1 < len(heading_pages) else total_pages
+        sections.append((label, start_page, end_page))
+    return sections
+
+
+def _theme_match_key(theme_text: str) -> str:
+    """Tüm boşlukları atarak bir eşleştirme anahtarı üretir - pypdf'in bazı
+    harf çiftlerinde (örn. "YAPI" -> "Y API", `tdeogr.pdf` s.80'de doğrulandı,
+    muhtemelen PDF'in harf aralığı/kerning kodlamasından kaynaklanıyor) sahte
+    boşluk eklemesi yüzünden, tema adının kendisi (`theme` alanı, gösterim
+    için ham hâliyle saklanır) eşleştirme için güvenilir değil. Hem indeksleme
+    hem sorgu tarafında (`approved_data_analyzer.py::_normalize_theme_for_rag`)
+    aynı fonksiyon kullanılmalı."""
+
+    return re.sub(r"\s+", "", theme_text.upper())
+
+
+def _normalize_grade_label(raw_heading: str) -> str:
+    """`"9. SINIF TEMALARI"` -> `"9"`, `"HAZIRLIK SINIFI TEMALARI"` -> `"hazırlık"` -
+    `backend/app/program_catalog.py`'deki `ProgramProfile.grade` biçimiyle
+    (düz rakam string'i) doğrudan karşılaştırılabilir olması için."""
+
+    match = re.match(r"\s*(\d+)\.\s*SINIF", raw_heading, re.IGNORECASE)
+    return match.group(1) if match else "hazırlık"
+
+
+def _detect_theme_sections(pdf_bytes: bytes) -> list[tuple[str | None, int, int]]:
+    """Verilen PDF baytları içinde `TEMA_HEADING_PATTERN`'a uyan başlıkları
+    tarar ve `(tema_adı, başlangıç_sayfa, bitiş_sayfa)` (1-indeksli/dahil)
+    üçlülerinden oluşan, tüm belgeyi kapsayan bir liste döndürür."""
+
+    from pypdf import PdfReader
+
+    total_pages = len(PdfReader(io.BytesIO(pdf_bytes)).pages)
+    heading_pages = _find_heading_pages(pdf_bytes, TEMA_HEADING_PATTERN)
+    return _sections_from_heading_pages(heading_pages, total_pages)
+
+
+def _detect_grade_sections(pdf_bytes: bytes) -> list[tuple[str | None, int, int]]:
+    """Verilen PDF baytları içinde `GRADE_HEADING_PATTERN`'a uyan SINIF
+    başlıklarını tarar ve `(normalize_edilmiş_sınıf, başlangıç_sayfa,
+    bitiş_sayfa)` (1-indeksli/dahil) üçlülerinden oluşan, tüm belgeyi
+    kapsayan bir liste döndürür (etiketler `_normalize_grade_label` ile
+    `"9"`/`"hazırlık"` biçimine çevrilir)."""
+
+    from pypdf import PdfReader
+
+    total_pages = len(PdfReader(io.BytesIO(pdf_bytes)).pages)
+    heading_pages = _find_heading_pages(pdf_bytes, GRADE_HEADING_PATTERN)
+    sections = _sections_from_heading_pages(heading_pages, total_pages)
+    return [
+        (_normalize_grade_label(label) if label is not None else None, start, end)
+        for label, start, end in sections
+    ]
+
+
+def _extract_original_pages(chunk: object, page_offset: int) -> list[int]:
+    """Bir Docling chunk'ının kaynaklandığı sayfa numaralarını (`chunk.meta.
+    doc_items[i].prov[j].page_no`, alt-PDF'e göre 1-indeksli) `page_offset`
+    (o alt-PDF'in orijinal belgedeki başlangıç sayfası - 1) ekleyerek ORİJİNAL
+    PDF'teki gerçek sayfa numaralarına çevirir. Alan yolu bulunamazsa
+    (Docling sürüm farkı vb.) boş liste döner - kaynak gösterimi zayıflar
+    ama indeksleme çökmez."""
+
+    pages: set[int] = set()
+    for doc_item in getattr(getattr(chunk, "meta", None), "doc_items", None) or []:
+        for prov in getattr(doc_item, "prov", None) or []:
+            page_no = getattr(prov, "page_no", None)
+            if isinstance(page_no, int):
+                pages.add(page_no + page_offset)
+    return sorted(pages)
+
+
+@app.function(image=indexing_image, volumes=VOLUMES, timeout=60)
+def clear_index(program_id: str | None = None) -> tuple[bool, str]:
+    """Belge dizinini temizler - `program_id` verilirse yalnızca o programa ait
+    parçaları, verilmezse TÜM koleksiyonu siler. SINIF/tema ayrımı olmadan
+    (bu güncellemeden önce) indekslenmiş eski veriyi temizleyip doğru
+    yöntemle yeniden indekslemeden önce çalıştırılmalı. GPU gerektirmez."""
+
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+    try:
+        client = QdrantClient(path=QDRANT_STORAGE_PATH)
+    except Exception as error:  # noqa: BLE001 - "storage folder already accessed" gibi kilit hataları da dahil.
+        return False, f"Belge dizinine erişilemedi (eşzamanlı kullanım olabilir): {error}"
+
+    try:
+        if not client.collection_exists(QDRANT_COLLECTION_NAME):
+            return True, "Koleksiyon zaten yok, temizlenecek bir şey yok."
+        if program_id:
+            client.delete(
+                collection_name=QDRANT_COLLECTION_NAME,
+                points_selector=Filter(
+                    must=[FieldCondition(key="program_id", match=MatchValue(value=program_id))]
+                ),
+            )
+            message = f"'{program_id}' programına ait parçalar silindi."
+        else:
+            client.delete_collection(QDRANT_COLLECTION_NAME)
+            message = "Tüm koleksiyon silindi."
+        rag_storage_volume.commit()
+        return True, message
+    finally:
+        client.close()
+
+
 @app.function(
     image=indexing_image,
     gpu="A10G",
@@ -176,9 +350,14 @@ else:
     timeout=600,
 )
 def index_pdf(
-    pdf_bytes: bytes, document_name: str, program_id: str
+    pdf_bytes: bytes,
+    document_name: str,
+    program_id: str,
+    start_page: int | None = None,
+    end_page: int | None = None,
 ) -> tuple[bool, str, dict[str, object] | None]:
-    """PDF baytlarını Docling ile ayrıştırır, HybridChunker ile parçalara
+    """PDF baytlarını (opsiyonel bir sayfa aralığına daraltıp) Docling ile
+    ayrıştırır, tema sınırlarına saygılı biçimde HybridChunker ile parçalara
     ayırır, bge-m3 ile gömer ve Qdrant'a yazar.
 
     `program_id`, hangi ders-sınıf programına ait olduğunu işaretler (örn.
@@ -189,6 +368,27 @@ def index_pdf(
     etiketlenir. Bu fonksiyon `program_id`'yi doğrulamaz (düz string olarak
     alır, `document_name` gibi) - katalog-farkındalığı `backend/app/`
     katmanında kalır, bu dosya kasıtlı olarak backend'i import etmez.
+
+    `start_page`/`end_page` (1-indeksli, dahil): MEB müfredat PDF'leri gibi
+    TEK bir dosyanın birden fazla sınıf düzeyini (SINIF) kapsadığı durumlarda,
+    çağıranın (bu belgenin hangi sayfa aralığının hangi `program_id`'ye ait
+    olduğunu bilen tek taraf) yalnızca ilgili aralığı indekslemesini sağlar -
+    aksi hâlde tüm belge tek bir `program_id`'ye etiketlenip başka sınıf
+    düzeylerinin içeriği yanlışlıkla aynı havuza karışır (bkz. gerçek
+    `tdeogr.pdf` üzerinde doğrulanan sorun: aynı öğrenme çıktısı kodu her
+    sınıf düzeyinde ve her temada tekrarlanıyor). Verilmezse (`None`) bugünkü
+    gibi belgenin tamamı kullanılır - geriye dönük uyumlu.
+
+    Belirlenen aralık içinde ayrıca önce "HAZIRLIK/N. SINIF TEMALARI" (bkz.
+    `_detect_grade_sections`), sonra her SINIF içinde "N. TEMA: İSİM"
+    başlıklarına göre (bkz. `_detect_theme_sections`) otomatik alt-bölümlere
+    ayrılır ve HER (sınıf, tema) çifti kendi Docling dönüşümünden/HybridChunker
+    geçişinden ayrı ayrı geçirilir - bu, hiçbir parçanın iki tema (veya iki
+    sınıf) arasında sınır geçmesini yapısal olarak imkânsız kılar. Her
+    parçanın Qdrant payload'ına tespit edilen `grade` (SINIF, ör. `"9"` veya
+    `"hazırlık"`) ve `theme` (tema adı) alanları ile orijinal PDF'teki gerçek
+    sayfa numaraları (`pages`, kaynak göstermek için) yazılır; tespit
+    edilemeyen alanlar `None`/boş liste kalır.
 
     Dönüş, `backend/app/remote_ocr_client.py`nin `run_remote_image_group_ocr`
     ile aynı (ok, mesaj, structuredData) kalıbını izler - bu fonksiyon Modal
@@ -202,118 +402,175 @@ def index_pdf(
         return False, "PDF 20 MB sınırını aşıyor.", None
     if not program_id or not program_id.strip():
         return False, "program_id boş olamaz.", None
-
-    # Baytları geçici dosyaya yaz - ocr_engine.py'nin _run_ocr'ıyla aynı desen.
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_file:
-        tmp_file.write(pdf_bytes)
-        tmp_path = tmp_file.name
+    if (start_page is None) != (end_page is None):
+        return False, "start_page ve end_page birlikte verilmeli.", None
+    if start_page is not None and (start_page < 1 or end_page < start_page):  # type: ignore[operator]
+        return False, "Geçersiz sayfa aralığı.", None
 
     try:
-        try:
-            from docling.datamodel.base_models import InputFormat
-            from docling.datamodel.pipeline_options import PdfPipelineOptions
-            from docling.document_converter import DocumentConverter, PdfFormatOption
+        if start_page is not None:
+            scoped_pdf_bytes = _slice_pdf_pages(pdf_bytes, start_page, end_page)  # type: ignore[arg-type]
+            scope_offset = start_page - 1  # scoped_pdf_bytes'daki sayfa 1 = orijinaldeki start_page
+        else:
+            scoped_pdf_bytes = pdf_bytes
+            scope_offset = 0
+        grade_sections = _detect_grade_sections(scoped_pdf_bytes)
+    except IndexError:
+        return False, "Sayfa aralığı belgenin sınırları dışında.", None
+    except Exception as error:  # noqa: BLE001 - pypdf üçüncü parti bir kütüphane; bozuk bir PDF
+        # dilimleme/SINIF-tespit adımında da tüm işi çökertmemeli.
+        return False, f"PDF sayfaları işlenemedi: {error}", None
 
-            # MAHİR'e yüklenen PDF'ler taranmış/görüntü tabanlı değil, metni
-            # zaten gömülü belgeler - OCR'ı kapatmak hem gereksiz RapidOCR
-            # model indirmesini ve her sayfada boş sonuç veren tespit
-            # turlarını (gerçek deploy'da görüldü) önler hem de indeksleme
-            # süresini kısaltır. Tablo/başlık yapı tespiti (do_table_structure)
-            # varsayılan açık kalır - bu OCR'dan bağımsız bir adım.
-            pdf_pipeline_options = PdfPipelineOptions()
-            pdf_pipeline_options.do_ocr = False
-            converter = DocumentConverter(
-                format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_pipeline_options)}
+    from docling.chunking import HybridChunker
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+    from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
+    from transformers import AutoTokenizer
+
+    # MAHİR'e yüklenen PDF'ler taranmış/görüntü tabanlı değil, metni zaten
+    # gömülü belgeler - OCR'ı kapatmak hem gereksiz RapidOCR model
+    # indirmesini ve her sayfada boş sonuç veren tespit turlarını (gerçek
+    # deploy'da görüldü) önler hem de indeksleme süresini kısaltır.
+    # Tablo/başlık yapı tespiti (do_table_structure) varsayılan açık kalır.
+    pdf_pipeline_options = PdfPipelineOptions()
+    pdf_pipeline_options.do_ocr = False
+    converter = DocumentConverter(
+        format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_pipeline_options)}
+    )
+    tokenizer = HuggingFaceTokenizer(
+        tokenizer=AutoTokenizer.from_pretrained(EMBEDDING_MODEL_NAME),
+        max_tokens=CHUNK_MAX_TOKENS,
+    )
+    chunker = HybridChunker(tokenizer=tokenizer)
+
+    # (chunk, contextualized_text, grade, theme, pages) - tüm sınıf/tema
+    # bölümlerinden biriken, tek seferde gömülüp tek seferde yazılacak son liste.
+    chunk_records: list[tuple[object, str, str | None, str | None, list[int]]] = []
+    tmp_paths: list[str] = []
+    section_count = 0
+    try:
+        for grade_label, grade_start, grade_end in grade_sections:
+            grade_pdf_bytes = (
+                scoped_pdf_bytes
+                if len(grade_sections) == 1
+                else _slice_pdf_pages(scoped_pdf_bytes, grade_start, grade_end)
             )
-            converted_document = converter.convert(tmp_path).document
-        except Exception as error:  # noqa: BLE001 - Docling üçüncü parti bir ML pipeline'ı;
-            # öğretmenin yüklediği bozuk/desteklenmeyen bir PDF tüm işi çökertmemeli.
-            return False, f"PDF ayrıştırılamadı: {error}", None
+            # grade_pdf_bytes'daki sayfa 1'in orijinal belgedeki karşılığı.
+            grade_offset = scope_offset + (grade_start - 1)
 
-        # Başlık/tablo yapısını koruyarak parçala (HybridChunker).
-        from docling.chunking import HybridChunker
-        from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
-        from transformers import AutoTokenizer
-
-        tokenizer = HuggingFaceTokenizer(
-            tokenizer=AutoTokenizer.from_pretrained(EMBEDDING_MODEL_NAME),
-            max_tokens=CHUNK_MAX_TOKENS,
-        )
-        chunker = HybridChunker(tokenizer=tokenizer)
-        chunks = list(chunker.chunk(dl_doc=converted_document))
-        if not chunks:
-            return False, "Belgeden okunabilir içerik çıkarılamadı.", None
-
-        # contextualize(): başlık bağlamını metne ekler - hem gömme kalitesini
-        # hem de sorgu anında LLM'e verilecek bağlamı iyileştirir.
-        contextualized_texts = [chunker.contextualize(chunk=chunk) for chunk in chunks]
-
-        from sentence_transformers import SentenceTransformer
-
-        try:
-            embedder = SentenceTransformer(EMBEDDING_MODEL_NAME)
-            vectors = embedder.encode(contextualized_texts, normalize_embeddings=True).tolist()
-        except Exception as error:  # noqa: BLE001 - gömme de üçüncü parti bir ML çağrısı; tek
-            # bir belge işi tüm fonksiyonu çökertmemeli.
-            return False, f"Metin parçaları gömülemedi: {error}", None
-
-        from qdrant_client import QdrantClient
-        from qdrant_client.models import Distance, PointStruct, VectorParams
-
-        try:
-            client = QdrantClient(path=QDRANT_STORAGE_PATH)
-        except Exception as error:  # noqa: BLE001 - "storage folder already accessed" gibi kilit
-            # hataları da dahil - bkz. modül docstring'i / bilinen sınırlamalar.
-            return False, f"Belge dizinine erişilemedi (eşzamanlı kullanım olabilir): {error}", None
-
-        try:
-            if not client.collection_exists(QDRANT_COLLECTION_NAME):
-                client.create_collection(
-                    QDRANT_COLLECTION_NAME,
-                    vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
+            theme_sections = _detect_theme_sections(grade_pdf_bytes)
+            for theme_name, theme_start, theme_end in theme_sections:
+                section_pdf_bytes = (
+                    grade_pdf_bytes
+                    if len(theme_sections) == 1
+                    else _slice_pdf_pages(grade_pdf_bytes, theme_start, theme_end)
                 )
+                # section_pdf_bytes'daki sayfa 1'in orijinal belgedeki karşılığı -
+                # Docling'in bu alt-PDF için raporlayacağı yerel sayfa numaralarına
+                # eklenerek gerçek PDF sayfa numarasına çevrilecek.
+                section_offset = grade_offset + (theme_start - 1)
+                section_count += 1
 
-            points = [
-                PointStruct(
-                    id=str(uuid.uuid4()),
-                    vector=vector,
-                    payload={
-                        "text": chunk.text,
-                        "contextualized_text": contextualized_text,
-                        "document_name": document_name,
-                        "program_id": program_id,
-                        "headings": list(getattr(chunk.meta, "headings", None) or []),
-                        "chunk_index": index,
-                    },
-                )
-                for index, (chunk, contextualized_text, vector) in enumerate(
-                    zip(chunks, contextualized_texts, vectors)
-                )
-            ]
-            client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=points)
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp_file:
+                    tmp_file.write(section_pdf_bytes)
+                    tmp_paths.append(tmp_file.name)
 
-            # KESİNLİKLE yazımdan sonra: aksi halde değişiklikler bu konteyner
-            # dışında hiçbir yerde (başka bir RAGInference konteyneri dahil)
-            # görünmez.
-            rag_storage_volume.commit()
-        except Exception as error:  # noqa: BLE001 - Qdrant yazımı; kısmi/bozuk bir yazım da
-            # fonksiyonu çökertmeden bildirilmeli.
-            return False, f"Belge dizinine yazılamadı: {error}", None
-        finally:
-            # Kilidi elden geldiğince hızlı bırak - bkz. bilinen sınırlamalar.
-            client.close()
+                try:
+                    converted_document = converter.convert(tmp_paths[-1]).document
+                except Exception as error:  # noqa: BLE001 - Docling üçüncü parti bir ML pipeline'ı;
+                    # öğretmenin yüklediği bozuk/desteklenmeyen bir PDF tüm işi çökertmemeli.
+                    label = theme_name or grade_label or "belge"
+                    return False, f"PDF ayrıştırılamadı ({label}): {error}", None
 
-        return (
-            True,
-            f"'{document_name}' işlendi: {len(points)} parça dizine eklendi.",
-            {
-                "documentName": document_name,
-                "chunkCount": len(points),
-                "collectionName": QDRANT_COLLECTION_NAME,
-            },
-        )
+                section_chunks = list(chunker.chunk(dl_doc=converted_document))
+                for chunk in section_chunks:
+                    pages = _extract_original_pages(chunk, section_offset)
+                    chunk_records.append(
+                        (chunk, chunker.contextualize(chunk=chunk), grade_label, theme_name, pages)
+                    )
     finally:
-        Path(tmp_path).unlink(missing_ok=True)
+        for tmp_path in tmp_paths:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    if not chunk_records:
+        return False, "Belgeden okunabilir içerik çıkarılamadı.", None
+
+    contextualized_texts = [record[1] for record in chunk_records]
+
+    from sentence_transformers import SentenceTransformer
+
+    try:
+        embedder = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        vectors = embedder.encode(contextualized_texts, normalize_embeddings=True).tolist()
+    except Exception as error:  # noqa: BLE001 - gömme de üçüncü parti bir ML çağrısı; tek
+        # bir belge işi tüm fonksiyonu çökertmemeli.
+        return False, f"Metin parçaları gömülemedi: {error}", None
+
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import Distance, PointStruct, VectorParams
+
+    try:
+        client = QdrantClient(path=QDRANT_STORAGE_PATH)
+    except Exception as error:  # noqa: BLE001 - "storage folder already accessed" gibi kilit
+        # hataları da dahil - bkz. modül docstring'i / bilinen sınırlamalar.
+        return False, f"Belge dizinine erişilemedi (eşzamanlı kullanım olabilir): {error}", None
+
+    try:
+        if not client.collection_exists(QDRANT_COLLECTION_NAME):
+            client.create_collection(
+                QDRANT_COLLECTION_NAME,
+                vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
+            )
+
+        points = [
+            PointStruct(
+                id=str(uuid.uuid4()),
+                vector=vector,
+                payload={
+                    "text": chunk.text,
+                    "contextualized_text": contextualized_text,
+                    "document_name": document_name,
+                    "program_id": program_id,
+                    "grade": grade_label,
+                    "theme": theme_name,
+                    "theme_key": _theme_match_key(theme_name) if theme_name else None,
+                    "pages": pages,
+                    "headings": list(getattr(chunk.meta, "headings", None) or []),
+                    "chunk_index": index,
+                },
+            )
+            for index, ((chunk, contextualized_text, grade_label, theme_name, pages), vector) in enumerate(
+                zip(chunk_records, vectors)
+            )
+        ]
+        client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=points)
+
+        # KESİNLİKLE yazımdan sonra: aksi halde değişiklikler bu konteyner
+        # dışında hiçbir yerde (başka bir RAGInference konteyneri dahil)
+        # görünmez.
+        rag_storage_volume.commit()
+    except Exception as error:  # noqa: BLE001 - Qdrant yazımı; kısmi/bozuk bir yazım da
+        # fonksiyonu çökertmeden bildirilmeli.
+        return False, f"Belge dizinine yazılamadı: {error}", None
+    finally:
+        # Kilidi elden geldiğince hızlı bırak - bkz. bilinen sınırlamalar.
+        client.close()
+
+    # Operatörün "doğru sayfa aralığını mı seçtim?" diye görsel olarak
+    # doğrulayabilmesi için tespit edilen SINIF etiketlerini mesaja ekle.
+    detected_grades = sorted({grade for grade, _, _ in grade_sections if grade is not None})
+    grade_summary = f", SINIF: {', '.join(detected_grades)}" if detected_grades else ""
+    return (
+        True,
+        f"'{document_name}' işlendi: {len(points)} parça dizine eklendi "
+        f"({section_count} sınıf/tema bölümü{grade_summary}).",
+        {
+            "documentName": document_name,
+            "chunkCount": len(points),
+            "collectionName": QDRANT_COLLECTION_NAME,
+        },
+    )
 
 
 @app.cls(
@@ -381,7 +638,12 @@ class RAGInference:
 
     @modal.method()
     def query(
-        self, question: str, top_k: int = DEFAULT_TOP_K, program_id: str | None = None
+        self,
+        question: str,
+        top_k: int = DEFAULT_TOP_K,
+        program_id: str | None = None,
+        grade: str | None = None,
+        theme: str | None = None,
     ) -> tuple[bool, str, dict[str, object] | None]:
         """Soruyu göm, Qdrant'tan en yakın parçaları getir, Qwen2.5 ile Türkçe yanıt üret.
 
@@ -390,10 +652,13 @@ class RAGInference:
         çağırır, böylece iki giriş noktası arasında mantık kopyalanmaz.
         `program_id` verilirse yalnızca o programa etiketlenmiş parçalarda
         arama yapılır; `None` ise (ör. `main()`'in ad-hoc testleri) bugüne
-        kadarki filtresiz davranış aynen korunur.
+        kadarki filtresiz davranış aynen korunur. `grade`/`theme` verilirse
+        ek güvenlik/hassasiyet filtresi olarak `program_id`'ye eklenir (bkz.
+        `_run_query`, `index_pdf`'in yazdığı `grade`/`theme` alanlarıyla
+        eşleşir).
         """
 
-        return self._run_query(question, top_k, program_id)
+        return self._run_query(question, top_k, program_id, grade, theme)
 
     @modal.fastapi_endpoint(method="POST")
     async def web_query(self, request: Request) -> JSONResponse:
@@ -422,12 +687,19 @@ class RAGInference:
             return JSONResponse({"ok": False, "message": "Soru boş olamaz."}, status_code=400)
         program_id = (body or {}).get("programId") or None
         top_k = int((body or {}).get("topK") or DEFAULT_TOP_K)
+        grade = (body or {}).get("grade") or None
+        theme = (body or {}).get("theme") or None
 
-        ok, message, data = self._run_query(question, top_k, program_id)
+        ok, message, data = self._run_query(question, top_k, program_id, grade, theme)
         return JSONResponse({"ok": ok, "message": message, "structuredData": data}, status_code=200 if ok else 500)
 
     def _run_query(
-        self, question: str, top_k: int, program_id: str | None
+        self,
+        question: str,
+        top_k: int,
+        program_id: str | None,
+        grade: str | None = None,
+        theme: str | None = None,
     ) -> tuple[bool, str, dict[str, object] | None]:
         """`query`/`web_query`'nin ortak mantığı: göm, filtrelenmiş getirim, üret."""
 
@@ -463,13 +735,24 @@ class RAGInference:
 
         # program_id verilirse yalnızca o programa etiketli parçalarda ara -
         # MAHİR tek derslik değil (60+ ders), aynı öğrenme çıktısı kodu farklı
-        # temalarda farklı anlama gelebiliyor; filtresiz getirim yanlış
-        # dersin/temanın içeriğini sessizce karıştırabilir.
-        query_filter = (
-            Filter(must=[FieldCondition(key="program_id", match=MatchValue(value=program_id))])
-            if program_id
-            else None
-        )
+        # temalarda/sınıf düzeylerinde farklı anlama gelebiliyor; filtresiz
+        # getirim yanlış dersin/sınıfın/temanın içeriğini sessizce
+        # karıştırabilir. grade/theme verilirse ek (AND) güvenlik/hassasiyet
+        # katmanı olarak eklenir - bkz. index_pdf'in yazdığı aynı adlı alanlar.
+        # theme, "theme_key" alanına göre eşleşir (`_theme_match_key`) - ham
+        # tema metni pypdf'in bazı harf çiftlerinde eklediği sahte boşluklar
+        # yüzünden (bkz. _theme_match_key docstring'i) birebir eşleşme için
+        # güvenilir değil.
+        filter_conditions = []
+        if program_id:
+            filter_conditions.append(FieldCondition(key="program_id", match=MatchValue(value=program_id)))
+        if grade:
+            filter_conditions.append(FieldCondition(key="grade", match=MatchValue(value=grade)))
+        if theme:
+            filter_conditions.append(
+                FieldCondition(key="theme_key", match=MatchValue(value=_theme_match_key(theme)))
+            )
+        query_filter = Filter(must=filter_conditions) if filter_conditions else None
 
         try:
             if not self._qdrant.collection_exists(QDRANT_COLLECTION_NAME):
@@ -515,6 +798,9 @@ class RAGInference:
         sources = [
             {
                 "documentName": (hit.payload or {}).get("document_name"),
+                "grade": (hit.payload or {}).get("grade"),
+                "theme": (hit.payload or {}).get("theme"),
+                "pages": (hit.payload or {}).get("pages", []),
                 "headings": (hit.payload or {}).get("headings", []),
                 "excerpt": str((hit.payload or {}).get("text", ""))[:300],
                 "score": hit.score,
@@ -525,10 +811,17 @@ class RAGInference:
 
 
 @app.local_entrypoint()
-def main(pdf_path: str, program_id: str, question: str = "Bu belge ne hakkında?") -> None:
+def main(
+    pdf_path: str,
+    program_id: str,
+    question: str = "Bu belge ne hakkında?",
+    start_page: int | None = None,
+    end_page: int | None = None,
+) -> None:
     """Uçtan uca örnek kullanım:
 
-        modal run rag_service.py --pdf-path C:\\yol\\ornek.pdf --program-id tde-9-tymm --question "..."
+        modal run rag_service.py --pdf-path C:\\yol\\ornek.pdf --program-id tde-9-tymm \
+            --start-page 65 --end-page 97 --question "..."
 
     Bu fonksiyon yalnızca örnektir; hiçbir mevcut MAHIR backend dosyası bunu
     çağırmaz (proje kapsam kararı: yalnızca örnek kod, canlı entegrasyon yok -
@@ -538,8 +831,10 @@ def main(pdf_path: str, program_id: str, question: str = "Bu belge ne hakkında?
     pdf_bytes = Path(pdf_path).read_bytes()
     document_name = Path(pdf_path).name
 
-    print(f"[rag_service] '{document_name}' ({program_id}) dizine ekleniyor...", flush=True)
-    index_ok, index_message, index_data = index_pdf.remote(pdf_bytes, document_name, program_id)
+    print(f"[rag_service] '{document_name}' ({program_id}, sayfa {start_page}-{end_page}) dizine ekleniyor...", flush=True)
+    index_ok, index_message, index_data = index_pdf.remote(
+        pdf_bytes, document_name, program_id, start_page, end_page
+    )
     print(f"[rag_service] index_pdf: ok={index_ok} mesaj={index_message} veri={index_data}", flush=True)
     if not index_ok:
         return
