@@ -31,6 +31,7 @@ from .reporting_engine import generate_report, write_report
 UPLOAD_PATH = "/mahir-upload"
 ANALYZE_PATH = "/mahir-analyze"
 OCR_WARMUP_PATH = "/mahir-ocr-warmup"
+RAG_WARMUP_PATH = "/mahir-rag-warmup"
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 MAX_FILES_PER_UPLOAD = 10
 MAX_REQUEST_SIZE = MAX_UPLOAD_SIZE * MAX_FILES_PER_UPLOAD
@@ -84,31 +85,47 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:
-        """Serve the prototype, but intercept the OCR warm-up ping first.
+        """Serve the prototype, but intercept the warm-up pings first.
 
-        The browser can't call the remote worker itself (it never learns
-        `MAHIR_OCR_REMOTE_URL`, and the worker is on another origin), so the
-        ping is proxied here. It must return *immediately*: the remote call
-        blocks for 30-50 s while a cold container loads its models, and the
-        teacher is still picking files - nothing may wait on it.
+        The browser can't call the remote services itself (it never learns
+        their URLs, and they are on another origin), so both pings are proxied
+        here. They must return *immediately*: a remote call blocks for 30-110 s
+        while a cold container loads its models, and the teacher is meanwhile
+        picking files or reviewing scores - nothing may wait on it.
         """
 
-        if urlparse(self.path).path != OCR_WARMUP_PATH:
-            super().do_GET()
-            return
+        request_path = urlparse(self.path).path
+        if request_path == OCR_WARMUP_PATH:
+            # OCR ısıtması dosyalar seçilir seçilmez tetikleniyor; soğuk
+            # başlangıcı (~30-50 sn) "Verileri Oku"nun beklemesinden çıkarır.
+            from .remote_ocr_client import warm_up_remote_ocr
 
-        if not MAHIR_OCR_REMOTE_URL:
-            # OCR'sız yerel geliştirme: ısıtılacak uzak bir işçi yok.
+            self._start_warm_up(MAHIR_OCR_REMOTE_URL, warm_up_remote_ocr)
+            return
+        if request_path == RAG_WARMUP_PATH:
+            # RAG ısıtması doğrulama ekranı açılınca tetikleniyor; öğretmen
+            # puanları incelerken ~110 sn'lik soğuk başlangıç biter ve
+            # scaledown_window=300 sayesinde analize kadar sıcak kalır. URL
+            # burada değil analiz modülünde tanımlı - modül üzerinden okunuyor
+            # ki testler onu yamalayabilsin.
+            from . import approved_data_analyzer
+            from .rag_client import warm_up_remote_rag
+
+            self._start_warm_up(approved_data_analyzer.MAHIR_RAG_REMOTE_URL, warm_up_remote_rag)
+            return
+        super().do_GET()
+
+    def _start_warm_up(self, remote_url: str, warm_up) -> None:
+        """Uzak ısıtmayı daemon thread'e atıp anında yanıt döner."""
+
+        if not remote_url:
+            # Uzak servis yapılandırılmamış (ör. OCR'sız yerel geliştirme):
+            # ısıtılacak bir şey yok, sessizce başarılı dön.
             self._send_json(200, {"ok": True, "started": False})
             return
 
-        from .remote_ocr_client import warm_up_remote_ocr
-
         threading.Thread(
-            target=warm_up_remote_ocr,
-            args=(MAHIR_OCR_REMOTE_URL,),
-            name="ocr-warmup",
-            daemon=True,
+            target=warm_up, args=(remote_url,), name=warm_up.__name__, daemon=True
         ).start()
         self._send_json(200, {"ok": True, "started": True})
 

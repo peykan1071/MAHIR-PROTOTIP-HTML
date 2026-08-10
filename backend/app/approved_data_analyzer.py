@@ -255,17 +255,26 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
 
     Mutates `outcome_results` in place, adding a `ragContext` field (empty
     string when unavailable) to every outcome so the field's presence is
-    always predictable regardless of which path was taken. Calls
-    `rag_client.query_rag_context` sequentially, once per weak outcome (see
-    module docstring history / rag_service.py for why not parallel: RAGInference
-    has no @modal.concurrent, so simultaneous calls would spin up separate
-    cold containers instead of reusing one warm one). Never raises: any
+    always predictable regardless of which path was taken. Never raises: any
     failure, timeout, or "not found in the document" answer just leaves
     `ragContext` empty, so a RAG problem can never block the teacher's
     analysis response. Only attempted for a resolved program (`program is
     not None`) - MAHİR covers 60+ courses but only registered programs have
     any indexed reference material, so unregistered courses would otherwise
-    pay a ~112s cold-start wait for a query guaranteed to return nothing.
+    pay a ~110s cold-start wait for a query guaranteed to return nothing.
+
+    All weak outcomes go out in ONE request (`query_rag_contexts`) so the
+    remote can answer them in a single vLLM batch. Measured warm, one question
+    costs ~10 s of which 7-8.6 s is generation at ~29 output tokens/s - that is
+    single-sequence decode speed on an A10G, bounded by memory bandwidth, so
+    decoding several sequences together costs barely more than one. The
+    earlier design issued them sequentially (parallel HTTP calls were rejected
+    because RAGInference has no @modal.concurrent and each call would spin up
+    its own cold container); batching gets the speed without that problem.
+
+    If the batch call fails for any reason the code falls back to the old
+    per-outcome sequential path: one request carrying everything means one
+    failure would otherwise blank every cell, where before it blanked one.
     """
 
     for outcome in outcome_results:
@@ -278,8 +287,12 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
         _logger.info("RAG atlandı: sebep=program-yok")
         return
 
-    from .rag_client import query_rag_context
+    from .rag_client import query_rag_context, query_rag_contexts
 
+    # Partiye girecek zayıf çıktıları topla. Sorusu üretilemeyen veya teması
+    # çözülemeyen çıktılar partiye HİÇ girmez - eskisi gibi sebep koduyla
+    # loglanıp boş bırakılırlar.
+    batch: list[tuple[dict[str, Any], str, dict[str, object]]] = []
     for outcome in outcome_results:
         code = str(outcome.get("outcomeCode") or "?")
         if float(outcome.get("successRate") or 0.0) >= _RAG_WEAK_THRESHOLD:
@@ -298,20 +311,51 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
             # hiç teşhis vermemekten daha kötü.
             _logger.info("RAG atlandı: cikti=%s sebep=tema-cozulemedi", code)
             continue
-        try:
-            ok, message, data = query_rag_context(
-                question,
-                program.id,
-                MAHIR_RAG_REMOTE_URL,
-                grade=program.grade,
-                theme=theme,
-                retrieval_query=_build_rag_retrieval_query(outcome),
-            )
-        except Exception:  # noqa: BLE001 - bir RAG/ağ sorunu analiz yanıtını asla kesmemeli.
-            _logger.exception("RAG atlandı: cikti=%s sebep=istisna", code)
-            continue
-        if not ok or not data:
-            _logger.info("RAG atlandı: cikti=%s sebep=uzak-hata mesaj=%s", code, message)
+        batch.append((
+            outcome,
+            theme,
+            {
+                "question": question,
+                "retrievalQuery": _build_rag_retrieval_query(outcome),
+                "grade": program.grade,
+                "theme": theme,
+            },
+        ))
+
+    if not batch:
+        return
+
+    items = [item for _outcome, _theme, item in batch]
+    try:
+        ok, message, results = query_rag_contexts(items, program.id, MAHIR_RAG_REMOTE_URL)
+    except Exception:  # noqa: BLE001 - bir RAG/ağ sorunu analiz yanıtını asla kesmemeli.
+        _logger.exception("Toplu RAG çağrısı istisna verdi")
+        ok, message, results = False, "istisna", None
+
+    if not ok or results is None:
+        # Tek istekte her şeyi göndermenin bedeli: bir arıza TÜM hücreleri
+        # boşaltırdı. Eski sıralı yol bu yüzden geri çekilme yolu olarak duruyor.
+        _logger.warning("Toplu RAG çağrısı başarısız (%s), tek tek sorgulanıyor", message)
+        results = []
+        for _outcome, _theme, item in batch:
+            try:
+                single_ok, _message, data = query_rag_context(
+                    str(item["question"]),
+                    program.id,
+                    MAHIR_RAG_REMOTE_URL,
+                    grade=program.grade,
+                    theme=str(item["theme"]),
+                    retrieval_query=str(item["retrievalQuery"]),
+                )
+            except Exception:  # noqa: BLE001 - tek bir çıktının hatası kalanları düşürmemeli.
+                _logger.exception("RAG atlandı: sebep=istisna")
+                single_ok, data = False, None
+            results.append(data if single_ok and data else None)
+
+    for (outcome, theme, _item), data in zip(batch, results):
+        code = str(outcome.get("outcomeCode") or "?")
+        if not isinstance(data, dict):
+            _logger.info("RAG atlandı: cikti=%s sebep=uzak-hata", code)
             continue
         answer = str(data.get("answer") or "").strip()
         sources = data.get("sources") or []

@@ -28,6 +28,51 @@ _SHARED_SECRET_HEADER = "X-MAHIR-RAG-Key"
 _DEFAULT_TOP_K = 8
 
 
+def warm_up_remote_rag(remote_url: str) -> bool:
+    """Ask the remote RAG service to boot and load its models now.
+
+    Its cold start is ~110 s (container + bge-m3 + vLLM/Qwen2.5-7B, measured -
+    see `modal app logs turkish-rag-system`), and today that whole wait lands on
+    the teacher pressing "approve and analyse". Calling this while they are
+    still reviewing scores moves it out of the way; `scaledown_window=300` in
+    `rag_service.py` keeps the container up long enough to cover that review.
+
+    Never raises - a failed warm-up must stay invisible, the analysis that
+    follows works exactly as before, just slower.
+    """
+
+    return _post(remote_url, {"warmup": True})[0]
+
+
+def query_rag_contexts(
+    items: list[dict[str, object]],
+    program_id: str,
+    remote_url: str,
+    top_k: int = _DEFAULT_TOP_K,
+) -> tuple[bool, str, list[dict[str, object]] | None]:
+    """POST several grounded questions in ONE request; results come back in order.
+
+    Each item is `{"question", "retrievalQuery", "grade", "theme"}` - the same
+    fields `query_rag_context` sends for a single question. The remote answers
+    them in a single vLLM batch, which is why this exists: measured warm, one
+    question costs ~10 s of which 7-8.6 s is generation at ~29 output tokens/s,
+    i.e. single-sequence decode speed. Decoding several sequences together
+    barely costs more than one, so N weak outcomes cost ~10 s instead of N×10 s.
+
+    Same never-raises contract as `query_rag_context`; on any failure the caller
+    can fall back to calling `query_rag_context` per outcome.
+    """
+
+    body_payload: dict[str, object] = {"queries": items, "programId": program_id, "topK": top_k}
+    ok, message, structured_data = _post(remote_url, body_payload)
+    if not ok or not isinstance(structured_data, dict):
+        return ok, message, None
+    results = structured_data.get("results")
+    if not isinstance(results, list) or len(results) != len(items):
+        return False, "Toplu RAG yanıtı sorgu sayısıyla eşleşmedi.", None
+    return True, message, results
+
+
 def query_rag_context(
     question: str,
     program_id: str,
@@ -67,6 +112,15 @@ def query_rag_context(
         body_payload["theme"] = theme
     if retrieval_query:
         body_payload["retrievalQuery"] = retrieval_query
+    return _post(remote_url, body_payload)
+
+
+def _post(remote_url: str, body_payload: dict[str, object]) -> tuple[bool, str, object | None]:
+    """Tek/toplu sorgu ve ısıtmanın ortak HTTP gövdesi - hepsi aynı uç noktaya
+    gidiyor (Modal her `@modal.fastapi_endpoint` metoduna TEK bir URL üretiyor,
+    bu yüzden ayrı bir ısıtma URL'si yapılandırmak yerine gövdeye bir bayrak
+    koyuyoruz)."""
+
     body = json.dumps(body_payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     shared_secret = os.environ.get("MAHIR_RAG_SHARED_SECRET", "")

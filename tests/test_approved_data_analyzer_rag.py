@@ -35,13 +35,25 @@ def _weak_tde_payload():
     }
 
 
+def _as_batch(canned):
+    """Tekil `query_rag_context` yanıtını toplu `query_rag_contexts` biçimine çevirir.
+
+    Zayıf çıktılar artık tek istekte, tek vLLM partisinde yanıtlanıyor
+    (bkz. `_attach_rag_context`); bu yardımcı, tekil biçimde yazılmış mevcut
+    beklentileri olduğu gibi korumayı sağlıyor.
+    """
+
+    ok, message, data = canned
+    return ok, message, [data]
+
+
 class RagContextAttachmentTests(unittest.TestCase):
     def test_ragcontext_field_always_present_even_without_remote_url(self):
         # MAHIR_RAG_REMOTE_URL artık koda gömülü bir varsayılana sahip (bkz.
         # approved_data_analyzer.py) - "yapılandırılmamış" durumu burada
         # açıkça boş string'e çekilerek test ediliyor, gerçek ağ çağrısı yapılmaz.
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
-            with patch("backend.app.rag_client.query_rag_context") as mock_query:
+            with patch("backend.app.rag_client.query_rag_contexts") as mock_query:
                 result = analyze_approved_data(_weak_tde_payload())
         mock_query.assert_not_called()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
@@ -53,7 +65,7 @@ class RagContextAttachmentTests(unittest.TestCase):
             "students": [{"studentNo": "1", "scores": [10]}],
         }
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context") as mock_query:
+            with patch("backend.app.rag_client.query_rag_contexts") as mock_query:
                 result = analyze_approved_data(payload)
         mock_query.assert_not_called()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
@@ -62,7 +74,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         payload = _weak_tde_payload()
         payload["students"][0]["scores"] = [90]  # successRate 0.90 >= eşik (0.70)
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context") as mock_query:
+            with patch("backend.app.rag_client.query_rag_contexts") as mock_query:
                 result = analyze_approved_data(payload)
         mock_query.assert_not_called()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
@@ -74,17 +86,17 @@ class RagContextAttachmentTests(unittest.TestCase):
             {"answer": "Bu kazanım dinleme becerisini kapsar.", "sources": [{"documentName": "x"}]},
         )
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context", return_value=canned) as mock_query:
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=_as_batch(canned)) as mock_query:
                 result = analyze_approved_data(_weak_tde_payload())
         mock_query.assert_called_once()
-        called_question, called_program_id, called_url = mock_query.call_args[0]
-        called_kwargs = mock_query.call_args[1]
-        self.assertIn("Sözün İnceliği", called_question)
-        self.assertIn("TDE1.2", called_question)
+        called_items, called_program_id, called_url = mock_query.call_args[0]
+        self.assertEqual(len(called_items), 1)
+        self.assertIn("Sözün İnceliği", called_items[0]["question"])
+        self.assertIn("TDE1.2", called_items[0]["question"])
         self.assertEqual(called_program_id, "tde-9-tymm")
         self.assertEqual(called_url, _FAKE_REMOTE_URL)
-        self.assertEqual(called_kwargs["grade"], "9")
-        self.assertEqual(called_kwargs["theme"], "SÖZÜN İNCELİĞİ")
+        self.assertEqual(called_items[0]["grade"], "9")
+        self.assertEqual(called_items[0]["theme"], "SÖZÜN İNCELİĞİ")
         self.assertEqual(result["outcomes"][0]["ragContext"], "Bu kazanım dinleme becerisini kapsar.")
 
     def test_outcome_description_reaches_both_question_and_retrieval_query(self):
@@ -93,12 +105,11 @@ class RagContextAttachmentTests(unittest.TestCase):
         # sırasında düşürülürse RAG elinde yalnızca çıplak bir kod kalıyor.
         canned = (True, "Yanıt üretildi.", {"answer": "teşhis", "sources": [{"documentName": "x"}]})
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context", return_value=canned) as mock_query:
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=_as_batch(canned)) as mock_query:
                 analyze_approved_data(_weak_tde_payload())
-        called_question = mock_query.call_args[0][0]
-        retrieval_query = mock_query.call_args[1]["retrieval_query"]
-        self.assertIn("anlam oluşturabilme", called_question)
-        self.assertIn("anlam oluşturabilme", retrieval_query)
+        item = mock_query.call_args[0][0][0]
+        self.assertIn("anlam oluşturabilme", item["question"])
+        self.assertIn("anlam oluşturabilme", item["retrievalQuery"])
 
     def test_retrieval_query_carries_no_success_rate_or_imperative(self):
         # Getirim sorgusu üretim talimatından ayrı: başarı oranının ve "teşhis et"
@@ -122,7 +133,7 @@ class RagContextAttachmentTests(unittest.TestCase):
     def test_no_answer_in_document_leaves_ragcontext_empty(self):
         canned = (True, "Yanıt üretildi.", {"answer": "Bu bilgi belgede bulunmuyor.", "sources": []})
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context", return_value=canned):
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=_as_batch(canned)):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
@@ -141,7 +152,7 @@ class RagContextAttachmentTests(unittest.TestCase):
             },
         )
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context", return_value=canned):
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=_as_batch(canned)):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "TDE1.2 dinleme becerisini kapsar.")
 
@@ -154,7 +165,7 @@ class RagContextAttachmentTests(unittest.TestCase):
             {"answer": "Bu bilgi belgede bulunmuyor.", "sources": [{"documentName": "x"}]},
         )
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context", return_value=canned):
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=_as_batch(canned)):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
@@ -165,25 +176,161 @@ class RagContextAttachmentTests(unittest.TestCase):
         payload = _weak_tde_payload()
         payload["questions"][0]["outcomeTheme"] = ""
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context") as mock_query:
+            with patch("backend.app.rag_client.query_rag_contexts") as mock_query:
                 result = analyze_approved_data(payload)
         mock_query.assert_not_called()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
     def test_rag_failure_leaves_ragcontext_empty_and_does_not_raise(self):
+        # Hem toplu hem geri çekilme yolu başarısız: analiz yine de tamamlanmalı.
+        failure = (False, "Uzak RAG sunucusuna ulaşılamadı.", None)
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch(
-                "backend.app.rag_client.query_rag_context",
-                return_value=(False, "Uzak RAG sunucusuna ulaşılamadı.", None),
-            ):
-                result = analyze_approved_data(_weak_tde_payload())
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=failure):
+                with patch("backend.app.rag_client.query_rag_context", return_value=failure):
+                    result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
     def test_rag_exception_leaves_ragcontext_empty_and_does_not_raise(self):
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context", side_effect=RuntimeError("boom")):
-                result = analyze_approved_data(_weak_tde_payload())
+            with patch("backend.app.rag_client.query_rag_contexts", side_effect=RuntimeError("boom")):
+                with patch("backend.app.rag_client.query_rag_context", side_effect=RuntimeError("boom")):
+                    result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
+
+
+def _two_weak_outcomes_payload():
+    """İki farklı temadan iki zayıf çıktı - parti davranışını görebilmek için."""
+
+    return {
+        "exam": {"courseName": "Türk Dili ve Edebiyatı", "grade": "9", "componentType": "written"},
+        "questions": [
+            {
+                "number": 1,
+                "maxScore": 100,
+                "outcomeCode": "TDE1.2",
+                "outcomeTheme": "1. Tema: Sözün İnceliği",
+                "outcomeSkill": "Okuma",
+                "outcomeDescription": "metinlerde anlam oluşturabilme",
+            },
+            {
+                "number": 2,
+                "maxScore": 100,
+                "outcomeCode": "TDE2.1",
+                "outcomeTheme": "2. Tema: Anlam Arayışı",
+                "outcomeSkill": "Okuma",
+                "outcomeDescription": "metinlerde okumayı yönetebilme",
+            },
+        ],
+        "students": [{"studentNo": "1", "scores": [30, 40]}],
+    }
+
+
+class RagBatchingTests(unittest.TestCase):
+    # Zayıf çıktılar tek istekte, tek vLLM partisinde yanıtlanıyor: ölçüldü,
+    # sıcak konteynerde tek sorgunun 7-8,6 sn'si üretim ve bu ~29 token/s tek
+    # dizilik çözme hızı - diziler birlikte çözülünce N sorgu ~1 sorgu kadar
+    # sürüyor (8 zayıf çıktı için ölçülen taban: 241 sn).
+    def test_all_weak_outcomes_go_out_in_one_call(self):
+        canned = (
+            True,
+            "Yanıt üretildi.",
+            [
+                {"answer": "birinci teşhis", "sources": [{"documentName": "x"}]},
+                {"answer": "ikinci teşhis", "sources": [{"documentName": "y"}]},
+            ],
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=canned) as mock_batch:
+                with patch("backend.app.rag_client.query_rag_context") as mock_single:
+                    result = analyze_approved_data(_two_weak_outcomes_payload())
+
+        mock_batch.assert_called_once()
+        mock_single.assert_not_called()
+        self.assertEqual(len(mock_batch.call_args[0][0]), 2)
+        contexts = [item["ragContext"] for item in result["outcomes"]]
+        self.assertEqual(contexts, ["birinci teşhis", "ikinci teşhis"])
+
+    def test_results_map_back_to_the_right_outcome(self):
+        # Sıra kayması, bir kazanımın teşhisini başka bir kazanıma yazmak
+        # demek olurdu - RAG'in daha önce düzeltilen "yanlış temadan veri"
+        # hatasının aynısı, bu kez tamamen kod tarafında.
+        canned = (
+            True,
+            "Yanıt üretildi.",
+            [
+                {"answer": "SÖZÜN İNCELİĞİ teşhisi", "sources": [{"documentName": "x"}]},
+                {"answer": "ANLAM ARAYIŞI teşhisi", "sources": [{"documentName": "y"}]},
+            ],
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=canned) as mock_batch:
+                result = analyze_approved_data(_two_weak_outcomes_payload())
+
+        sent_themes = [item["theme"] for item in mock_batch.call_args[0][0]]
+        self.assertEqual(sent_themes, ["SÖZÜN İNCELİĞİ", "ANLAM ARAYIŞI"])
+        by_code = {item["outcomeCode"]: item["ragContext"] for item in result["outcomes"]}
+        self.assertEqual(by_code["TDE1.2"], "SÖZÜN İNCELİĞİ teşhisi")
+        self.assertEqual(by_code["TDE2.1"], "ANLAM ARAYIŞI teşhisi")
+
+    def test_unresolved_theme_outcome_is_kept_out_of_the_batch(self):
+        payload = _two_weak_outcomes_payload()
+        payload["questions"][0]["outcomeTheme"] = ""
+        canned = (True, "Yanıt üretildi.", [{"answer": "teşhis", "sources": [{"documentName": "y"}]}])
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=canned) as mock_batch:
+                result = analyze_approved_data(payload)
+
+        sent = mock_batch.call_args[0][0]
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]["theme"], "ANLAM ARAYIŞI")
+        by_code = {item["outcomeCode"]: item["ragContext"] for item in result["outcomes"]}
+        self.assertEqual(by_code["TDE1.2"], "")
+        self.assertEqual(by_code["TDE2.1"], "teşhis")
+
+    def test_batch_failure_falls_back_to_per_outcome_calls(self):
+        # Tek istekte her şeyi göndermenin bedeli: bir arıza TÜM hücreleri
+        # boşaltırdı. Eskiden yalnızca bir hücre boş kalıyordu, o davranış
+        # geri çekilme yoluyla korunuyor.
+        single = (True, "Yanıt üretildi.", {"answer": "tekil teşhis", "sources": [{"documentName": "x"}]})
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.rag_client.query_rag_contexts",
+                return_value=(False, "Uzak RAG sunucusuna ulaşılamadı.", None),
+            ):
+                with patch("backend.app.rag_client.query_rag_context", return_value=single) as mock_single:
+                    result = analyze_approved_data(_two_weak_outcomes_payload())
+
+        self.assertEqual(mock_single.call_count, 2)
+        contexts = [item["ragContext"] for item in result["outcomes"]]
+        self.assertEqual(contexts, ["tekil teşhis", "tekil teşhis"])
+
+    def test_batch_exception_also_falls_back(self):
+        single = (True, "Yanıt üretildi.", {"answer": "tekil teşhis", "sources": [{"documentName": "x"}]})
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.rag_client.query_rag_contexts", side_effect=RuntimeError("boom")):
+                with patch("backend.app.rag_client.query_rag_context", return_value=single) as mock_single:
+                    result = analyze_approved_data(_two_weak_outcomes_payload())
+
+        self.assertEqual(mock_single.call_count, 2)
+        self.assertEqual(result["outcomes"][0]["ragContext"], "tekil teşhis")
+
+    def test_one_empty_result_does_not_affect_the_others(self):
+        # Getirimi boş çıkan öğe partiye girmiyor ve kendi no_answer sonucunu
+        # alıyor - diğerlerinin teşhisi bundan etkilenmemeli.
+        canned = (
+            True,
+            "Yanıt üretildi.",
+            [
+                {"answer": "Bu bilgi belgede bulunmuyor.", "sources": []},
+                {"answer": "ikinci teşhis", "sources": [{"documentName": "y"}]},
+            ],
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=canned):
+                result = analyze_approved_data(_two_weak_outcomes_payload())
+
+        contexts = [item["ragContext"] for item in result["outcomes"]]
+        self.assertEqual(contexts, ["", "ikinci teşhis"])
 
 
 class RecommendationStrippingTests(unittest.TestCase):
@@ -241,7 +388,7 @@ class RecommendationStrippingTests(unittest.TestCase):
             {"answer": "Ek okuma çalışmaları yapılmalıdır.", "sources": [{"documentName": "x"}]},
         )
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_context", return_value=canned):
+            with patch("backend.app.rag_client.query_rag_contexts", return_value=_as_batch(canned)):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 

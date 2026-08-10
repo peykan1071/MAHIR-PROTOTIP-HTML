@@ -715,11 +715,30 @@ class RAGInference:
         except Exception:  # noqa: BLE001 - okunamayan istek gövdesi 500'e değil 400'e düşmeli.
             return JSONResponse({"ok": False, "message": "İstek gövdesi okunamadı."}, status_code=400)
 
+        program_id = (body or {}).get("programId") or None
+        top_k = int((body or {}).get("topK") or DEFAULT_TOP_K)
+
+        # Isıtma: soğuk başlangıç ölçüldü, ~110 sn (konteyner + modeller). Bu
+        # dal hiçbir sorgu çalıştırmadan sadece konteynerin ayakta ve
+        # @modal.enter()'ın bitmiş olmasını sağlar - öğretmen doğrulama
+        # ekranında puanları incelerken çağrılıyor, böylece analiz anında
+        # konteyner zaten sıcak oluyor (scaledown_window=300).
+        if (body or {}).get("warmup"):
+            return JSONResponse({"ok": True, "message": "RAG hattı hazır.", "structuredData": {"ready": True}})
+
+        # Toplu biçim: N zayıf öğrenme çıktısı tek istekte, tek vLLM partisinde.
+        raw_queries = (body or {}).get("queries")
+        if isinstance(raw_queries, list) and raw_queries:
+            ok, message, results = self._run_batch_query(raw_queries, top_k, program_id)
+            return JSONResponse(
+                {"ok": ok, "message": message, "structuredData": {"results": results} if ok else None},
+                status_code=200 if ok else 500,
+            )
+
+        # Tekil biçim - eski istemciler ve `main()` için aynen korunuyor.
         question = str((body or {}).get("question") or "").strip()
         if not question:
             return JSONResponse({"ok": False, "message": "Soru boş olamaz."}, status_code=400)
-        program_id = (body or {}).get("programId") or None
-        top_k = int((body or {}).get("topK") or DEFAULT_TOP_K)
         grade = (body or {}).get("grade") or None
         theme = (body or {}).get("theme") or None
         retrieval_query = str((body or {}).get("retrievalQuery") or "").strip() or None
@@ -747,7 +766,59 @@ class RAGInference:
         Verilmezse `question` gömülür - eski davranış birebir korunur.
         """
 
-        if not question or not question.strip():
+        ok, message, results = self._run_batch_query(
+            [
+                {
+                    "question": question,
+                    "retrievalQuery": retrieval_query,
+                    "grade": grade,
+                    "theme": theme,
+                }
+            ],
+            top_k,
+            program_id,
+        )
+        if not ok or not results:
+            return ok, message, None
+        result = results[0]
+        # Tek sorgu sözleşmesi korunuyor: kaynak yoksa mesaj "Bu bilgi belgede
+        # bulunmuyor.", varsa "Yanıt üretildi." - çağıranlar (rag_client,
+        # approved_data_analyzer, main()) buna göre yazılmış.
+        found = bool(result.get("sources"))
+        return True, "Yanıt üretildi." if found else "Bu bilgi belgede bulunmuyor.", result
+
+    def _run_batch_query(
+        self,
+        items: list[dict[str, object]],
+        top_k: int,
+        program_id: str | None,
+    ) -> tuple[bool, str, list[dict[str, object]] | None]:
+        """Birden çok soruyu TEK partide yanıtlar; sonuçlar giriş sırasıyla döner.
+
+        Neden parti: ölçüldü (bkz. `modal app logs turkish-rag-system`), sıcak
+        bir konteynerde tek sorgu ~10 s sürüyor ve bunun 7-8,6 s'si vLLM
+        üretimi - `Processed prompts: 1/1`, ~29 çıktı token/s. Bu, 7B bir
+        modelin A10G'de TEK dizilik çözme hızı; darboğaz GPU'nun bellek bant
+        genişliği, hesap gücü değil. vLLM birden çok diziyi birlikte
+        çözdüğünde toplam süre neredeyse değişmiyor, yani N zayıf öğrenme
+        çıktısı için N × 10 s yerine ~10 s ödeniyor.
+
+        Parti başına BİR kez yapılanlar (eskiden sorgu başınaydı): Volume
+        reload + Qdrant yeniden açma, gömme çağrısı (hepsi tek `encode`'da).
+        Qdrant araması ve filtreler (program_id/grade/theme_key) öğe başına
+        ayrı ayrı uygulanmaya devam ediyor - temalar birbirine karışmaz.
+
+        Altyapı hataları (volume/gömme/Qdrant/üretim) tüm parti için `False`
+        döndürür; çağıran taraf tek tek sorgulamaya geri düşebilir (bkz.
+        `approved_data_analyzer.py::_attach_rag_context`). Getirimi boş çıkan
+        öğe partiye hiç girmez, kendi `no_answer` sonucunu alır - diğerlerini
+        etkilemez.
+        """
+
+        if not items:
+            return False, "Sorgu listesi boş olamaz.", None
+        questions = [str(item.get("question") or "").strip() for item in items]
+        if not all(questions):
             return False, "Soru boş olamaz.", None
 
         # Bu konteyner sıcak kalırken başka bir konteynerde (index_pdf) commit
@@ -768,91 +839,126 @@ class RAGInference:
             return False, f"Belge dizini tazelenemedi: {error}", None
 
         try:
-            embedded_text = (retrieval_query or "").strip() or question
-            query_vector = self._embedder.encode([embedded_text], normalize_embeddings=True)[0].tolist()
+            embedded_texts = [
+                str(item.get("retrievalQuery") or "").strip() or question
+                for item, question in zip(items, questions)
+            ]
+            query_vectors = self._embedder.encode(embedded_texts, normalize_embeddings=True)
         except Exception as error:  # noqa: BLE001 - gömme üçüncü parti bir ML çağrısı; tek bir
             # sorgu tüm servis konteynerini çökertmemeli.
             return False, f"Soru gömülemedi: {error}", None
 
-        no_answer: dict[str, object] = {"answer": "Bu bilgi belgede bulunmuyor.", "sources": []}
+        def _no_answer() -> dict[str, object]:
+            return {"answer": "Bu bilgi belgede bulunmuyor.", "sources": []}
 
         from qdrant_client.models import FieldCondition, Filter, MatchValue
 
-        # program_id verilirse yalnızca o programa etiketli parçalarda ara -
-        # MAHİR tek derslik değil (60+ ders), aynı öğrenme çıktısı kodu farklı
-        # temalarda/sınıf düzeylerinde farklı anlama gelebiliyor; filtresiz
-        # getirim yanlış dersin/sınıfın/temanın içeriğini sessizce
-        # karıştırabilir. grade/theme verilirse ek (AND) güvenlik/hassasiyet
-        # katmanı olarak eklenir - bkz. index_pdf'in yazdığı aynı adlı alanlar.
-        # theme, "theme_key" alanına göre eşleşir (`_theme_match_key`) - ham
-        # tema metni pypdf'in bazı harf çiftlerinde eklediği sahte boşluklar
-        # yüzünden (bkz. _theme_match_key docstring'i) birebir eşleşme için
-        # güvenilir değil.
-        filter_conditions = []
-        if program_id:
-            filter_conditions.append(FieldCondition(key="program_id", match=MatchValue(value=program_id)))
-        if grade:
-            filter_conditions.append(FieldCondition(key="grade", match=MatchValue(value=grade)))
-        if theme:
-            filter_conditions.append(
-                FieldCondition(key="theme_key", match=MatchValue(value=_theme_match_key(theme)))
-            )
-        query_filter = Filter(must=filter_conditions) if filter_conditions else None
-
         try:
-            if not self._qdrant.collection_exists(QDRANT_COLLECTION_NAME):
-                return True, "Bu bilgi belgede bulunmuyor.", no_answer
-            hits = self._qdrant.query_points(
-                collection_name=QDRANT_COLLECTION_NAME,
-                query=query_vector,
-                query_filter=query_filter,
-                limit=top_k,
-                with_payload=True,
-            ).points
+            collection_exists = self._qdrant.collection_exists(QDRANT_COLLECTION_NAME)
         except Exception as error:  # noqa: BLE001 - yerel Qdrant okuması; bozuk/erişilemeyen
             # bir depo tüm servisi çökertmemeli.
             return False, f"Belge dizininden okunamadı: {error}", None
+        if not collection_exists:
+            return True, "Bu bilgi belgede bulunmuyor.", [_no_answer() for _ in items]
 
-        if not hits:
-            return True, "Bu bilgi belgede bulunmuyor.", no_answer
+        results: list[dict[str, object] | None] = [None] * len(items)
+        conversations: list[list[dict[str, str]]] = []
+        generated_indexes: list[int] = []
+        hits_by_index: dict[int, list] = {}
 
-        context_blocks = [
-            str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
-            for hit in hits
-        ]
-        context_text = "\n\n---\n\n".join(context_blocks)
+        for index, (item, question) in enumerate(zip(items, questions)):
+            # program_id verilirse yalnızca o programa etiketli parçalarda ara -
+            # MAHİR tek derslik değil (60+ ders), aynı öğrenme çıktısı kodu farklı
+            # temalarda/sınıf düzeylerinde farklı anlama gelebiliyor; filtresiz
+            # getirim yanlış dersin/sınıfın/temanın içeriğini sessizce
+            # karıştırabilir. grade/theme verilirse ek (AND) güvenlik/hassasiyet
+            # katmanı olarak eklenir - bkz. index_pdf'in yazdığı aynı adlı alanlar.
+            # theme, "theme_key" alanına göre eşleşir (`_theme_match_key`) - ham
+            # tema metni pypdf'in bazı harf çiftlerinde eklediği sahte boşluklar
+            # yüzünden (bkz. _theme_match_key docstring'i) birebir eşleşme için
+            # güvenilir değil.
+            grade = item.get("grade") or None
+            theme = item.get("theme") or None
+            filter_conditions = []
+            if program_id:
+                filter_conditions.append(FieldCondition(key="program_id", match=MatchValue(value=program_id)))
+            if grade:
+                filter_conditions.append(FieldCondition(key="grade", match=MatchValue(value=str(grade))))
+            if theme:
+                filter_conditions.append(
+                    FieldCondition(key="theme_key", match=MatchValue(value=_theme_match_key(str(theme))))
+                )
+            query_filter = Filter(must=filter_conditions) if filter_conditions else None
 
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"BAĞLAM:\n{context_text}\n\nSORU: {question}\n\n"
-                "Yalnızca yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla.",
-            },
-        ]
+            try:
+                hits = self._qdrant.query_points(
+                    collection_name=QDRANT_COLLECTION_NAME,
+                    query=query_vectors[index].tolist(),
+                    query_filter=query_filter,
+                    limit=top_k,
+                    with_payload=True,
+                ).points
+            except Exception as error:  # noqa: BLE001 - yerel Qdrant okuması; bozuk/erişilemeyen
+                # bir depo tüm servisi çökertmemeli.
+                return False, f"Belge dizininden okunamadı: {error}", None
 
-        try:
-            from vllm import SamplingParams
+            if not hits:
+                results[index] = _no_answer()
+                continue
 
-            outputs = self._llm.chat(messages, SamplingParams(temperature=0.1, max_tokens=1024))
-            answer = outputs[0].outputs[0].text.strip()
-        except Exception as error:  # noqa: BLE001 - vLLM üretimi üçüncü parti bir ML çağrısı;
-            # bir sorgunun başarısız olması servis konteynerini çökertmemeli.
-            return False, f"Yanıt üretilemedi: {error}", None
+            context_blocks = [
+                str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
+                for hit in hits
+            ]
+            context_text = "\n\n---\n\n".join(context_blocks)
+            conversations.append([
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": f"BAĞLAM:\n{context_text}\n\nSORU: {question}\n\n"
+                    "Yalnızca yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla.",
+                },
+            ])
+            generated_indexes.append(index)
+            hits_by_index[index] = hits
 
-        sources = [
-            {
-                "documentName": (hit.payload or {}).get("document_name"),
-                "grade": (hit.payload or {}).get("grade"),
-                "theme": (hit.payload or {}).get("theme"),
-                "pages": (hit.payload or {}).get("pages", []),
-                "headings": (hit.payload or {}).get("headings", []),
-                "excerpt": str((hit.payload or {}).get("text", ""))[:300],
-                "score": hit.score,
-            }
-            for hit in hits
-        ]
-        return True, "Yanıt üretildi.", {"answer": answer, "sources": sources}
+        if conversations:
+            try:
+                from vllm import SamplingParams
+
+                # Konuşma LİSTESİ veriliyor - vLLM partiyi kendi sıralayıp
+                # birlikte çözüyor ve çıktıları giriş sırasıyla döndürüyor.
+                outputs = self._llm.chat(conversations, SamplingParams(temperature=0.1, max_tokens=1024))
+            except Exception as error:  # noqa: BLE001 - vLLM üretimi üçüncü parti bir ML çağrısı;
+                # bir sorgunun başarısız olması servis konteynerini çökertmemeli.
+                return False, f"Yanıt üretilemedi: {error}", None
+            if len(outputs) != len(conversations):
+                return False, "Toplu üretimde yanıt sayısı sorgu sayısıyla eşleşmedi.", None
+
+            for output, index in zip(outputs, generated_indexes):
+                results[index] = {
+                    "answer": output.outputs[0].text.strip(),
+                    "sources": _build_sources(hits_by_index[index]),
+                }
+
+        return True, "Yanıt üretildi.", [result or _no_answer() for result in results]
+
+
+def _build_sources(hits) -> list[dict[str, object]]:
+    """Qdrant isabetlerini yanıtın `sources` listesine çevirir."""
+
+    return [
+        {
+            "documentName": (hit.payload or {}).get("document_name"),
+            "grade": (hit.payload or {}).get("grade"),
+            "theme": (hit.payload or {}).get("theme"),
+            "pages": (hit.payload or {}).get("pages", []),
+            "headings": (hit.payload or {}).get("headings", []),
+            "excerpt": str((hit.payload or {}).get("text", ""))[:300],
+            "score": hit.score,
+        }
+        for hit in hits
+    ]
 
 
 @app.local_entrypoint()

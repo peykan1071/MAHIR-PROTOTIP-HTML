@@ -70,6 +70,36 @@ class ReceiverWarmUpRouteTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertFalse(json.loads(body)["started"])
 
+    def test_rag_warmup_returns_immediately_without_waiting_for_remote(self):
+        # RAG'in soğuk başlangıcı daha da uzun (~110 sn); bu ping doğrulama
+        # ekranı açılırken atıldığı için hiçbir koşulda bloklamamalı.
+        started = threading.Event()
+
+        def slow_warm_up(_remote_url):
+            started.set()
+            time.sleep(5)
+            return True
+
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.rag_client.warm_up_remote_rag", slow_warm_up):
+                begin = time.monotonic()
+                status, body = _get(self.server, file_receiver.RAG_WARMUP_PATH)
+                elapsed = time.monotonic() - begin
+
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)["started"])
+        self.assertLess(elapsed, 1.0, "ısıtma ping'i uzak çağrıyı beklememeli")
+        self.assertTrue(started.wait(timeout=5), "uzak ısıtma çağrısı hiç başlamadı")
+
+    def test_rag_warmup_without_remote_url_makes_no_remote_call(self):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
+            with patch("backend.app.rag_client.warm_up_remote_rag") as mock_warm_up:
+                status, body = _get(self.server, file_receiver.RAG_WARMUP_PATH)
+
+        mock_warm_up.assert_not_called()
+        self.assertEqual(status, 200)
+        self.assertFalse(json.loads(body)["started"])
+
     def test_static_file_serving_still_works(self):
         # do_GET override'ı yalnızca ısıtma yolunu yakalamalı; prototipin geri
         # kalanı (index.html, script.js, assets) aynı sunucudan geliyor.

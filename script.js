@@ -2816,14 +2816,21 @@ const fileUploadBridge = (() => {
     // Tek seferlik değil, kısılmış: öğretmen aynı oturumda ikinci bir grup
     // yüklediğinde konteyner çoktan kapanmış olabilir, o yüzden yeniden
     // ısıtılabilmeli - ama her dosya seçiminde tekrar tekrar değil.
-    const OCR_WARM_UP_THROTTLE_MS = 30000;
-    let ocrWarmUpAt = 0;
-    const warmUpOcr = () => {
+    const WARM_UP_THROTTLE_MS = 30000;
+    const warmUpAt = {};
+    const warmUp = (path) => {
       const now = Date.now();
-      if (now - ocrWarmUpAt < OCR_WARM_UP_THROTTLE_MS) return;
-      ocrWarmUpAt = now;
-      fetch("/mahir-ocr-warmup").catch(() => {});
+      if (now - (warmUpAt[path] || 0) < WARM_UP_THROTTLE_MS) return;
+      warmUpAt[path] = now;
+      fetch(path).catch(() => {});
     };
+    const warmUpOcr = () => warmUp("/mahir-ocr-warmup");
+    // RAG'in soğuk başlangıcı daha da uzun (ölçülen ~110 sn: konteyner +
+    // bge-m3 + vLLM/Qwen2.5-7B) ve bugün tam "Onayla ve Analiz Et"e basıldığı
+    // anda ödeniyor. Doğrulama ekranı açılırken ısıtıyoruz: öğretmen puanları
+    // incelerken hazırlık biter, rag_service.py'deki scaledown_window=300 de
+    // konteyneri o inceleme boyunca ayakta tutar.
+    const warmUpRag = () => warmUp("/mahir-rag-warmup");
 
     const selectFiles = (files) => {
       const incoming = Array.from(files || []);
@@ -3329,6 +3336,7 @@ const fileUploadBridge = (() => {
       if (sourceMode === "manual") {
         renderValidationData({ exam: {}, students: [], warnings: ["Veriler elle girilecektir."], summary: {} });
         screenManager.showScreen("validation-screen");
+        warmUpRag();
         return;
       }
       if (!selectedFiles.length) return;
@@ -3379,6 +3387,7 @@ const fileUploadBridge = (() => {
           const reportRequest = reportText ? Promise.resolve(reportText) : fetch(`/shared/report-example.txt?ts=${Date.now()}`).then((reportResponse) => reportResponse.ok ? reportResponse.text() : message);
           reportRequest.then(showReport).catch(() => showReport(message));
           screenManager.showScreen("validation-screen");
+          warmUpRag();
           console.info("[MAHIR] Belge grubu backend alıcısına gönderildi.", { fileCount: selectedFiles.length, studentCount: mergedData.students.length });
           showMessage(message, "success");
         })
