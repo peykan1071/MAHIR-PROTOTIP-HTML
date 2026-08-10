@@ -267,7 +267,11 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
         if not ok or not data:
             continue
         answer = str(data.get("answer") or "").strip()
-        if not answer or not data.get("sources") or answer == _RAG_NO_ANSWER_TEXT:
+        # startswith, tam eşleşme değil: model bazen "Bu bilgi belgede
+        # bulunmuyor." ile başlayıp çelişkili şekilde devam edip teşhis
+        # yazmaya devam edebiliyor (gerçek deploy'da görüldü) - böyle
+        # kendiyle çelişen bir yanıtı göstermek yerine tamamen atlanır.
+        if not answer or not data.get("sources") or answer.startswith(_RAG_NO_ANSWER_TEXT):
             continue
         outcome["ragContext"] = answer
 
@@ -275,11 +279,13 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
 def _build_rag_question(outcome: dict[str, Any]) -> str:
     """Build a RAG question from theme + code + skill together - never code
     alone, since the same code (e.g. TDE1.2) means a different learning
-    outcome in each of the four TDE9 themes. Deliberately descriptive
-    ("what does it cover", "briefly explain") rather than prescriptive
-    ("how should it be taught") - MAHİR does not suggest activities, methods,
-    or remedial programs (DEVELOPMENT_CHARTER.md), this question wording is
-    the point where that constraint is actually enforced."""
+    outcome in each of the four TDE9 themes. Includes the actual success
+    rate so the RAG system prompt (rag_service.py) can compare the outcome's
+    Bloom's-taxonomy cognitive level against the score, per the analyst-style
+    diagnostic framing. Deliberately asks for a diagnosis, never "how should
+    this be taught" - MAHİR does not suggest activities, methods, or
+    remedial programs (DEVELOPMENT_CHARTER.md), this question wording is the
+    point where that constraint is actually enforced."""
 
     parts = [
         str(part)
@@ -288,7 +294,10 @@ def _build_rag_question(outcome: dict[str, Any]) -> str:
     ]
     if not parts:
         return ""
+    success_rate = float(outcome.get("successRate") or 0.0)
+    percent_text = f"%{round(success_rate * 100)}"
     return (
-        f"{' - '.join(parts)} öğrenme çıktısı hangi temel kavram ve becerileri "
-        "kapsar? Bu kazanımın konusunu kısaca açıkla."
+        f"{' - '.join(parts)} öğrenme çıktısında öğrenciler {percent_text} "
+        "başarı oranı gösterdi. Bu kazanımın bilişsel düzeyini bu başarı "
+        "oranıyla kıyaslayarak teşhis et."
     )
