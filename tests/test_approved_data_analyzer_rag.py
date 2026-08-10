@@ -83,6 +83,50 @@ class RagContextAttachmentTests(unittest.TestCase):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
+    def test_answer_prefixed_with_no_answer_phrase_is_stripped_not_discarded(self):
+        # Gerçek dizine karşı doğrulandı: model doğru bağlamla beslendiğinde bile
+        # cevabı neredeyse her zaman "Bu bilgi belgede bulunmuyor." ile başlatıp
+        # ardından gerçek bir teşhisle devam ediyor - kaynaklar dolu geldiği
+        # sürece bu, gerçek bir "bulunamadı" değil, atılmaması gereken geçerli
+        # bir cevap.
+        canned = (
+            True,
+            "Yanıt üretildi.",
+            {
+                "answer": "Bu bilgi belgede bulunmuyor.\n\nTDE1.2 dinleme becerisini kapsar.",
+                "sources": [{"documentName": "x"}],
+            },
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.rag_client.query_rag_context", return_value=canned):
+                result = analyze_approved_data(_weak_tde_payload())
+        self.assertEqual(result["outcomes"][0]["ragContext"], "TDE1.2 dinleme becerisini kapsar.")
+
+    def test_answer_only_the_no_answer_phrase_with_sources_still_leaves_ragcontext_empty(self):
+        # Kırpmadan sonra hiçbir şey kalmıyorsa (model gerçekten hiçbir şey
+        # bulamadıysa, kaynaklar dolu gelse bile) yine boş bırakılmalı.
+        canned = (
+            True,
+            "Yanıt üretildi.",
+            {"answer": "Bu bilgi belgede bulunmuyor.", "sources": [{"documentName": "x"}]},
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.rag_client.query_rag_context", return_value=canned):
+                result = analyze_approved_data(_weak_tde_payload())
+        self.assertEqual(result["outcomes"][0]["ragContext"], "")
+
+    def test_unresolved_theme_skips_rag_call_entirely(self):
+        # Tema kataloğa göre çözülemiyorsa grade-only bir aramaya düşülmemeli -
+        # bu, 9. sınıfın 4 farklı temasından herhangi birinin içeriğini
+        # getirebilir ve yanlış temadan "kaynaklı" görünen bir teşhis üretebilir.
+        payload = _weak_tde_payload()
+        payload["questions"][0]["outcomeTheme"] = ""
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.rag_client.query_rag_context") as mock_query:
+                result = analyze_approved_data(payload)
+        mock_query.assert_not_called()
+        self.assertEqual(result["outcomes"][0]["ragContext"], "")
+
     def test_rag_failure_leaves_ragcontext_empty_and_does_not_raise(self):
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
             with patch(

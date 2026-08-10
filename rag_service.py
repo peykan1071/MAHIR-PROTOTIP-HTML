@@ -117,7 +117,11 @@ SYSTEM_PROMPT = (
     "kazanımlar için çalıştırılır - eksikliğin şiddetini şu eşiklere göre "
     "belirt: başarı oranı %50'nin altındaysa Kritik, %50-69 arasındaysa "
     "Orta (Hafif etiketini kullanma, bu aralıkta hiçbir durum hafif "
-    "sayılmaz).\n"
+    "sayılmaz). Bu kazanım genellikle sonraki/ileri düzey kazanımların "
+    "temelini oluşturduğundan, eksikliğin sonraki öğrenmelere sarmal "
+    "(kümülatif) bir risk oluşturup oluşturmadığını da teşhisine kısaca "
+    "ekle - yalnızca bu riski TEŞHİS ET, nasıl giderileceğini önerme "
+    "(madde 4).\n"
     "4) Yalnızca teşhis koy, çözüm önerme: etkinlik, kaynak, öğretim "
     "yöntemi veya telafi programı önerme; yalnızca durumu, eksikliği ve "
     "risk düzeyini kanıtlarıyla belirle - bu kural istisnasızdır.\n\n"
@@ -126,7 +130,8 @@ SYSTEM_PROMPT = (
     "kapsasın: (a) kazanımın bilişsel düzeyi ile başarı oranının "
     "karşılaştırması ve bu kazanıma özgü eksiklik teşhisi, (b) eksikliğin "
     "şiddeti (Kritik/Orta) ve bilgi düzeyinden mi yoksa üst düzey beceri "
-    "eksikliğinden mi kaynaklandığı."
+    "eksikliğinden mi kaynaklandığı, (c) eksikliğin sonraki kazanımlara "
+    "olası sarmal riski."
 )
 
 rag_storage_volume = modal.Volume.from_name("rag-storage", create_if_missing=True)

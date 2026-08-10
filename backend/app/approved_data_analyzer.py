@@ -262,6 +262,14 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
         if not question:
             continue
         theme = _normalize_theme_for_rag(str(outcome.get("outcomeTheme") or ""))
+        if not theme:
+            # Tema çözülemezse (ör. kazanım kataloğunda seçim yapılmamış) grade-only
+            # bir aramaya düşmüyoruz: bu, 9. sınıfın 4 farklı temasından herhangi
+            # birinin içeriğini getirebilir - aynı çıktı kodu her temada farklı bir
+            # kazanıma karşılık geldiği için (bkz. rag_service.py index_pdf
+            # docstring'i) yanlış temadan "kaynaklı" görünen bir teşhis vermek,
+            # hiç teşhis vermemekten daha kötü.
+            continue
         try:
             ok, _message, data = query_rag_context(
                 question, program.id, MAHIR_RAG_REMOTE_URL, grade=program.grade, theme=theme
@@ -271,11 +279,19 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
         if not ok or not data:
             continue
         answer = str(data.get("answer") or "").strip()
-        # startswith, tam eşleşme değil: model bazen "Bu bilgi belgede
-        # bulunmuyor." ile başlayıp çelişkili şekilde devam edip teşhis
-        # yazmaya devam edebiliyor (gerçek deploy'da görüldü) - böyle
-        # kendiyle çelişen bir yanıtı göstermek yerine tamamen atlanır.
-        if not answer or not data.get("sources") or answer.startswith(_RAG_NO_ANSWER_TEXT):
+        if not answer or not data.get("sources"):
+            continue
+        # startswith + kırpma, tam eşleşme değil: gerçek dizin karşısında
+        # doğrulandı (bkz. proje hafızası) - model doğru bağlamla beslendiğinde
+        # bile CEVABI neredeyse HER ZAMAN "Bu bilgi belgede bulunmuyor." ile
+        # başlatıp ardından gerçek, bağlama dayalı bir teşhisle devam ediyor.
+        # Önceki sürüm bu ön ek varsa cevabın TAMAMINI atıyordu - bu da
+        # kaynakları dolu gelen, geçerli çoğu yanıtın sessizce boş kalmasına
+        # yol açıyordu. Yalnızca ön eki kırpıp gerçekten hiçbir şey kalmıyorsa
+        # (modelin GERÇEKTEN hiçbir şey bulamadığı durum) atlanır.
+        if answer.startswith(_RAG_NO_ANSWER_TEXT):
+            answer = answer[len(_RAG_NO_ANSWER_TEXT):].strip()
+        if not answer:
             continue
         outcome["ragContext"] = answer
 
