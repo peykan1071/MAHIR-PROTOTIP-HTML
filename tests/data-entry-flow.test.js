@@ -11,7 +11,8 @@ const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 
 assert.match(html, /MAHİR Veri Giriş Şablonu<\/h3>/);
 assert.match(html, /shared\/templates\/MAHIR_Veri_Giris_Sablonu\.docx/);
-assert.match(html, /Sınav Kâğıdı Puan Çizelgesi \(OCR\)/);
+assert.match(html, /Puan Çizelgesi Görseli \(OCR\)/);
+assert.match(html, /Öğrenci bazlı puan çizelgesi görsellerini yükleyin\./);
 assert.match(html, /Ornek_Sinav_Kagidi_Soru_Bazli_Puan_Cizelgesi\.docx/);
 assert.match(html, /Örnek Sınav Kâğıdını İndir/);
 assert.match(html, /data-ocr-guidance/);
@@ -21,8 +22,12 @@ assert.match(html, /renk, ölçü ve tasarımının örnekle aynı olması gerek
 assert.match(html, /Uygun olmayan belgeler/);
 assert.match(html, /bu alanda işleme alınmaz/);
 assert.match(html, /Kişisel verilerin korunması/);
-assert.match(html, /öğrenci adı, soyadı, T\.C\. kimlik numarası ve diğer kişisel verileri kaldırınız/);
+assert.match(html, /data-personal-data-warning/);
+assert.match(html, /Öğrenci adı, soyadı, T\.C\. kimlik numarası ve gereksiz diğer kişisel verileri yüklemeyiniz veya girmeyiniz/);
 assert.match(html, /yalnızca okul numarasını kullanınız/);
+assert.ok(html.indexOf("data-personal-data-warning") < html.indexOf("data-ocr-guidance"));
+assert.match(html, /Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır\./);
+assert.doesNotMatch(html, /Öğrenci T\.C\. kimlik numarası yüklemeyiniz/);
 assert.match(html, /Öğrencinin Aldığı Puan/);
 assert.doesNotMatch(html, /MAHİR Veri Giriş Şablonu\s*[–-]\s*Sürüm/);
 assert.match(html, /data-save-current-group>Verileri Kontrol Et ve Kaydet<\/button>/);
@@ -42,6 +47,8 @@ assert.match(html, /data-confirm-final-analysis>Verileri Onayla ve Analize Geç<
 assert.match(script, /if \(total === expected\) \{\s*showFinalReview\(\);\s*return;/);
 assert.match(script, /ocrGuidance\?\.toggleAttribute\("hidden", mode !== "images"\)/);
 assert.match(script, /Çizelge Fotoğraflarını Seç/);
+assert.match(script, /Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır\./);
+assert.doesNotMatch(script, /Öğrenci T\.C\. kimlik numarası yüklemeyiniz/);
 assert.match(script, /addGroupButton\.hidden = sourceMode !== "images" \|\| total >= expected/);
 assert.match(script, /const startNewGroup = \(\) => \{[\s\S]*clearAllFiles\(\);[\s\S]*clearValidationErrors\(\);/);
 assert.doesNotMatch(script, /clearFile\(\)/);

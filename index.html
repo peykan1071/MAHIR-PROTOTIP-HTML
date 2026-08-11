@@ -279,12 +279,19 @@
               <p>Her yol aynı öğretmen onay ekranına bağlanır.</p>
             </div>
             <div class="data-source-options" role="radiogroup" aria-label="Veri giriş yolu">
-              <label><input type="radio" name="data-source" value="images" data-source-option checked> <span><strong>Sınav Kâğıdı Puan Çizelgesi (OCR)</strong><small>Her öğrenci için üç satırlı puan çizelgesi</small></span></label>
+              <label><input type="radio" name="data-source" value="images" data-source-option checked> <span><strong>Puan Çizelgesi Görseli (OCR)</strong><small>Öğrenci bazlı puan çizelgesi görsellerini yükleyin.</small></span></label>
               <label><input type="radio" name="data-source" value="document" data-source-option> <span><strong>Word / PDF / Excel tablosu</strong><small>Öğretmenin kendi düzeni olabilir</small></span></label>
               <label><input type="radio" name="data-source" value="template" data-source-option> <span><strong>MAHİR şablonu</strong><small>Önerilen yapılandırılmış giriş</small></span></label>
               <label><input type="radio" name="data-source" value="manual" data-source-option> <span><strong>Elle veri girişi</strong><small>Dosya yüklemeden tabloyu doldurun</small></span></label>
             </div>
           </article>
+
+          <dl class="ocr-guidance-list" data-personal-data-warning>
+            <div>
+              <dt>Kişisel verilerin korunması</dt>
+              <dd>Öğrenci adı, soyadı, T.C. kimlik numarası ve gereksiz diğer kişisel verileri yüklemeyiniz veya girmeyiniz. Öğrencinin ayırt edilmesi için yalnızca okul numarasını kullanınız.</dd>
+            </div>
+          </dl>
 
           <article class="ocr-guidance-card" aria-labelledby="ocr-guidance-title" data-ocr-guidance>
             <div class="ocr-guidance-copy">
@@ -299,10 +306,6 @@
                 <div>
                   <dt>Uygun olmayan belgeler</dt>
                   <dd>Toplu sınıf listeleri, Excel ekran görüntüleri ve cevap anahtarları bu alanda işleme alınmaz.</dd>
-                </div>
-                <div>
-                  <dt>Kişisel verilerin korunması</dt>
-                  <dd>Yüklemeden önce görseldeki öğrenci adı, soyadı, T.C. kimlik numarası ve diğer kişisel verileri kaldırınız. Öğrencinin ayırt edilmesi için yalnızca okul numarasını kullanınız.</dd>
                 </div>
               </dl>
             </div>
@@ -347,7 +350,7 @@
           <div class="uploaded-files-list" data-uploaded-files-list aria-live="polite" hidden></div>
 
           <p class="notification-message upload-status-message" data-component="Notification Message" data-upload-status aria-live="polite">
-            Öğrenci T.C. kimlik numarası yüklemeyiniz. Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır.
+            Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır.
           </p>
 
           <div class="button-group data-entry-actions" aria-label="Veri ekleme işlemleri">

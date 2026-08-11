@@ -2806,7 +2806,7 @@ const fileUploadBridge = (() => {
       setStatus(
         hasFiles
           ? `${selectedFiles.length} dosya hazır. Okunan alanlar öğretmen onayına sunulacaktır.`
-          : "Öğrenci T.C. kimlik numarası yüklemeyiniz. Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır.",
+          : "Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır.",
         hasFiles ? "success" : ""
       );
     };
