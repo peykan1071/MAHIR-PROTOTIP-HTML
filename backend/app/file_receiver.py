@@ -49,7 +49,15 @@ ALLOWED_EXTENSIONS = {
     ".xlsx",
 }
 IMAGE_EXTENSIONS = {".gif", ".jpeg", ".jpg", ".png", ".webp"}
-MAHIR_OCR_REMOTE_URL = os.environ.get("MAHIR_OCR_REMOTE_URL", "")
+_DEFAULT_MAHIR_OCR_REMOTE_URL = "https://hakanergul--mahir-ocr-worker-ocr-worker.modal.run"
+# Dağıtılmış OCR işçisinin adresi koda gömülü - `approved_data_analyzer.py`'deki
+# `MAHIR_RAG_REMOTE_URL` ile aynı desen. Modal'ın ürettiği URL bir daha dağıtım
+# yapılana kadar değişmiyor, bu yüzden sunucuyu her başlatışta aynı pencerede
+# env değişkeni ayarlamaya gerek yok - unutulduğunda sunucu hata vermeden
+# OCR'sız "pass-through" moduna düşüyordu (bkz. README'deki uyarı). Farklı bir
+# dağıtıma (ör. test ortamı) işaret etmek gerekirse env var yine geçersiz kılar;
+# boş string vermek OCR'ı bilinçli olarak kapatır.
+MAHIR_OCR_REMOTE_URL = os.environ.get("MAHIR_OCR_REMOTE_URL", _DEFAULT_MAHIR_OCR_REMOTE_URL)
 
 
 @dataclass(frozen=True)
