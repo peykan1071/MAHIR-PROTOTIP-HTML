@@ -74,6 +74,19 @@ CHUNK_MAX_TOKENS = 512
 DEFAULT_TOP_K = 5
 MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024  # backend/app/file_receiver.py ile aynı sınır
 
+# Getirim isabetlerinin, EN İYİ isabetin skoruna göre korunma alt sınırı - mutlak
+# bir `score_threshold` DEĞİL. Gerekçe ölçüm: 8 gerçek zayıf öğrenme çıktısı,
+# tema filtresi açık, top_k=8 (64 isabet). Her sorgu aynı şekli veriyor - 2 güçlü
+# isabet (0,86-0,94), bir orta grup (~0,73-0,78), sonra 0,60-0,68'de bir kuyruk.
+# Kopuşun iki yanındaki isabetlerin en iyi isabete oranı hesaplandığında, kopuş
+# gösteren altı sorgunun ortak aralığı 0,771-0,793 çıktı; 0,78 hepsinde tam
+# kopuş noktasından kesiyor. Mutlak bir eşik bunu yapamaz: bge-m3'ün skorları
+# belgeye/sorguya göre kayıyor (aynı dizinde 0,60 ile 0,94 arası gözlendi) ve
+# önerilen 0,40 gibi bir sayı burada hiçbir şeyi elemezdi. Oranın asıl değeri
+# uyarlanabilir olması - kuyruğu düz olan iki sorguda (Sözün İnceliği) 8
+# isabetin 8'ini de koruyor.
+_RELATIVE_SCORE_FLOOR = 0.78
+
 # MEB müfredat PDF'lerindeki hiyerarşi başlıkları - tdeogr.pdf üzerinde tüm
 # 5 sınıf düzeyi ve 20 sınıf×tema kombinasyonu için elle doğrulandı. Satırın
 # TAMAMINI kaplayan bağımsız bir metin satırı arıyoruz (`^...$`, MULTILINE) -
@@ -338,6 +351,56 @@ def _extract_original_pages(chunk: object, page_offset: int) -> list[int]:
     return sorted(pages)
 
 
+# uuid5 için sabit ad alanı - değeri değişirse aynı içerik farklı ID üretir,
+# yani bu string kalıcı bir şemanın parçasıdır ve DEĞİŞTİRİLMEMELİDİR.
+_POINT_ID_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "mahir-rag-chunk")
+
+
+def _deterministic_point_id(program_id: str, document_name: str, chunk_index: int, text: str) -> str:
+    """Aynı içerik -> aynı Qdrant nokta ID'si (içerik adresli, uuid5).
+
+    Eskiden `uuid4()` kullanılıyordu: aynı PDF'i `clear_index` çağırmadan
+    yeniden indekslemek 118 parçayı ikizler, `top_k` neredeyse birebir aynı
+    metinlerle dolar ve getirim sessizce bozulurdu - hiçbir hata vermeden.
+    uuid5 ile ikinci yazım aynı ID'lere denk gelir, `upsert` üzerine yazar.
+
+    `chunk_index` kasıtlı olarak anahtarın içinde: HybridChunker'ın
+    `repeat_table_header` davranışı aynı başlık satırını tekrarladığı için tek
+    bir tema İÇİNDE birebir aynı metne sahip iki parça mümkün ve bir ID
+    çakışması sessiz veri kaybı olurdu. Aynı PDF + aynı aralık + aynı kod aynı
+    sırayı ürettiğinden bu, belirlenimciliği bozmaz.
+
+    Bu, `clear_index`'in yerini ALMAZ: parçalama değişirse (ör. chunker ayarı)
+    eski ID'ler öksüz kalır ve yine temizlik gerekir. Kaldırdığı şey,
+    `clear_index`'i unutmanın bedeli.
+    """
+
+    return str(uuid.uuid5(_POINT_ID_NAMESPACE, f"{program_id}|{document_name}|{chunk_index}|{text}"))
+
+
+def _drop_weak_hits(hits: list, floor_ratio: float = _RELATIVE_SCORE_FLOOR) -> list:
+    """En iyi isabetin `floor_ratio` katının altında kalan isabetleri atar.
+
+    Qdrant isabetleri skora göre azalan sırada döndürür, bu yüzden eşik en
+    baştaki isabetten hesaplanır. Ölçüm gerekçesi için bkz.
+    `_RELATIVE_SCORE_FLOOR`.
+
+    Qdrant'ın kendi `score_threshold` parametresi yerine sorgudan SONRA
+    kırpıyoruz, çünkü orada eşiğin altında kalan bir sorgu BOŞ isabet listesi
+    döndürür ve `_no_answer()` yoluna düşerdi - yani öğretmenin raporunda boş
+    bir hücre. Bu fonksiyon her zaman en az bir isabet bırakır: kırpma bağlamı
+    daraltabilir, ama teşhisi asla tamamen ortadan kaldıramaz.
+    """
+
+    if not hits:
+        return hits
+    top_score = hits[0].score
+    if top_score <= 0:  # kosinüs negatif olabilir; oranla kırpmak orada anlamsız.
+        return hits
+    cutoff = top_score * floor_ratio
+    return [hit for hit in hits if hit.score >= cutoff] or hits[:1]
+
+
 @app.function(image=indexing_image, volumes=VOLUMES, timeout=60)
 def clear_index(program_id: str | None = None) -> tuple[bool, str]:
     """Belge dizinini temizler - `program_id` verilirse yalnızca o programa ait
@@ -556,7 +619,7 @@ def index_pdf(
 
         points = [
             PointStruct(
-                id=str(uuid.uuid4()),
+                id=_deterministic_point_id(program_id, document_name, index, chunk.text),
                 vector=vector,
                 payload={
                     "text": chunk.text,
@@ -905,6 +968,11 @@ class RAGInference:
             if not hits:
                 results[index] = _no_answer()
                 continue
+
+            # Zayıf kuyruğu at - bkz. `_drop_weak_hits` / `_RELATIVE_SCORE_FLOOR`.
+            # `sources` da kırpılmış listeden üretilir: rapordaki kaynak listesi
+            # modelin gerçekten gördüğü bağlamla aynı kalmalı.
+            hits = _drop_weak_hits(hits)
 
             context_blocks = [
                 str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
