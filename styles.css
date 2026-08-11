@@ -647,6 +647,24 @@ button[aria-disabled="true"] {
   vertical-align: top;
 }
 
+/* "Kanıtları Gör": D bölümünde her oranın hangi sorulardan ve kaç öğrenciden
+   hesaplandığı. Yalnız ekran önizlemesinde açılır olur - indirilen Word/PDF
+   belgesinde aynı metin düz olarak yer alır (bkz. mahir-report-export-common.js
+   renderOutputBody, block.details'i kasıtlı olarak geçmiyor). */
+.report-preview-sections .evidence-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.report-preview-sections .evidence-details > summary::marker {
+  color: var(--color-border);
+}
+
+.report-preview-sections .evidence-detail {
+  margin: 6px 0 0;
+  font-weight: 400;
+}
+
 .report-intro {
   margin: 0;
 }

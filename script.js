@@ -3190,7 +3190,12 @@ const fileUploadBridge = (() => {
         number: currentGroupNumber,
         students: students.map((student) => ({ ...student })),
         sourceMode,
-        documentType: structuredData?.exam?.documentType || inferDocumentType(structuredData)
+        documentType: structuredData?.exam?.documentType || inferDocumentType(structuredData),
+        // Düzeltme sayısı YALNIZ burada yakalanabilir: students yukarıda
+        // DOM'dan (öğretmenin düzelttiği hâliyle) geldi, structuredData ise
+        // hâlâ makinenin okuduğu özgün değerleri tutuyor - ve startNewGroup()
+        // birazdan structuredData'yı null yapıp o özgün değerleri yok edecek.
+        corrections: window.MAHIRScoreCorrections?.diffScores(structuredData?.students, students)
       });
       currentGroupNumber += 1;
       const total = savedGroups.reduce((sum, group) => sum + group.students.length, 0);
@@ -3284,6 +3289,16 @@ const fileUploadBridge = (() => {
       }
       const analysisPayload = {
         ...approvedData,
+        // "Bu %68 nereden geldi?" cevabının parçası: kaç puan hücresinin
+        // öğretmen tarafından düzeltildiği. Grup bazında kaydedilen sayımlara,
+        // son inceleme ekranında yapılan EK düzenlemeler eklenir - bu aşamada
+        // structuredData zaten birleştirilmiş (düzeltilmiş) değerleri tuttuğu
+        // için buradaki fark yalnızca sonradan yapılanları verir, mükerrer
+        // sayım olmaz.
+        correctedCells: (window.MAHIRScoreCorrections?.mergeCorrections(
+          ...savedGroups.map((group) => group.corrections),
+          window.MAHIRScoreCorrections.diffScores(structuredData?.students, approvedData.students)
+        ) || {}).byQuestionIndex || {},
         students: (approvedData.students || []).map((student, index) => ({
           ...student,
           studentNo: student.technicalId || `Ö-${String(index + 1).padStart(3, "0")}`

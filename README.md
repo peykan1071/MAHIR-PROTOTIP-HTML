@@ -168,6 +168,9 @@ Node.js kuruluysa tarayıcıdan bağımsız JavaScript kontrolleri de çalışt�
 ```bash
 node tests/program-catalog.test.js
 node tests/workspace-backup.test.js
+node tests/data-entry-flow.test.js
+node tests/score-corrections.test.js
+node tests/report-evidence.test.js
 ```
 
 ## Proje yapısı

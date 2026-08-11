@@ -32,4 +32,19 @@ assert.match(script, /returnToAnalysisButton\.disabled = isApproved/);
 assert.doesNotMatch(script, /data-finish-data-entry/);
 assert.doesNotMatch(script, /data-return-to-data/);
 
+// Düzeltme sayımının zamanlaması: fark, savedGroups.push İÇİNDE alınmak
+// zorunda. students orada DOM'dan (düzeltilmiş) gelirken structuredData hâlâ
+// makinenin okuduğu özgün değerleri tutuyor; startNewGroup() hemen ardından
+// structuredData'yı null yapıp o değerleri yok ediyor. Çağrı buradan çıkarsa
+// sayım sessizce sıfırlanır - bu yüzden kaynakta sabitleniyor.
+assert.match(
+  script,
+  /savedGroups\.push\(\{[\s\S]*?corrections: window\.MAHIRScoreCorrections\?\.diffScores\(structuredData\?\.students, students\)[\s\S]*?\}\);/,
+  "Düzeltme farkı savedGroups.push içinde, grup kaydedilirken alınmalı."
+);
+assert.match(script, /startNewGroup = \(\) => \{[\s\S]*?structuredData = null/);
+// Sayım analiz yüküne girmeli, yoksa rapordaki kanıt hep "düzeltme yok" der.
+assert.match(script, /correctedCells: \(window\.MAHIRScoreCorrections\?\.mergeCorrections\(/);
+assert.match(html, /assets\/js\/mahir-score-corrections\.js/);
+
 console.log("data-entry-flow.test.js: all assertions passed");

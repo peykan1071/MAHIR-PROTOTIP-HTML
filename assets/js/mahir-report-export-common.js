@@ -335,19 +335,53 @@
     ]]
   });
 
+  // "Bu %68 nereden geldi?" sorusunun cevabı. İki parça hâlinde üretilir:
+  // özet (kaç soru, kaç öğrenci, kaç düzeltme) ve ayrıntı (soru bazında
+  // yüzdeler). Ekranda özet <summary>, ayrıntı açılır gövde olur; indirilen
+  // Word/PDF belgesinde ikisi tek bir düz metin hücresi hâlinde birleşir -
+  // orada açılır etkileşim anlamsız, ama sayıların belgede olması jüri
+  // karşısında savunulabilirliğin ta kendisi.
+  const outcomeEvidence = (outcome) => {
+    const evidence = outcome.evidence || {};
+    // Kanıt backend'de, yüzdenin hesaplandığı yerde üretiliyor
+    // (backend/app/approved_data_analyzer.py). Gelmediyse (eski analiz,
+    // kaydedilmiş çalışma) eski davranışa düşülür: yalnız soru numaraları.
+    const questions = Array.isArray(evidence.questions) ? evidence.questions : [];
+    if (!questions.length) {
+      return { summary: relatedQuestionsForOutcome(outcome.outcomeCode, outcome.outcomeTheme), detail: "" };
+    }
+    const corrected = Number(evidence.correctedCellCount) || 0;
+    const summary = [
+      `${evidence.questionCount} sorudan hesaplandı`,
+      `${evidence.participatingStudentCount} katılımcı öğrenci`,
+      corrected ? `${corrected} hücre öğretmen tarafından düzeltildi` : "öğretmen düzeltmesi yok"
+    ].join(" · ");
+    const detail = [
+      questions.map((question) => `Soru ${question.number}: ${formatPercent(question.successRate)}`).join(", "),
+      `Toplam ${formatNumber(evidence.earnedScore)} / ${formatNumber(evidence.possibleScore)} puan`
+    ].filter(Boolean).join(" — ");
+    return { summary, detail };
+  };
+
   const buildOutcomeBlock = () => {
     const outcomes = getAnalysis().outcomes || [];
-    const rows = outcomes.map((outcome) => [
+    const evidences = outcomes.map(outcomeEvidence);
+    const rows = outcomes.map((outcome, index) => [
       [normalizeText(outcome.outcomeTheme), normalizeText(outcome.outcomeCode || outcome.learningOutcome), normalizeText(outcome.outcomeSkill)].filter(Boolean).join(" — "),
-      relatedQuestionsForOutcome(outcome.outcomeCode, outcome.outcomeTheme),
+      [evidences[index].summary, evidences[index].detail].filter(Boolean).join(" — "),
       formatPercent(outcome.successRate),
       successLevel(outcome.successRate, outcome.category),
       normalizeText(outcome.decision)
     ]);
     return {
       heading: "D. ÖĞRENME ÇIKTILARI ANALİZİ",
-      paragraphs: ["Başarı düzeyleri, rapor hazırlanırken kullanılan ölçütlere göre sınıflandırılır; gerekli görüldüğünde değerlendirme eşikleri açıklama bölümünde belirtilir."],
-      tables: [[["Öğrenme Çıktısı", "İlişkili Sorular", "Başarı %", "Düzey", "Kanıt / Kısa Yorum"], ...rows]]
+      paragraphs: ["Başarı düzeyleri, rapor hazırlanırken kullanılan ölçütlere göre sınıflandırılır; gerekli görüldüğünde değerlendirme eşikleri açıklama bölümünde belirtilir. \"Hesaplama Dayanağı\" sütunu, her oranın hangi sorulardan ve kaç öğrenciden hesaplandığını gösterir."],
+      // Ekranda 2. sütun açılır bir kanıta dönüşür; diğer render hedefleri
+      // (PDF gövdesi, Word ve PDF dışa aktarıcıları) blok modelini genel
+      // olarak tükettiği için bu alanı hiç görmez ve düz metin basmaya
+      // devam eder - o dosyalarda hiçbir değişiklik gerekmiyor.
+      details: { column: 1, summaries: evidences.map((evidence) => evidence.summary) },
+      tables: [[["Öğrenme Çıktısı", "Hesaplama Dayanağı", "Başarı %", "Düzey", "Kanıt / Kısa Yorum"], ...rows]]
     };
   };
 
@@ -449,11 +483,40 @@
     return element;
   };
 
-  const renderTable = (rows) => {
+  // Kanıt hücresini ekranda açılır hâle getirir: özet her zaman görünür,
+  // soru bazındaki ayrıntı tıklayınca açılır. Özet metni hücrenin başında
+  // olduğu için geri kalanı ayrıntı sayılır; ikisi de aynı düz metinden
+  // türetildiğinden ekran ile belge asla farklı şey söyleyemez.
+  const evidenceCell = (text, summaryText) => {
+    const td = document.createElement("td");
+    const value = String(text || "");
+    const summary = String(summaryText || "");
+    if (!summary || !value.startsWith(summary) || value.length <= summary.length) {
+      td.textContent = value;
+      return td;
+    }
+    const details = document.createElement("details");
+    details.className = "evidence-details";
+    const summaryElement = document.createElement("summary");
+    summaryElement.textContent = summary;
+    const body = document.createElement("p");
+    body.className = "evidence-detail";
+    body.textContent = value.slice(summary.length).replace(/^\s*—\s*/, "");
+    details.append(summaryElement, body);
+    td.append(details);
+    return td;
+  };
+
+  const renderTable = (rows, details = null) => {
     const table = document.createElement("table");
     rows.forEach((row, rowIndex) => {
       const tr = document.createElement("tr");
-      row.forEach((item) => tr.append(cell(rowIndex === 0 ? "th" : "td", item)));
+      row.forEach((item, columnIndex) => {
+        const isEvidence = details && rowIndex > 0 && columnIndex === details.column;
+        tr.append(isEvidence
+          ? evidenceCell(item, details.summaries?.[rowIndex - 1])
+          : cell(rowIndex === 0 ? "th" : "td", item));
+      });
       table.append(tr);
     });
     return table;
@@ -476,6 +539,8 @@
         p.textContent = paragraph;
         section.append(p);
       });
+      // Kasıtlı olarak `block.details` GEÇİLMİYOR: bu gövde PDF'e olduğu gibi
+      // çizildiği için kapalı bir <details> orada kanıtı görünmez kılardı.
       block.tables.forEach((tableRows) => section.append(renderTable(tableRows)));
       body.append(section);
     });
@@ -497,7 +562,7 @@
         p.textContent = paragraph;
         section.append(p);
       });
-      block.tables.forEach((tableRows) => section.append(renderTable(tableRows)));
+      block.tables.forEach((tableRows) => section.append(renderTable(tableRows, block.details)));
       body.append(section);
     });
   };

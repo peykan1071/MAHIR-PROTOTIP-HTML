@@ -77,9 +77,23 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
     if not participating:
         raise ValueError("Sınava katılan öğrenci bulunmadığı için analiz oluşturulamadı.")
 
+    # Öğretmenin düzelttiği puan hücrelerinin soru indeksi bazında sayısı -
+    # tarayıcı gönderir (bkz. assets/js/mahir-score-corrections.js), çünkü
+    # makinenin okuduğu özgün değerler yalnız orada, grup kaydedilirken
+    # görülebiliyor. Yükte yoksa boş sözlük: alan tamamen geriye dönük uyumlu.
+    corrected_cells = _normalize_corrected_cells(payload.get("correctedCells"))
+
     question_results = []
     outcome_totals: dict[str, dict[str, Any]] = defaultdict(
-        lambda: {"earned": 0.0, "possible": 0.0, "skill": "", "description": "", "parentDescription": ""}
+        lambda: {
+            "earned": 0.0,
+            "possible": 0.0,
+            "skill": "",
+            "description": "",
+            "parentDescription": "",
+            "questions": [],
+            "correctedCellCount": 0,
+        }
     )
     for question_index, question in enumerate(normalized_questions):
         earned = sum(student["scores"][question_index] for student in participating)
@@ -109,6 +123,22 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
         # bileşenin dar ifadesinden daha eksiksiz bir bağlam veriyor.
         outcome_totals[outcome_key]["description"] = question["outcomeDescription"]
         outcome_totals[outcome_key]["parentDescription"] = question["parentOutcomeDescription"]
+        # Hesabın dayanağı: bu çıktının yüzdesini hangi soruların, hangi
+        # oranlarla ürettiği. Ön yüz bunu yeniden türetmiyor - eskiden
+        # mahir-report-export-common.js soru/çıktı eşleşmesini normalize
+        # edilmiş metin karşılaştırmasıyla buluyordu; tek doğruluk kaynağı
+        # sayının hesaplandığı yer, yani burası.
+        outcome_totals[outcome_key]["questions"].append(
+            {
+                "number": question["number"],
+                "maxScore": question["maxScore"],
+                "earnedScore": earned,
+                "possibleScore": possible,
+                "successRate": rate,
+                "correctedCellCount": corrected_cells.get(question_index, 0),
+            }
+        )
+        outcome_totals[outcome_key]["correctedCellCount"] += corrected_cells.get(question_index, 0)
 
     outcome_results = []
     for outcome_key, totals in outcome_totals.items():
@@ -128,6 +158,15 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
                 "developmentLevel": _category(rate),
                 "category": _category(rate),
                 "decision": _decision(rate),
+                "evidence": {
+                    "questionNumbers": [item["number"] for item in totals["questions"]],
+                    "questionCount": len(totals["questions"]),
+                    "participatingStudentCount": len(participating),
+                    "earnedScore": totals["earned"],
+                    "possibleScore": totals["possible"],
+                    "correctedCellCount": totals["correctedCellCount"],
+                    "questions": totals["questions"],
+                },
             }
         )
 
@@ -157,6 +196,31 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
         "outcomes": outcome_results,
         "students": participating,
     }
+
+
+def _normalize_corrected_cells(raw: Any) -> dict[int, int]:
+    """`{"0": 2, "3": 1}` -> `{0: 2, 3: 1}` (soru indeksi -> düzeltilen hücre sayısı).
+
+    Öğretmenin kaç puan hücresini düzelttiği yalnız tarayıcıda bilinebiliyor
+    (bkz. `assets/js/mahir-score-corrections.js`), bu yüzden analiz yüküyle
+    birlikte geliyor. Sayıya güvenilmiyor: bozuk, negatif veya sayı olmayan
+    girdiler sessizce elenir - bu alan yalnız bir açıklanabilirlik göstergesi,
+    hiçbir puanı veya oranı etkilemediği için bir doğrulama hatası fırlatıp
+    öğretmenin analizini engellemesi orantısız olurdu.
+    """
+
+    if not isinstance(raw, dict):
+        return {}
+    normalized: dict[int, int] = {}
+    for key, value in raw.items():
+        try:
+            index = int(key)
+            count = int(value)
+        except (TypeError, ValueError):
+            continue
+        if index >= 0 and count > 0:
+            normalized[index] = count
+    return normalized
 
 
 def _normalize_question(item: Any, fallback_number: int) -> dict[str, Any]:
