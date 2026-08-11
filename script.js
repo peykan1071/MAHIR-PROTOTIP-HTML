@@ -2379,7 +2379,7 @@ const screenManager = (() => {
 
 const fileUploadBridge = (() => {
   const maxFileSize = 20 * 1024 * 1024;
-  const allowedExtensions = ["pdf", "doc", "docx", "jpg", "jpeg", "png", "webp"];
+  const allowedExtensions = ["pdf", "doc", "docx", "xlsx", "jpg", "jpeg", "png", "webp"];
 
   const init = () => {
     const fileInput = document.querySelector("#exam-file");
@@ -2473,6 +2473,16 @@ const fileUploadBridge = (() => {
     const usefulValue = (value) => {
       const text = String(value ?? "").trim();
       return text && /[\p{L}\p{N}]/u.test(text) && !/^(okunamadı|belirtilmedi|null|undefined)$/i.test(text) ? text : "";
+    };
+
+    const looksLikeTckn = (value) => {
+      const digits = String(value || "").replace(/\D/g, "");
+      if (digits.length !== 11 || digits.startsWith("0")) return false;
+      const numbers = [...digits].map(Number);
+      const tenth = ((numbers[0] + numbers[2] + numbers[4] + numbers[6] + numbers[8]) * 7
+        - (numbers[1] + numbers[3] + numbers[5] + numbers[7])) % 10;
+      const eleventh = numbers.slice(0, 10).reduce((sum, number) => sum + number, 0) % 10;
+      return numbers[9] === (tenth + 10) % 10 && numbers[10] === eleventh;
     };
 
     const contextInputs = () => Array.from(document.querySelectorAll("[data-exam-field]"));
@@ -2718,7 +2728,7 @@ const fileUploadBridge = (() => {
 
     const validateFile = (file) => {
       if (!allowedExtensions.includes(getExtension(file))) {
-        return "Bu dosya türü desteklenmiyor. Word, PDF, JPG, PNG veya WEBP yükleyiniz.";
+        return "Bu dosya türü desteklenmiyor. Word, PDF, Excel (.xlsx), JPG, PNG veya WEBP yükleyiniz.";
       }
       if (file.size > maxFileSize) {
         return "Dosya 20 MB sınırını aşıyor. Daha küçük bir dosya yükleyiniz.";
@@ -2836,8 +2846,10 @@ const fileUploadBridge = (() => {
       const rules = document.querySelector("[data-upload-rules]");
       const label = document.querySelector("[data-file-select-label]");
       const templateCard = document.querySelector("[data-template-card]");
+      const ocrGuidance = document.querySelector("[data-ocr-guidance]");
       const dropzone = document.querySelector("[data-upload-dropzone]");
       templateCard?.toggleAttribute("hidden", mode !== "template");
+      ocrGuidance?.toggleAttribute("hidden", mode !== "images");
       dropzone?.toggleAttribute("hidden", mode === "manual");
       if (mode === "manual") {
         readButton.disabled = false;
@@ -2848,12 +2860,12 @@ const fileUploadBridge = (() => {
       }
       const images = mode === "images";
       fileInput.multiple = images;
-      fileInput.accept = images ? ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" : ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      if (title) title.textContent = images ? "Görselleri yükleyin" : "Veri evrakını yükleyin";
-      if (description) description.textContent = images ? "Aynı sınava ait en fazla 10 öğrenci soru puan çizelgesini tek grup olarak seçebilirsiniz." : "MAHİR şablonunu veya öğretmen tarafından hazırlanmış Word/PDF tablosunu seçiniz.";
-      if (rules) rules.textContent = images ? "JPG, PNG veya WEBP · En fazla 10 görsel · Dosya başına 20 MB" : "Word veya PDF · En fazla 20 MB";
-      if (label) label.textContent = images ? "Görselleri Seç" : "Dosya Seç";
-      readButton.textContent = images ? "Görselleri Oku ve Kontrol Et" : "Verileri Oku ve Kontrol Et";
+      fileInput.accept = images ? ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" : ".pdf,.doc,.docx,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      if (title) title.textContent = images ? "Soru bazlı puan çizelgelerini yükleyin" : "Veri evrakını yükleyin";
+      if (description) description.textContent = images ? "Her öğrenci için üç satırlı Soru Bazlı Puan Çizelgesinin fotoğrafını seçin. Bir grupta en fazla 10 görsel yükleyebilirsiniz." : "MAHİR şablonunu veya öğretmen tarafından hazırlanmış Word, PDF ya da Excel tablosunu seçiniz.";
+      if (rules) rules.textContent = images ? "JPG, PNG veya WEBP · En fazla 10 görsel · Dosya başına 20 MB" : "Word, PDF veya Excel (.xlsx) · En fazla 20 MB";
+      if (label) label.textContent = images ? "Çizelge Fotoğraflarını Seç" : "Dosya Seç";
+      readButton.textContent = images ? "Çizelgeleri Oku ve Kontrol Et" : "Verileri Oku ve Kontrol Et";
     };
 
     const showReport = (text) => {
@@ -2875,6 +2887,21 @@ const fileUploadBridge = (() => {
       return cell;
     };
 
+    const refreshResolvedOcrWarnings = () => {
+      document.querySelectorAll("[data-ocr-failure-source]").forEach((item) => {
+        const source = item.dataset.ocrFailureSource;
+        const matchingRows = Array.from(document.querySelectorAll("[data-student-row]"))
+          .filter((row) => row.dataset.sourceFile === source);
+        const completed = matchingRows.length > 0 && matchingRows.every((row) =>
+          Array.from(row.querySelectorAll("input")).every((input) => usefulValue(input.value))
+        );
+        item.textContent = completed
+          ? `${source}: OCR okuyamadı; veri öğretmen tarafından tamamlandı.`
+          : item.dataset.originalWarning;
+        item.classList.toggle("is-resolved", completed);
+      });
+    };
+
     const renderValidationData = (data, options = {}) => {
       if (!data) return;
       finalReviewMode = Boolean(options.finalReview);
@@ -2894,13 +2921,21 @@ const fileUploadBridge = (() => {
       const documentReadGuidance = document.querySelector("[data-document-read-guidance]");
       const questions = currentQuestionConfiguration();
       const expectedStudentCount = Math.max(1, Number(studentCountInput?.value) || 1);
-      const parsedStudents = (data.students || []).map((student, index) => ({
+      const privacyWarnings = [];
+      const parsedStudents = (data.students || []).map((student, index) => {
+        const detectedTckn = looksLikeTckn(student.studentNo);
+        if (detectedTckn) {
+          privacyWarnings.push(`${usefulValue(student.sourceFile) || `${index + 1}. satır`}: KVKK uyarısı — T.C. kimlik numarası algılandı ve öğrenci analiz verisinden çıkarıldı.`);
+        }
+        return ({
         rowNumber: student.rowNumber || index + 1,
-        studentNo: usefulValue(student.studentNo),
+        studentNo: detectedTckn ? "" : usefulValue(student.studentNo),
         technicalId: student.technicalId || `Ö-${String(savedGroups.reduce((sum, group) => sum + group.students.length, 0) + index + 1).padStart(3, "0")}`,
+        sourceFile: usefulValue(student.sourceFile),
         scores: Array.from({ length: questions.length }, (_, scoreIndex) => student.scores?.[scoreIndex] ?? null),
         totalScore: student.totalScore ?? null
-      }));
+        });
+      });
       const templateCouldNotBeRead = sourceMode === "template" && !hasDetectedMahirTemplate(data);
       const targetRowCount = options.finalReview
         ? parsedStudents.length
@@ -2915,6 +2950,7 @@ const fileUploadBridge = (() => {
           rowNumber: index + 1,
           studentNo: "",
           technicalId: `Ö-${String(savedStudentCount + index + 1).padStart(3, "0")}`,
+          sourceFile: sourceMode === "images" ? selectedFiles[index]?.name || "" : "",
           scores: Array(questions.length).fill(null),
           totalScore: null
         });
@@ -2951,7 +2987,13 @@ const fileUploadBridge = (() => {
 
       if (studentHead) {
         const row = document.createElement("tr");
-        ["Okul Numarası", ...questions.map((question) => `S${question.number}`), "Toplam"]
+        const showSourceFile = sourceMode === "images" && students.some((student) => usefulValue(student.sourceFile));
+        [
+          ...(showSourceFile ? ["Kaynak Görsel"] : []),
+          "Okul Numarası",
+          ...questions.map((question) => `S${question.number}`),
+          "Toplam"
+        ]
           .forEach((label) => {
             const header = document.createElement("th");
             header.scope = "col";
@@ -2967,6 +3009,13 @@ const fileUploadBridge = (() => {
         row.dataset.studentRow = "";
         row.dataset.rowNumber = student.rowNumber || studentIndex + 1;
         row.dataset.technicalId = student.technicalId || `Ö-${String(studentIndex + 1).padStart(3, "0")}`;
+        row.dataset.sourceFile = student.sourceFile || "";
+        if (sourceMode === "images" && students.some((item) => usefulValue(item.sourceFile))) {
+          const sourceCell = document.createElement("td");
+          sourceCell.className = "readonly-summary";
+          sourceCell.textContent = student.sourceFile || "Kaynak görsel belirlenemedi";
+          row.append(sourceCell);
+        }
         row.append(editableCell(student.studentNo, `${student.rowNumber || studentIndex + 1}. satır okul numarası`, "text", "studentNo"));
         questions.forEach((question, index) => {
           row.append(editableCell(student.scores?.[index], `${student.rowNumber || studentIndex + 1}. satır S${question.number} puanı`, "number", "score"));
@@ -2983,22 +3032,36 @@ const fileUploadBridge = (() => {
 
       if (warningList) {
         warningList.replaceChildren();
-        const relevantWarnings = (data.warnings || []).filter((warning) => !/soru|öğrenme çıktısı|azami puan/i.test(warning));
+        const relevantWarnings = [...(data.warnings || []), ...privacyWarnings].filter((warning) => !/soru|öğrenme çıktısı|azami puan/i.test(warning));
         const configuredTotal = questions.reduce((sum, question) => sum + Number(question.maxScore || 0), 0);
         const documentTotal = Number(data.exam?.totalMaxScore);
         if (Number.isFinite(documentTotal) && documentTotal > 0 && Math.abs(documentTotal - configuredTotal) > 0.01) {
           relevantWarnings.push(`Belgedeki toplam puan (${documentTotal}) ile tanımlanan soru puanları toplamı (${configuredTotal}) eşleşmiyor.`);
         }
-        const warnings = relevantWarnings.length ? relevantWarnings : ["MAHİR, yüklenen verilerde kontrol edilmesi gereken bir sorun tespit etmedi."];
+        const warnings = relevantWarnings.length
+          ? relevantWarnings
+          : ["Veriler öğretmen kontrolüne sunulmuştur. Kaydetmeden önce otomatik kontroller çalıştırılacaktır."];
         warnings.forEach((warning) => {
           const item = document.createElement("li");
           item.textContent = warning;
+          const ocrFailure = String(warning).match(/^(.+?):\s*(?:Görselde tablo tespit edilemedi|Görseldeki tablo satırından öğrenci bilgisi okunamadı)\.?$/i);
+          if (ocrFailure) {
+            item.dataset.ocrFailureSource = ocrFailure[1];
+            item.dataset.originalWarning = warning;
+          }
           warningList.append(item);
         });
+        refreshResolvedOcrWarnings();
       }
       document.querySelector("[data-post-save-actions]")?.setAttribute("hidden", "");
       document.querySelector("[data-final-data-review]")?.toggleAttribute("hidden", !options.finalReview);
       if (saveGroupButton) saveGroupButton.hidden = Boolean(options.finalReview);
+      if (returnToUploadButton) returnToUploadButton.hidden = Boolean(options.finalReview);
+      if (!options.finalReview) {
+        const approvalMessage = document.querySelector("[data-approval-message]");
+        const projectedTotal = savedStudentCount + students.length;
+        if (approvalMessage) approvalMessage.textContent = `Bu gruptaki ${students.length} öğrenci kaydı henüz kaydedilmedi. Grup kaydedildiğinde toplam ${projectedTotal}/${expectedStudentCount} öğrenciye ulaşılacaktır.`;
+      }
       renderSavedGroups();
     };
 
@@ -3013,6 +3076,7 @@ const fileUploadBridge = (() => {
         rowNumber: Number(row.dataset.rowNumber),
         studentNo: row.querySelector('[data-validation-field="studentNo"]')?.value.trim() || "",
         technicalId: row.dataset.technicalId,
+        sourceFile: row.dataset.sourceFile || "",
         scores: Array.from(row.querySelectorAll('[data-validation-field="score"]')).map(numberValue),
         totalScore: numberValue(row.querySelector('[data-validation-field="totalScore"]'))
       }));
@@ -3171,6 +3235,7 @@ const fileUploadBridge = (() => {
       renderSavedGroups();
       clearValidationErrors();
       if (saveGroupButton) saveGroupButton.hidden = true;
+      if (returnToUploadButton) returnToUploadButton.hidden = true;
       if (total === expected) {
         showFinalReview();
         return;
@@ -3181,18 +3246,20 @@ const fileUploadBridge = (() => {
       if (postSummary) postSummary.textContent = `${total}/${expected} öğrenci verisi başarıyla kaydedildi. Önceki kayıtlar korunarak yeni görsel grubunu ekleyebilirsiniz.`;
       if (addGroupButton) addGroupButton.hidden = sourceMode !== "images" || total >= expected;
       const approvalMessage = document.querySelector("[data-approval-message]");
-      if (approvalMessage) approvalMessage.textContent = `${expected - total} öğrenci kaydı daha eklenmeden analiz onayı gösterilmeyecektir.`;
+      if (approvalMessage) approvalMessage.textContent = `Toplam ${total}/${expected} öğrenci kaydı korunuyor. Kalan ${expected - total} öğrenci yeni bir grup olarak kaydedildiğinde analiz onayı gösterilecektir.`;
     };
 
     const startNewGroup = () => {
       finalReviewMode = false;
       structuredData = null;
-      clearFile();
+      clearAllFiles();
+      clearValidationErrors();
       document.querySelector("[data-post-save-actions]")?.setAttribute("hidden", "");
       document.querySelector("[data-final-data-review]")?.setAttribute("hidden", "");
       if (saveGroupButton) saveGroupButton.hidden = false;
+      if (returnToUploadButton) returnToUploadButton.hidden = false;
       screenManager.showScreen("data-entry-screen");
-      setStatus(`Önceki ${savedGroups.length} grup korunuyor. ${currentGroupNumber}. grup için en fazla 10 yeni görsel seçebilirsiniz.`, "success");
+      setStatus(`Kaydedilen ${savedGroups.length} grup korunuyor. Önceki grubun görselleri temizlendi; ${currentGroupNumber}. grup için yeni görselleri seçiniz.`, "success");
     };
 
     const returnToUpload = () => {
@@ -3257,11 +3324,19 @@ const fileUploadBridge = (() => {
         return;
       }
       const analysisPayload = {
-        ...approvedData,
+        exam: approvedData.exam,
+        questions: approvedData.questions,
         students: (approvedData.students || []).map((student, index) => ({
-          ...student,
-          studentNo: student.technicalId || `Ö-${String(index + 1).padStart(3, "0")}`
-        }))
+          rowNumber: student.rowNumber,
+          studentRef: student.technicalId || `Ö-${String(index + 1).padStart(3, "0")}`,
+          scores: student.scores,
+          totalScore: student.totalScore
+        })),
+        ...(approvedData.componentAnalyses ? { componentAnalyses: approvedData.componentAnalyses } : {}),
+        privacyContext: {
+          studentIdentityMode: "session-pseudonymized",
+          excludedFields: ["fullName", "tckn", "studentNo", "sourceFile"]
+        }
       };
       approvalButton.disabled = true;
       approvalButton.textContent = "Analiz Başlatılıyor…";
@@ -3330,12 +3405,16 @@ const fileUploadBridge = (() => {
 
       Promise.all(selectedFiles.map(uploadFile))
         .then((payloads) => {
-          const mergedData = payloads.reduce((merged, payload) => {
+          const mergedData = payloads.reduce((merged, payload, payloadIndex) => {
             const data = payload.structuredData || {};
+            const sourceFile = payload.fileName || selectedFiles[payloadIndex]?.name || "";
             return {
               ...merged,
               exam: { ...(merged.exam || {}), ...(data.exam || {}) },
-              students: [...(merged.students || []), ...(data.students || [])],
+              students: [
+                ...(merged.students || []),
+                ...(data.students || []).map((student) => ({ ...student, sourceFile: student.sourceFile || sourceFile }))
+              ],
               warnings: [...(merged.warnings || []), ...(data.warnings || [])],
               summary: { ...(merged.summary || {}), ...(data.summary || {}) }
             };
@@ -3401,7 +3480,10 @@ const fileUploadBridge = (() => {
     addGroupButton?.addEventListener("click", startNewGroup);
     returnToUploadButton?.addEventListener("click", returnToUpload);
     confirmFinalButton?.addEventListener("click", analyzeApprovedData);
-    document.querySelector("[data-validation-students]")?.addEventListener("input", invalidateAnalysisAfterApprovedDataEdit);
+    document.querySelector("[data-validation-students]")?.addEventListener("input", () => {
+      invalidateAnalysisAfterApprovedDataEdit();
+      refreshResolvedOcrWarnings();
+    });
     document.querySelector('[data-target-screen="report-screen"]')?.addEventListener("click", () => {
       populateContextFields(structuredData?.exam || {});
       refreshContextStatus();

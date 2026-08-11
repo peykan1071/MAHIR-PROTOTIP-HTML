@@ -109,7 +109,6 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
             rows = [
                 {
                     "studentNo": "Okunamadı",
-                    "fullName": "Okunamadı",
                     "scores": [],
                     "totalScore": None,
                     "calculatedTotal": 0,
@@ -117,6 +116,17 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
                 }
             ]
         for row in rows:
+            privacy_findings = set(row.pop("privacyFindings", []) or [])
+            if privacy_findings:
+                labels = []
+                if "TCKN" in privacy_findings:
+                    labels.append("T.C. kimlik numarası")
+                if "AD_SOYAD" in privacy_findings:
+                    labels.append("ad-soyad")
+                warnings.append(
+                    f"{uploaded_file.file_name}: KVKK uyarısı — {' ve '.join(labels)} "
+                    "algılandı ve öğrenci analiz verisinden çıkarıldı."
+                )
             row["rowNumber"] = len(students) + 1
             students.append(row)
 

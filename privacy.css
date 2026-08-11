@@ -1,0 +1,14 @@
+/* Kişisel veri koruma ve OCR denetim izi görünümleri. */
+.privacy-notice {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #b7d7c4;
+  border-left: 4px solid #26734d;
+  border-radius: 0.65rem;
+  background: #f2fbf6;
+  color: #214f39;
+}
+
+[data-validation-warnings] .is-resolved {
+  color: #26734d;
+}
