@@ -308,6 +308,15 @@ input[type="checkbox"] {
   background: #f2fbf6;
 }
 
+/* Durum kartlarının display kuralları, yerleşik hidden özelliğini geçersiz kılmamalıdır. */
+.saved-groups-card[hidden],
+.validation-errors-card[hidden],
+.post-save-card[hidden],
+.final-data-review-card[hidden],
+.document-read-guidance[hidden] {
+  display: none !important;
+}
+
 .student-save-actions {
   justify-content: flex-end;
   margin-top: 18px;
@@ -430,6 +439,39 @@ input[type="checkbox"] {
 .data-source-options input { margin-top: 3px; }
 .data-source-options span { display: grid; gap: 4px; }
 .data-source-options small { color: var(--color-muted); }
+
+.ocr-guidance-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+  gap: 24px;
+  align-items: center;
+  padding: 24px;
+  border: 1px solid #b9d7cb;
+  border-radius: var(--radius-card);
+  background: #f4fbf8;
+}
+
+.ocr-guidance-card[hidden] { display: none !important; }
+.ocr-guidance-card h3,
+.ocr-guidance-card p { margin-top: 0; }
+.ocr-guidance-list { display: grid; gap: 12px; margin: 16px 0 0; }
+.ocr-guidance-list div { display: grid; gap: 3px; }
+.ocr-guidance-list dt { color: var(--color-primary-dark); font-weight: 800; }
+.ocr-guidance-list dd { margin: 0; color: var(--color-text); line-height: 1.5; }
+.score-table-example { margin: 0; }
+.score-table-example figcaption { margin-bottom: 10px; font-weight: 700; color: var(--color-primary); }
+.score-table-example-scroll { overflow-x: auto; }
+.score-table-example table { width: 100%; min-width: 430px; border-collapse: collapse; background: #fff; font-size: .88rem; }
+.score-table-example th,
+.score-table-example td { border: 1px solid #7b8b84; padding: 8px 7px; text-align: center; }
+.score-table-example th { text-align: left; background: #e8f2ee; }
+.score-table-example-download {
+  display: inline-flex;
+  width: 100%;
+  margin-top: 12px;
+  justify-content: center;
+  text-align: center;
+}
 
 .template-download-card h3,
 .template-download-card p,
@@ -576,6 +618,7 @@ button[aria-disabled="true"] {
 @media (max-width: 720px) {
   .template-download-card,
   .data-source-options,
+  .ocr-guidance-card,
   .uploaded-file-card {
     grid-template-columns: 1fr;
   }

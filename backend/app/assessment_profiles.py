@@ -118,9 +118,9 @@ def build_general_evaluation(
         analysis = component_analyses[component]
         students = analysis.get("students") or []
         component_scores[component] = {
-            str(student.get("studentNo")): float(student.get("calculatedTotal", 0))
+            str(student.get("studentRef")): float(student.get("calculatedTotal", 0))
             for student in students
-            if student.get("studentNo") not in (None, "")
+            if student.get("studentRef") not in (None, "")
         }
         for outcome in analysis.get("outcomes") or []:
             skill_evidence.append(

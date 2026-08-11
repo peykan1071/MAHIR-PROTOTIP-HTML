@@ -24,6 +24,19 @@ def parse_mahir_docx(content: bytes) -> dict[str, object]:
     students = _parse_students_flexible(student_table or [])
     warnings = _build_warnings(exam, questions, students)
 
+    if student_table:
+        headings = {_normalise_label(cell) for cell in student_table[0]}
+        identity_columns = []
+        if headings & {"tc kimlik no", "t c kimlik no", "tc kimlik numarasi", "t c kimlik numarasi", "tckn"}:
+            identity_columns.append("T.C. kimlik numarası")
+        if headings & {"ad soyad", "adi soyadi", "ogrenci ad soyad", "ogrenci adi soyadi"}:
+            identity_columns.append("ad-soyad")
+        if identity_columns:
+            warnings.append(
+                f"Word belgesi: KVKK uyarısı - {' ve '.join(identity_columns)} sütunu algılandı "
+                "ve öğrenci analiz verisinden çıkarıldı."
+            )
+
     if not student_table:
         warnings.append(
             "Word belgesindeki öğrenci ve puan alanları otomatik olarak ayırt edilemedi. "
@@ -69,7 +82,7 @@ def _find_student_table(tables: list[list[list[str]]]) -> list[list[str]] | None
             continue
         labels = {_normalise_label(cell) for cell in table[0]}
         has_number = any(label in {"okul no", "ogrenci no", "numara", "no"} for label in labels)
-        has_score = any(re.fullmatch(r"(?:s|soru) ?\d+", label) for label in labels)
+        has_score = any(re.match(r"^(?:s|soru) ?\d+\b", label) for label in labels)
         if has_number and has_score:
             return table
     return None
@@ -196,10 +209,10 @@ def _parse_students_flexible(rows: list[list[str]]) -> list[dict[str, object]]:
 
     row_index = find_index(lambda label: label in {"sira", "sira no"})
     number_index = find_index(lambda label: label in {"okul no", "ogrenci no", "numara", "no"})
-    total_index = find_index(lambda label: label in {"toplam", "toplam puan", "puan"})
+    total_index = find_index(lambda label: label == "puan" or label.startswith("toplam"))
     score_indexes = [
         index for index, label in enumerate(headings)
-        if re.fullmatch(r"(?:s|soru) ?\d+", label)
+        if re.match(r"^(?:s|soru) ?\d+\b", label)
     ]
     students = []
 

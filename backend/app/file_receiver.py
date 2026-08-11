@@ -21,6 +21,8 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import urlparse
 
 from .docx_parser import parse_mahir_docx
+from .pdf_parser import parse_score_pdf
+from .spreadsheet_parser import parse_score_xlsx
 from .approved_data_analyzer import analyze_approved_data
 from .measurement_engine import build_measured_ced_document
 from .pedagogical_analysis import analyze_learning_outcomes
@@ -299,6 +301,57 @@ def run_existing_backend_flow(
                     "summary": {"questionCount": 0, "studentCount": 0, "warningCount": 1},
                 },
             )
+
+    if file_check.extension == ".pdf":
+        try:
+            structured_data = parse_score_pdf(uploaded_file.content)
+            summary = structured_data["summary"]
+            return (
+                True,
+                f"PDF tablosu okundu: {summary['questionCount']} soru ve "
+                f"{summary['studentCount']} öğrenci satırı öğretmen kontrolüne aktarıldı.",
+                structured_data,
+            )
+        except ValueError as error:
+            return (
+                True,
+                "PDF belgesi alındı; tablo otomatik okunamadığı için bilgiler öğretmen kontrol ekranında tamamlanacaktır.",
+                {
+                    "exam": {}, "questions": [], "students": [], "warnings": [str(error)],
+                    "summary": {"questionCount": 0, "studentCount": 0, "warningCount": 1},
+                },
+            )
+
+    if file_check.extension == ".xlsx":
+        try:
+            structured_data = parse_score_xlsx(uploaded_file.content)
+            summary = structured_data["summary"]
+            return (
+                True,
+                f"Excel tablosu okundu: {summary['questionCount']} soru ve "
+                f"{summary['studentCount']} öğrenci satırı öğretmen kontrolüne aktarıldı.",
+                structured_data,
+            )
+        except ValueError as error:
+            return (
+                True,
+                "Excel belgesi alındı; tablo otomatik okunamadığı için bilgiler öğretmen kontrol ekranında tamamlanacaktır.",
+                {
+                    "exam": {}, "questions": [], "students": [], "warnings": [str(error)],
+                    "summary": {"questionCount": 0, "studentCount": 0, "warningCount": 1},
+                },
+            )
+
+    if file_check.extension == ".xls":
+        return (
+            True,
+            "Eski .xls biçimi alındı; otomatik okuma için dosyayı Excel'de .xlsx olarak kaydediniz.",
+            {
+                "exam": {}, "questions": [], "students": [],
+                "warnings": ["Eski .xls biçimi doğrudan okunmuyor. Dosyayı .xlsx biçiminde kaydedip yeniden yükleyiniz."],
+                "summary": {"questionCount": 0, "studentCount": 0, "warningCount": 1},
+            },
+        )
 
     if file_check.extension != ".csv":
         return True, "Belge alındı ve öğretmen kontrolüne hazırlandı.", None
