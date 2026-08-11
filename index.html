@@ -6,6 +6,7 @@
   <meta name="description" content="MAHİR ekran akışı için semantik HTML prototip temeli">
   <title>MAHİR | Sınav Analizi ve Değerlendirme Raporu</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="privacy.css">
 </head>
 <body>
   <div class="app-shell welcome-shell" data-reference-size="2048x900">
@@ -235,7 +236,7 @@
           <h2 id="data-entry-title">Veri Ekleme</h2>
         </header>
 
-        <p>Sınav yapısını belirleyiniz; veriyi görsel grubu, Word/PDF tablosu, MAHİR şablonu veya elle giriş yoluyla ekleyiniz.</p>
+        <p>Sınav yapısını belirleyiniz; veriyi görsel grubu, Word/PDF/Excel tablosu, MAHİR şablonu veya elle giriş yoluyla ekleyiniz.</p>
 
         <form class="data-upload-form" aria-labelledby="data-entry-title" data-upload-form>
           <article class="exam-structure-card" aria-labelledby="exam-structure-title">
@@ -278,29 +279,67 @@
               <p>Her yol aynı öğretmen onay ekranına bağlanır.</p>
             </div>
             <div class="data-source-options" role="radiogroup" aria-label="Veri giriş yolu">
-              <label><input type="radio" name="data-source" value="images" data-source-option checked> <span><strong>Görsel grubu</strong><small>En fazla 10 JPG, PNG veya WEBP</small></span></label>
-              <label><input type="radio" name="data-source" value="document" data-source-option> <span><strong>Word / PDF tablosu</strong><small>Öğretmenin kendi düzeni olabilir</small></span></label>
+              <label><input type="radio" name="data-source" value="images" data-source-option checked> <span><strong>Sınav Kâğıdı Puan Çizelgesi (OCR)</strong><small>Her öğrenci için üç satırlı puan çizelgesi</small></span></label>
+              <label><input type="radio" name="data-source" value="document" data-source-option> <span><strong>Word / PDF / Excel tablosu</strong><small>Öğretmenin kendi düzeni olabilir</small></span></label>
               <label><input type="radio" name="data-source" value="template" data-source-option> <span><strong>MAHİR şablonu</strong><small>Önerilen yapılandırılmış giriş</small></span></label>
               <label><input type="radio" name="data-source" value="manual" data-source-option> <span><strong>Elle veri girişi</strong><small>Dosya yüklemeden tabloyu doldurun</small></span></label>
             </div>
           </article>
 
+          <article class="ocr-guidance-card" aria-labelledby="ocr-guidance-title" data-ocr-guidance>
+            <div class="ocr-guidance-copy">
+              <p class="data-entry-kicker">Görsel OCR için gerekli yapı</p>
+              <h3 id="ocr-guidance-title">Soru Bazlı Puan Çizelgesi</h3>
+              <p>Her görsel, bir öğrenciye ait puan çizelgesini net ve eksiksiz göstermelidir.</p>
+              <dl class="ocr-guidance-list">
+                <div>
+                  <dt>Çizelge yapısı</dt>
+                  <dd>Çizelgede soru numaraları, azami puanlar ve öğrencinin aldığı puanlar olmak üzere üç satır bulunmalıdır. Tablonun renk, ölçü ve tasarımının örnekle aynı olması gerekmez.</dd>
+                </div>
+                <div>
+                  <dt>Uygun olmayan belgeler</dt>
+                  <dd>Toplu sınıf listeleri, Excel ekran görüntüleri ve cevap anahtarları bu alanda işleme alınmaz.</dd>
+                </div>
+                <div>
+                  <dt>Kişisel verilerin korunması</dt>
+                  <dd>Yüklemeden önce görseldeki öğrenci adı, soyadı, T.C. kimlik numarası ve diğer kişisel verileri kaldırınız. Öğrencinin ayırt edilmesi için yalnızca okul numarasını kullanınız.</dd>
+                </div>
+              </dl>
+            </div>
+            <figure class="score-table-example" aria-labelledby="score-table-example-caption">
+              <figcaption id="score-table-example-caption">Okunacak çizelge örneği</figcaption>
+              <div class="score-table-example-scroll">
+                <table>
+                  <tbody>
+                    <tr><th>Okul No</th><td colspan="5">101</td></tr>
+                    <tr><th>Sorular</th><td>S1</td><td>S2</td><td>S3</td><td>S4</td><td>Toplam</td></tr>
+                    <tr><th>Azami Puan</th><td>25</td><td>25</td><td>25</td><td>25</td><td>100</td></tr>
+                    <tr><th>Öğrencinin Aldığı Puan</th><td>20</td><td>15</td><td>25</td><td>20</td><td>80</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <a class="secondary-button score-table-example-download" href="shared/templates/Ornek_Sinav_Kagidi_Soru_Bazli_Puan_Cizelgesi.docx" download>
+                Örnek Sınav Kâğıdını İndir
+              </a>
+            </figure>
+          </article>
+
           <article class="template-download-card" aria-labelledby="template-download-title" data-template-card hidden>
             <div>
               <p class="data-entry-kicker">Önerilen yöntem</p>
-              <h3 id="template-download-title">MAHİR Veri Giriş Şablonu – Sürüm 2</h3>
+              <h3 id="template-download-title">MAHİR Veri Giriş Şablonu</h3>
               <p>Dilerseniz bu şablonu kullanabilirsiniz; şablon kullanımı zorunlu değildir.</p>
             </div>
-            <a class="secondary-button template-download-button" href="shared/templates/MAHIR_Veri_Giris_Sablonu_Surum_2.docx" download>
+            <a class="secondary-button template-download-button" href="shared/templates/MAHIR_Veri_Giris_Sablonu.docx" download>
               Şablonu İndir
             </a>
           </article>
 
           <div class="upload-box document-upload-box" data-component="Upload Box" data-upload-dropzone role="group" aria-labelledby="upload-title">
             <div class="upload-symbol" aria-hidden="true">↑</div>
-            <h3 id="upload-title" data-upload-title>Görselleri yükleyin</h3>
-            <p data-upload-description>Aynı sınava ait en fazla 10 öğrenci soru puan çizelgesini tek grup olarak seçebilirsiniz.</p>
-            <label class="primary-button file-select-button" for="exam-file" data-file-select-label>Görselleri Seç</label>
+            <h3 id="upload-title" data-upload-title>Soru bazlı puan çizelgelerini yükleyin</h3>
+            <p data-upload-description>Her öğrenci için üç satırlı Soru Bazlı Puan Çizelgesinin fotoğrafını seçin. Bir grupta en fazla 10 görsel yükleyebilirsiniz.</p>
+            <label class="primary-button file-select-button" for="exam-file" data-file-select-label>Çizelge Fotoğraflarını Seç</label>
             <input id="exam-file" class="visually-hidden-file-input" name="exam-file" type="file" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
             <p class="upload-rules" data-upload-rules>JPG, PNG veya WEBP · En fazla 10 görsel · Dosya başına 20 MB</p>
           </div>
@@ -313,7 +352,7 @@
 
           <div class="button-group data-entry-actions" aria-label="Veri ekleme işlemleri">
             <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="preparation-screen">Geri</button>
-            <button class="primary-button" data-component="Primary Button" type="button" data-read-document disabled aria-disabled="true">Görselleri Oku ve Kontrol Et</button>
+            <button class="primary-button" data-component="Primary Button" type="button" data-read-document disabled aria-disabled="true">Çizelgeleri Oku ve Kontrol Et</button>
           </div>
         </form>
 
@@ -355,6 +394,9 @@
 
           <article class="table-card student-data-card" data-component="Validation Card" aria-labelledby="student-data-title">
             <h3 id="student-data-title">Öğretmen Kontrolündeki Öğrenci Verisi</h3>
+            <aside class="privacy-notice" aria-label="Kişisel veri koruma bilgisi">
+              <strong>KVKK veri minimizasyonu:</strong> Ad-soyad ve T.C. kimlik numarası analiz için kullanılmaz. Okul numarası yalnız öğretmen kontrol ekranında tutulur; analiz ve LLM katmanına oturumluk takma öğrenci referansı aktarılır.
+            </aside>
             <p class="notification-message document-read-guidance" data-document-read-guidance aria-live="polite" hidden></p>
             <div class="table-wrap">
               <table class="data-table">

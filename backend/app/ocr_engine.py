@@ -140,24 +140,60 @@ def _parse_number(value: str) -> float | int | None:
     return int(number) if number.is_integer() else number
 
 
+def _looks_like_tckn(value: str) -> bool:
+    """Return True only for values matching the Turkish identity-number checksum."""
+
+    digits = re.sub(r"\D", "", value)
+    if len(digits) != 11 or digits[0] == "0":
+        return False
+    numbers = [int(digit) for digit in digits]
+    tenth = ((sum(numbers[0:9:2]) * 7) - sum(numbers[1:8:2])) % 10
+    eleventh = sum(numbers[:10]) % 10
+    return numbers[9] == tenth and numbers[10] == eleventh
+
+
+def _looks_like_full_name(value: str) -> bool:
+    normalized = " ".join(value.strip().split())
+    if any(character.isdigit() for character in normalized):
+        return False
+    words = re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşü]+", normalized)
+    return len(words) >= 2 and len("".join(words)) >= 5
+
+
 def _parse_positional_row(row: list[str]) -> dict[str, object] | None:
     if len(row) < 2:
         return None
 
-    student_no = row[0].strip()
-    total_score = _parse_number(row[-1])
-    scores = [_parse_number(cell) for cell in row[1:-1]]
+    privacy_findings: list[str] = []
+    safe_cells: list[str] = []
+    for cell in row:
+        if _looks_like_tckn(cell):
+            if "TCKN" not in privacy_findings:
+                privacy_findings.append("TCKN")
+            continue
+        if _looks_like_full_name(cell):
+            if "AD_SOYAD" not in privacy_findings:
+                privacy_findings.append("AD_SOYAD")
+            continue
+        safe_cells.append(cell)
+
+    if len(safe_cells) < 2:
+        return None
+
+    student_no = safe_cells[0].strip()
+    total_score = _parse_number(safe_cells[-1])
+    scores = [_parse_number(cell) for cell in safe_cells[1:-1]]
 
     if not student_no and total_score is None and all(score is None for score in scores):
         return None
 
     return {
         "studentNo": student_no,
-        "fullName": "",
         "scores": scores,
         "totalScore": total_score,
         "calculatedTotal": round(sum(score or 0 for score in scores), 2),
         "control": "",
+        "privacyFindings": privacy_findings,
     }
 
 

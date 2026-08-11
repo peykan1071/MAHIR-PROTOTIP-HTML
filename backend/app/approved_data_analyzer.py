@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 from typing import Any
 
 from .assessment_profiles import (
@@ -19,6 +20,7 @@ from .program_catalog import validate_question_program_context
 def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
     """Validate approved browser data and return deterministic analysis results."""
 
+    _assert_privacy_safe_students(payload.get("students"))
     questions = payload.get("questions")
     students = payload.get("students")
     exam = payload.get("exam") or {}
@@ -151,10 +153,10 @@ def _normalize_student(
 ) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise ValueError(f"{fallback_row}. öğrenci verisi geçersiz.")
-    student_no = str(item.get("studentNo") or "").strip()
-    if not student_no or student_no.casefold() == "okunamadı":
+    student_ref = str(item.get("studentRef") or "").strip()
+    if not re.fullmatch(r"Ö-\d{3,}", student_ref):
         raise ValueError(
-            f"{fallback_row}. öğrenci satırındaki okunamayan veya boş okul numarasını düzeltiniz."
+            f"{fallback_row}. öğrenci için oturumluk takma referans oluşturulamadı."
         )
     scores = item.get("scores")
     if not isinstance(scores, list) or len(scores) != len(questions):
@@ -179,11 +181,36 @@ def _normalize_student(
         )
     return {
         "rowNumber": item.get("rowNumber") or fallback_row,
-        "studentNo": student_no,
+        "studentRef": student_ref,
         "scores": normalized_scores,
         "calculatedTotal": calculated_total,
         "attendance": "",
     }
+
+
+def _assert_privacy_safe_students(students: Any) -> None:
+    """Reject identity-bearing fields at the analysis/LLM boundary."""
+
+    if not isinstance(students, list):
+        return
+    forbidden = {
+        "studentNo": "okul numarası",
+        "fullName": "ad-soyad",
+        "name": "ad-soyad",
+        "surname": "soyad",
+        "tckn": "T.C. kimlik numarası",
+        "tcKimlikNo": "T.C. kimlik numarası",
+        "sourceFile": "kaynak dosya adı",
+    }
+    for index, student in enumerate(students, 1):
+        if not isinstance(student, dict):
+            continue
+        found = [label for key, label in forbidden.items() if key in student]
+        if found:
+            raise ValueError(
+                f"{index}. öğrenci verisi analiz güvenlik kapısından geçirilemedi: "
+                f"{', '.join(dict.fromkeys(found))} analiz/LLM katmanına gönderilemez."
+            )
 
 
 def _number(value: Any, default: float | int | None = None) -> float:

@@ -44,9 +44,7 @@ class AssessmentProfileTests(unittest.TestCase):
                 {
                     "exam": {"courseName": "Fen Bilimleri", "componentType": "listening"},
                     "questions": [{"number": 1, "maxScore": 100}],
-                    "students": [
-                        {"studentNo": "1", "fullName": "Örnek Öğrenci", "scores": [80]}
-                    ],
+                    "students": [{"studentRef": "Ö-001", "scores": [80]}],
                 }
             )
 
@@ -59,9 +57,7 @@ class AssessmentProfileTests(unittest.TestCase):
                         "componentType": "performance",
                     },
                     "questions": [{"number": 1, "maxScore": 100}],
-                    "students": [
-                        {"studentNo": "1", "fullName": "Örnek Öğrenci", "scores": [80]}
-                    ],
+                    "students": [{"studentRef": "Ö-001", "scores": [80]}],
                 }
             )
 
@@ -74,9 +70,7 @@ class AssessmentProfileTests(unittest.TestCase):
                     "weightingProfileId": "language-50-25-25",
                 },
                 "questions": [{"number": 1, "maxScore": 100}],
-                "students": [
-                    {"studentNo": "1", "fullName": "Örnek Öğrenci", "scores": [80]}
-                ],
+                "students": [{"studentRef": "Ö-001", "scores": [80]}],
             }
         )
         self.assertEqual(result["exam"]["componentWeight"], 0.25)
@@ -86,18 +80,19 @@ class AssessmentProfileTests(unittest.TestCase):
             {
                 "exam": {"courseName": "Fen Bilimleri", "componentType": "written"},
                 "questions": [{"number": 1, "maxScore": 100}],
-                "students": [{"studentNo": "Ö-001", "scores": [80]}],
+                "students": [{"studentRef": "Ö-001", "scores": [80]}],
             }
         )
-        self.assertEqual(result["students"][0]["studentNo"], "Ö-001")
+        self.assertEqual(result["students"][0]["studentRef"], "Ö-001")
         self.assertNotIn("fullName", result["students"][0])
+        self.assertNotIn("studentNo", result["students"][0])
 
     def test_general_evaluation_requires_all_language_components(self):
         result = build_general_evaluation(
             "tde-70-15-15",
             {
-                "written": {"students": [{"studentNo": "1", "calculatedTotal": 80}], "outcomes": []},
-                "listening": {"students": [{"studentNo": "1", "calculatedTotal": 100}], "outcomes": []},
+                "written": {"students": [{"studentRef": "Ö-001", "calculatedTotal": 80}], "outcomes": []},
+                "listening": {"students": [{"studentRef": "Ö-001", "calculatedTotal": 100}], "outcomes": []},
             },
         )
         self.assertFalse(result["complete"])
@@ -111,13 +106,30 @@ class AssessmentProfileTests(unittest.TestCase):
             ("speaking", 60, "Konuşma"),
         ):
             components[component] = {
-                "students": [{"studentNo": "1", "calculatedTotal": score}],
+                "students": [{"studentRef": "Ö-001", "calculatedTotal": score}],
                 "outcomes": [{"outcomeCode": "ÖÇ.1", "outcomeSkill": skill, "realizationRate": score / 100}],
             }
         result = build_general_evaluation("tde-70-15-15", components)
         self.assertTrue(result["complete"])
-        self.assertEqual(result["studentScores"], {"1": 80.0})
+        self.assertEqual(result["studentScores"], {"Ö-001": 80.0})
         self.assertEqual(len(result["componentEvidence"]), 3)
+
+    def test_identity_bearing_student_fields_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "okul numarası.*ad-soyad"):
+            analyze_approved_data(
+                {
+                    "exam": {"courseName": "Fen Bilimleri", "componentType": "written"},
+                    "questions": [{"number": 1, "maxScore": 100}],
+                    "students": [
+                        {
+                            "studentRef": "Ö-001",
+                            "studentNo": "123",
+                            "fullName": "Örnek Öğrenci",
+                            "scores": [80],
+                        }
+                    ],
+                }
+            )
 
 
 if __name__ == "__main__":
