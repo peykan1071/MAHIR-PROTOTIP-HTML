@@ -35,3 +35,5 @@ Dosya biçimleri mevcut CED veri modeli ve backend akışıyla uyumlu olmalıdı
 - Ortak Metin, programlar arası bileşenlerin kavramsal açıklama kaynağıdır.
 - 1. ve 2. dönem konu-soru dağılım tabloları, ortak yazılılarda kullanılan süreç bileşenlerini ve senaryo kapsamını doğrular.
 - Resmî belgede bulunmayan ders, sınıf, sınav veya süreç bileşeni için veri üretilmez.
+- Ana öğrenme çıktılarının güncel metni dört tema belgesinden doğrulanır; toplu 2024 program PDF'si yalnız destekleyici kaynaktır.
+- Süreç bileşenlerinin kapsamı ve metni 1. ve 2. dönem resmî konu-soru dağılım tablolarından alınır; satır sonundan kaynaklanan kelime bölünmeleri dışında içerik kısaltılmaz.

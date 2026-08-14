@@ -2594,6 +2594,203 @@ const fileUploadBridge = (() => {
       applyComponentOutcomeFilter();
     };
 
+    const outcomeOptionText = (outcome = {}) => [
+      outcome.theme,
+      outcome.parentCode,
+      outcome.code,
+      outcome.title
+    ].filter(Boolean).join(" — ");
+
+    const closeOutcomeCombobox = (combobox, { restoreFocus = false } = {}) => {
+      if (!combobox) return;
+      const trigger = combobox.querySelector("[data-outcome-trigger]");
+      const listbox = combobox.querySelector("[data-outcome-listbox]");
+      if (!trigger || !listbox || listbox.hidden) return;
+      listbox.hidden = true;
+      combobox.classList.remove("is-open", "opens-up");
+      trigger.setAttribute("aria-expanded", "false");
+      trigger.removeAttribute("aria-activedescendant");
+      if (restoreFocus) trigger.focus();
+    };
+
+    const closeOtherOutcomeComboboxes = (current) => {
+      document.querySelectorAll("[data-outcome-combobox].is-open").forEach((combobox) => {
+        if (combobox !== current) closeOutcomeCombobox(combobox);
+      });
+    };
+
+    const createOutcomeCombobox = (savedValue, rowIndex) => {
+      const placeholderText = learningOutcomes.length
+        ? "İsteğe bağlı — öğrenme çıktısı seçiniz"
+        : "İsteğe bağlı — çıktı verisi bulunmuyor";
+      const combobox = document.createElement("div");
+      combobox.className = "outcome-combobox";
+      combobox.dataset.outcomeCombobox = "";
+
+      const nativeSelect = document.createElement("select");
+      nativeSelect.className = "outcome-native-select";
+      nativeSelect.dataset.questionOutcome = "";
+      nativeSelect.tabIndex = -1;
+      nativeSelect.setAttribute("aria-hidden", "true");
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = placeholderText;
+      nativeSelect.append(placeholder);
+
+      const listboxId = `outcome-listbox-${rowIndex + 1}`;
+      const trigger = document.createElement("button");
+      trigger.type = "button";
+      trigger.className = "outcome-combobox-trigger";
+      trigger.dataset.outcomeTrigger = "";
+      trigger.setAttribute("role", "combobox");
+      trigger.setAttribute("aria-haspopup", "listbox");
+      trigger.setAttribute("aria-expanded", "false");
+      trigger.setAttribute("aria-controls", listboxId);
+      trigger.setAttribute("aria-label", `Soru ${rowIndex + 1} öğrenme çıktısı`);
+      trigger.disabled = !learningOutcomes.length;
+
+      const valueText = document.createElement("span");
+      valueText.className = "outcome-combobox-value";
+      valueText.dataset.outcomeValue = "";
+      const arrow = document.createElement("span");
+      arrow.className = "outcome-combobox-arrow";
+      arrow.setAttribute("aria-hidden", "true");
+      trigger.append(valueText, arrow);
+
+      const listbox = document.createElement("div");
+      listbox.id = listboxId;
+      listbox.className = "outcome-combobox-listbox";
+      listbox.dataset.outcomeListbox = "";
+      listbox.setAttribute("role", "listbox");
+      listbox.hidden = true;
+
+      let activeIndex = -1;
+      const options = [];
+      const selectedIndex = learningOutcomes.findIndex((outcome) => outcome.id === savedValue);
+
+      const emptyOption = document.createElement("div");
+      emptyOption.id = `${listboxId}-option-0`;
+      emptyOption.className = "outcome-combobox-option";
+      emptyOption.dataset.optionIndex = "0";
+      emptyOption.setAttribute("role", "option");
+      emptyOption.setAttribute("aria-selected", selectedIndex < 0 ? "true" : "false");
+      emptyOption.textContent = placeholderText;
+      listbox.append(emptyOption);
+      options.push(emptyOption);
+
+      learningOutcomes.forEach((outcome, optionIndex) => {
+        const optionText = outcomeOptionText(outcome);
+        const nativeOption = document.createElement("option");
+        nativeOption.value = outcome.id;
+        nativeOption.textContent = optionText;
+        nativeOption.selected = optionIndex === selectedIndex;
+        nativeSelect.append(nativeOption);
+
+        const option = document.createElement("div");
+        option.id = `${listboxId}-option-${optionIndex + 1}`;
+        option.className = "outcome-combobox-option";
+        option.dataset.outcomeOption = outcome.id;
+        option.dataset.optionIndex = String(optionIndex + 1);
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", optionIndex === selectedIndex ? "true" : "false");
+        option.textContent = optionText;
+        listbox.append(option);
+        options.push(option);
+      });
+
+      nativeSelect.value = selectedIndex >= 0 ? learningOutcomes[selectedIndex].id : "";
+      valueText.textContent = selectedIndex >= 0 ? outcomeOptionText(learningOutcomes[selectedIndex]) : placeholderText;
+
+      const setActiveOption = (nextIndex, { scroll = true } = {}) => {
+        if (!options.length) return;
+        activeIndex = Math.min(options.length - 1, Math.max(0, nextIndex));
+        options.forEach((option, index) => option.classList.toggle("is-active", index === activeIndex));
+        trigger.setAttribute("aria-activedescendant", options[activeIndex].id);
+        if (scroll) options[activeIndex].scrollIntoView({ block: "nearest" });
+      };
+
+      const selectOption = (optionIndex) => {
+        if (!options[optionIndex]) return;
+        const outcome = optionIndex > 0 ? learningOutcomes[optionIndex - 1] : null;
+        nativeSelect.value = outcome?.id || "";
+        valueText.textContent = outcome ? outcomeOptionText(outcome) : placeholderText;
+        options.forEach((option, index) => option.setAttribute("aria-selected", index === optionIndex ? "true" : "false"));
+        activeIndex = optionIndex;
+        nativeSelect.dispatchEvent(new Event("input", { bubbles: true }));
+        nativeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        closeOutcomeCombobox(combobox, { restoreFocus: true });
+      };
+
+      const openCombobox = () => {
+        if (!options.length || !listbox.hidden) return;
+        closeOtherOutcomeComboboxes(combobox);
+        listbox.hidden = false;
+        combobox.classList.add("is-open");
+        trigger.setAttribute("aria-expanded", "true");
+
+        const firstEight = options.slice(0, 8);
+        const eightOptionHeight = Math.ceil(firstEight.reduce((height, option) => height + option.getBoundingClientRect().height, 0) + 2);
+        const triggerRect = trigger.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - triggerRect.bottom - 12;
+        const spaceAbove = triggerRect.top - 12;
+        const opensUp = spaceBelow < Math.min(eightOptionHeight, 280) && spaceAbove > spaceBelow;
+        const availableSpace = Math.max(160, opensUp ? spaceAbove : spaceBelow);
+        combobox.classList.toggle("opens-up", opensUp);
+        listbox.style.maxHeight = `${Math.max(160, Math.min(eightOptionHeight, availableSpace))}px`;
+        const currentSelectedIndex = learningOutcomes.findIndex((outcome) => outcome.id === nativeSelect.value);
+        setActiveOption(currentSelectedIndex >= 0 ? currentSelectedIndex + 1 : 0, { scroll: false });
+        options[activeIndex]?.scrollIntoView({ block: "nearest" });
+      };
+
+      trigger.addEventListener("click", () => {
+        if (listbox.hidden) openCombobox();
+        else closeOutcomeCombobox(combobox);
+      });
+
+      trigger.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const direction = event.key === "ArrowDown" ? 1 : -1;
+          if (listbox.hidden) {
+            openCombobox();
+            if (!nativeSelect.value && direction < 0) setActiveOption(options.length - 1);
+          } else {
+            setActiveOption(activeIndex < 0 ? (direction > 0 ? 0 : options.length - 1) : activeIndex + direction);
+          }
+        } else if (event.key === "Home" && !listbox.hidden) {
+          event.preventDefault();
+          setActiveOption(0);
+        } else if (event.key === "End" && !listbox.hidden) {
+          event.preventDefault();
+          setActiveOption(options.length - 1);
+        } else if ((event.key === "Enter" || event.key === " ") && !listbox.hidden) {
+          event.preventDefault();
+          selectOption(activeIndex);
+        } else if ((event.key === "Enter" || event.key === " ") && listbox.hidden) {
+          event.preventDefault();
+          openCombobox();
+        } else if (event.key === "Escape" && !listbox.hidden) {
+          event.preventDefault();
+          closeOutcomeCombobox(combobox, { restoreFocus: true });
+        } else if (event.key === "Tab") {
+          closeOutcomeCombobox(combobox);
+        }
+      });
+
+      listbox.addEventListener("pointerdown", (event) => event.preventDefault());
+      listbox.addEventListener("click", (event) => {
+        const option = event.target.closest("[data-option-index]");
+        if (option) selectOption(Number(option.dataset.optionIndex));
+      });
+      listbox.addEventListener("pointermove", (event) => {
+        const option = event.target.closest("[data-option-index]");
+        if (option) setActiveOption(Number(option.dataset.optionIndex), { scroll: false });
+      });
+
+      combobox.append(nativeSelect, trigger, listbox);
+      return combobox;
+    };
+
     const currentQuestionConfiguration = () => Array.from(questionConfiguration?.querySelectorAll("[data-question-config-row]") || []).map((row, index) => {
       const outcomeSelect = row.querySelector("[data-question-outcome]");
       const selected = learningOutcomes.find((outcome) => outcome.id === outcomeSelect?.value);
@@ -2649,23 +2846,13 @@ const fileUploadBridge = (() => {
         scoreInput.value = saved.maxScore || "";
         scoreInput.dataset.questionScore = "";
         scoreLabel.append(scoreInput);
-        const outcomeField = document.createElement("label");
-        outcomeField.textContent = "Öğrenme Çıktısı";
+        const outcomeField = document.createElement("div");
+        outcomeField.className = "outcome-combobox-field";
         outcomeField.hidden = !activeProgramId || (assessmentComponent?.value || "written") === "general";
-        const outcomeSelect = document.createElement("select");
-        outcomeSelect.dataset.questionOutcome = "";
-        const placeholder = document.createElement("option");
-        placeholder.value = "";
-        placeholder.textContent = learningOutcomes.length ? "İsteğe bağlı — öğrenme çıktısı seçiniz" : "İsteğe bağlı — çıktı verisi bulunmuyor";
-        outcomeSelect.append(placeholder);
-        learningOutcomes.forEach((outcome) => {
-          const option = document.createElement("option");
-          option.value = outcome.id;
-          option.textContent = [outcome.theme, outcome.parentCode, outcome.code, outcome.title].filter(Boolean).join(" — ");
-          option.selected = saved.outcomeKey === outcome.id;
-          outcomeSelect.append(option);
-        });
-        outcomeField.append(outcomeSelect);
+        const outcomeCaption = document.createElement("span");
+        outcomeCaption.className = "outcome-combobox-label";
+        outcomeCaption.textContent = "Öğrenme Çıktısı";
+        outcomeField.append(outcomeCaption, createOutcomeCombobox(saved.outcomeKey, index));
         row.append(badge, scoreLabel, outcomeField);
         questionConfiguration.append(row);
       }
@@ -3456,6 +3643,9 @@ const fileUploadBridge = (() => {
     questionCountInput?.addEventListener("input", renderQuestionConfiguration);
     questionConfiguration?.addEventListener("input", updateStructureStatus);
     questionConfiguration?.addEventListener("change", updateStructureStatus);
+    document.addEventListener("pointerdown", (event) => {
+      if (!event.target.closest("[data-outcome-combobox]")) closeOtherOutcomeComboboxes(null);
+    });
     assessmentComponent?.addEventListener("change", updateComponentNote);
     document.addEventListener("mahir:preparation-context-changed", () => {
       updateComponentNote();
