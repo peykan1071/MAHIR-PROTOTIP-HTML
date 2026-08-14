@@ -43,6 +43,12 @@ assert.doesNotMatch(html, /Bu Grubun Verilerini Kaydet/);
 assert.match(html, /data-saved-groups-card hidden/);
 assert.match(html, /data-add-image-group>Yeni Görsel Grubu Ekle<\/button>/);
 assert.match(html, /data-confirm-final-analysis>Verileri Onayla ve Analize Geç<\/button>/);
+assert.match(html, /data-general-report-merger/);
+assert.match(html, /Yazılı Sınav Analiz Raporu/);
+assert.match(html, /Dinleme\/İzleme Sınavı Analiz Raporu/);
+assert.match(html, /Konuşma Sınavı Analiz Raporu/);
+assert.match(html, /data-merge-general-reports/);
+assert.match(html, /öğrenci bazlı e-Okul puanı hesaplanmaz/);
 
 assert.match(script, /if \(total === expected\) \{\s*showFinalReview\(\);\s*return;/);
 assert.match(script, /ocrGuidance\?\.toggleAttribute\("hidden", mode !== "images"\)/);
@@ -85,11 +91,16 @@ assert.match(script, /End/);
 assert.match(script, /Enter/);
 assert.match(script, /Escape/);
 assert.match(script, /nativeSelect\.dispatchEvent\(new Event\("change"/);
+assert.match(script, /fetch\(`\/mahir-merge-reports\?\$\{mergeQuery\}`/);
+assert.match(script, /Raporları Doğrula ve Birleştir/);
+assert.match(script, /updateGeneralReportMode/);
 assert.doesNotMatch(script, /data-finish-data-entry/);
 assert.doesNotMatch(script, /data-return-to-data/);
 assert.match(styles, /\.post-save-card\[hidden\][\s\S]*\.final-data-review-card\[hidden\][\s\S]*display: none !important/);
 assert.match(styles, /\.outcome-combobox-listbox[\s\S]*overflow-x: hidden;[\s\S]*overflow-y: auto;/);
 assert.match(styles, /\.outcome-combobox-option[\s\S]*white-space: normal;[\s\S]*overflow-wrap: anywhere;/);
 assert.match(styles, /\.outcome-combobox-value[\s\S]*white-space: nowrap;[\s\S]*text-overflow: ellipsis;/);
+assert.match(styles, /\.general-report-slots[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
 
 console.log("data-entry-flow.test.js: all assertions passed");
+

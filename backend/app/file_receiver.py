@@ -17,9 +17,11 @@ import re
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from .docx_parser import parse_mahir_docx
+from .analysis_report_parser import parse_analysis_report_docx
+from .general_report_merger import merge_component_reports
 from .pdf_parser import parse_score_pdf
 from .spreadsheet_parser import parse_score_xlsx
 from .approved_data_analyzer import analyze_approved_data
@@ -31,6 +33,7 @@ from .reporting_engine import generate_report, write_report
 
 UPLOAD_PATH = "/mahir-upload"
 ANALYZE_PATH = "/mahir-analyze"
+MERGE_REPORTS_PATH = "/mahir-merge-reports"
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 MAX_FILES_PER_UPLOAD = 10
 MAX_REQUEST_SIZE = MAX_UPLOAD_SIZE * MAX_FILES_PER_UPLOAD
@@ -87,6 +90,9 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         request_path = urlparse(self.path).path
         if request_path == ANALYZE_PATH:
             self._handle_analysis_request()
+            return
+        if request_path == MERGE_REPORTS_PATH:
+            self._handle_general_report_merge()
             return
         if request_path != UPLOAD_PATH:
             self._send_json(404, {"ok": False, "message": "Bilinmeyen alıcı yolu."})
@@ -190,6 +196,46 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 "ok": True,
                 "message": "Öğretmen onaylı veriler analiz motoruna aktarıldı.",
                 "analysis": result,
+            },
+        )
+
+    def _handle_general_report_merge(self) -> None:
+        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        content_type = self.headers.get("Content-Type", "")
+        if content_length <= 0:
+            self._send_json(400, {"ok": False, "message": "Analiz raporları alınamadı."})
+            return
+        if content_length > MAX_UPLOAD_SIZE * 3:
+            self._send_json(413, {"ok": False, "message": "Üç raporun toplam boyutu 60 MB sınırını aşıyor."})
+            return
+
+        uploaded_files = extract_uploaded_files(self.rfile.read(content_length), content_type)
+        if len(uploaded_files) != 3:
+            self._send_json(400, {"ok": False, "message": "Genel değerlendirme için üç MAHİR Word analiz raporu yüklenmelidir."})
+            return
+        if any(validate_file_name(file.file_name).extension != ".docx" for file in uploaded_files):
+            self._send_json(400, {"ok": False, "message": "Genel değerlendirmede yalnız MAHİR Word analiz raporları (.docx) kullanılabilir."})
+            return
+
+        try:
+            reports = [parse_analysis_report_docx(file.content) for file in uploaded_files]
+            query = parse_qs(urlparse(self.path).query)
+            exam, analysis = merge_component_reports(
+                reports,
+                expected_course=(query.get("course") or [""])[0],
+                expected_grade=(query.get("grade") or [""])[0],
+            )
+        except ValueError as error:
+            self._send_json(422, {"ok": False, "message": str(error)})
+            return
+
+        self._send_json(
+            200,
+            {
+                "ok": True,
+                "message": "Üç bileşen raporu doğrulandı ve genel değerlendirme oluşturuldu.",
+                "exam": exam,
+                "analysis": analysis,
             },
         )
 
@@ -421,3 +467,4 @@ def _extract_boundary(content_type: str) -> bytes:
 def _clean_filename(file_name: str) -> str:
     windows_name = PureWindowsPath(file_name or "").name
     return PurePosixPath(windows_name).name
+
