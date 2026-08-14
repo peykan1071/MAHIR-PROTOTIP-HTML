@@ -355,12 +355,24 @@ input[type="checkbox"] {
   gap: 7px;
 }
 
+.outcome-combobox-field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.outcome-combobox-label {
+  color: var(--color-secondary);
+  font-weight: 700;
+}
+
 /* Author styles must not override the native hidden state. */
 .exam-count-grid label[hidden] {
   display: none;
 }
 
 .question-configuration-row label[hidden],
+.outcome-combobox-field[hidden],
 .program-data-status[hidden] {
   display: none;
 }
@@ -385,6 +397,131 @@ input[type="checkbox"] {
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: #ffffff;
+}
+
+.question-configuration-row > * {
+  min-width: 0;
+}
+
+.outcome-combobox {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+.outcome-native-select {
+  display: none;
+}
+
+.outcome-combobox-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  text-align: left;
+  font-weight: 400;
+}
+
+.outcome-combobox-trigger:hover:not(:disabled) {
+  border-color: #72aeb2;
+}
+
+.outcome-combobox-trigger:focus-visible,
+.outcome-combobox.is-open .outcome-combobox-trigger {
+  outline: 3px solid rgba(0, 79, 87, 0.18);
+  outline-offset: 1px;
+  border-color: var(--color-focus);
+}
+
+.outcome-combobox-trigger:disabled {
+  cursor: not-allowed;
+  color: var(--color-muted);
+  background: #f5f7f8;
+  opacity: 1;
+}
+
+.outcome-combobox-value {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.outcome-combobox-arrow {
+  width: 9px;
+  height: 9px;
+  justify-self: center;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.outcome-combobox.is-open .outcome-combobox-arrow {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.outcome-combobox-listbox {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border: 1px solid #9fbac8;
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 12px 28px rgba(18, 52, 91, 0.18);
+}
+
+.outcome-combobox.opens-up .outcome-combobox-listbox {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.outcome-combobox-listbox[hidden] {
+  display: none;
+}
+
+.outcome-combobox-option {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 7px;
+  color: var(--color-text);
+  background: transparent;
+  font-weight: 400;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  cursor: pointer;
+}
+
+.outcome-combobox-option.is-active {
+  color: var(--color-secondary);
+  background: #e7f3f4;
+}
+
+.outcome-combobox-option[aria-selected="true"] {
+  color: #ffffff;
+  background: var(--color-primary-dark);
+}
+
+.outcome-combobox-option[aria-selected="true"].is-active {
+  background: var(--color-focus);
 }
 
 .question-number-badge {
