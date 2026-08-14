@@ -2596,7 +2596,7 @@ const fileUploadBridge = (() => {
         mergeGeneralReportsButton.setAttribute("aria-disabled", String(!complete));
       }
       if (!complete) {
-        setGeneralReportStatus(`Genel değerlendirme için üç MAHİR Word analiz raporu gereklidir. Seçilen rapor: ${selectedCount}/3.`);
+        setGeneralReportStatus(`Genel değerlendirme için MAHİR'den indirilen üç Word (.docx) analiz raporu gereklidir. Seçilen rapor: ${selectedCount}/3.`);
       }
     };
 

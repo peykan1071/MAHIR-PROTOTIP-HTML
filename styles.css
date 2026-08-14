@@ -484,6 +484,10 @@ input[type="checkbox"] {
   gap: 12px;
 }
 
+.question-configuration-list[hidden] {
+  display: none !important;
+}
+
 .question-configuration-row {
   display: grid;
   grid-template-columns: 72px minmax(120px, 0.3fr) minmax(240px, 1fr);
@@ -2349,4 +2353,3 @@ body:has(#welcome-screen.active-screen) .welcome-footer-social svg {
     min-width: 0;
   }
 }
-

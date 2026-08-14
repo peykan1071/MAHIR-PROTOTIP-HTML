@@ -101,6 +101,7 @@ assert.match(styles, /\.outcome-combobox-listbox[\s\S]*overflow-x: hidden;[\s\S]
 assert.match(styles, /\.outcome-combobox-option[\s\S]*white-space: normal;[\s\S]*overflow-wrap: anywhere;/);
 assert.match(styles, /\.outcome-combobox-value[\s\S]*white-space: nowrap;[\s\S]*text-overflow: ellipsis;/);
 assert.match(styles, /\.general-report-slots[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+assert.match(styles, /\.question-configuration-list\[hidden\][\s\S]*display: none !important/);
+assert.match(html, /MAHİR'den indirilen üç Word \(\.docx\) analiz raporu gereklidir/);
 
 console.log("data-entry-flow.test.js: all assertions passed");
-
