@@ -103,5 +103,8 @@ assert.match(styles, /\.outcome-combobox-value[\s\S]*white-space: nowrap;[\s\S]*
 assert.match(styles, /\.general-report-slots[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
 assert.match(styles, /\.question-configuration-list\[hidden\][\s\S]*display: none !important/);
 assert.match(html, /MAHİR'den indirilen üç Word \(\.docx\) analiz raporu gereklidir/);
+assert.match(html, /Word \(\.docx\):[\s\S]*Genel Değerlendirme ekranına yüklenebilir/);
+assert.match(html, /PDF:[\s\S]*Genel Değerlendirme ekranına yüklenemez/);
+assert.match(styles, /\.report-download-guidance[\s\S]*grid-column: 1 \/ -1/);
 
 console.log("data-entry-flow.test.js: all assertions passed");
