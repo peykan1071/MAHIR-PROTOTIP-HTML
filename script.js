@@ -2575,6 +2575,58 @@ const fileUploadBridge = (() => {
       renderQuestionConfiguration();
     };
 
+    const setGeneralReportStatus = (message, state = "") => {
+      if (!generalReportStatus) return;
+      generalReportStatus.textContent = message;
+      generalReportStatus.classList.toggle("is-error", state === "error");
+      generalReportStatus.classList.toggle("is-success", state === "success");
+    };
+
+    const refreshGeneralReportFiles = () => {
+      const selectedCount = Object.values(generalReportFiles).filter(Boolean).length;
+      const complete = selectedCount === 3;
+      if (mergeGeneralReportsButton) {
+        mergeGeneralReportsButton.disabled = !complete;
+        mergeGeneralReportsButton.setAttribute("aria-disabled", String(!complete));
+      }
+      if (!complete) {
+        setGeneralReportStatus(`Genel değerlendirme için MAHİR'den indirilen üç Word (.docx) analiz raporu gereklidir. Seçilen rapor: ${selectedCount}/3.`);
+      }
+    };
+
+    const updateGeneralReportMode = (enabled, profile) => {
+      if (generalReportMerger) generalReportMerger.hidden = !enabled;
+      standardDataEntryItems.forEach((item) => { item.hidden = enabled; });
+      const studentCountField = studentCountInput?.closest("label");
+      const questionCountField = questionCountInput?.closest("label");
+      if (studentCountField) studentCountField.hidden = enabled;
+      if (questionCountField) questionCountField.hidden = enabled;
+      if (scoreTotal) scoreTotal.hidden = enabled;
+      if (questionConfiguration) questionConfiguration.hidden = enabled;
+      if (structureStatus) structureStatus.hidden = enabled;
+      if (programDataStatus) programDataStatus.hidden = enabled || !programDataStatus.textContent;
+      const scenarioGuidance = document.querySelector("[data-scenario-guidance]");
+      if (scenarioGuidance) scenarioGuidance.hidden = enabled;
+
+      const structureTitle = document.querySelector("#exam-structure-title");
+      const structureDescription = structureTitle?.nextElementSibling;
+      if (structureTitle) structureTitle.textContent = enabled ? "Genel Değerlendirme Türü" : "Soru, Puan ve Öğrenme Çıktısı Eşleştirmesi";
+      if (structureDescription) structureDescription.textContent = enabled
+        ? "Genel değerlendirme, aynı gruba ait üç MAHİR analiz raporunun doğrulanıp birleştirilmesiyle oluşturulur."
+        : "Azami puan zorunludur. Öğrenme çıktısı biliniyorsa seçilir; bilinmiyorsa soru bazlı analiz yapılır.";
+
+      if (enabled && profile) {
+        document.querySelector("[data-general-weight-badge]").textContent = Object.values(profile.weights).map((weight) => `%${weight * 100}`).join(" · ");
+        Object.entries(profile.weights).forEach(([component, weight]) => {
+          const target = document.querySelector(`[data-general-report-weight="${component}"]`);
+          if (target) target.textContent = `Genel sonuca etkisi: %${weight * 100}`;
+        });
+        refreshGeneralReportFiles();
+      } else if (!enabled) {
+        configureSourceMode(sourceMode);
+      }
+    };
+
     const updateComponentNote = () => {
       const component = assessmentComponent?.value || "written";
       const profileId = currentProfileId();
@@ -2619,7 +2671,7 @@ const fileUploadBridge = (() => {
       });
     };
 
-    const createOutcomeCombobox = (savedValue, rowIndex) => {
+    const createOutcomeCombobox = (savedValues, rowIndex) => {
       const placeholderText = learningOutcomes.length
         ? "İsteğe bağlı — öğrenme çıktısı seçiniz"
         : "İsteğe bağlı — çıktı verisi bulunmuyor";
@@ -2630,11 +2682,14 @@ const fileUploadBridge = (() => {
       const nativeSelect = document.createElement("select");
       nativeSelect.className = "outcome-native-select";
       nativeSelect.dataset.questionOutcome = "";
+      nativeSelect.multiple = true;
       nativeSelect.tabIndex = -1;
       nativeSelect.setAttribute("aria-hidden", "true");
+      const savedIds = new Set((Array.isArray(savedValues) ? savedValues : [savedValues]).filter(Boolean));
       const placeholder = document.createElement("option");
       placeholder.value = "";
       placeholder.textContent = placeholderText;
+      placeholder.selected = savedIds.size === 0;
       nativeSelect.append(placeholder);
 
       const listboxId = `outcome-listbox-${rowIndex + 1}`;
@@ -2646,7 +2701,7 @@ const fileUploadBridge = (() => {
       trigger.setAttribute("aria-haspopup", "listbox");
       trigger.setAttribute("aria-expanded", "false");
       trigger.setAttribute("aria-controls", listboxId);
-      trigger.setAttribute("aria-label", `Soru ${rowIndex + 1} öğrenme çıktısı`);
+      trigger.setAttribute("aria-label", `Soru ${rowIndex + 1} öğrenme çıktıları`);
       trigger.disabled = !learningOutcomes.length;
 
       const valueText = document.createElement("span");
@@ -2662,19 +2717,19 @@ const fileUploadBridge = (() => {
       listbox.className = "outcome-combobox-listbox";
       listbox.dataset.outcomeListbox = "";
       listbox.setAttribute("role", "listbox");
+      listbox.setAttribute("aria-multiselectable", "true");
       listbox.hidden = true;
 
       let activeIndex = -1;
       const options = [];
-      const selectedIndex = learningOutcomes.findIndex((outcome) => outcome.id === savedValue);
 
       const emptyOption = document.createElement("div");
       emptyOption.id = `${listboxId}-option-0`;
       emptyOption.className = "outcome-combobox-option";
       emptyOption.dataset.optionIndex = "0";
       emptyOption.setAttribute("role", "option");
-      emptyOption.setAttribute("aria-selected", selectedIndex < 0 ? "true" : "false");
-      emptyOption.textContent = placeholderText;
+      emptyOption.setAttribute("aria-selected", savedIds.size ? "false" : "true");
+      emptyOption.textContent = learningOutcomes.length ? "Seçimleri temizle" : placeholderText;
       listbox.append(emptyOption);
       options.push(emptyOption);
 
@@ -2683,7 +2738,7 @@ const fileUploadBridge = (() => {
         const nativeOption = document.createElement("option");
         nativeOption.value = outcome.id;
         nativeOption.textContent = optionText;
-        nativeOption.selected = optionIndex === selectedIndex;
+        nativeOption.selected = savedIds.has(outcome.id);
         nativeSelect.append(nativeOption);
 
         const option = document.createElement("div");
@@ -2692,14 +2747,26 @@ const fileUploadBridge = (() => {
         option.dataset.outcomeOption = outcome.id;
         option.dataset.optionIndex = String(optionIndex + 1);
         option.setAttribute("role", "option");
-        option.setAttribute("aria-selected", optionIndex === selectedIndex ? "true" : "false");
+        option.setAttribute("aria-selected", savedIds.has(outcome.id) ? "true" : "false");
         option.textContent = optionText;
         listbox.append(option);
         options.push(option);
       });
 
-      nativeSelect.value = selectedIndex >= 0 ? learningOutcomes[selectedIndex].id : "";
-      valueText.textContent = selectedIndex >= 0 ? outcomeOptionText(learningOutcomes[selectedIndex]) : placeholderText;
+      const selectedOutcomes = () => learningOutcomes.filter((outcome) => Array.from(nativeSelect.selectedOptions).some((option) => option.value === outcome.id));
+      const refreshSelection = () => {
+        const selected = selectedOutcomes();
+        valueText.textContent = selected.length === 1
+          ? outcomeOptionText(selected[0])
+          : selected.length > 1
+            ? `${selected.length} öğrenme çıktısı seçildi`
+            : placeholderText;
+        emptyOption.setAttribute("aria-selected", selected.length ? "false" : "true");
+        options.slice(1).forEach((option, index) => {
+          option.setAttribute("aria-selected", selected.some((outcome) => outcome.id === learningOutcomes[index]?.id) ? "true" : "false");
+        });
+      };
+      refreshSelection();
 
       const setActiveOption = (nextIndex, { scroll = true } = {}) => {
         if (!options.length) return;
@@ -2711,14 +2778,16 @@ const fileUploadBridge = (() => {
 
       const selectOption = (optionIndex) => {
         if (!options[optionIndex]) return;
-        const outcome = optionIndex > 0 ? learningOutcomes[optionIndex - 1] : null;
-        nativeSelect.value = outcome?.id || "";
-        valueText.textContent = outcome ? outcomeOptionText(outcome) : placeholderText;
-        options.forEach((option, index) => option.setAttribute("aria-selected", index === optionIndex ? "true" : "false"));
+        if (optionIndex === 0) {
+          Array.from(nativeSelect.options).forEach((option) => { option.selected = false; });
+        } else {
+          const nativeOption = nativeSelect.options[optionIndex];
+          if (nativeOption) nativeOption.selected = !nativeOption.selected;
+        }
+        refreshSelection();
         activeIndex = optionIndex;
         nativeSelect.dispatchEvent(new Event("input", { bubbles: true }));
         nativeSelect.dispatchEvent(new Event("change", { bubbles: true }));
-        closeOutcomeCombobox(combobox, { restoreFocus: true });
       };
 
       const openCombobox = () => {
@@ -2737,7 +2806,7 @@ const fileUploadBridge = (() => {
         const availableSpace = Math.max(160, opensUp ? spaceAbove : spaceBelow);
         combobox.classList.toggle("opens-up", opensUp);
         listbox.style.maxHeight = `${Math.max(160, Math.min(eightOptionHeight, availableSpace))}px`;
-        const currentSelectedIndex = learningOutcomes.findIndex((outcome) => outcome.id === nativeSelect.value);
+        const currentSelectedIndex = learningOutcomes.findIndex((outcome) => Array.from(nativeSelect.selectedOptions).some((option) => option.value === outcome.id));
         setActiveOption(currentSelectedIndex >= 0 ? currentSelectedIndex + 1 : 0, { scroll: false });
         options[activeIndex]?.scrollIntoView({ block: "nearest" });
       };
@@ -2753,7 +2822,7 @@ const fileUploadBridge = (() => {
           const direction = event.key === "ArrowDown" ? 1 : -1;
           if (listbox.hidden) {
             openCombobox();
-            if (!nativeSelect.value && direction < 0) setActiveOption(options.length - 1);
+            if (!nativeSelect.selectedOptions.length && direction < 0) setActiveOption(options.length - 1);
           } else {
             setActiveOption(activeIndex < 0 ? (direction > 0 ? 0 : options.length - 1) : activeIndex + direction);
           }
@@ -2793,17 +2862,32 @@ const fileUploadBridge = (() => {
 
     const currentQuestionConfiguration = () => Array.from(questionConfiguration?.querySelectorAll("[data-question-config-row]") || []).map((row, index) => {
       const outcomeSelect = row.querySelector("[data-question-outcome]");
-      const selected = learningOutcomes.find((outcome) => outcome.id === outcomeSelect?.value);
+      const selected = Array.from(outcomeSelect?.selectedOptions || [])
+        .map((option) => learningOutcomes.find((outcome) => outcome.id === option.value))
+        .filter(Boolean);
+      const weight = selected.length ? 1 / selected.length : 0;
+      const outcomes = selected.map((outcome) => ({
+        outcomeCode: outcome.code || "",
+        outcomeDescription: outcome.title || "",
+        outcomeTheme: outcome.theme || "",
+        outcomeSkill: outcome.skill || "",
+        parentOutcomeCode: outcome.parentCode || outcome.code || "",
+        parentOutcomeDescription: outcome.parentTitle || outcome.title || "",
+        outcomeKey: outcome.id || "",
+        weight
+      }));
+      const primary = outcomes[0] || {};
       return {
         number: index + 1,
         maxScore: Number(row.querySelector("[data-question-score]")?.value || 0),
-        outcomeCode: selected?.code || "",
-        outcomeDescription: selected?.title || "",
-        outcomeTheme: selected?.theme || "",
-        outcomeSkill: selected?.skill || "",
-        parentOutcomeCode: selected?.parentCode || selected?.code || "",
-        parentOutcomeDescription: selected?.parentTitle || selected?.title || "",
-        outcomeKey: selected?.id || outcomeSelect?.value || ""
+        outcomes,
+        outcomeCode: primary.outcomeCode || "",
+        outcomeDescription: primary.outcomeDescription || "",
+        outcomeTheme: primary.outcomeTheme || "",
+        outcomeSkill: primary.outcomeSkill || "",
+        parentOutcomeCode: primary.parentOutcomeCode || "",
+        parentOutcomeDescription: primary.parentOutcomeDescription || "",
+        outcomeKey: primary.outcomeKey || ""
       };
     });
 
@@ -2851,8 +2935,14 @@ const fileUploadBridge = (() => {
         outcomeField.hidden = !activeProgramId || (assessmentComponent?.value || "written") === "general";
         const outcomeCaption = document.createElement("span");
         outcomeCaption.className = "outcome-combobox-label";
-        outcomeCaption.textContent = "Öğrenme Çıktısı";
-        outcomeField.append(outcomeCaption, createOutcomeCombobox(saved.outcomeKey, index));
+        outcomeCaption.textContent = "Öğrenme Çıktıları";
+        const savedOutcomeKeys = Array.isArray(saved.outcomes) && saved.outcomes.length
+          ? saved.outcomes.map((outcome) => outcome.outcomeKey).filter(Boolean)
+          : [saved.outcomeKey].filter(Boolean);
+        const outcomeHelp = document.createElement("small");
+        outcomeHelp.className = "outcome-combobox-help";
+        outcomeHelp.textContent = "Birden fazla çıktı seçilebilir; soru puanı seçilen çıktılar arasında eşit paylaşılır.";
+        outcomeField.append(outcomeCaption, createOutcomeCombobox(savedOutcomeKeys, index), outcomeHelp);
         row.append(badge, scoreLabel, outcomeField);
         questionConfiguration.append(row);
       }
@@ -3163,7 +3253,10 @@ const fileUploadBridge = (() => {
       questionBody?.replaceChildren();
       questions.forEach((question) => {
         const row = document.createElement("tr");
-        [question.number, question.maxScore, `${question.outcomeCode}${question.outcomeDescription ? ` — ${question.outcomeDescription}` : ""}`].forEach((value) => {
+        const outcomeSummary = (question.outcomes || []).length
+          ? question.outcomes.map((outcome) => `${outcome.outcomeCode}${outcome.outcomeDescription ? ` — ${outcome.outcomeDescription}` : ""}`).join("; ")
+          : `${question.outcomeCode}${question.outcomeDescription ? ` — ${question.outcomeDescription}` : ""}`;
+        [question.number, question.maxScore, outcomeSummary].forEach((value) => {
           const cell = document.createElement("td");
           cell.className = "readonly-summary";
           cell.textContent = value;

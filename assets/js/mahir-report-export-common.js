@@ -141,9 +141,31 @@
     return "Destek gerekli";
   };
 
-  const getQuestionDescription = (question) => {
-    const structured = getStructuredQuestions().find((item) => Number(item.number) === Number(question.number)) || {};
-    return valueFrom(question, ["outcomeDescription", "learningOutcome", "description"]) || valueFrom(structured, ["outcomeDescription", "learningOutcome", "description"]) || valueFrom(question, ["outcomeCode"]) || "Öğrenme çıktısı belirtilmedi";
+  const getQuestionOutcomes = (question = {}, structuredQuestion = {}) => {
+    const source = Array.isArray(question.outcomes) && question.outcomes.length
+      ? question.outcomes
+      : Array.isArray(structuredQuestion.outcomes) && structuredQuestion.outcomes.length
+        ? structuredQuestion.outcomes
+        : [question, structuredQuestion].filter((item) => valueFrom(item, ["outcomeCode", "outcomeDescription", "outcomeKey"]));
+    const seen = new Set();
+    return source.map((item) => ({
+      outcomeCode: normalizeText(item.outcomeCode),
+      outcomeTheme: normalizeText(item.outcomeTheme),
+      outcomeDescription: valueFrom(item, ["outcomeDescription", "learningOutcome", "description"]),
+      outcomeKey: normalizeText(item.outcomeKey)
+    })).filter((item) => {
+      const key = item.outcomeKey || [item.outcomeTheme, item.outcomeCode, item.outcomeDescription].join("|");
+      if (!key.replace(/\|/g, "") || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
+  const getQuestionDescription = (question, structuredQuestion = {}) => {
+    const labels = getQuestionOutcomes(question, structuredQuestion).map((outcome) =>
+      [outcome.outcomeCode, outcome.outcomeDescription].filter(Boolean).join(" — ")
+    ).filter(Boolean);
+    return labels.join("; ") || "Öğrenme çıktısı belirtilmedi";
   };
 
   const getParticipatingStudents = () => {
@@ -161,11 +183,14 @@
       const maxScore = Number(question.maxScore ?? structuredQuestion.maxScore) || 0;
       const average = participating && Number.isFinite(Number(question.earnedScore)) ? Number(question.earnedScore) / participating : "";
       const rate = Number(question.successRate);
+      const outcomes = getQuestionOutcomes(question, structuredQuestion);
+      const primaryOutcome = outcomes[0] || {};
       return {
         number: question.number ?? structuredQuestion.number ?? index + 1,
-        outcomeCode: normalizeText(question.outcomeCode || structuredQuestion.outcomeCode),
-        outcomeTheme: normalizeText(question.outcomeTheme || structuredQuestion.outcomeTheme),
-        outcomeDescription: getQuestionDescription({ ...structuredQuestion, ...question }),
+        outcomes,
+        outcomeCode: primaryOutcome.outcomeCode || normalizeText(question.outcomeCode || structuredQuestion.outcomeCode),
+        outcomeTheme: primaryOutcome.outcomeTheme || normalizeText(question.outcomeTheme || structuredQuestion.outcomeTheme),
+        outcomeDescription: getQuestionDescription(question, structuredQuestion),
         maxScore,
         average,
         successRate: Number.isFinite(rate) ? rate : "",
@@ -178,8 +203,9 @@
   };
 
   const relatedQuestionsForOutcome = (outcomeCode, outcomeTheme = "") => getQuestionRows()
-    .filter((question) => normalizeText(question.outcomeCode) === normalizeText(outcomeCode)
-      && (!outcomeTheme || normalizeText(question.outcomeTheme) === normalizeText(outcomeTheme)))
+    .filter((question) => question.outcomes.some((outcome) =>
+      normalizeText(outcome.outcomeCode) === normalizeText(outcomeCode)
+      && (!outcomeTheme || normalizeText(outcome.outcomeTheme) === normalizeText(outcomeTheme))))
     .map((question) => `S${question.number}`)
     .join(", ");
 

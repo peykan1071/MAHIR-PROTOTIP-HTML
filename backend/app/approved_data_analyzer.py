@@ -63,7 +63,16 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
 
     question_results = []
     outcome_totals: dict[str, dict[str, Any]] = defaultdict(
-        lambda: {"earned": 0.0, "possible": 0.0, "skill": ""}
+        lambda: {
+            "earned": 0.0,
+            "possible": 0.0,
+            "outcomeCode": "",
+            "outcomeDescription": "",
+            "outcomeTheme": "",
+            "outcomeSkill": "",
+            "parentOutcomeCode": "",
+            "parentOutcomeDescription": "",
+        }
     )
     for question_index, question in enumerate(normalized_questions):
         earned = sum(student["scores"][question_index] for student in participating)
@@ -76,22 +85,47 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
             "realizationRate": rate,
             "successRate": rate,
         })
-        outcome_key = " | ".join(
-            value for value in (question["outcomeTheme"], question["outcomeCode"]) if value
-        ) or f"Soru {question['number']}"
-        outcome_totals[outcome_key]["earned"] += earned
-        outcome_totals[outcome_key]["possible"] += possible
-        outcome_totals[outcome_key]["skill"] = question["outcomeSkill"]
+
+        mappings = question["outcomes"] or [{
+            "outcomeCode": f"Soru {question['number']}",
+            "outcomeDescription": "",
+            "outcomeTheme": "",
+            "outcomeSkill": "",
+            "parentOutcomeCode": "",
+            "parentOutcomeDescription": "",
+            "outcomeKey": f"question-{question['number']}",
+            "weight": 1.0,
+        }]
+        for mapping in mappings:
+            weight = mapping["weight"]
+            outcome_key = mapping["outcomeKey"] or " | ".join(
+                value for value in (mapping["outcomeTheme"], mapping["outcomeCode"]) if value
+            ) or f"Soru {question['number']}"
+            totals = outcome_totals[outcome_key]
+            totals["earned"] += earned * weight
+            totals["possible"] += possible * weight
+            for field in (
+                "outcomeCode",
+                "outcomeDescription",
+                "outcomeTheme",
+                "outcomeSkill",
+                "parentOutcomeCode",
+                "parentOutcomeDescription",
+            ):
+                if mapping.get(field):
+                    totals[field] = mapping[field]
 
     outcome_results = []
-    for outcome_key, totals in outcome_totals.items():
+    for totals in outcome_totals.values():
         rate = totals["earned"] / totals["possible"] if totals["possible"] else 0.0
-        theme, separator, code = outcome_key.rpartition(" | ")
         outcome_results.append(
             {
-                "outcomeCode": code if separator else outcome_key,
-                "outcomeTheme": theme if separator else "",
-                "outcomeSkill": totals["skill"],
+                "outcomeCode": totals["outcomeCode"],
+                "outcomeDescription": totals["outcomeDescription"],
+                "outcomeTheme": totals["outcomeTheme"],
+                "outcomeSkill": totals["outcomeSkill"],
+                "parentOutcomeCode": totals["parentOutcomeCode"],
+                "parentOutcomeDescription": totals["parentOutcomeDescription"],
                 "earnedScore": totals["earned"],
                 "possibleScore": totals["possible"],
                 "successRate": rate,
@@ -128,16 +162,8 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _normalize_question(item: Any, fallback_number: int) -> dict[str, Any]:
-    if not isinstance(item, dict):
-        raise ValueError(f"{fallback_number}. soru verisi geçersiz.")
-    number = int(_number(item.get("number"), fallback_number))
-    max_score = _number(item.get("maxScore"))
-    if max_score <= 0:
-        raise ValueError(f"{number}. sorunun azami puanı sıfırdan büyük olmalıdır.")
+def _normalize_outcome(item: dict[str, Any], weight: float) -> dict[str, Any]:
     return {
-        "number": number,
-        "maxScore": max_score,
         "outcomeCode": str(item.get("outcomeCode") or "").strip(),
         "outcomeDescription": str(item.get("outcomeDescription") or "").strip(),
         "outcomeTheme": str(item.get("outcomeTheme") or "").strip(),
@@ -145,6 +171,51 @@ def _normalize_question(item: Any, fallback_number: int) -> dict[str, Any]:
         "parentOutcomeCode": str(item.get("parentOutcomeCode") or "").strip(),
         "parentOutcomeDescription": str(item.get("parentOutcomeDescription") or "").strip(),
         "outcomeKey": str(item.get("outcomeKey") or "").strip(),
+        "weight": weight,
+    }
+
+
+def _normalize_question(item: Any, fallback_number: int) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        raise ValueError(f"{fallback_number}. soru verisi geçersiz.")
+    number = int(_number(item.get("number"), fallback_number))
+    max_score = _number(item.get("maxScore"))
+    if max_score <= 0:
+        raise ValueError(f"{number}. sorunun azami puanı sıfırdan büyük olmalıdır.")
+
+    raw_outcomes = item.get("outcomes")
+    outcome_fields = (
+        "outcomeCode",
+        "outcomeDescription",
+        "outcomeTheme",
+        "outcomeSkill",
+        "parentOutcomeCode",
+        "parentOutcomeDescription",
+        "outcomeKey",
+    )
+    outcome_items = [
+        entry
+        for entry in raw_outcomes
+        if isinstance(entry, dict) and any(entry.get(field) for field in outcome_fields)
+    ] if isinstance(raw_outcomes, list) else []
+    if not outcome_items and any(item.get(field) for field in ("outcomeCode", "outcomeDescription", "outcomeKey")):
+        outcome_items = [item]
+    weight = 1.0 / len(outcome_items) if outcome_items else 1.0
+    outcomes = [_normalize_outcome(entry, weight) for entry in outcome_items]
+    primary = outcomes[0] if outcomes else _normalize_outcome({}, 1.0)
+    return {
+        "number": number,
+        "maxScore": max_score,
+        "outcomes": outcomes,
+        **{field: primary[field] for field in (
+            "outcomeCode",
+            "outcomeDescription",
+            "outcomeTheme",
+            "outcomeSkill",
+            "parentOutcomeCode",
+            "parentOutcomeDescription",
+            "outcomeKey",
+        )},
     }
 
 

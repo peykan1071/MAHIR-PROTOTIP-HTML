@@ -366,6 +366,11 @@ input[type="checkbox"] {
   font-weight: 700;
 }
 
+.outcome-combobox-help {
+  color: var(--color-muted);
+  line-height: 1.35;
+}
+
 /* Author styles must not override the native hidden state. */
 .exam-count-grid label[hidden] {
   display: none;
