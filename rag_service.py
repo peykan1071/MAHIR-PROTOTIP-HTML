@@ -74,6 +74,15 @@ CHUNK_MAX_TOKENS = 512
 DEFAULT_TOP_K = 5
 MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024  # backend/app/file_receiver.py ile aynı sınır
 
+# --- Genel ajan uç noktasının sınırları ---
+# Bu uç nokta, çağıranın gönderdiği prompt'u bu GPU'da çalıştırır. Paylaşılan
+# parola KÖTÜ NİYETLİYİ engelliyor; aşağıdaki sınırlar HATAYI engelliyor -
+# döngüye giren ya da yanlışlıkla devasa bağlam gönderen bir ajan sessizce GPU
+# dakikası yakmasın. Değerler `max_model_len=8192` ile uyumlu seçildi.
+MAX_AGENT_PROMPTS = 16
+MAX_AGENT_PROMPT_CHARS = 8000
+MAX_AGENT_OUTPUT_TOKENS = 1024
+
 # Getirim isabetlerinin, EN İYİ isabetin skoruna göre korunma alt sınırı - mutlak
 # bir `score_threshold` DEĞİL. Gerekçe ölçüm: 8 gerçek zayıf öğrenme çıktısı,
 # tema filtresi açık, top_k=8 (64 isabet). Her sorgu aynı şekli veriyor - 2 güçlü
@@ -789,6 +798,25 @@ class RAGInference:
         if (body or {}).get("warmup"):
             return JSONResponse({"ok": True, "message": "RAG hattı hazır.", "structuredData": {"ready": True}})
 
+        # Genel ajan biçimi: çağıran kendi system/user prompt'unu gönderir.
+        # `queries`den farkı GETİRİM YOK - Qdrant'a hiç dokunulmaz, Volume
+        # reload edilmez, gömme yapılmaz. MAHİR'in beş uzman ajanı
+        # (backend/app/agents/) bunu kullanır: her birinin kendi prompt'u var
+        # ama hepsi aynı sıcak konteyneri ve aynı vLLM partisini paylaşır.
+        raw_agents = (body or {}).get("agents")
+        if isinstance(raw_agents, list) and raw_agents:
+            # Doğrulama ile üretim ayrı: geçersiz istek çağıranın hatası (400),
+            # üretim arızası servisin hatası (500). İkisini tek dönüş değerinden
+            # ayırt etmeye çalışmak mesaj metnine bakmak demek olurdu.
+            rejection = _reject_agent_prompts(raw_agents)
+            if rejection:
+                return JSONResponse({"ok": False, "message": rejection}, status_code=400)
+            ok, message, results = self._run_agent_prompts(raw_agents)
+            return JSONResponse(
+                {"ok": ok, "message": message, "structuredData": {"results": results} if ok else None},
+                status_code=200 if ok else 500,
+            )
+
         # Toplu biçim: N zayıf öğrenme çıktısı tek istekte, tek vLLM partisinde.
         raw_queries = (body or {}).get("queries")
         if isinstance(raw_queries, list) and raw_queries:
@@ -849,6 +877,57 @@ class RAGInference:
         # approved_data_analyzer, main()) buna göre yazılmış.
         found = bool(result.get("sources"))
         return True, "Yanıt üretildi." if found else "Bu bilgi belgede bulunmuyor.", result
+
+    def _run_agent_prompts(
+        self, items: list[dict[str, object]]
+    ) -> tuple[bool, str, list[dict[str, object]] | None]:
+        """Çağıranın gönderdiği system/user prompt çiftlerini TEK partide çalıştırır.
+
+        `_run_batch_query`in parti mantığını izler ama getirim tarafı hiç yok:
+        Qdrant açılmaz, Volume reload edilmez, gömme yapılmaz. Bu yüzden aynı
+        sayıda öğe için RAG sorgusundan belirgin biçimde hızlıdır - MAHİR'in
+        ajanlarının çoğu müfredat metnine değil, kendi hesapladığı verilere
+        bakarak yorum üretiyor.
+
+        Parti neden: ölçüldü - vLLM'de N dizinin birlikte çözülmesi neredeyse
+        tek dizi kadar sürüyor (darboğaz GPU'nun bellek bant genişliği). Yani
+        beş ajanın beş ayrı prompt'u, tek ajanın bir prompt'uyla aynı maliyete
+        yakın. Ek GPU maliyeti olmadan çok ajanlı olmanın yolu bu.
+
+        Çıktılar giriş sırasıyla döner; `name` alanı çağıranın eşleştirme
+        yapabilmesi için aynen geri verilir.
+        """
+
+        from vllm import SamplingParams
+
+        conversations = [
+            [
+                {"role": "system", "content": str(item.get("system") or "")},
+                {"role": "user", "content": str(item.get("user") or "")},
+            ]
+            for item in items
+        ]
+        # Tavan uygulanır: çağıran daha büyük isterse sessizce kırpılır, çünkü
+        # bu sınır GPU'yu korumak için var ve pazarlık konusu değil.
+        max_tokens = min(
+            MAX_AGENT_OUTPUT_TOKENS,
+            max(int(_number_or(item.get("maxTokens"), MAX_AGENT_OUTPUT_TOKENS)) for item in items),
+        )
+
+        try:
+            outputs = self._llm.chat(
+                conversations, SamplingParams(temperature=0.1, max_tokens=max_tokens)
+            )
+        except Exception as error:  # noqa: BLE001 - vLLM üretimi üçüncü parti bir ML çağrısı;
+            # bir partinin başarısız olması servis konteynerini çökertmemeli.
+            return False, f"Ajan yanıtları üretilemedi: {error}", None
+        if len(outputs) != len(conversations):
+            return False, "Ajan partisinde yanıt sayısı istek sayısıyla eşleşmedi.", None
+
+        return True, "Ajan yanıtları üretildi.", [
+            {"name": str(item.get("name") or ""), "answer": output.outputs[0].text.strip()}
+            for item, output in zip(items, outputs)
+        ]
 
     def _run_batch_query(
         self,
@@ -1010,6 +1089,39 @@ class RAGInference:
                 }
 
         return True, "Yanıt üretildi.", [result or _no_answer() for result in results]
+
+
+def _number_or(value: object, fallback: int) -> int:
+    """Sayıya çevrilemeyen `maxTokens` isteği sessizce varsayılana düşer -
+    bir ajanın bozuk alanı yüzünden tüm parti reddedilmemeli."""
+
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _reject_agent_prompts(items: list[object]) -> str:
+    """Geçersizse Türkçe ret sebebi, geçerliyse boş string döndürür.
+
+    Sınırların gerekçesi `MAX_AGENT_*` sabitlerinin yanında yazılı: parola
+    kapısı kötü niyetliyi, bu kontroller hatayı durduruyor.
+    """
+
+    if len(items) > MAX_AGENT_PROMPTS:
+        return f"Tek istekte en çok {MAX_AGENT_PROMPTS} ajan prompt'u gönderilebilir."
+    for index, item in enumerate(items, 1):
+        if not isinstance(item, dict):
+            return f"{index}. ajan prompt'u geçersiz."
+        system = str(item.get("system") or "").strip()
+        user = str(item.get("user") or "").strip()
+        if not system or not user:
+            return f"{index}. ajan prompt'unda system ve user alanları zorunludur."
+        if len(system) + len(user) > MAX_AGENT_PROMPT_CHARS:
+            return (
+                f"{index}. ajan prompt'u {MAX_AGENT_PROMPT_CHARS} karakter sınırını aşıyor."
+            )
+    return ""
 
 
 def _build_sources(hits) -> list[dict[str, object]]:

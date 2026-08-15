@@ -2,6 +2,18 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Çok Ajanlı Analiz Hattı - Faz 2: Paylaşılan LLM Altyapısı - 2026-08-16
+
+- `rag_service.py`'nin uç noktasına dördüncü bir gövde biçimi eklendi: `{"agents": [{"name", "system", "user"}...]}`. Ajanlar artık kendi prompt'unu gönderebiliyor; önceden `SYSTEM_PROMPT` sabit gömülüydü ve tüm depoda tek bir LLM çağrı noktası vardı. Mevcut üç biçim (`warmup`, `queries`, tekil `question`) aynen korundu.
+- Bu dal **getirime hiç dokunmuyor**: Qdrant açılmıyor, Volume reload edilmiyor, gömme yapılmıyor. MAHİR'in ajanlarının çoğu müfredat metnine değil, kendi hesapladığı verilere bakarak yorum üretiyor.
+- **Ek GPU maliyeti yok.** Bir turdaki tüm ajan prompt'ları tek istekte, tek vLLM partisinde ve aynı sıcak konteynerde gidiyor. Canlı ölçüm (tam ısınmış konteyner): 1 prompt 2,9 sn / 215 karakter; 10 prompt 7,4 sn / 3448 karakter. Yani 10 prompt, tek prompt'un 2,6 katı sürede 16 katı metin üretiyor - verim 74 kr/sn'den 466 kr/sn'ye çıkıyor.
+- Charter süzgeci ortak katmana taşındı: yeni `backend/app/charter_guard.py`. "MAHİR yöntem/telafi önermez" kısıtı artık tek bir ajanın değil, LLM üreten her ajanın sorunu ve her yanıt bu süzgeçten geçiyor. Mevcut 5 süzgeç testi hiç değiştirilmeden geçmeye devam ediyor - taşımanın sadık olduğunun kanıtı.
+- Yeni istemci katmanı `backend/app/agents/llm.py`: parti toplayıcı + charter süzgeci + iz kaydı. HTTP için mevcut `rag_client._post` yeniden kullanılıyor (parola başlığını, hata gövdesinden Türkçe mesaj çıkarmayı ve zaman aşımını zaten doğru yapıyor). `rag_client` ile aynı "asla istisna fırlatmaz" sözleşmesi geçerli.
+- Uç nokta artık çağıranın prompt'unu bu GPU'da çalıştırdığı için sınırlar kondu: istek başına en çok 16 prompt, prompt başına 8000 karakter, `maxTokens` tavanı 1024. Parola kapısı kötü niyetliyi, bu sınırlar hatayı durduruyor - döngüye giren bir ajan sessizce GPU dakikası yakmasın. Geçersiz istekler üretim çalıştırılmadan 400 alıyor.
+- İzde LLM kaydı: `AgentTrace.llm_calls` artık `{agent, promptChars, answerChars, strippedSentences, durationMs}` taşıyor. Prompt ve yanıt **metni** kasıtlı olarak dışarıda - iz yalnız sayım ve özet taşıyor.
+- Canlı doğrulandı: parolasız `{"agents": [...]}` isteği 401; sınır ihlalleri 400; mevcut RAG akışı bozulmadı (8/8 dolu, 0 yanlış şiddet, 0 yanlış Bloom, 0 gerçek öneri sızıntısı).
+- Yeni testler: `tests/test_agent_llm.py` (11 test, gerçek yerel HTTP sunucusuna karşı).
+
 ## Uzak Servislerde Paylaşılan Parola Yeniden Etkin - 2026-08-16
 
 - OCR ve RAG uç noktaları 2026-08-10'dan beri herkese açıktı (geliştirme kolaylığı için bilinçli olarak kapatılmıştı). İkisi de yeni birer parolayla yeniden dağıtıldı; parolasız veya yanlış parolalı istekler artık **401** alıyor.

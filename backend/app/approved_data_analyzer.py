@@ -7,6 +7,10 @@ import os
 import re
 from typing import Any
 
+# Charter süzgeci `charter_guard`a taşındı: kısıt tek bir ajanın değil, LLM
+# üreten her ajanın sorunu. Takma ad, mevcut çağrı yerlerini ve testleri
+# değiştirmeden bırakmak için.
+from .charter_guard import strip_recommendation_sentences as _strip_recommendation_sentences
 from .assessment_profiles import (
     COMPONENT_LABELS,
     GENERAL,
@@ -365,40 +369,6 @@ def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramP
         outcome["ragContext"] = answer
 
 
-# DEVELOPMENT_CHARTER.md: "MAHİR ... öğretim yöntemi veya telafi programı
-# önermez". Bu kısıt rag_service.py'nin SYSTEM_PROMPT'unda (madde 5) yazılı ama
-# 7B'lik bir modelde prompt tek başına güvence değil - canlı ölçümde 8 yanıtın
-# 2'si "... programları önerilir" / "... eğitim verilmesi gerekmektedir" gibi
-# öneri cümleleriyle bitti. Bu yüzden kod tarafında da cümle düzeyinde bir
-# emniyet ağı var. Tetikleyiciler kasıtlı olarak dar tutuldu - teşhis dilinde
-# meşru olan biçimler elenmemeli: "gerektirir" ("bu kazanım analiz becerisi
-# gerektirir") ve "gerekli olan" ("gerekli olan yeteneklerin kazandırılmadığı")
-# kalmalı; yalnızca reçete yazan biçimler ("gerekir", "gerekmektedir",
-# "gereklidir", zorunluluk kipi "-malıdır") elenmeli.
-_RECOMMENDATION_PATTERN = re.compile(
-    r"öneri|tavsiye|telafi|gerekmekte|gerekiyor|\bgerekir\b|gereklid[ıi]r"
-    r"|ihtiyaç duyul|şartt[ıi]r|mal[ıi]d[ıi]r\b|melid[ıi]r\b"
-    # "eksikliği giderme ihtiyacı ortaya çıkmaktadır" gibi kapanışlar: MAHİR'in
-    # kendi terimi olan "gelişim ihtiyacı" elenmemeli, bu yüzden tetikleyici
-    # "ihtiyaç" değil, telafiyi anlatan "gider-" kökü.
-    r"|giderme|giderilme|gidermek|giderilmesi",
-    re.IGNORECASE,
-)
-
-
-def _strip_recommendation_sentences(answer: str) -> tuple[str, int]:
-    """Öneri içeren cümleleri at; (kalan metin, atılan cümle sayısı) döndür.
-
-    Yanıt tek bir akıcı paragraf olduğundan (bkz. SYSTEM_PROMPT çıktı biçimi)
-    cümleler birbirinden büyük ölçüde bağımsız - bir cümleyi düşürmek kalan
-    teşhisi bozmuyor. Hepsi öneriyse boş string döner ve çağıran taraf çıktıyı
-    tamamen atar; charter ihlali içeren bir metni raporlamaktansa hücreyi boş
-    bırakmak doğrusu.
-    """
-
-    sentences = re.split(r"(?<=[.!?])\s+", answer)
-    kept = [sentence for sentence in sentences if not _RECOMMENDATION_PATTERN.search(sentence)]
-    return " ".join(kept).strip(), len(sentences) - len(kept)
 
 
 # Standart Unicode .upper() Türkçe 'i'/'ı' ayrımını kaybediyor (ikisi de düz
