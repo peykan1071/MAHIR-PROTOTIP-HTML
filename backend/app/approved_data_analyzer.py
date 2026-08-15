@@ -6,7 +6,6 @@ import logging
 import os
 import re
 from collections import defaultdict
-import re
 from typing import Any
 
 from .assessment_profiles import (

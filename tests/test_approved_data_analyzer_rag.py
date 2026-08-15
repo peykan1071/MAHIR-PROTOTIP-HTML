@@ -31,7 +31,7 @@ def _weak_tde_payload():
                 ),
             }
         ],
-        "students": [{"studentNo": "1", "scores": [30]}],
+        "students": [{"studentRef": "Ö-001", "scores": [30]}],
     }
 
 
@@ -62,7 +62,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         payload = {
             "exam": {"courseName": "Fen Bilimleri", "componentType": "written"},
             "questions": [{"number": 1, "maxScore": 100}],
-            "students": [{"studentNo": "1", "scores": [10]}],
+            "students": [{"studentRef": "Ö-001", "scores": [10]}],
         }
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
             with patch("backend.app.rag_client.query_rag_contexts") as mock_query:
@@ -221,7 +221,7 @@ def _two_weak_outcomes_payload():
                 "outcomeDescription": "metinlerde okumayı yönetebilme",
             },
         ],
-        "students": [{"studentNo": "1", "scores": [30, 40]}],
+        "students": [{"studentRef": "Ö-001", "scores": [30, 40]}],
     }
 
 

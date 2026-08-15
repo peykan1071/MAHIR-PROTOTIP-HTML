@@ -42,8 +42,11 @@ _QUESTIONS = [
     _question(9, "M9.OB3"),
 ]
 _STUDENTS = [
-    {"studentNo": "Ö-001", "scores": [8, 6, 7, 5]},
-    {"studentNo": "Ö-002", "scores": [6, 6, 7, 9]},
+    # `studentRef` (studentNo değil): analiz katmanı kimlik taşıyan alanları
+    # `_assert_privacy_safe_students` ile reddediyor, yalnız `Ö-\d{3,}` biçiminde
+    # oturumluk takma referans kabul ediyor.
+    {"studentRef": "Ö-001", "scores": [8, 6, 7, 5]},
+    {"studentRef": "Ö-002", "scores": [6, 6, 7, 9]},
 ]
 
 
