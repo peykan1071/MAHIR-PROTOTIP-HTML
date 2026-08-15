@@ -60,6 +60,20 @@ python3 backend/run_file_receiver.py
 
 `MAHIR_OCR_SHARED_SECRET`, servis adresi herkese açık olduğu için isteklerin `X-MAHIR-OCR-Key` başlığıyla doğrulanmasını sağlar - istemci ve işçi tarafında aynı parola tanımlı olmalı; hiçbiri tanımlı değilse (yerel geliştirme/test) doğrulama yapılmaz. `MAHIR_OCR_REMOTE_URL` tanımlı değilken görsel yüklemeleri OCR yapılmadan kabul edilir; sunucu çökmez.
 
+### Paylaşılan parola zorunludur (2026-08-16'dan itibaren)
+
+Her iki uzak servis de artık parola doğruluyor: parolasız veya yanlış parolalı istekler **401** alır. Yerel sunucuyu başlatmadan önce **aynı kabukta** iki değişkeni de tanımlayın:
+
+```bash
+export MAHIR_RAG_SHARED_SECRET=...
+export MAHIR_OCR_SHARED_SECRET=...
+python backend/run_file_receiver.py
+```
+
+Bu depoda parolalar `secrets.local.txt` dosyasında tutulur; dosya `.gitignore`'da olduğu için depoya girmez. Dosya sizde yoksa parolaları bilen biriyle paylaşılması gerekir - koddan türetilemez.
+
+**Parolayı değiştirmek** yalnız ortam değişkenini güncellemekle olmaz: değer *dağıtım anında* Modal uygulamasına gömülüyor (bkz. `rag_service.py` ve `modal_app.py` içindeki `modal.Secret.from_dict`). Yeni parola için değişkeni tanımlayıp `python -m modal deploy rag_service.py` ve `python -m modal deploy modal_app.py` komutlarını yeniden çalıştırın.
+
 Sınırlamalar: Boşta kalan servis bir süre sonra sıfıra ölçeklenir; gelen ilk istek konteyneri yeniden başlatıp pipeline'ı GPU'ya yükler (soğuk başlangıç, model dosyaları imaja gömülü olduğu için saniyeler-birkaç dakika sürebilir) - `run_ocr_worker.py` bu süreyi istek beklemeden önce tüketir. Kesin maliyet için [modal.com/pricing](https://modal.com/pricing) sayfasını kontrol edin.
 
 ## Geliştirme Kuralları
@@ -182,6 +196,7 @@ MAHIR-PROTOTIP-HTML/
 ├── script.js                  # Kullanıcı akışı ve ön yüz bağlantıları
 ├── assets/js/                 # Program kataloğu, yedekleme ve çıktı üreticileri
 ├── backend/app/               # Belge okuma, doğrulama ve analiz motorları
+├── backend/app/agents/        # Beş uzman ajan, orkestratör ve CED omurgası
 ├── shared/pilot/tde9/         # TDE 9 pilot program verileri
 ├── shared/templates/          # Veri giriş ve rapor şablonları
 ├── tests/                     # Python ve JavaScript kontrolleri

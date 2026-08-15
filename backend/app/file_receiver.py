@@ -24,10 +24,6 @@ from .docx_parser import parse_mahir_docx
 from .pdf_parser import parse_score_pdf
 from .spreadsheet_parser import parse_score_xlsx
 from .approved_data_analyzer import analyze_approved_data
-from .measurement_engine import build_measured_ced_document
-from .pedagogical_analysis import analyze_learning_outcomes
-from .program_mapper import load_learning_outcomes
-from .reporting_engine import generate_report, write_report
 
 
 UPLOAD_PATH = "/mahir-upload"
@@ -353,45 +349,18 @@ def run_existing_backend_flow(
             },
         )
 
-    if file_check.extension != ".csv":
-        return True, "Belge alındı ve öğretmen kontrolüne hazırlandı.", None
-
-    project_root = Path(__file__).resolve().parents[2]
-    temporary_dir = project_root / "backend" / ".tmp"
-    temporary_dir.mkdir(exist_ok=True)
-    uploaded_csv_path = temporary_dir / "uploaded-sample-exam.csv"
-
-    try:
-        uploaded_csv_path.write_bytes(uploaded_file.content)
-        outcomes_path = project_root / "shared" / "sample-learning-outcomes.json"
-        student_results_path = project_root / "shared" / "sample-student-results.json"
-        report_path = project_root / "shared" / "report-example.txt"
-        document, question_rates, outcome_rates = build_measured_ced_document(
-            uploaded_csv_path,
-            outcomes_path,
-            student_results_path,
-        )
-        learning_outcomes = load_learning_outcomes(outcomes_path)
-        analysis_results = analyze_learning_outcomes(outcome_rates, learning_outcomes)
-        report_text = generate_report(
-            document,
-            question_rates,
-            outcome_rates,
-            analysis_results,
-            learning_outcomes,
-        )
-        write_report(report_text, report_path)
-        print(report_text, end="", flush=True)
-        return True, "Dosya başarıyla işlendi.", None
-    except (OSError, ValueError) as error:
-        return False, str(error), None
-    finally:
-        if uploaded_csv_path.exists():
-            uploaded_csv_path.unlink()
-        try:
-            temporary_dir.rmdir()
-        except OSError:
-            pass
+    # Buraya kadar tanınmayan her biçim öğretmen kontrol ekranına düşer.
+    #
+    # Eskiden burada bir `.csv` dalı vardı: yüklenen dosyayı diske yazıp
+    # `measurement_engine`/`pedagogical_analysis`/`reporting_engine` zincirini
+    # koşturuyor, sonucu `shared/report-example.txt`e yazıp konsola basıyordu.
+    # Üç sebeple kaldırıldı: (1) arayüzdeki dosya girişi `.csv` kabul etmiyor,
+    # yani öğretmen bu dalı hiç tetikleyemiyordu; (2) tetiklense bile yüklenen
+    # içeriği kullanmayıp sabit `shared/sample-*.json` dosyalarını okuyordu;
+    # (3) tarayıcıya `None` döndüğü için öğretmen sonucu zaten göremiyordu.
+    # O zincirin gerçek karşılığı artık canlı akışta: `analyze_approved_data`
+    # beş uzman ajanı koşturuyor (bkz. backend/app/agents/).
+    return True, "Belge alındı ve öğretmen kontrolüne hazırlandı.", None
 
 
 def run_image_group_ocr(uploaded_files: list[UploadedFile]) -> tuple[bool, str, dict[str, object] | None]:

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-from collections import defaultdict
 from typing import Any
 
 from .assessment_profiles import (
@@ -16,7 +15,10 @@ from .assessment_profiles import (
     build_general_evaluation,
     profile_for_course,
 )
-from .program_catalog import ProgramProfile, validate_question_program_context
+# `defaultdict` ve `validate_question_program_context` artık burada değil:
+# ölçme toplamları `measurement_engine`e, program eşleştirme ise
+# `agents/pipeline.py::ProgramMappingAgent`a taşındı.
+from .program_catalog import ProgramProfile
 
 _DEFAULT_MAHIR_RAG_REMOTE_URL = "https://hakanergul--turkish-rag-system-raginference-web-query.modal.run"
 # Varsayılan, deploy edilmiş RAG servisinin adresi olarak koda gömülü - terminalde
@@ -68,135 +70,16 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(students, list) or not students:
         raise ValueError("Analiz için en az bir öğrenci bulunmalıdır.")
 
-    program = validate_question_program_context(course_name, exam.get("grade"), questions)
+    # Buradan sonrası beş uzman ajanın işi (bkz. backend/app/agents/): Belge
+    # Anlama -> Program Eşleştirme -> Ölçme -> Pedagojik Analiz -> Raporlama.
+    # Yukarıdaki kontroller İSTEK düzeyinde (bileşen türü, ağırlık profili,
+    # gizlilik kapısı) ve ajanların işi değil, bu yüzden burada kalıyor.
+    #
+    # Import fonksiyon içinde: `agents` paketi bu modülden normalleştirme ve
+    # eşik yardımcılarını alıyor, modül seviyesinde import döngü kurardı.
+    from .agents.orchestrator import run_pipeline
 
-    normalized_questions = [_normalize_question(item, index) for index, item in enumerate(questions, 1)]
-    participating = [
-        _normalize_student(item, normalized_questions, index)
-        for index, item in enumerate(students, 1)
-    ]
-    if not participating:
-        raise ValueError("Sınava katılan öğrenci bulunmadığı için analiz oluşturulamadı.")
-
-    # Öğretmenin düzelttiği puan hücrelerinin soru indeksi bazında sayısı -
-    # tarayıcı gönderir (bkz. assets/js/mahir-score-corrections.js), çünkü
-    # makinenin okuduğu özgün değerler yalnız orada, grup kaydedilirken
-    # görülebiliyor. Yükte yoksa boş sözlük: alan tamamen geriye dönük uyumlu.
-    corrected_cells = _normalize_corrected_cells(payload.get("correctedCells"))
-
-    question_results = []
-    outcome_totals: dict[str, dict[str, Any]] = defaultdict(
-        lambda: {
-            "earned": 0.0,
-            "possible": 0.0,
-            "skill": "",
-            "description": "",
-            "parentDescription": "",
-            "questions": [],
-            "correctedCellCount": 0,
-        }
-    )
-    for question_index, question in enumerate(normalized_questions):
-        earned = sum(student["scores"][question_index] for student in participating)
-        possible = question["maxScore"] * len(participating)
-        rate = earned / possible if possible else 0.0
-        question_results.append({
-            **question,
-            "earnedScore": earned,
-            "possibleScore": possible,
-            "realizationRate": rate,
-            "successRate": rate,
-        })
-        outcome_key = " | ".join(
-            value for value in (question["outcomeTheme"], question["outcomeCode"]) if value
-        ) or f"Soru {question['number']}"
-        outcome_totals[outcome_key]["earned"] += earned
-        outcome_totals[outcome_key]["possible"] += possible
-        outcome_totals[outcome_key]["skill"] = question["outcomeSkill"]
-        # Kazanımın tam metni (ör. "«Sözün İnceliği» temasında ele alınan
-        # metinlerde dinlemeyi/izlemeyi yönetebilme") RAG için iki açıdan
-        # kritik: müfredat PDF'iyle aynı dilde yazıldığı için çıplak bir koddan
-        # çok daha iyi bir getirim anahtarı, ve kazanımın bilişsel fiilinin
-        # ("yönetebilme", "değerlendirebilme") geçtiği tek yer - rag_service.py'nin
-        # SYSTEM_PROMPT'u modelden tam olarak bu düzeyi sınıflandırmasını istiyor.
-        # Süreç bileşeni seçildiyse (bkz. assets/js/mahir-program-catalog.js
-        # filterOutcomes) üst kazanımın metni de taşınır; ikisi birlikte tek bir
-        # bileşenin dar ifadesinden daha eksiksiz bir bağlam veriyor.
-        outcome_totals[outcome_key]["description"] = question["outcomeDescription"]
-        outcome_totals[outcome_key]["parentDescription"] = question["parentOutcomeDescription"]
-        # Hesabın dayanağı: bu çıktının yüzdesini hangi soruların, hangi
-        # oranlarla ürettiği. Ön yüz bunu yeniden türetmiyor - eskiden
-        # mahir-report-export-common.js soru/çıktı eşleşmesini normalize
-        # edilmiş metin karşılaştırmasıyla buluyordu; tek doğruluk kaynağı
-        # sayının hesaplandığı yer, yani burası.
-        outcome_totals[outcome_key]["questions"].append(
-            {
-                "number": question["number"],
-                "maxScore": question["maxScore"],
-                "earnedScore": earned,
-                "possibleScore": possible,
-                "successRate": rate,
-                "correctedCellCount": corrected_cells.get(question_index, 0),
-            }
-        )
-        outcome_totals[outcome_key]["correctedCellCount"] += corrected_cells.get(question_index, 0)
-
-    outcome_results = []
-    for outcome_key, totals in outcome_totals.items():
-        rate = totals["earned"] / totals["possible"] if totals["possible"] else 0.0
-        theme, separator, code = outcome_key.rpartition(" | ")
-        outcome_results.append(
-            {
-                "outcomeCode": code if separator else outcome_key,
-                "outcomeTheme": theme if separator else "",
-                "outcomeSkill": totals["skill"],
-                "outcomeDescription": totals["description"],
-                "parentOutcomeDescription": totals["parentDescription"],
-                "earnedScore": totals["earned"],
-                "possibleScore": totals["possible"],
-                "successRate": rate,
-                "realizationRate": rate,
-                "developmentLevel": _category(rate),
-                "category": _category(rate),
-                "decision": _decision(rate),
-                "evidence": {
-                    "questionNumbers": [item["number"] for item in totals["questions"]],
-                    "questionCount": len(totals["questions"]),
-                    "participatingStudentCount": len(participating),
-                    "earnedScore": totals["earned"],
-                    "possibleScore": totals["possible"],
-                    "correctedCellCount": totals["correctedCellCount"],
-                    "questions": totals["questions"],
-                },
-            }
-        )
-
-    _attach_rag_context(outcome_results, program)
-
-    average = sum(student["calculatedTotal"] for student in participating) / len(participating)
-    exam_max = sum(question["maxScore"] for question in normalized_questions)
-    return {
-        "exam": {
-            **exam,
-            "componentType": component_type,
-            "componentLabel": COMPONENT_LABELS[component_type],
-            "weightingProfileId": profile_id or None,
-            "componentWeight": PROFILES[profile_id].weights.get(component_type) if profile_id else None,
-        },
-        "summary": {
-            "questionCount": len(normalized_questions),
-            "studentCount": len(students),
-            "participatingStudentCount": len(participating),
-            "absentStudentCount": 0,
-            "examMaxScore": exam_max,
-            "classAverage": round(average, 2),
-            "classLearningLevel": average / exam_max if exam_max else 0.0,
-            "classSuccessRate": average / exam_max if exam_max else 0.0,
-        },
-        "questions": question_results,
-        "outcomes": outcome_results,
-        "students": participating,
-    }
+    return run_pipeline(payload, component_type, profile_id).analysis
 
 
 def _normalize_corrected_cells(raw: Any) -> dict[int, int]:
