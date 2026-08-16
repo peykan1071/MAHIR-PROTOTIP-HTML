@@ -2939,6 +2939,7 @@ const fileUploadBridge = (() => {
       reportRuntime.structuredData = structuredData;
       reportRuntime.exam = structuredData.exam;
       reportRuntime.analysis = null;
+      reportRuntime.trace = null;
       const questionBody = document.querySelector("[data-validation-questions]");
       const studentHead = document.querySelector("[data-validation-student-head]");
       const studentBody = document.querySelector("[data-validation-students]");
@@ -3306,6 +3307,9 @@ const fileUploadBridge = (() => {
     const invalidateAnalysisAfterApprovedDataEdit = () => {
       if (!finalReviewMode || !reportRuntime.analysis) return;
       reportRuntime.analysis = null;
+      // İz, analizle birlikte geçersizleşir: eski koşunun ajan kaydını yeni
+      // (henüz üretilmemiş) bir analizin yanında göstermek öğretmeni yanıltır.
+      reportRuntime.trace = null;
       reportRuntime.report = null;
       screenManager.revokeDataApproval();
       document.dispatchEvent(new CustomEvent("mahir:report-reset"));
@@ -3337,10 +3341,64 @@ const fileUploadBridge = (() => {
       if (approvalMessage) approvalMessage.textContent = "Tüm verileri gözden geçiriniz. Açık onay verilmeden analiz başlamaz.";
     };
 
-    const renderAnalysis = (analysis) => {
+    // Analiz ekranındaki "Analiz Özeti" listesini beş ajanın GERÇEK koşusuyla
+    // değiştirir. İz gelmediğinde (kaydedilmiş eski çalışma, genel dil
+    // değerlendirmesi) listeye hiç dokunulmaz - index.html'deki sabit metin
+    // geçerli bir geri çekilme yolu olarak kalır.
+    const renderAgentTrace = (trace) => {
+      const list = document.querySelector("[data-agent-trace]");
+      const agents = Array.isArray(trace?.agents) ? trace.agents : [];
+      if (!list || !agents.length) return;
+      const format = window.MAHIRReportExport;
+      list.replaceChildren();
+      agents.forEach((entry) => {
+        const item = document.createElement("li");
+        // Süre ve LLM sayısı ayrı bir <span>'de: öğretmenin okuduğu cümle ile
+        // teknik ölçüm birbirine karışmasın.
+        const label = document.createElement("strong");
+        label.textContent = entry.label || entry.agent;
+        const task = document.createTextNode(` — ${format?.agentTaskText?.(entry) || ""}`);
+        const meta = document.createElement("span");
+        meta.className = "agent-trace-meta";
+        meta.textContent = [
+          format?.durationText?.(entry.durationMs),
+          entry.llmCalls?.length ? `${entry.llmCalls.length} dil modeli çağrısı` : "",
+          entry.failed || entry.skipped ? format?.agentStatusText?.(entry) : ""
+        ].filter(Boolean).join(" · ");
+        item.dataset.agent = entry.agent;
+        if (entry.failed) item.dataset.agentFailed = "true";
+        if (entry.skipped) item.dataset.agentSkipped = "true";
+        item.append(label, task, meta);
+        list.append(item);
+      });
+
+      // Ortak dil modeli turu ayrı satırda: süre ajanlara bölüştürülmüyor
+      // (dokuz istem tek istekte çözülüyor, paylaştırmak uydurma olurdu).
+      const round = trace.llmRound;
+      if (round?.promptCount) {
+        const item = document.createElement("li");
+        item.dataset.agent = "llm-turu";
+        const label = document.createElement("strong");
+        label.textContent = "Dil modeli turu (ortak)";
+        const meta = document.createElement("span");
+        meta.className = "agent-trace-meta";
+        meta.textContent = [
+          format?.durationText?.(round.durationMs),
+          round.ok ? "" : "Tamamlanamadı"
+        ].filter(Boolean).join(" · ");
+        item.append(label, document.createTextNode(` — ${round.promptCount} istem tek istekte çözüldü`), meta);
+        list.append(item);
+      }
+    };
+
+    const renderAnalysis = (analysis, trace) => {
       const reportScreen = document.querySelector("#report-screen");
       if (reportScreen?.dataset.reportLocked === "true") return;
       reportRuntime.analysis = analysis;
+      // İz raporun İÇİNDE değil yanında taşınıyor; rapor sözleşmesi teknik
+      // alanlarla kirlenmesin diye (bkz. backend `analyze_approved_data_traced`).
+      reportRuntime.trace = trace || null;
+      renderAgentTrace(trace);
       window.MAHIRReportExport?.syncOutputHeader(reportScreen);
     };
 
@@ -3398,7 +3456,7 @@ const fileUploadBridge = (() => {
             reportRuntime.languageComponentAnalyses = reportRuntime.languageComponentAnalyses || {};
             reportRuntime.languageComponentAnalyses[selectedComponent] = analysis;
           }
-          renderAnalysis(analysis);
+          renderAnalysis(analysis, payload.trace);
           screenManager.approveData();
           screenManager.showScreen("analysis-screen");
           showMessage("Analiz tamamlandı. Öğrenme kanıtlarına dayalı değerlendirme raporu görüntülenmeye hazırdır.", "success");

@@ -11,7 +11,10 @@ from unittest.mock import patch
 
 import rag_service
 from backend.app.agents import prompts
-from backend.app.approved_data_analyzer import analyze_approved_data
+from backend.app.approved_data_analyzer import (
+    analyze_approved_data,
+    analyze_approved_data_traced,
+)
 
 _FAKE_URL = "https://fake.example/web_query"
 
@@ -47,7 +50,13 @@ def _tde_payload(scores=(3, 4, 2)):
 
 
 def _capture(answer=""):
-    """`run_agent_prompts` yerine geçer; gönderilen kuyruğu kaydeder."""
+    """`run_agent_prompts` yerine geçer; gönderilen kuyruğu kaydeder.
+
+    Dönen sözlük GERÇEK `run_agent_prompts` çıktısının tüm alanlarını taşır.
+    Eksik bırakmak bedava değil: Faz 3'te sahte yanıtta `sources` yoktu, gerçek
+    uçtan gelen alan istemcide düşürülüyordu ve hiçbir birim testi görmedi -
+    canlı koşuda 0/8 teşhisle ortaya çıktı.
+    """
 
     calls = []
 
@@ -59,6 +68,9 @@ def _capture(answer=""):
                 "answer": answer,
                 "sources": [{"documentName": "x"}] if "retrieval" in item else [],
                 "strippedSentences": 0,
+                "promptChars": len(item.get("system", "")) + len(item.get("user", "")),
+                "answerChars": len(answer),
+                "durationMs": 1.0,
             }
             for item in items
         ]
@@ -128,6 +140,78 @@ class SingleRoundTests(unittest.TestCase):
 
         self.assertEqual(calls, [])
         self.assertEqual(result["summary"]["anomalies"], "")
+
+
+class LlmTraceTests(unittest.TestCase):
+    """Faz 2'de söz verilen `AgentTrace.llm_calls` gerçekten doluyor mu."""
+
+    def _trace(self, answer=""):
+        calls, fake = _capture(answer=answer)
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+            with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
+                _analysis, trace = analyze_approved_data_traced(_tde_payload())
+        return {entry["agent"]: entry for entry in trace["agents"]}
+
+    def test_llm_calls_land_on_the_agent_that_queued_the_prompt(self):
+        # Sahiplik prompt ADINDAN çıkarılsaydı teşhisler ("pedagoji/...")
+        # hiçbir ajana bağlanamaz, anomali ise doğru ajana denk gelip sorunu
+        # gizlerdi.
+        # Üç zayıf çıktı -> üç teşhis prompt'u; anomali prompt'u tek.
+        agents = self._trace(answer="teşhis")
+        self.assertEqual(len(agents["olcme-degerlendirme"]["llmCalls"]), 1)
+        self.assertEqual(len(agents["pedagojik-analiz"]["llmCalls"]), 3)
+
+    def test_agents_without_an_llm_role_stay_empty(self):
+        agents = self._trace(answer="teşhis")
+        for name in ("belge-anlama", "program-eslestirme", "raporlama"):
+            with self.subTest(agent=name):
+                self.assertEqual(agents[name]["llmCalls"], [])
+
+    def test_llm_call_records_carry_counts_but_no_text(self):
+        agents = self._trace(answer="Öğrenme kaybı vardır.")
+        record = agents["pedagojik-analiz"]["llmCalls"][0]
+        self.assertGreater(record["promptChars"], 0)
+        self.assertIn("answerChars", record)
+        self.assertNotIn("Öğrenme kaybı", repr(record), "İz, yanıt metnini taşımamalı.")
+
+    def test_the_shared_round_is_traced_as_one_request(self):
+        # Faz 3'ün asıl iddiası burada görünür hâle geliyor: dört LLM istemi,
+        # TEK tur. Süre ajanlara bölüştürülmüyor - paylaştırmak uydurma olurdu.
+        calls, fake = _capture(answer="teşhis")
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+            with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
+                _analysis, trace = analyze_approved_data_traced(_tde_payload())
+
+        self.assertEqual(trace["llmRound"]["promptCount"], 4)
+        self.assertEqual(trace["llmRound"]["resultCount"], 4)
+        self.assertTrue(trace["llmRound"]["ok"])
+        self.assertGreaterEqual(trace["llmRound"]["durationMs"], 0.0)
+
+    def test_no_round_leaves_the_record_empty(self):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
+            _analysis, trace = analyze_approved_data_traced(_tde_payload())
+        self.assertEqual(trace["llmRound"], {})
+
+    def test_failed_round_is_traced_as_not_ok(self):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                return_value=(False, "ulaşılamadı", None),
+            ):
+                _analysis, trace = analyze_approved_data_traced(_tde_payload())
+        self.assertFalse(trace["llmRound"]["ok"])
+        self.assertEqual(trace["llmRound"]["resultCount"], 0)
+
+    def test_failed_round_leaves_llm_calls_empty(self):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                return_value=(False, "ulaşılamadı", None),
+            ):
+                _analysis, trace = analyze_approved_data_traced(_tde_payload())
+        for entry in trace["agents"]:
+            with self.subTest(agent=entry["agent"]):
+                self.assertEqual(entry["llmCalls"], [])
 
 
 class AnomalyAgentTests(unittest.TestCase):

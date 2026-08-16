@@ -24,6 +24,12 @@ from ..charter_guard import strip_recommendation_sentences
 # çağırana yakın yerde üretilsin.
 MAX_PROMPTS_PER_REQUEST = 16
 
+# Uzak uç noktanın anladığı alanlar. Kuyruktaki sözlük bunlardan fazlasını
+# taşıyabiliyor (ör. `agent`: LLM kaydının hangi ajanın izine düşeceği) ve o
+# alanlar yerel - beyaz liste, çağıran tarafın iç alanlarının sessizce ağa
+# sızmasını yapısal olarak engelliyor.
+_WIRE_KEYS = ("name", "system", "user", "maxTokens", "retrieval")
+
 
 def build_prompt(agent: str, system: str, user: str, max_tokens: int | None = None) -> dict[str, Any]:
     """Uzak uç noktanın beklediği tek prompt sözlüğünü kurar."""
@@ -59,8 +65,10 @@ def run_agent_prompts(
     # doğru yapıyor. İkinci bir HTTP istemcisi yazmak bunu kopyalamak olurdu.
     from ..rag_client import _post
 
+    wire = [{key: item[key] for key in _WIRE_KEYS if key in item} for item in items]
+
     began = time.monotonic()
-    ok, message, structured_data = _post(remote_url, {"agents": items})
+    ok, message, structured_data = _post(remote_url, {"agents": wire})
     duration_ms = (time.monotonic() - began) * 1000
     if not ok or not isinstance(structured_data, dict):
         return ok, message, None

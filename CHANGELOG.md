@@ -2,6 +2,21 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Çok Ajanlı Analiz Hattı - Faz 4: İzlenebilirlik Yüzeyi - 2026-08-16
+
+- **Hat üç fazdır çalışıyordu ama öğretmen göremiyordu.** `analyze_approved_data` yalnız `run_pipeline(...).analysis` döndürüyor, beş ajanın izini ve bulgularını o satırda düşürüyordu. Artık `analyze_approved_data_traced` ikisini birlikte veriyor ve iz `/mahir-analyze` yanıtında **`analysis`in KARDEŞİ** olarak taşınıyor - içinde değil, çünkü biri raporun kendisi diğeri raporun nasıl üretildiği. Rapor sözleşmesi değişmedi; kaydedilmiş eski çalışmalar ve tüm eşdeğerlik testleri geçerli kaldı.
+- **Analiz ekranındaki sabit 6 maddelik liste gerçek koşuyla değişti**: her ajan kendi adı, yaptığı iş, süresi ve dil modeli çağrı sayısıyla görünüyor. İz gelmediğinde (genel dil değerlendirmesi, eski kaydedilmiş çalışma) sabit metin geri çekilme yolu olarak duruyor.
+- **Rapora "I. ANALİZ SÜRECİ VE AJAN İZİ" bölümü eklendi**; Word ve PDF dışa aktarıcıları blok modelini genel olarak tükettiği için o iki dosyada tek satır değişiklik gerekmedi. İz yoksa bölüm hiç üretilmiyor - rapor bugünküyle birebir aynı kalıyor.
+- **Ortak dil modeli turu KENDİ satırında**, ajanlara bölüştürülmüyor. Sebebi ölçümde göründü: tur bittiğinde Pedagojik Analiz'in kendi süresi 0,7 ms, turun kendisi 18,9 sn. Süreyi ajanlara paylaştırmak hem uydurma olurdu hem de tek istekli mimarinin kanıtını yok ederdi; ayrı satır ("9 istem tek istekte çözüldü") tam tersine onu görünür kılıyor.
+- **`AgentTrace.llm_calls` nihayet doluyor.** Faz 2'de `trace_entry` yazılmış ve test edilmişti ama **hiçbir yerden çağrılmıyordu** - CHANGELOG alanın dolduğunu söylüyordu, kod söylemiyordu. Sahiplik artık prompt'un açık `agent` alanından okunuyor (addan çıkarmak kırılgandı: anomali prompt'unun adı ajan adıyla aynı, teşhis prompt'larınınki "pedagoji/..." ve sahibi "pedagojik-analiz"). Canlı: Ölçme 1, Pedagojik 8 kayıt.
+- **Ölçme Ajanı'nın anomali bulgusu artık raporda görünüyor** (C bölümünün altında paragraf). Faz 3 onu üretiyordu ama hiçbir rapor bloğu okumuyordu. Kapanış cümlesi kasıtlı: "Bu gözlem hiçbir puanı veya oranı değiştirmez" - charter gereği bu bir gözlem, karar değil. Bulgu yoksa paragraf hiç eklenmiyor. Yol boyunca bir hata da çıktı: `getSummary()` özeti alan alan yeniden kurduğu için `anomalies` sessizce düşüyordu.
+- **`PipelineError` artık yüzeye çıkıyor**: zorunlu bir ajan düştüğünde rota çıplak 500 yerine kısmi izi de gönderiyor - hangi ajan düştü, hangileri atlandı, öncekiler ne üretmişti.
+- İz gizlilik kuralı `to_wire` biçimine de genişletildi ve canlı gövde üzerinde doğrulandı: öğrenci satırı, puanlar, prompt ve yanıt metni izde yok.
+- **Temizlik**: ölü `_attach_rag_context` (~140 satır) kaldırıldı - işi Faz 3'te ajanın kendisine geçmişti. `rag_client.query_rag_context(s)` duruyor ama canlı akışta çağrılmıyor; `rag_service.py`nin eski `queries` biçiminin tek istemcisi oldukları için ikisi birlikte kaldırılmalı, koda not düşüldü.
+- **Çürümüş testler onarıldı**: `test_approved_data_analyzer_rag.py`'de beş test hâlâ çağrılmayan `rag_client.query_rag_contexts`i mock'luyordu. Üçünün `assert_not_called` iddiası boşa dönmüştü; ikisi ise mock hiç devreye girmediği için çözülemeyen bir alan adına düşüp **DNS hatası sayesinde geçiyordu** - arıza yalıtımını ölçtüklerini sanıyorduk, ölçmüyorlardı.
+- Canlı doğrulama (sıcak konteyner, gerçek rota): HTTP 200, gövde `{ok, message, analysis, trace}`; 5 ajan Türkçe etiketleriyle; ortak tur 9 istem / 9 sonuç; 8/8 teşhis dolu; anomali kasıtlı olarak bozulan Soru 4'ü adlandırdı. **Faz 3'ün maliyet iddiası bozulmadı: 15,7 sn** (iz toplamak ağ turu eklemiyor).
+- Yeni testler: `tests/test_analysis_route_trace.py` (5), `tests/report-trace.test.js`, ayrıca iz/LLM kaydı testleri. Toplam 135 → 155 Python testi, 5 → 6 node dosyası.
+
 ## Çok Ajanlı Analiz Hattı - Faz 3: Tek İstekli LLM Turu + Anomali Ajanı - 2026-08-16
 
 - **Bir analizde artık TEK LLM isteği atılıyor**, kaç ajan LLM kullanırsa kullansın. Ajanlar LLM'i doğrudan çağırmıyor; `context.enqueue_prompt(...)` ile prompt'larını kuyruğa yazıyor, orkestratör hepsini tek istekte gönderip sonuçları `apply_llm` ile sahiplerine dağıtıyor.
@@ -22,7 +37,7 @@ Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip e
 - Charter süzgeci ortak katmana taşındı: yeni `backend/app/charter_guard.py`. "MAHİR yöntem/telafi önermez" kısıtı artık tek bir ajanın değil, LLM üreten her ajanın sorunu ve her yanıt bu süzgeçten geçiyor. Mevcut 5 süzgeç testi hiç değiştirilmeden geçmeye devam ediyor - taşımanın sadık olduğunun kanıtı.
 - Yeni istemci katmanı `backend/app/agents/llm.py`: parti toplayıcı + charter süzgeci + iz kaydı. HTTP için mevcut `rag_client._post` yeniden kullanılıyor (parola başlığını, hata gövdesinden Türkçe mesaj çıkarmayı ve zaman aşımını zaten doğru yapıyor). `rag_client` ile aynı "asla istisna fırlatmaz" sözleşmesi geçerli.
 - Uç nokta artık çağıranın prompt'unu bu GPU'da çalıştırdığı için sınırlar kondu: istek başına en çok 16 prompt, prompt başına 8000 karakter, `maxTokens` tavanı 1024. Parola kapısı kötü niyetliyi, bu sınırlar hatayı durduruyor - döngüye giren bir ajan sessizce GPU dakikası yakmasın. Geçersiz istekler üretim çalıştırılmadan 400 alıyor.
-- İzde LLM kaydı: `AgentTrace.llm_calls` artık `{agent, promptChars, answerChars, strippedSentences, durationMs}` taşıyor. Prompt ve yanıt **metni** kasıtlı olarak dışarıda - iz yalnız sayım ve özet taşıyor.
+- İz kaydı için `trace_entry` yazıldı: `{agent, promptChars, answerChars, strippedSentences, durationMs}`. Prompt ve yanıt **metni** kasıtlı olarak dışarıda - iz yalnız sayım ve özet taşıyor. (Düzeltme: bu kayıt Faz 2'de üretiliyor ama `AgentTrace.llm_calls`e hiç YAZILMIYORDU; alan Faz 4'te gerçekten dolduruldu.)
 - Canlı doğrulandı: parolasız `{"agents": [...]}` isteği 401; sınır ihlalleri 400; mevcut RAG akışı bozulmadı (8/8 dolu, 0 yanlış şiddet, 0 yanlış Bloom, 0 gerçek öneri sızıntısı).
 - Yeni testler: `tests/test_agent_llm.py` (11 test, gerçek yerel HTTP sunucusuna karşı).
 

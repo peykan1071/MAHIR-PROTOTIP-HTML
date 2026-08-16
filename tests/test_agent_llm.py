@@ -71,6 +71,29 @@ class AgentLlmTests(unittest.TestCase):
         self.assertEqual(sorted(sent), ["name", "system", "user"])
         self.assertEqual(sent["name"], "ajan-0")
 
+    def test_local_only_fields_never_reach_the_wire(self):
+        # `agent` alanı LLM kaydının hangi ajanın izine düşeceğini söylüyor -
+        # yerel bir yönlendirme bilgisi. Uzak uç nokta onu tanımıyor; gövdeye
+        # sızması hem sözleşmeyi bozar hem de "ne gönderdiğimizi biliyoruz"
+        # güvencesini zayıflatır.
+        self._reply([("a", "x")])
+        prompt = llm.build_prompt("a", "s", "u")
+        prompt["agent"] = "olcme-degerlendirme"
+        llm.run_agent_prompts([prompt], self.url)
+
+        sent = _received[0]["agents"][0]
+        self.assertNotIn("agent", sent)
+        self.assertEqual(sorted(sent), ["name", "system", "user"])
+
+    def test_retrieval_block_does_reach_the_wire(self):
+        # Beyaz liste, tanınan alanları elemekle "koruma" yapmamalı: getirim
+        # bloğu düşerse teşhisler bağlamsız üretilir ve kimse fark etmez.
+        self._reply([("a", "x")])
+        prompt = llm.build_prompt("a", "s", "u")
+        prompt["retrieval"] = {"programId": "tde9", "topK": 8}
+        llm.run_agent_prompts([prompt], self.url)
+        self.assertEqual(_received[0]["agents"][0]["retrieval"], {"programId": "tde9", "topK": 8})
+
     def test_max_tokens_is_sent_only_when_asked(self):
         self._reply([("a", "x")])
         llm.run_agent_prompts([llm.build_prompt("a", "s", "u", max_tokens=256)], self.url)

@@ -11,7 +11,7 @@ kullanır; ağır/uzak bağımlılıklar (OCR, LLM) ajanların içinde, çağrı
 import edilir - `ocr_engine.py`nin düzeniyle aynı.
 """
 
-from .base import Agent, AgentContext, AgentIssue, AgentResult, AgentTrace
+from .base import Agent, AgentContext, AgentIssue, AgentResult, AgentTrace, trace_of
 from .orchestrator import PIPELINE, run_pipeline
 
 __all__ = [
@@ -22,4 +22,5 @@ __all__ = [
     "AgentTrace",
     "PIPELINE",
     "run_pipeline",
+    "trace_of",
 ]

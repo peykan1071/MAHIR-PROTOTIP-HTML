@@ -9,10 +9,13 @@ disagree on the output.
 import unittest
 from unittest.mock import patch
 
-from backend.app.agents import PIPELINE, run_pipeline
+from backend.app.agents import PIPELINE, run_pipeline, trace_of
 from backend.app.agents.orchestrator import PipelineError
 from backend.app.agents.base import AgentContext, AgentIssue, AgentResult
-from backend.app.approved_data_analyzer import analyze_approved_data
+from backend.app.approved_data_analyzer import (
+    analyze_approved_data,
+    analyze_approved_data_traced,
+)
 
 
 def _question(number, code, theme="1. Tema: Sayılar", max_score=10):
@@ -226,16 +229,91 @@ class TraceTests(unittest.TestCase):
         self.assertEqual(context.trace_for("olcme-degerlendirme").outputs["correctedCellTotal"], 3)
 
 
+class TraceWireFormatTests(unittest.TestCase):
+    """`/mahir-analyze` yanıtına giden iz biçimi - öğretmenin gördüğü yüzeyin girdisi."""
+
+    def test_traced_analysis_matches_the_plain_one(self):
+        # İz eklemek analizin kendisini değiştirmemeli; eşdeğerlik güvencesi
+        # `analyze_approved_data`nın delege ettiği yeni yolda da geçerli.
+        payload = _payload()
+        analysis, _trace = analyze_approved_data_traced(payload)
+        self.assertEqual(analysis, analyze_approved_data(payload))
+
+    def test_every_agent_reaches_the_wire_with_a_turkish_label(self):
+        _analysis, trace = analyze_approved_data_traced(_payload())
+        self.assertEqual(
+            [entry["label"] for entry in trace["agents"]],
+            [
+                "Belge Anlama",
+                "Program Eşleştirme",
+                "Ölçme ve Değerlendirme",
+                "Pedagojik Analiz",
+                "Raporlama",
+            ],
+        )
+
+    def test_wire_entry_carries_what_the_surface_needs(self):
+        _analysis, trace = analyze_approved_data_traced(_payload())
+        entry = next(item for item in trace["agents"] if item["agent"] == "olcme-degerlendirme")
+        self.assertEqual(entry["outputs"]["measuredQuestionCount"], 4)
+        self.assertGreaterEqual(entry["durationMs"], 0.0)
+        self.assertEqual(entry["llmCalls"], [], "LLM turu kapalıyken kayıt olmamalı.")
+        self.assertFalse(entry["failed"])
+        self.assertFalse(entry["skipped"])
+
+    def test_wire_trace_carries_no_student_rows(self):
+        # Gizlilik kuralı `to_dict` kadar `to_wire` için de geçerli - tarayıcıya
+        # giden biçim, gizlilik kapısının arkasına açılan bir yan kapı olmamalı.
+        _analysis, trace = analyze_approved_data_traced(_payload())
+        blob = repr(trace)
+        self.assertNotIn("Ö-001", blob)
+        self.assertNotIn("scores", blob)
+
+    def test_agent_findings_reach_the_wire_as_issues(self):
+        questions = [dict(_question(1, "M9.OB1"), outcomeCode="")]
+        _analysis, trace = analyze_approved_data_traced({
+            "exam": {"courseName": "Matematik", "grade": "9", "componentType": "written"},
+            "questions": questions,
+            "students": [{"studentRef": "Ö-001", "scores": [4]}],
+        })
+        self.assertTrue(any(issue["code"] == "cikti-secilmemis" for issue in trace["issues"]))
+
+    def test_skipped_agents_reach_the_wire_named(self):
+        # Zorunlu ajan düştüğünde de iz üretiliyor; "neden çalışmadı"
+        # gösterilebilmesi için atlananların da adı ve etiketi olmalı.
+        broken = _pipeline_with("olcme-degerlendirme", "Ölçme", required=True)
+        with patch("backend.app.agents.orchestrator.PIPELINE", broken):
+            with self.assertRaises(PipelineError) as caught:
+                _run(_payload())
+
+        agents = trace_of(caught.exception.context)["agents"]
+        self.assertEqual(len(agents), 5)
+        skipped = [entry for entry in agents if entry["skipped"]]
+        self.assertEqual(
+            [entry["label"] for entry in skipped], ["Pedagojik Analiz", "Raporlama"]
+        )
+
+
+def _pipeline_with(name, description, required):
+    """Adı verilen ajanı hep patlayan bir taklitle değiştirir.
+
+    `label` bilerek verilmiyor: orkestratör etiketi olmayan bir ajanda slug'a
+    düşmeli ve iz üretmeyi sürdürmeli - dışarıdan eklenen bir ajan yüzeyi
+    çökertmemeli.
+    """
+
+    class Boom:
+        def run(self, context):
+            raise RuntimeError("uzak servis düştü")
+
+    Boom.name, Boom.description, Boom.required = name, description, required
+    return tuple(Boom() if agent.name == name else agent for agent in PIPELINE)
+
+
 class FailureIsolationTests(unittest.TestCase):
     """Zorunlu/isteğe bağlı ayrımı: hangi arıza analizi düşürür, hangisi düşürmez."""
 
-    def _pipeline_with(self, name, description, required):
-        class Boom:
-            def run(self, context):
-                raise RuntimeError("uzak servis düştü")
-
-        Boom.name, Boom.description, Boom.required = name, description, required
-        return tuple(Boom() if agent.name == name else agent for agent in PIPELINE)
+    _pipeline_with = staticmethod(_pipeline_with)
 
     def test_optional_agent_failure_still_produces_a_report(self):
         # Pedagojik Analiz isteğe bağlı: yorumsuz bir rapor hâlâ işe yarar.

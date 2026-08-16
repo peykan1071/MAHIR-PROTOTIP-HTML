@@ -100,6 +100,12 @@
   const getStructuredQuestions = () => runtime().structuredData?.questions || [];
   const getStructuredStudents = () => runtime().structuredData?.students || [];
   const getAnalysis = () => runtime().analysis || {};
+  // Analizi ÜRETEN ajanların izi (/mahir-analyze yanıtındaki `trace`). `analysis`in
+  // kardeşi, içinde değil: biri raporun kendisi, diğeri raporun nasıl üretildiği.
+  const getTraceAgents = () => {
+    const agents = runtime().trace?.agents;
+    return Array.isArray(agents) ? agents : [];
+  };
 
   const dateText = () => new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date());
   const displayDate = (value) => {
@@ -204,7 +210,11 @@
       highestScore: totals.length ? Math.max(...totals) : "",
       lowestScore: totals.length ? Math.min(...totals) : "",
       successfulStudentCount: totals.length ? successful : "",
-      unsuccessfulStudentCount: totals.length ? unsuccessful : ""
+      unsuccessfulStudentCount: totals.length ? unsuccessful : "",
+      // Ölçme Ajanı'nın anomali gözlemi. Bu fonksiyon özeti yeniden KURDUĞU
+      // için (alanları tek tek yazıyor) buraya eklenmeyen her alan sessizce
+      // düşer - backend üretse bile rapora ulaşamaz.
+      anomalies: summary.anomalies || ""
     };
   };
 
@@ -319,9 +329,22 @@
     };
   };
 
+  // Ölçme ve Değerlendirme Ajanı'nın anomali bulgusu. Kapanış cümlesi kasıtlı:
+  // bu bir GÖZLEM, karar veya öneri değil - DEVELOPMENT_CHARTER.md gereği MAHİR
+  // etkinlik, yöntem veya telafi programı belirlemez. Bulgu yoksa paragraf hiç
+  // eklenmez; "bir şey bulunmadı" satırı gürültüden başka bir şey olmaz.
+  const anomalyParagraphs = () => {
+    const finding = normalizeText(getSummary().anomalies);
+    if (!isUseful(finding)) return [];
+    return [
+      `Ölçme ve Değerlendirme Ajanı'nın dikkat çektiği noktalar: ${finding} ` +
+      "Bu gözlem hiçbir puanı veya oranı değiştirmez."
+    ];
+  };
+
   const buildQuestionBlock = () => ({
     heading: "C. SORU BAZLI BAŞARI ANALİZİ",
-    paragraphs: [],
+    paragraphs: anomalyParagraphs(),
     tables: [[
       ["Soru", "Öğrenme Çıktısı / Kazanım", "Azami Puan", "Ortalama", "Başarı %", "Durum"],
       ...getQuestionRows().map((question) => [
@@ -454,6 +477,97 @@
     };
   };
 
+  // --- Ajan izi: "bu raporu kim üretti"nin cevabı ---
+  //
+  // Sayılar backend'den (`AgentTrace.to_wire`), cümleler burada kuruluyor -
+  // kanıt özetiyle (`outcomeEvidence`) aynı desen: hat sayı üretir, sunum
+  // metni tarayıcıda kurulur.
+
+  const durationText = (ms) => {
+    const value = Number(ms);
+    if (!Number.isFinite(value)) return "";
+    return value >= 1000 ? `${formatNumber(value / 1000, 1)} sn` : `${Math.round(value)} ms`;
+  };
+
+  // Ajan slug'ına göre "ne yaptı" cümlesi. Bilinmeyen slug `description`a
+  // düşer, böylece hatta yeni bir ajan eklendiğinde tablo bozulmaz - yalnız
+  // daha genel bir cümle gösterir.
+  const AGENT_TASK_TEXT = {
+    "belge-anlama": (out) => [
+      out.questionCount ? `${out.questionCount} soru` : "",
+      out.studentCount ? `${out.studentCount} öğrenci` : ""
+    ].filter(Boolean).join(", ") + " belge sözleşmesine çevrildi",
+    "program-eslestirme": (out) => (out.programId
+      ? `${out.outcomeCount || 0} öğrenme çıktısı öğretim programına bağlandı`
+      : "Kayıtlı öğretim programı bulunamadı") +
+      (out.unmappedQuestionCount ? `; ${out.unmappedQuestionCount} soru eşleşmedi` : ""),
+    "olcme-degerlendirme": (out) =>
+      `${out.measuredQuestionCount || 0} soru, ${out.measuredOutcomeCount || 0} öğrenme çıktısı hesaplandı` +
+      (out.correctedCellTotal ? `; ${out.correctedCellTotal} öğretmen düzeltmesi` : ""),
+    "pedagojik-analiz": (out) =>
+      `${out.outcomeCount || 0} öğrenme çıktısı yorumlandı` +
+      (out.curriculumGroundedCount ? `; ${out.curriculumGroundedCount} müfredat temelli teşhis` : ""),
+    "raporlama": () => "Analiz raporu sözleşmesi kuruldu"
+  };
+
+  const agentTaskText = (entry) => {
+    if (entry.skipped) return "Önceki adım tamamlanamadığı için çalıştırılmadı.";
+    const build = AGENT_TASK_TEXT[entry.agent];
+    const text = build ? normalizeText(build(entry.outputs || {})) : "";
+    return text || normalizeText(entry.description) || "";
+  };
+
+  const agentStatusText = (entry) => {
+    if (entry.skipped) return "Çalıştırılmadı";
+    if (entry.failed) return "Tamamlanamadı";
+    return "Tamam";
+  };
+
+  // Ortak dil modeli turu KENDİ satırında gösteriliyor, ajanlara bölüştürülmüyor.
+  // Sebep: dokuz prompt tek istekte çözülüyor; süreyi paylaştırmak uydurma
+  // olurdu ve tek istekli mimarinin kanıtını da yok ederdi. Ajan satırlarında
+  // yalnız o ajanın kendi hesap süresi görünür (milisaniyeler) - aradaki fark
+  // zaten anlatılmak istenen şey.
+  const llmRoundRow = () => {
+    const round = runtime().trace?.llmRound;
+    if (!round?.promptCount) return null;
+    return [
+      "Dil modeli turu (ortak)",
+      `${round.promptCount} istem tek istekte çözüldü`,
+      durationText(round.durationMs),
+      String(round.promptCount),
+      round.ok ? "Tamam" : "Tamamlanamadı"
+    ];
+  };
+
+  const buildAgentTraceBlock = () => {
+    const agents = getTraceAgents();
+    // İz yoksa bölüm HİÇ üretilmez: kaydedilmiş eski çalışmalarda ve genel dil
+    // değerlendirmesinde rapor bugünküyle birebir aynı kalmalı.
+    if (!agents.length) return null;
+    const rows = agents.map((entry) => [
+      normalizeText(entry.label || entry.agent),
+      agentTaskText(entry),
+      durationText(entry.durationMs),
+      entry.llmCalls?.length ? String(entry.llmCalls.length) : "—",
+      agentStatusText(entry)
+    ]);
+    const round = llmRoundRow();
+    if (round) rows.push(round);
+    return {
+      heading: "I. ANALİZ SÜRECİ VE AJAN İZİ",
+      paragraphs: [
+        "Bu rapor, birbirine sırayla devreden uzman ajanlar tarafından üretilmiştir. " +
+        "Aşağıdaki tablo her adımın ne yaptığını, ne kadar sürdüğünü ve dil modelini " +
+        "kaç kez kullandığını gösterir. Sayısal sonuçların tamamı ölçme adımında " +
+        "hesaplanır; dil modeli hiçbir puanı veya oranı üretmez. Dil modeline " +
+        "ihtiyaç duyan adımların istemleri tek bir istekte toplanır; son satır o " +
+        "ortak turu gösterir."
+      ],
+      tables: [[["Ajan", "Yaptığı İş", "Süre", "Dil Modeli Çağrısı", "Durum"], ...rows]]
+    };
+  };
+
   const getBlocks = () => [
     { heading: "A. SINAV VE EĞİTİM BAĞLAMI", paragraphs: [], tables: [buildContextTable()] },
     buildGeneralSummaryBlock(),
@@ -462,8 +576,9 @@
     buildPedagogyBlock(),
     buildDevelopmentNeedsBlock(),
     buildSourceBlock(),
-    buildDocumentInfoBlock()
-  ];
+    buildDocumentInfoBlock(),
+    buildAgentTraceBlock()
+  ].filter(Boolean);
 
   const getReportModel = (reportElement) => {
     const model = {
@@ -600,6 +715,11 @@
     getOutputStatusMessage,
     normalizeText,
     formatNumber,
-    formatPercent
+    formatPercent,
+    // Analiz ekranı da aynı cümleleri kullanıyor (bkz. script.js
+    // renderAgentTrace) - ekran ile rapor asla farklı şey söylememeli.
+    agentTaskText,
+    agentStatusText,
+    durationText
   };
 })();

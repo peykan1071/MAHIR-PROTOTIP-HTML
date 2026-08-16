@@ -45,12 +45,18 @@ class AgentTrace:
     """
 
     agent: str
+    # Öğretmene gösterilen ad ve görev cümlesi. Ajanın kendisinden kopyalanıyor
+    # (bkz. `orchestrator._execute`) çünkü tarayıcıda slug -> ad sözlüğü tutmak
+    # ikinci bir doğruluk kaynağı yaratırdı: yeni bir ajan eklendiğinde iki
+    # yerden birini güncellemeyi unutmak sessizce yanlış etiket gösterirdi.
+    label: str = ""
+    description: str = ""
     duration_ms: float = 0.0
     inputs: dict[str, Any] = field(default_factory=dict)
     outputs: dict[str, Any] = field(default_factory=dict)
     issues: list[AgentIssue] = field(default_factory=list)
-    # Faz 1'de hep boş; LLM destekli ajanlar geldiğinde her çağrının kaydı
-    # (hangi prompt, kaç token, ne kadar sürdü) buraya düşecek.
+    # LLM turundan dönen kayıtlar (bkz. `agents/llm.py::trace_entry`): yalnız
+    # sayım ve süre, prompt/yanıt METNİ yok. LLM kullanmayan üç ajanda boş.
     llm_calls: list[dict[str, Any]] = field(default_factory=list)
     failed: bool = False
     # Kendinden önceki ZORUNLU bir ajan düştüğü için hiç çalışmadı.
@@ -58,6 +64,31 @@ class AgentTrace:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    def to_wire(self) -> dict[str, Any]:
+        """Tarayıcıya giden biçim (camelCase, `/mahir-analyze` yanıtındaki `trace`).
+
+        `to_dict`ten ayrı: o `asdict` üzerinden snake_case üretiyor ve testler
+        ona bağlı; tarayıcı sözleşmesi ise depodaki diğer alanlarla aynı dilde
+        olmalı. `inputs` bilerek dışarıda - bugün hep boş, göndermek yalnız
+        gürültü olurdu.
+
+        GİZLİLİK: taşınan her şey sayım (`outputs`) veya öğretmene gösterilebilir
+        Türkçe cümle (`issues`); öğrenci satırı yapısal olarak giremiyor
+        (bkz. `tests/test_agent_pipeline.py::test_trace_carries_no_student_rows`).
+        """
+
+        return {
+            "agent": self.agent,
+            "label": self.label or self.agent,
+            "description": self.description,
+            "durationMs": round(self.duration_ms, 1),
+            "outputs": dict(self.outputs),
+            "issues": [asdict(issue) for issue in self.issues],
+            "llmCalls": list(self.llm_calls),
+            "failed": self.failed,
+            "skipped": self.skipped,
+        }
 
 
 @dataclass(slots=True)
@@ -97,6 +128,11 @@ class AgentContext:
     # yok" iddiası beş ajanda çökerdi.
     llm_queue: list[dict[str, Any]] = field(default_factory=list)
     llm_results: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # LLM turunun kendisinin kaydı. Ajan izlerinden AYRI tutuluyor çünkü tur
+    # ortak: dokuz prompt tek istekte çözülüyor ve süreyi ajanlara bölmek
+    # uydurma olurdu. Ayrı satır olarak göstermek hem dürüst hem de tek istekli
+    # mimarinin kanıtı - bölüştürülseydi o kanıt kaybolurdu.
+    llm_round: dict[str, Any] = field(default_factory=dict)
 
     def enqueue_prompt(self, prompt: dict[str, Any]) -> None:
         self.llm_queue.append(prompt)
@@ -112,6 +148,23 @@ class AgentContext:
             if entry.agent == agent_name:
                 return entry
         return None
+
+
+def trace_of(context: AgentContext) -> dict[str, Any]:
+    """Bağlamın izini `/mahir-analyze` yanıtına konacak biçime çevirir.
+
+    Ajan izinin yanına hat düzeyindeki bulgular da konuyor: bir bulgu tek bir
+    ajanın izinde de duruyor ama öğretmene "analiz sırasında şunlar fark edildi"
+    diye topluca göstermek için tek bir listeye ihtiyaç var.
+    """
+
+    return {
+        "agents": [entry.to_wire() for entry in context.trace],
+        "issues": [asdict(issue) for issue in context.issues],
+        # Ortak LLM turu: kaç prompt, tek istekte mi, ne kadar sürdü. Tur hiç
+        # yapılmadıysa boş sözlük.
+        "llmRound": dict(context.llm_round),
+    }
 
 
 class Agent(Protocol):
@@ -130,6 +183,10 @@ class Agent(Protocol):
     """
 
     name: str
+    # `name` adreslenebilir kimlik (slug, log ve eşleştirme için); `label`
+    # öğretmenin ekranda gördüğü ad. İkisi ayrı çünkü biri sözleşme, diğeri
+    # sunum - slug'ı Türkçeleştirmek log ve prompt eşleştirmesini bozardı.
+    label: str
     description: str
     required: bool
 

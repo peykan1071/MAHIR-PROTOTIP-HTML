@@ -1,4 +1,4 @@
-"""Analyze teacher-approved MAHIR question and student score data."""
+﻿"""Analyze teacher-approved MAHIR question and student score data."""
 
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from .assessment_profiles import (
 # `defaultdict` ve `validate_question_program_context` artık burada değil:
 # ölçme toplamları `measurement_engine`e, program eşleştirme ise
 # `agents/pipeline.py::ProgramMappingAgent`a taşındı.
-from .program_catalog import ProgramProfile
 
 _DEFAULT_MAHIR_RAG_REMOTE_URL = "https://hakanergul--turkish-rag-system-raginference-web-query.modal.run"
 # Varsayılan, deploy edilmiş RAG servisinin adresi olarak koda gömülü - terminalde
@@ -41,7 +40,33 @@ _logger = logging.getLogger(__name__)
 
 
 def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate approved browser data and return deterministic analysis results."""
+    """Validate approved browser data and return deterministic analysis results.
+
+    İmza kasıtlı olarak değişmedi: hattın "sayıları değiştirmiyoruz" güvencesini
+    koruyan eşdeğerlik ve altın değer testlerinin tamamı buna bağlı. Ajan izine
+    de ihtiyacı olan çağıran (`file_receiver`) `analyze_approved_data_traced`
+    kullanır.
+    """
+
+    return analyze_approved_data_traced(payload)[0]
+
+
+def empty_trace() -> dict[str, Any]:
+    """Hattın koşmadığı yollar için boş iz - alanın varlığı her zaman öngörülebilir."""
+
+    return {"agents": [], "issues": []}
+
+
+def analyze_approved_data_traced(
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Analizi ve onu ÜRETEN ajan izini birlikte döndürür.
+
+    İz `analysis`in içine değil KARDEŞİNE konuyor: `analysis` öğretmenin rapor
+    sözleşmesi, iz ise "bu raporu kim üretti"nin cevabı - taşıma katmanı
+    üstverisi. Ayrı tutmak rapor sözleşmesini teknik alanlarla kirletmiyor ve
+    kaydedilmiş eski çalışmaları geçerli bırakıyor.
+    """
 
     _assert_privacy_safe_students(payload.get("students"))
     questions = payload.get("questions")
@@ -68,7 +93,10 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
                 "Genel değerlendirme için yazılı, dinleme/izleme ve konuşma bileşenlerine ait "
                 "onaylanmış öğrenme kanıtları gereklidir."
             )
-        return build_general_evaluation(course_profile.id, component_analyses)
+        # Genel dil değerlendirmesi hattı koşturmuyor - bileşen analizleri zaten
+        # üretilmiş, burada yalnız ağırlıklandırılıyorlar. İz boş döner ve yüzey
+        # bunu bugünkü davranışa düşerek karşılar.
+        return build_general_evaluation(course_profile.id, component_analyses), empty_trace()
     if not isinstance(questions, list) or not questions:
         raise ValueError("Analiz için en az bir soru bulunmalıdır.")
     if not isinstance(students, list) or not students:
@@ -81,9 +109,11 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
     #
     # Import fonksiyon içinde: `agents` paketi bu modülden normalleştirme ve
     # eşik yardımcılarını alıyor, modül seviyesinde import döngü kurardı.
+    from .agents.base import trace_of
     from .agents.orchestrator import run_pipeline
 
-    return run_pipeline(payload, component_type, profile_id).analysis
+    context = run_pipeline(payload, component_type, profile_id)
+    return context.analysis, trace_of(context)
 
 
 def _normalize_corrected_cells(raw: Any) -> dict[int, int]:
@@ -227,147 +257,13 @@ def _decision(rate: float) -> str:
     return "Öğrenme çıktısına ilişkin öğrenme kanıtları ilave desteğe ihtiyaç olduğunu göstermektedir."
 
 
-def _attach_rag_context(outcome_results: list[dict[str, Any]], program: ProgramProfile | None) -> None:
-    """Attach a short RAG-grounded conceptual explanation to each weak outcome.
-
-    Mutates `outcome_results` in place, adding a `ragContext` field (empty
-    string when unavailable) to every outcome so the field's presence is
-    always predictable regardless of which path was taken. Never raises: any
-    failure, timeout, or "not found in the document" answer just leaves
-    `ragContext` empty, so a RAG problem can never block the teacher's
-    analysis response. Only attempted for a resolved program (`program is
-    not None`) - MAHİR covers 60+ courses but only registered programs have
-    any indexed reference material, so unregistered courses would otherwise
-    pay a ~110s cold-start wait for a query guaranteed to return nothing.
-
-    All weak outcomes go out in ONE request (`query_rag_contexts`) so the
-    remote can answer them in a single vLLM batch. Measured warm, one question
-    costs ~10 s of which 7-8.6 s is generation at ~29 output tokens/s - that is
-    single-sequence decode speed on an A10G, bounded by memory bandwidth, so
-    decoding several sequences together costs barely more than one. The
-    earlier design issued them sequentially (parallel HTTP calls were rejected
-    because RAGInference has no @modal.concurrent and each call would spin up
-    its own cold container); batching gets the speed without that problem.
-
-    If the batch call fails for any reason the code falls back to the old
-    per-outcome sequential path: one request carrying everything means one
-    failure would otherwise blank every cell, where before it blanked one.
-    """
-
-    for outcome in outcome_results:
-        outcome["ragContext"] = ""
-
-    if not MAHIR_RAG_REMOTE_URL:
-        _logger.info("RAG atlandı: sebep=yapilandirilmamis")
-        return
-    if program is None:
-        _logger.info("RAG atlandı: sebep=program-yok")
-        return
-
-    from .rag_client import query_rag_context, query_rag_contexts
-
-    # Partiye girecek zayıf çıktıları topla. Sorusu üretilemeyen veya teması
-    # çözülemeyen çıktılar partiye HİÇ girmez - eskisi gibi sebep koduyla
-    # loglanıp boş bırakılırlar.
-    batch: list[tuple[dict[str, Any], str, dict[str, object]]] = []
-    for outcome in outcome_results:
-        code = str(outcome.get("outcomeCode") or "?")
-        if float(outcome.get("successRate") or 0.0) >= _RAG_WEAK_THRESHOLD:
-            continue
-        question = _build_rag_question(outcome)
-        if not question:
-            _logger.info("RAG atlandı: cikti=%s sebep=soru-bos", code)
-            continue
-        theme = _normalize_theme_for_rag(str(outcome.get("outcomeTheme") or ""))
-        if not theme:
-            # Tema çözülemezse (ör. kazanım kataloğunda seçim yapılmamış) grade-only
-            # bir aramaya düşmüyoruz: bu, 9. sınıfın 4 farklı temasından herhangi
-            # birinin içeriğini getirebilir - aynı çıktı kodu her temada farklı bir
-            # kazanıma karşılık geldiği için (bkz. rag_service.py index_pdf
-            # docstring'i) yanlış temadan "kaynaklı" görünen bir teşhis vermek,
-            # hiç teşhis vermemekten daha kötü.
-            _logger.info("RAG atlandı: cikti=%s sebep=tema-cozulemedi", code)
-            continue
-        batch.append((
-            outcome,
-            theme,
-            {
-                "question": question,
-                "retrievalQuery": _build_rag_retrieval_query(outcome),
-                "grade": program.grade,
-                "theme": theme,
-            },
-        ))
-
-    if not batch:
-        return
-
-    items = [item for _outcome, _theme, item in batch]
-    try:
-        ok, message, results = query_rag_contexts(items, program.id, MAHIR_RAG_REMOTE_URL)
-    except Exception:  # noqa: BLE001 - bir RAG/ağ sorunu analiz yanıtını asla kesmemeli.
-        _logger.exception("Toplu RAG çağrısı istisna verdi")
-        ok, message, results = False, "istisna", None
-
-    if not ok or results is None:
-        # Tek istekte her şeyi göndermenin bedeli: bir arıza TÜM hücreleri
-        # boşaltırdı. Eski sıralı yol bu yüzden geri çekilme yolu olarak duruyor.
-        _logger.warning("Toplu RAG çağrısı başarısız (%s), tek tek sorgulanıyor", message)
-        results = []
-        for _outcome, _theme, item in batch:
-            try:
-                single_ok, _message, data = query_rag_context(
-                    str(item["question"]),
-                    program.id,
-                    MAHIR_RAG_REMOTE_URL,
-                    grade=program.grade,
-                    theme=str(item["theme"]),
-                    retrieval_query=str(item["retrievalQuery"]),
-                )
-            except Exception:  # noqa: BLE001 - tek bir çıktının hatası kalanları düşürmemeli.
-                _logger.exception("RAG atlandı: sebep=istisna")
-                single_ok, data = False, None
-            results.append(data if single_ok and data else None)
-
-    for (outcome, theme, _item), data in zip(batch, results):
-        code = str(outcome.get("outcomeCode") or "?")
-        if not isinstance(data, dict):
-            _logger.info("RAG atlandı: cikti=%s sebep=uzak-hata", code)
-            continue
-        answer = str(data.get("answer") or "").strip()
-        sources = data.get("sources") or []
-        if not answer or not sources:
-            # Kaynak listesi boşsa getirim hiç isabet vermemiştir (bkz.
-            # rag_service.py::_run_query'nin `no_answer` dönüşü) - filtrelerden
-            # (program_id/grade/theme_key) biri tutmamış demektir.
-            _logger.info("RAG atlandı: cikti=%s sebep=kaynak-yok tema=%s", code, theme)
-            continue
-        # startswith + kırpma, tam eşleşme değil: gerçek dizin karşısında
-        # doğrulandı (bkz. proje hafızası) - model doğru bağlamla beslendiğinde
-        # bile CEVABI neredeyse HER ZAMAN "Bu bilgi belgede bulunmuyor." ile
-        # başlatıp ardından gerçek, bağlama dayalı bir teşhisle devam ediyor.
-        # Önceki sürüm bu ön ek varsa cevabın TAMAMINI atıyordu - bu da
-        # kaynakları dolu gelen, geçerli çoğu yanıtın sessizce boş kalmasına
-        # yol açıyordu. Yalnızca ön eki kırpıp gerçekten hiçbir şey kalmıyorsa
-        # (modelin GERÇEKTEN hiçbir şey bulamadığı durum) atlanır.
-        if answer.startswith(_RAG_NO_ANSWER_TEXT):
-            answer = answer[len(_RAG_NO_ANSWER_TEXT):].strip()
-        if not answer:
-            _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti tema=%s", code, theme)
-            continue
-        answer, dropped = _strip_recommendation_sentences(answer)
-        if dropped:
-            _logger.warning("RAG önerisi kırpıldı: cikti=%s cumle=%d", code, dropped)
-        if not answer:
-            _logger.info("RAG atlandı: cikti=%s sebep=tamami-oneri tema=%s", code, theme)
-            continue
-        _logger.info(
-            "RAG dolduruldu: cikti=%s sebep=basarili kaynak=%d",
-            code,
-            len(sources) if isinstance(sources, list) else -1,
-        )
-        outcome["ragContext"] = answer
-
+# Burada bir `_attach_rag_context` vardı: zayıf çıktıları toplayıp `rag_client`
+# üzerinden tek partide sorguluyor, yanıtları `ragContext`e yazıyordu. Faz 3'te
+# bu iş ajanın kendisine geçti - prompt'lar `pipeline.py::_enqueue_diagnosis_prompts`
+# ile kuyruğa yazılıyor, yanıtlar `PedagogicalAnalysisAgent.apply_llm` içinde
+# aynı sonrası-işlemeden geçiyor. Aşağıdaki yardımcılar (`_build_rag_question`,
+# `_build_rag_retrieval_query`, `_normalize_theme_for_rag`, `_bloom_level_for`)
+# hâlâ oradan çağrılıyor, bu yüzden burada duruyorlar.
 
 
 

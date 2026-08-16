@@ -46,6 +46,7 @@ class DocumentUnderstandingAgent:
     """
 
     name = "belge-anlama"
+    label = "Belge Anlama"
     description = "Öğretmen onaylı yükü Canonical Education Document'e çevirir."
     # CED yoksa sonraki hiçbir adımın anlamı yok.
     required = True
@@ -95,6 +96,7 @@ class ProgramMappingAgent:
     """
 
     name = "program-eslestirme"
+    label = "Program Eşleştirme"
     description = "Her soruyu Türkiye Yüzyılı Maarif Modeli öğrenme çıktısıyla eşleştirir."
     # Program çözülemezse yalnız müfredat temelli teşhis düşer; ölçme sürer.
     required = False
@@ -154,6 +156,7 @@ class MeasurementAgent:
     """
 
     name = "olcme-degerlendirme"
+    label = "Ölçme ve Değerlendirme"
     description = "Soru ve öğrenme çıktısı düzeyinde başarı oranlarını hesaplar."
     # Sayılar raporun kendisi; yoksa gösterilecek bir şey yok.
     required = True
@@ -216,6 +219,11 @@ class MeasurementAgent:
             [row for rows in evidence_questions.values() for row in rows]
         )
         if prompt:
+            # Sahiplik AÇIK yazılıyor: orkestratör LLM kaydını bu alana bakarak
+            # doğru ajanın izine düşürüyor. Prompt ADINDAN çıkarmak kırılgan
+            # olurdu - bu ajanınki ajan adıyla aynı, Pedagojik'inkiler
+            # "pedagoji/..." biçiminde ve ajan adı "pedagojik-analiz".
+            prompt["agent"] = self.name
             context.enqueue_prompt(prompt)
 
         return AgentResult(
@@ -265,12 +273,13 @@ class PedagogicalAnalysisAgent:
     """
 
     name = "pedagojik-analiz"
+    label = "Pedagojik Analiz"
     description = "Başarı oranlarını düzey, karar ve müfredat temelli teşhise dönüştürür."
     # Yorumsuz bir rapor hâlâ işe yarar; rapor YOKLUĞU yaramaz.
     required = False
 
     def run(self, context: AgentContext) -> AgentResult:
-        from ..approved_data_analyzer import _attach_rag_context, _category, _decision
+        from ..approved_data_analyzer import _category, _decision
 
         outcome_totals = context.scratch["outcomeTotals"]
         evidence_questions = context.scratch["evidenceQuestions"]
@@ -384,6 +393,7 @@ class ReportingAgent:
     """
 
     name = "raporlama"
+    label = "Raporlama"
     description = "Ölçme ve pedagojik sonuçları MAHİR analiz raporu sözleşmesine dönüştürür."
     required = True
     # LLM turundan SONRA koşar: rapor, ajanların LLM sonuçlarını da içermeli ve
@@ -489,6 +499,10 @@ def _enqueue_diagnosis_prompts(
         name = f"pedagoji/{outcome.get('outcomeTheme')}|{code}"
         context.enqueue_prompt({
             "name": name,
+            # LLM kaydının hangi ajanın izine düşeceği (bkz. orchestrator
+            # `_flush_llm_queue`). Ağa çıkmaz: `llm.run_agent_prompts` gövdeyi
+            # beyaz listeyle kuruyor.
+            "agent": PedagogicalAnalysisAgent.name,
             "system": DIAGNOSIS_SYSTEM_PROMPT,
             "user": f"SORU: {question}\n\nYalnızca yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla.",
             "retrieval": {

@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 from .docx_parser import parse_mahir_docx
 from .pdf_parser import parse_score_pdf
 from .spreadsheet_parser import parse_score_xlsx
-from .approved_data_analyzer import analyze_approved_data
+from .approved_data_analyzer import analyze_approved_data_traced
 
 
 UPLOAD_PATH = "/mahir-upload"
@@ -229,11 +229,24 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {"ok": False, "message": "Onaylanan veri alınamadı."})
             return
 
+        from .agents.base import trace_of
+        from .agents.orchestrator import PipelineError
+
         try:
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
-            result = analyze_approved_data(payload)
+            result, trace = analyze_approved_data_traced(payload)
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
             self._send_json(422, {"ok": False, "message": str(error)})
+            return
+        except PipelineError as error:
+            # Zorunlu bir ajan düştü. İzi de göndermek kasıtlı: hangi ajanın
+            # düştüğü, hangilerinin atlandığı ve öncekilerin ne ürettiği,
+            # hatanın kendisi kadar değerli - `PipelineError` bu kısmi bağlamı
+            # tam da bunun için taşıyor.
+            self._send_json(
+                500,
+                {"ok": False, "message": str(error), "trace": trace_of(error.context)},
+            )
             return
 
         self._send_json(
@@ -242,6 +255,10 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 "ok": True,
                 "message": "Öğretmen onaylı veriler analiz motoruna aktarıldı.",
                 "analysis": result,
+                # Analizi ÜRETEN ajanların izi: hangi ajan ne kadar sürdü, ne
+                # üretti, LLM'i kaç kez kullandı. `analysis`in kardeşi, içinde
+                # değil - rapor sözleşmesi teknik alanlarla kirlenmemeli.
+                "trace": trace,
             },
         )
 

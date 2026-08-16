@@ -52,6 +52,13 @@ def query_rag_contexts(
 ) -> tuple[bool, str, list[dict[str, object]] | None]:
     """POST several grounded questions in ONE request; results come back in order.
 
+    CANLI AKIŞTA ÇAĞRILMIYOR (bu ve `query_rag_context`): Faz 3'te getirim ajan
+    kuyruğuna taşındı, teşhis artık `agents/llm.py` üzerinden birleşik `agents`
+    biçimiyle gidiyor. İkisi burada duruyor çünkü `rag_service.py`nin eski
+    `queries` biçiminin tek istemcisi onlar ve o sunucu dalı geriye dönük uyum
+    için bilinçli olarak korunuyor. İstemci ile sunucu dalı BİRLİKTE kaldırılmalı
+    - yalnız birini silmek diğerini test edilemez hâle getirir.
+
     Each item is `{"question", "retrievalQuery", "grade", "theme"}` - the same
     fields `query_rag_context` sends for a single question. The remote answers
     them in a single vLLM batch, which is why this exists: measured warm, one

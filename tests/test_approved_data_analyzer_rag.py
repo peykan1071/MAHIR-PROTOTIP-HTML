@@ -76,16 +76,17 @@ def _weak_tde_payload():
     }
 
 
-def _as_batch(canned):
-    """Tekil `query_rag_context` yanıtını toplu `query_rag_contexts` biçimine çevirir.
+def _llm_patch(**kwargs):
+    """LLM turunu yamalar - hattın GERÇEKTEN çağırdığı yer burası.
 
-    Zayıf çıktılar artık tek istekte, tek vLLM partisinde yanıtlanıyor
-    (bkz. `_attach_rag_context`); bu yardımcı, tekil biçimde yazılmış mevcut
-    beklentileri olduğu gibi korumayı sağlıyor.
+    Bu testler bir zamanlar `rag_client.query_rag_contexts`i yamalıyordu; Faz
+    3'te getirim ajan kuyruğuna taşınınca o fonksiyon çağrılmaz oldu ve yamalar
+    sessizce etkisizleşti. `assert_not_called` iddiaları boşa döndü, arıza
+    testleri ise mock yerine çözülemeyen bir alan adına düşüp DNS hatası
+    sayesinde "geçmeye" başladı. Tek yamalama noktası bu yüzden burada.
     """
 
-    ok, message, data = canned
-    return ok, message, [data]
+    return patch("backend.app.agents.llm.run_agent_prompts", **kwargs)
 
 
 class RagContextAttachmentTests(unittest.TestCase):
@@ -94,7 +95,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         # approved_data_analyzer.py) - "yapılandırılmamış" durumu burada
         # açıkça boş string'e çekilerek test ediliyor, gerçek ağ çağrısı yapılmaz.
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
-            with patch("backend.app.rag_client.query_rag_contexts") as mock_query:
+            with _llm_patch() as mock_query:
                 result = analyze_approved_data(_weak_tde_payload())
         mock_query.assert_not_called()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
@@ -106,7 +107,7 @@ class RagContextAttachmentTests(unittest.TestCase):
             "students": [{"studentRef": "Ö-001", "scores": [10]}],
         }
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_contexts") as mock_query:
+            with _llm_patch() as mock_query:
                 result = analyze_approved_data(payload)
         mock_query.assert_not_called()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
@@ -115,8 +116,10 @@ class RagContextAttachmentTests(unittest.TestCase):
         payload = _weak_tde_payload()
         payload["students"][0]["scores"] = [90]  # successRate 0.90 >= eşik (0.70)
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_contexts") as mock_query:
+            with _llm_patch() as mock_query:
                 result = analyze_approved_data(payload)
+        # Tek soruluk sınavda anomali prompt'u da kurulmuyor (örüntü için en az
+        # üç soru gerekli), yani kuyruk tamamen boş ve hiç tur atılmıyor.
         mock_query.assert_not_called()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
@@ -218,26 +221,29 @@ class RagContextAttachmentTests(unittest.TestCase):
         payload = _weak_tde_payload()
         payload["questions"][0]["outcomeTheme"] = ""
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_contexts") as mock_query:
+            with _llm_patch() as mock_query:
                 result = analyze_approved_data(payload)
         mock_query.assert_not_called()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
     def test_rag_failure_leaves_ragcontext_empty_and_does_not_raise(self):
-        # Hem toplu hem geri çekilme yolu başarısız: analiz yine de tamamlanmalı.
+        # LLM turu başarısız: analiz yine de tamamlanmalı, yalnız teşhis boş kalır.
         failure = (False, "Uzak RAG sunucusuna ulaşılamadı.", None)
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_contexts", return_value=failure):
-                with patch("backend.app.rag_client.query_rag_context", return_value=failure):
-                    result = analyze_approved_data(_weak_tde_payload())
+            with _llm_patch(return_value=failure) as mock_query:
+                result = analyze_approved_data(_weak_tde_payload())
+        mock_query.assert_called_once()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
+        # Sayılar arızadan etkilenmemeli - teşhis bir zenginleştirme.
+        self.assertEqual(result["outcomes"][0]["successRate"], 0.30)
 
     def test_rag_exception_leaves_ragcontext_empty_and_does_not_raise(self):
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.rag_client.query_rag_contexts", side_effect=RuntimeError("boom")):
-                with patch("backend.app.rag_client.query_rag_context", side_effect=RuntimeError("boom")):
-                    result = analyze_approved_data(_weak_tde_payload())
+            with _llm_patch(side_effect=RuntimeError("boom")) as mock_query:
+                result = analyze_approved_data(_weak_tde_payload())
+        mock_query.assert_called_once()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
+        self.assertEqual(result["outcomes"][0]["successRate"], 0.30)
 
 
 def _two_weak_outcomes_payload():

@@ -103,6 +103,21 @@ def _validate_boundary(context: AgentContext, agent_name: str) -> list[AgentIssu
     return issues
 
 
+def _skipped_trace(agent) -> AgentTrace:
+    """Hiç çalışmamış ajanın izi - etiketiyle birlikte.
+
+    Atlanan ajan da öğretmene gösteriliyor ("Çalıştırılmadı"), yani adının
+    çalışanlarla aynı biçimde gelmesi gerekiyor.
+    """
+
+    return AgentTrace(
+        agent=agent.name,
+        label=getattr(agent, "label", "") or agent.name,
+        description=getattr(agent, "description", ""),
+        skipped=True,
+    )
+
+
 def _execute(agent, context: AgentContext) -> bool:
     """Tek ajanı koşturur, izini yazar; ZORUNLU bir ajan düştüyse True döner.
 
@@ -112,7 +127,11 @@ def _execute(agent, context: AgentContext) -> bool:
     """
 
     started = time.perf_counter()
-    trace = AgentTrace(agent=agent.name)
+    trace = AgentTrace(
+        agent=agent.name,
+        label=getattr(agent, "label", "") or agent.name,
+        description=getattr(agent, "description", ""),
+    )
     try:
         result = agent.run(context)
         trace.outputs = result.outputs
@@ -180,7 +199,7 @@ def run_pipeline(
             # Zorunlu bir ajan düştü: kalanları koşturmak yanıltıcı olurdu
             # (eksik girdiyle üretilmiş bir rapor, rapor yokluğundan kötüdür).
             # Yine de ize yazılıyorlar - "neden çalışmadı" da izlenebilir olmalı.
-            context.trace.append(AgentTrace(agent=agent.name, skipped=True))
+            context.trace.append(_skipped_trace(agent))
             continue
         aborted = _execute(agent, context)
 
@@ -189,7 +208,7 @@ def run_pipeline(
 
     for agent in after_llm:
         if aborted:
-            context.trace.append(AgentTrace(agent=agent.name, skipped=True))
+            context.trace.append(_skipped_trace(agent))
             continue
         aborted = _execute(agent, context)
 
@@ -200,6 +219,31 @@ def run_pipeline(
         )
 
     return context
+
+
+def _record_llm_calls(context: AgentContext, results: list[dict[str, Any]]) -> None:
+    """Her LLM sonucunun kaydını, prompt'u kuyruğa yazan ajanın izine düşürür.
+
+    Sahiplik prompt'un `agent` alanından okunuyor, adından ÇIKARILMIYOR: anomali
+    prompt'unun adı ajan adıyla aynı ama teşhis prompt'ları "pedagoji/..."
+    biçiminde ve sahibi "pedagojik-analiz" - ada dayalı bir kural sessizce
+    yanlış ajana yazardı.
+
+    Kaydın kendisi `llm.trace_entry`den geliyor ve prompt/yanıt METNİ taşımıyor;
+    iz, gizlilik kapısının arkasına açılan bir yan kapı olmamalı.
+    """
+
+    from .llm import trace_entry
+
+    owner_by_name = {
+        str(item.get("name")): str(item.get("agent") or "")
+        for item in context.llm_queue
+    }
+    for result in results:
+        owner = owner_by_name.get(str(result.get("name")))
+        trace = context.trace_for(owner) if owner else None
+        if trace is not None:
+            trace.llm_calls.append(trace_entry(result))
 
 
 def _flush_llm_queue(context: AgentContext) -> None:
@@ -231,13 +275,21 @@ def _flush_llm_queue(context: AgentContext) -> None:
 
         if ok and results:
             context.llm_results = {str(item.get("name")): item for item in results}
+            _record_llm_calls(context, results)
         else:
             _logger.warning("LLM turu başarısız (%s); ajanlar sonuçsuz devam edecek", message)
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        context.llm_round = {
+            "promptCount": len(context.llm_queue),
+            "resultCount": len(context.llm_results),
+            "durationMs": round(elapsed_ms, 1),
+            "ok": bool(ok and results),
+        }
         _logger.info(
             "LLM turu: prompt=%d sonuc=%d sure=%.1fs",
             len(context.llm_queue),
             len(context.llm_results),
-            time.perf_counter() - started,
+            elapsed_ms / 1000,
         )
     elif context.llm_queue:
         _logger.info("LLM turu atlandı: sebep=yapilandirilmamis prompt=%d", len(context.llm_queue))

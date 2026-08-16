@@ -708,6 +708,21 @@ button[aria-disabled="true"] {
   font-weight: 400;
 }
 
+/* Analiz ekranındaki ajan izi: her satır bir uzman ajanın gerçek koşusu.
+   Süre ve dil modeli sayımı ayrı satırda ve soluk - öğretmenin okuduğu cümle
+   ile teknik ölçüm birbirine karışmasın. */
+.analysis-progress .agent-trace-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85em;
+  color: var(--color-muted, #59697a);
+}
+
+.analysis-progress li[data-agent-failed],
+.analysis-progress li[data-agent-skipped] {
+  color: var(--color-muted, #59697a);
+}
+
 .report-intro {
   margin: 0;
 }
