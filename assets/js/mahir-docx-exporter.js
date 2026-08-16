@@ -77,7 +77,13 @@
     return [
     sectionBand(block.heading),
     ...block.paragraphs.map((text) => paragraph(text, "Normal", { after: 70, line: 252 })),
-    ...block.tables.map((table) => tableXml(table, { after: true }))
+    ...block.tables.map((table) => tableXml(table, { after: true })),
+    // Dipnot tablodan SONRA ve küçük puntoyla: hücrede kısa atıf ("s. 66-67"),
+    // belgenin tam adı burada bir kez (bkz. mahir-report-export-common.js
+    // sourceNotes). `paragraphs` bu işi göremez - o alan tablonun önünde.
+    ...(block.notes || []).map((text) => paragraph(text, "Normal", {
+      size: 17, color: "59697A", after: 70, line: 240
+    }))
     ].join("");
   };
 

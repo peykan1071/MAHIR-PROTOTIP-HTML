@@ -54,9 +54,25 @@ python3 backend/run_file_receiver.py
 
 (PowerShell'de `set` yerine `$env:MAHIR_OCR_REMOTE_URL = "..."` kullanın.)
 
+**Not**: `MAHIR_OCR_REMOTE_URL` artık koda gömülü bir varsayılana sahip (bkz. `backend/app/file_receiver.py`), `MAHIR_RAG_REMOTE_URL` gibi. Kendi dağıtımınızı kullanıyorsanız yukarıdaki gibi ayarlayın; bu depodaki dağıtımla çalışıyorsanız ayarlamanıza gerek yok. OCR'ı bilinçli olarak kapatmak için boş string verin.
+
 **Önemli**: `MAHIR_OCR_REMOTE_URL` ve `MAHIR_OCR_SHARED_SECRET`, **aynı terminal penceresinde ve `run_file_receiver.py`'yi başlatmadan önce** ayarlanmalıdır. Bunları bir pencerede ayarlayıp sunucuyu başka bir pencerede (veya zaten açık bir pencerede, sunucuyu yeniden başlatmadan) çalıştırırsanız değişkenler sessizce yok sayılır - sunucu hata vermez, sadece OCR'sız "pass-through" moduna düşer. Bunu şu şekilde ayırt edebilirsiniz: tarayıcının Ağ (Network) sekmesinde `/mahir-upload` yanıtına bakınca `"structuredData": null` ve `"message": "N görsel alındı ve öğretmen kontrolüne hazırlandı."` görüyorsanız (OCR sonucu değil, sadece "alındı" onayı), env değişkenleri devreye girmemiş demektir - sunucuyu durdurup aynı pencerede env değişkenlerini tekrar ayarlayıp yeniden başlatın.
 
 `MAHIR_OCR_SHARED_SECRET`, servis adresi herkese açık olduğu için isteklerin `X-MAHIR-OCR-Key` başlığıyla doğrulanmasını sağlar - istemci ve işçi tarafında aynı parola tanımlı olmalı; hiçbiri tanımlı değilse (yerel geliştirme/test) doğrulama yapılmaz. `MAHIR_OCR_REMOTE_URL` tanımlı değilken görsel yüklemeleri OCR yapılmadan kabul edilir; sunucu çökmez.
+
+### Paylaşılan parola zorunludur (2026-08-16'dan itibaren)
+
+Her iki uzak servis de artık parola doğruluyor: parolasız veya yanlış parolalı istekler **401** alır. Yerel sunucuyu başlatmadan önce **aynı kabukta** iki değişkeni de tanımlayın:
+
+```bash
+export MAHIR_RAG_SHARED_SECRET=...
+export MAHIR_OCR_SHARED_SECRET=...
+python backend/run_file_receiver.py
+```
+
+Bu depoda parolalar `secrets.local.txt` dosyasında tutulur; dosya `.gitignore`'da olduğu için depoya girmez. Dosya sizde yoksa parolaları bilen biriyle paylaşılması gerekir - koddan türetilemez.
+
+**Parolayı değiştirmek** yalnız ortam değişkenini güncellemekle olmaz: değer *dağıtım anında* Modal uygulamasına gömülüyor (bkz. `rag_service.py` ve `modal_app.py` içindeki `modal.Secret.from_dict`). Yeni parola için değişkeni tanımlayıp `python -m modal deploy rag_service.py` ve `python -m modal deploy modal_app.py` komutlarını yeniden çalıştırın.
 
 Sınırlamalar: Boşta kalan servis bir süre sonra sıfıra ölçeklenir; gelen ilk istek konteyneri yeniden başlatıp pipeline'ı GPU'ya yükler (soğuk başlangıç, model dosyaları imaja gömülü olduğu için saniyeler-birkaç dakika sürebilir) - `run_ocr_worker.py` bu süreyi istek beklemeden önce tüketir. Kesin maliyet için [modal.com/pricing](https://modal.com/pricing) sayfasını kontrol edin.
 
@@ -93,6 +109,20 @@ Pilot veri paketinde:
 bulunur.
 
 TDE kodları yalnız **Türk Dili ve Edebiyatı + 9. sınıf** profili seçildiğinde açılır. Başka bir derse TDE kodu gönderilmesi arka uç tarafından da reddedilir. Ayrıntılar için [TDE 9 pilot veri paketi](shared/pilot/tde9/README.md) incelenebilir.
+
+### Referans belgeyi dizine ekleme
+
+Müfredat teşhisinin dayandığı öğretim programı PDF'i şu komutla indekslenir:
+
+```bash
+python -m modal run rag_service.py \
+    --pdf-path "C:\yol\tdeogr.pdf" --program-id tde-9-tymm \
+    --start-page 65 --end-page 97 --replace
+```
+
+- **Belgenin adı komutta yazılmaz**, `rag_service.DOCUMENT_TITLES` kaydından gelir (`--document-title` ile geçersiz kılınabilir). Bu ad öğretmenin raporunda kaynak olarak görünüyor ("Kaynak: Ortaöğretim … Öğretim Programı … (2024), s. 66-67"), bu yüzden dosya adı değil belgenin resmî adıdır. Kayıtta olmayan bir program için komut hata verir - yanlış adla indekslemektense durmak doğrudur.
+- **`--replace` bayrağı, belge adı ya da parçalama değiştiyse ŞARTTIR.** Nokta kimliği içerik adreslidir ve `document_name` o kimliğin parçasıdır: yeni adla yazılan parçalar yeni kimlikler alır, eskiler üzerine yazılmaz ve dizinde aynı içerik iki kez kalır. Getirim bunu hatasızca yutar, yalnız sonuç bozulur.
+- `--start-page`/`--end-page` bu belgede 9. sınıf bölümüdür; PDF hazırlık ve 9-12. sınıfları birlikte kapsıyor.
 
 ## Sistem sınırı ve doğruluk yaklaşımı
 
@@ -166,6 +196,9 @@ Node.js kuruluysa tarayıcıdan bağımsız JavaScript kontrolleri de çalışt�
 ```bash
 node tests/program-catalog.test.js
 node tests/workspace-backup.test.js
+node tests/data-entry-flow.test.js
+node tests/score-corrections.test.js
+node tests/report-evidence.test.js
 ```
 
 ## Proje yapısı
@@ -177,6 +210,7 @@ MAHIR-PROTOTIP-HTML/
 ├── script.js                  # Kullanıcı akışı ve ön yüz bağlantıları
 ├── assets/js/                 # Program kataloğu, yedekleme ve çıktı üreticileri
 ├── backend/app/               # Belge okuma, doğrulama ve analiz motorları
+├── backend/app/agents/        # Beş uzman ajan, orkestratör ve CED omurgası
 ├── shared/pilot/tde9/         # TDE 9 pilot program verileri
 ├── shared/templates/          # Veri giriş ve rapor şablonları
 ├── tests/                     # Python ve JavaScript kontrolleri

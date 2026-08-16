@@ -77,51 +77,68 @@ def apply_student_results(document: CEDDocument, student_answers: list[dict[str,
     return document
 
 
-def calculate_question_success_rates(document: CEDDocument) -> dict[str, float]:
-    """Calculate success rate for each question."""
+def calculate_question_totals(document: CEDDocument) -> dict[str, dict[str, float]]:
+    """Return raw earned/possible totals per question id.
+
+    Ham toplamlar oranın kendisinden ayrı olarak gerekiyor: rapordaki
+    "Kanıtları Gör" bloğu, öğretmenin gösterilen yüzdeyi gösterilen
+    puanlardan yeniden üretebilmesini istiyor (bkz.
+    `approved_data_analyzer` evidence alanı). Oran fonksiyonu da bunu
+    kullanır - hesap tek yerde kalsın diye.
+    """
 
     student_count = len(document.student_results)
-    rates: dict[str, float] = {}
-
-    if student_count == 0:
-        return {question.id: 0.0 for question in document.questions}
+    totals: dict[str, dict[str, float]] = {}
 
     for question in document.questions:
         max_score = question.max_score or 0
-        if max_score <= 0:
-            rates[question.id] = 0.0
-            continue
+        earned = sum(
+            _find_question_score(student, question.id) for student in document.student_results
+        )
+        totals[question.id] = {"earned": earned, "possible": max_score * student_count}
 
-        earned_score = 0.0
-        for student in document.student_results:
-            score = _find_question_score(student, question.id)
-            earned_score += score
+    return totals
 
-        rates[question.id] = earned_score / (max_score * student_count)
 
-    return rates
+def calculate_question_success_rates(document: CEDDocument) -> dict[str, float]:
+    """Calculate success rate for each question."""
+
+    return {
+        question_id: values["earned"] / values["possible"] if values["possible"] else 0.0
+        for question_id, values in calculate_question_totals(document).items()
+    }
+
+
+def calculate_learning_outcome_totals(document: CEDDocument) -> dict[str, dict[str, float]]:
+    """Return raw earned/possible totals per learning outcome id.
+
+    Bir öğrenme çıktısı birden çok soruyu kapsayabildiği için toplamlar soru
+    bazında hesaplanıp çıktıya eklenir; sıralama soru sırasıdır, yani aynı
+    girdi her zaman aynı kayan nokta toplamını verir.
+    """
+
+    question_totals = calculate_question_totals(document)
+    totals: dict[str, dict[str, float]] = defaultdict(lambda: {"earned": 0.0, "possible": 0.0})
+
+    for question in document.questions:
+        values = question_totals[question.id]
+        for outcome_id in question.learning_outcome_ids:
+            weight = question.learning_outcome_weights.get(outcome_id, 1.0)
+            totals[outcome_id]["earned"] += values["earned"] * weight
+            totals[outcome_id]["possible"] += values["possible"] * weight
+
+    return dict(totals)
 
 
 def calculate_learning_outcome_success_rates(document: CEDDocument) -> dict[str, float]:
     """Calculate weighted success rate for each learning outcome."""
 
-    totals: dict[str, dict[str, float]] = defaultdict(lambda: {"earned": 0.0, "possible": 0.0})
-    student_count = len(document.student_results)
-
-    if student_count == 0:
+    if not document.student_results:
         return {}
-
-    for question in document.questions:
-        possible_score = (question.max_score or 0) * student_count
-        earned_score = sum(_find_question_score(student, question.id) for student in document.student_results)
-
-        for outcome_id in question.learning_outcome_ids:
-            totals[outcome_id]["earned"] += earned_score
-            totals[outcome_id]["possible"] += possible_score
 
     return {
         outcome_id: values["earned"] / values["possible"] if values["possible"] else 0.0
-        for outcome_id, values in totals.items()
+        for outcome_id, values in calculate_learning_outcome_totals(document).items()
     }
 
 

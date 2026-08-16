@@ -3111,6 +3111,55 @@ const fileUploadBridge = (() => {
       renderFilesList();
     };
 
+    // Uzak OCR işçisinin soğuk başlangıcı ölçülen sürenin %75-85'i (konteyner
+    // açılışı + modelleri GPU'ya yükleme ~30-50 sn; asıl OCR yalnızca 7-12 sn).
+    // Öğretmen dosyalarını seçer seçmez bu hazırlığı başlatıyoruz ki "Verileri
+    // Oku"ya bastığında büyük ölçüde bitmiş olsun. Ateşle-unut: yanıtı
+    // beklenmez, hatası yutulur - ısıtma başarısız olsa da yükleme eskisi gibi
+    // (yalnızca daha yavaş) çalışır.
+    // Tek seferlik değil, kısılmış: öğretmen aynı oturumda ikinci bir grup
+    // yüklediğinde konteyner çoktan kapanmış olabilir, o yüzden yeniden
+    // ısıtılabilmeli - ama her dosya seçiminde tekrar tekrar değil.
+    const WARM_UP_THROTTLE_MS = 30000;
+    const warmUpAt = {};
+    const warmUp = (path) => {
+      const now = Date.now();
+      if (now - (warmUpAt[path] || 0) < WARM_UP_THROTTLE_MS) return;
+      warmUpAt[path] = now;
+      fetch(path).catch(() => {});
+    };
+    const warmUpOcr = () => warmUp("/mahir-ocr-warmup");
+    // RAG'in soğuk başlangıcı daha da uzun (ölçülen ~110 sn: konteyner +
+    // bge-m3 + vLLM/Qwen2.5-7B) ve bugün tam "Onayla ve Analiz Et"e basıldığı
+    // anda ödeniyor. Doğrulama ekranı açılırken ısıtıyoruz: öğretmen puanları
+    // incelerken hazırlık biter, rag_service.py'deki scaledown_window=300 de
+    // konteyneri o inceleme boyunca ayakta tutar.
+    const warmUpRag = () => warmUp("/mahir-rag-warmup");
+
+    // --- Süre ölçümü ---
+    //
+    // İki uzun işlem (belge okuma ve analiz) sessizdi: öğretmen butona basıp
+    // bekliyor, ne kadar beklediği hiçbir yere yazılmıyordu. Ölçüm kırılımlı,
+    // çünkü tek bir toplam asıl soruyu yanıtlamıyor - aynı iş soğuk
+    // konteynerde 160 sn, sıcakta 15,7 sn sürebiliyor (ölçüldü).
+    //
+    // Biçimlendirme MAHIRReportExport.durationText'ten geliyor ("16,7 sn" /
+    // "340 ms", tr-TR); ikinci bir biçimlendirici yazmaya gerek yok.
+    const durationText = (ms) => window.MAHIRReportExport?.durationText?.(ms) ?? `${Math.round(ms)} ms`;
+
+    // Isıtmanın üzerinden geçen süre: "neden 45 sn sürdü"nün cevabı çoğu zaman
+    // burada. Kısaysa uzak konteyner hâlâ soğuk demektir.
+    const sinceWarmUp = (path) => (warmUpAt[path] ? durationText(Date.now() - warmUpAt[path]) : "ısıtılmadı");
+
+    const startTimer = (label) => {
+      const began = performance.now();
+      return (fields = {}) => {
+        const elapsed = performance.now() - began;
+        console.info(`[MAHIR][süre] ${label} toplam ${durationText(elapsed)}`, fields);
+        return durationText(elapsed);
+      };
+    };
+
     const selectFiles = (files) => {
       const incoming = Array.from(files || []);
       if (!incoming.length) return;
@@ -3130,6 +3179,7 @@ const fileUploadBridge = (() => {
       selectedFiles = merged;
       fileInput.value = "";
       renderFilesList();
+      warmUpOcr();
     };
 
     const configureSourceMode = (mode) => {
@@ -3243,6 +3293,7 @@ const fileUploadBridge = (() => {
       reportRuntime.structuredData = structuredData;
       reportRuntime.exam = structuredData.exam;
       reportRuntime.analysis = null;
+      reportRuntime.trace = null;
       const questionBody = document.querySelector("[data-validation-questions]");
       const studentHead = document.querySelector("[data-validation-student-head]");
       const studentBody = document.querySelector("[data-validation-students]");
@@ -3661,7 +3712,12 @@ const fileUploadBridge = (() => {
         number: currentGroupNumber,
         students: students.map((student) => ({ ...student })),
         sourceMode,
-        documentType: structuredData?.exam?.documentType || inferDocumentType(structuredData)
+        documentType: structuredData?.exam?.documentType || inferDocumentType(structuredData),
+        // Düzeltme sayısı YALNIZ burada yakalanabilir: students yukarıda
+        // DOM'dan (öğretmenin düzelttiği hâliyle) geldi, structuredData ise
+        // hâlâ makinenin okuduğu özgün değerleri tutuyor - ve startNewGroup()
+        // birazdan structuredData'yı null yapıp o özgün değerleri yok edecek.
+        corrections: window.MAHIRScoreCorrections?.diffScores(structuredData?.students, students)
       });
       currentGroupNumber += 1;
       const total = savedGroups.reduce((sum, group) => sum + group.students.length, 0);
@@ -3711,6 +3767,9 @@ const fileUploadBridge = (() => {
     const invalidateAnalysisAfterApprovedDataEdit = () => {
       if (!finalReviewMode || !reportRuntime.analysis) return;
       reportRuntime.analysis = null;
+      // İz, analizle birlikte geçersizleşir: eski koşunun ajan kaydını yeni
+      // (henüz üretilmemiş) bir analizin yanında göstermek öğretmeni yanıltır.
+      reportRuntime.trace = null;
       reportRuntime.report = null;
       screenManager.revokeDataApproval();
       document.dispatchEvent(new CustomEvent("mahir:report-reset"));
@@ -3742,10 +3801,64 @@ const fileUploadBridge = (() => {
       if (approvalMessage) approvalMessage.textContent = "Tüm verileri gözden geçiriniz. Açık onay verilmeden analiz başlamaz.";
     };
 
-    const renderAnalysis = (analysis) => {
+    // Analiz ekranındaki "Analiz Özeti" listesini beş ajanın GERÇEK koşusuyla
+    // değiştirir. İz gelmediğinde (kaydedilmiş eski çalışma, genel dil
+    // değerlendirmesi) listeye hiç dokunulmaz - index.html'deki sabit metin
+    // geçerli bir geri çekilme yolu olarak kalır.
+    const renderAgentTrace = (trace) => {
+      const list = document.querySelector("[data-agent-trace]");
+      const agents = Array.isArray(trace?.agents) ? trace.agents : [];
+      if (!list || !agents.length) return;
+      const format = window.MAHIRReportExport;
+      list.replaceChildren();
+      agents.forEach((entry) => {
+        const item = document.createElement("li");
+        // Süre ve LLM sayısı ayrı bir <span>'de: öğretmenin okuduğu cümle ile
+        // teknik ölçüm birbirine karışmasın.
+        const label = document.createElement("strong");
+        label.textContent = entry.label || entry.agent;
+        const task = document.createTextNode(` — ${format?.agentTaskText?.(entry) || ""}`);
+        const meta = document.createElement("span");
+        meta.className = "agent-trace-meta";
+        meta.textContent = [
+          format?.durationText?.(entry.durationMs),
+          entry.llmCalls?.length ? `${entry.llmCalls.length} dil modeli çağrısı` : "",
+          entry.failed || entry.skipped ? format?.agentStatusText?.(entry) : ""
+        ].filter(Boolean).join(" · ");
+        item.dataset.agent = entry.agent;
+        if (entry.failed) item.dataset.agentFailed = "true";
+        if (entry.skipped) item.dataset.agentSkipped = "true";
+        item.append(label, task, meta);
+        list.append(item);
+      });
+
+      // Ortak dil modeli turu ayrı satırda: süre ajanlara bölüştürülmüyor
+      // (dokuz istem tek istekte çözülüyor, paylaştırmak uydurma olurdu).
+      const round = trace.llmRound;
+      if (round?.promptCount) {
+        const item = document.createElement("li");
+        item.dataset.agent = "llm-turu";
+        const label = document.createElement("strong");
+        label.textContent = "Dil modeli turu (ortak)";
+        const meta = document.createElement("span");
+        meta.className = "agent-trace-meta";
+        meta.textContent = [
+          format?.durationText?.(round.durationMs),
+          round.ok ? "" : "Tamamlanamadı"
+        ].filter(Boolean).join(" · ");
+        item.append(label, document.createTextNode(` — ${round.promptCount} istem tek istekte çözüldü`), meta);
+        list.append(item);
+      }
+    };
+
+    const renderAnalysis = (analysis, trace) => {
       const reportScreen = document.querySelector("#report-screen");
       if (reportScreen?.dataset.reportLocked === "true") return;
       reportRuntime.analysis = analysis;
+      // İz raporun İÇİNDE değil yanında taşınıyor; rapor sözleşmesi teknik
+      // alanlarla kirlenmesin diye (bkz. backend `analyze_approved_data_traced`).
+      reportRuntime.trace = trace || null;
+      renderAgentTrace(trace);
       window.MAHIRReportExport?.syncOutputHeader(reportScreen);
     };
 
@@ -3824,6 +3937,17 @@ const fileUploadBridge = (() => {
         return;
       }
       const analysisPayload = {
+        ...approvedData,
+        // "Bu %68 nereden geldi?" cevabının parçası: kaç puan hücresinin
+        // öğretmen tarafından düzeltildiği. Grup bazında kaydedilen sayımlara,
+        // son inceleme ekranında yapılan EK düzenlemeler eklenir - bu aşamada
+        // structuredData zaten birleştirilmiş (düzeltilmiş) değerleri tuttuğu
+        // için buradaki fark yalnızca sonradan yapılanları verir, mükerrer
+        // sayım olmaz.
+        correctedCells: (window.MAHIRScoreCorrections?.mergeCorrections(
+          ...savedGroups.map((group) => group.corrections),
+          window.MAHIRScoreCorrections.diffScores(structuredData?.students, approvedData.students)
+        ) || {}).byQuestionIndex || {},
         exam: approvedData.exam,
         questions: approvedData.questions,
         students: (approvedData.students || []).map((student, index) => ({
@@ -3842,6 +3966,9 @@ const fileUploadBridge = (() => {
       approvalButton.textContent = "Analiz Başlatılıyor…";
       showMessage("Öğretmen onaylı veriler analiz motoruna aktarılıyor.");
 
+      // Ölçüm doğrulamalardan sonra, istek gitmeden hemen önce başlıyor.
+      const stopTimer = startTimer("Analiz");
+
       fetch("/mahir-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3856,10 +3983,21 @@ const fileUploadBridge = (() => {
             reportRuntime.languageComponentAnalyses = reportRuntime.languageComponentAnalyses || {};
             reportRuntime.languageComponentAnalyses[selectedComponent] = analysis;
           }
-          renderAnalysis(analysis);
+          renderAnalysis(analysis, payload.trace);
           screenManager.approveData();
           screenManager.showScreen("analysis-screen");
-          showMessage("Analiz tamamlandı. Öğrenme kanıtlarına dayalı değerlendirme raporu görüntülenmeye hazırdır.", "success");
+          // Kırılım izden geliyor (Faz 4): `totalMs` sunucudaki toplam,
+          // `llmRound` ortak dil modeli turu. Tarayıcı toplamı ≥ rota ≥ tur
+          // olmalı; aradaki farklar ağ ve JSON taşıması.
+          const round = payload.trace?.llmRound || {};
+          const elapsed = stopTimer({
+            rota: durationText(payload.trace?.totalMs ?? 0),
+            llmTuru: round.promptCount ? durationText(round.durationMs) : "yok",
+            istem: round.promptCount || 0,
+            ajan: payload.trace?.agents?.length || 0,
+            isitmadanBeri: sinceWarmUp("/mahir-rag-warmup")
+          });
+          showMessage(`Analiz tamamlandı. Öğrenme kanıtlarına dayalı değerlendirme raporu görüntülenmeye hazırdır. (${elapsed})`, "success");
         })
         .catch((error) => {
           const approvalMessage = document.querySelector("[data-approval-message]");
@@ -3867,7 +4005,8 @@ const fileUploadBridge = (() => {
             approvalMessage.textContent = error.message;
             approvalMessage.focus({ preventScroll: true });
           }
-          showMessage(error.message, "error");
+          const elapsed = stopTimer({ hata: error.message, isitmadanBeri: sinceWarmUp("/mahir-rag-warmup") });
+          showMessage(`${error.message} (${elapsed})`, "error");
         })
         .finally(() => {
           approvalButton.disabled = false;
@@ -3885,6 +4024,7 @@ const fileUploadBridge = (() => {
       if (sourceMode === "manual") {
         renderValidationData({ exam: {}, students: [], warnings: ["Veriler elle girilecektir."], summary: {} });
         screenManager.showScreen("validation-screen");
+        warmUpRag();
         return;
       }
       if (!selectedFiles.length) return;
@@ -3893,17 +4033,30 @@ const fileUploadBridge = (() => {
       readButton.setAttribute("aria-disabled", "true");
       readButton.textContent = selectedFiles.length > 1 ? `${selectedFiles.length} Belge Okunuyor…` : "Belge Okunuyor…";
 
-      const uploadFile = (file) => {
+      // Dosya başına ayrı istek DEĞİL, hepsi tek istekte: her istek uzak OCR
+      // işçisinde ayrı bir konteyner açtırıyordu, yani N fotoğraf = N kez
+      // (ölçülen) 30-50 sn'lik model yükleme. Hem yerel alıcı hem uzak işçi bir
+      // istekteki görsel grubunu tek çağrıda işliyor (file_receiver.py
+      // run_image_group_ocr / ocr_worker.py _run_image_group_ocr) ve ikisinin de
+      // sınırı 10 dosya - arayüzün kendi sınırıyla aynı.
+      const uploadFileGroup = (files) => {
         const formData = new FormData();
-        formData.append("exam-file", file);
+        files.forEach((file) => formData.append("exam-file", file));
         return fetch("/mahir-upload", { method: "POST", body: formData })
           .then((response) => response.json().catch(() => ({})).then((payload) => {
-            if (!response.ok) throw new Error(payload.message || `${file.name} işlenemedi.`);
+            if (!response.ok) throw new Error(payload.message || `${files.length} belge işlenemedi.`);
             return payload;
           }));
       };
 
-      Promise.all(selectedFiles.map(uploadFile))
+      // Ölçüm burada başlıyor - doğrulamalardan SONRA, istek gitmeden hemen
+      // önce: eksik alan uyarısıyla dönülen yol bir "OCR işlemi" değil.
+      const stopTimer = startTimer("OCR");
+      const uploadedBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+
+      // Tek elemanlı liste: aşağıdaki birleştirme mantığı olduğu gibi kalıyor,
+      // böylece yanıt sözleşmesi ve renderValidationData girdisi değişmiyor.
+      uploadFileGroup(selectedFiles).then((payload) => [payload])
         .then((payloads) => {
           const mergedData = payloads.reduce((merged, payload, payloadIndex) => {
             const data = payload.structuredData || {};
@@ -3931,13 +4084,28 @@ const fileUploadBridge = (() => {
           const reportRequest = reportText ? Promise.resolve(reportText) : fetch(`/shared/report-example.txt?ts=${Date.now()}`).then((reportResponse) => reportResponse.ok ? reportResponse.text() : message);
           reportRequest.then(showReport).catch(() => showReport(message));
           screenManager.showScreen("validation-screen");
+          warmUpRag();
           console.info("[MAHIR] Belge grubu backend alıcısına gönderildi.", { fileCount: selectedFiles.length, studentCount: mergedData.students.length });
-          showMessage(message, "success");
+          const elapsed = stopTimer({
+            dosya: selectedFiles.length,
+            boyut: formatBytes(uploadedBytes),
+            ogrenci: mergedData.students.length,
+            isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
+          });
+          showMessage(`${message} (${elapsed})`, "success");
         })
         .catch((error) => {
           window.clearInterval(progressTimer);
           console.warn("[MAHIR] Dosya backend alıcısına gönderilemedi.", error);
-          showMessage("Belge okuma servisine ulaşılamadı. Prototip sunucusunu çalıştırıp yeniden deneyiniz.", "error");
+          // Hata yolu da ölçülüyor: "45 sn sonra patladı" bilgisi, "45 sn
+          // sürdü" kadar değerli - zaman aşımını yavaşlıktan ayıran şey bu.
+          const elapsed = stopTimer({
+            dosya: selectedFiles.length,
+            boyut: formatBytes(uploadedBytes),
+            hata: error.message,
+            isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
+          });
+          showMessage(`Belge okuma servisine ulaşılamadı. Prototip sunucusunu çalıştırıp yeniden deneyiniz. (${elapsed})`, "error");
           showReport("Backend bağlantısı kurulamadı.");
         })
         .finally(() => {

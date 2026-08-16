@@ -1060,6 +1060,47 @@ button[aria-disabled="true"] {
   vertical-align: top;
 }
 
+/* "Kanıtları Gör": D bölümünde her oranın hangi sorulardan ve kaç öğrenciden
+   hesaplandığı. Yalnız ekran önizlemesinde açılır olur - indirilen Word/PDF
+   belgesinde aynı metin düz olarak yer alır (bkz. mahir-report-export-common.js
+   renderOutputBody, block.details'i kasıtlı olarak geçmiyor). */
+.report-preview-sections .evidence-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.report-preview-sections .evidence-details > summary::marker {
+  color: var(--color-border);
+}
+
+.report-preview-sections .evidence-detail {
+  margin: 6px 0 0;
+  font-weight: 400;
+}
+
+/* Tablo dipnotu: hücrede kısa atıf ("s. 66-67"), belgenin tam adı burada bir
+   kez. Küçük punto ve soluk renk, dipnotu tablo içeriğinden ayırıyor. */
+.report-note {
+  margin: 6px 0 0;
+  font-size: 0.85em;
+  color: var(--color-muted, #59697a);
+}
+
+/* Analiz ekranındaki ajan izi: her satır bir uzman ajanın gerçek koşusu.
+   Süre ve dil modeli sayımı ayrı satırda ve soluk - öğretmenin okuduğu cümle
+   ile teknik ölçüm birbirine karışmasın. */
+.analysis-progress .agent-trace-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85em;
+  color: var(--color-muted, #59697a);
+}
+
+.analysis-progress li[data-agent-failed],
+.analysis-progress li[data-agent-skipped] {
+  color: var(--color-muted, #59697a);
+}
+
 .report-intro {
   margin: 0;
 }

@@ -100,6 +100,12 @@
   const getStructuredQuestions = () => runtime().structuredData?.questions || [];
   const getStructuredStudents = () => runtime().structuredData?.students || [];
   const getAnalysis = () => runtime().analysis || {};
+  // Analizi ÜRETEN ajanların izi (/mahir-analyze yanıtındaki `trace`). `analysis`in
+  // kardeşi, içinde değil: biri raporun kendisi, diğeri raporun nasıl üretildiği.
+  const getTraceAgents = () => {
+    const agents = runtime().trace?.agents;
+    return Array.isArray(agents) ? agents : [];
+  };
 
   const dateText = () => new Intl.DateTimeFormat("tr-TR", { dateStyle: "long" }).format(new Date());
   const displayDate = (value) => {
@@ -230,7 +236,11 @@
       highestScore: totals.length ? Math.max(...totals) : "",
       lowestScore: totals.length ? Math.min(...totals) : "",
       successfulStudentCount: totals.length ? successful : "",
-      unsuccessfulStudentCount: totals.length ? unsuccessful : ""
+      unsuccessfulStudentCount: totals.length ? unsuccessful : "",
+      // Ölçme Ajanı'nın anomali gözlemi. Bu fonksiyon özeti yeniden KURDUĞU
+      // için (alanları tek tek yazıyor) buraya eklenmeyen her alan sessizce
+      // düşer - backend üretse bile rapora ulaşamaz.
+      anomalies: summary.anomalies || ""
     };
   };
 
@@ -345,9 +355,22 @@
     };
   };
 
+  // Ölçme ve Değerlendirme Ajanı'nın anomali bulgusu. Kapanış cümlesi kasıtlı:
+  // bu bir GÖZLEM, karar veya öneri değil - DEVELOPMENT_CHARTER.md gereği MAHİR
+  // etkinlik, yöntem veya telafi programı belirlemez. Bulgu yoksa paragraf hiç
+  // eklenmez; "bir şey bulunmadı" satırı gürültüden başka bir şey olmaz.
+  const anomalyParagraphs = () => {
+    const finding = normalizeText(getSummary().anomalies);
+    if (!isUseful(finding)) return [];
+    return [
+      `Ölçme ve Değerlendirme Ajanı'nın dikkat çektiği noktalar: ${finding} ` +
+      "Bu gözlem hiçbir puanı veya oranı değiştirmez."
+    ];
+  };
+
   const buildQuestionBlock = () => ({
     heading: "C. SORU BAZLI BAŞARI ANALİZİ",
-    paragraphs: [],
+    paragraphs: anomalyParagraphs(),
     tables: [[
       ["Soru", "Öğrenme Çıktısı / Kazanım", "Azami Puan", "Ortalama", "Başarı %", "Durum"],
       ...getQuestionRows().map((question) => [
@@ -361,19 +384,53 @@
     ]]
   });
 
+  // "Bu %68 nereden geldi?" sorusunun cevabı. İki parça hâlinde üretilir:
+  // özet (kaç soru, kaç öğrenci, kaç düzeltme) ve ayrıntı (soru bazında
+  // yüzdeler). Ekranda özet <summary>, ayrıntı açılır gövde olur; indirilen
+  // Word/PDF belgesinde ikisi tek bir düz metin hücresi hâlinde birleşir -
+  // orada açılır etkileşim anlamsız, ama sayıların belgede olması jüri
+  // karşısında savunulabilirliğin ta kendisi.
+  const outcomeEvidence = (outcome) => {
+    const evidence = outcome.evidence || {};
+    // Kanıt backend'de, yüzdenin hesaplandığı yerde üretiliyor
+    // (backend/app/approved_data_analyzer.py). Gelmediyse (eski analiz,
+    // kaydedilmiş çalışma) eski davranışa düşülür: yalnız soru numaraları.
+    const questions = Array.isArray(evidence.questions) ? evidence.questions : [];
+    if (!questions.length) {
+      return { summary: relatedQuestionsForOutcome(outcome.outcomeCode, outcome.outcomeTheme), detail: "" };
+    }
+    const corrected = Number(evidence.correctedCellCount) || 0;
+    const summary = [
+      `${evidence.questionCount} sorudan hesaplandı`,
+      `${evidence.participatingStudentCount} katılımcı öğrenci`,
+      corrected ? `${corrected} hücre öğretmen tarafından düzeltildi` : "öğretmen düzeltmesi yok"
+    ].join(" · ");
+    const detail = [
+      questions.map((question) => `Soru ${question.number}: ${formatPercent(question.successRate)}`).join(", "),
+      `Toplam ${formatNumber(evidence.earnedScore)} / ${formatNumber(evidence.possibleScore)} puan`
+    ].filter(Boolean).join(" — ");
+    return { summary, detail };
+  };
+
   const buildOutcomeBlock = () => {
     const outcomes = getAnalysis().outcomes || [];
-    const rows = outcomes.map((outcome) => [
+    const evidences = outcomes.map(outcomeEvidence);
+    const rows = outcomes.map((outcome, index) => [
       [normalizeText(outcome.outcomeTheme), normalizeText(outcome.outcomeCode || outcome.learningOutcome), normalizeText(outcome.outcomeSkill)].filter(Boolean).join(" — "),
-      relatedQuestionsForOutcome(outcome.outcomeCode, outcome.outcomeTheme),
+      [evidences[index].summary, evidences[index].detail].filter(Boolean).join(" — "),
       formatPercent(outcome.successRate),
       successLevel(outcome.successRate, outcome.category),
       normalizeText(outcome.decision)
     ]);
     return {
       heading: "D. ÖĞRENME ÇIKTILARI ANALİZİ",
-      paragraphs: ["Başarı düzeyleri, rapor hazırlanırken kullanılan ölçütlere göre sınıflandırılır; gerekli görüldüğünde değerlendirme eşikleri açıklama bölümünde belirtilir."],
-      tables: [[["Öğrenme Çıktısı", "İlişkili Sorular", "Başarı %", "Düzey", "Kanıt / Kısa Yorum"], ...rows]]
+      paragraphs: ["Başarı düzeyleri, rapor hazırlanırken kullanılan ölçütlere göre sınıflandırılır; gerekli görüldüğünde değerlendirme eşikleri açıklama bölümünde belirtilir. \"Hesaplama Dayanağı\" sütunu, her oranın hangi sorulardan ve kaç öğrenciden hesaplandığını gösterir."],
+      // Ekranda 2. sütun açılır bir kanıta dönüşür; diğer render hedefleri
+      // (PDF gövdesi, Word ve PDF dışa aktarıcıları) blok modelini genel
+      // olarak tükettiği için bu alanı hiç görmez ve düz metin basmaya
+      // devam eder - o dosyalarda hiçbir değişiklik gerekmiyor.
+      details: { column: 1, summaries: evidences.map((evidence) => evidence.summary) },
+      tables: [[["Öğrenme Çıktısı", "Hesaplama Dayanağı", "Başarı %", "Düzey", "Kanıt / Kısa Yorum"], ...rows]]
     };
   };
 
@@ -392,19 +449,102 @@
     };
   };
 
+  // "Bu teşhis nereden geldi?" sorusunun cevabı: hangi belgenin hangi sayfası.
+  // D bölümündeki "Kanıtları Gör" bir ORANIN hangi puanlardan geldiğini
+  // söylüyor; bu da bir TEŞHİSİN hangi müfredat sayfasından geldiğini.
+  //
+  // Sayfa numaraları orijinal PDF'e göre (backend `_merge_rag_sources`).
+  // Ardışık sayfalar aralığa indirgeniyor: "s. 66-68", "s. 66, 71" - sekiz
+  // getirim isabetinin sayfa listesi aksi hâlde hücreyi doldururdu.
+  const pageRanges = (pages) => {
+    const sorted = [...new Set((pages || []).filter((page) => Number.isInteger(page) && page > 0))]
+      .sort((a, b) => a - b);
+    const parts = [];
+    let start = null;
+    let previous = null;
+    sorted.forEach((page) => {
+      if (start === null) { start = previous = page; return; }
+      if (page === previous + 1) { previous = page; return; }
+      parts.push(start === previous ? `${start}` : `${start}-${previous}`);
+      start = previous = page;
+    });
+    if (start !== null) parts.push(start === previous ? `${start}` : `${start}-${previous}`);
+    return parts.join(", ");
+  };
+
+  // Belgenin RESMÎ adı uzun ("Ortaöğretim Türk Dili ve Edebiyatı Dersi Öğretim
+  // Programı - Türkiye Yüzyılı Maarif Modeli (2024)") ve her satırda tekrarlanması
+  // tabloyu okunamaz kılıyordu. Akademik atıf düzeni: hücrede kısa atıf, belgenin
+  // tam adı tablonun ALTINDA dipnotta - bir kez.
+  //
+  // Tek belge (olağan durum): hücrede "(s. 66-67)", dipnotta "Kaynak: <tam ad>".
+  // Birden çok belge: hücrede "(K1, s. 66-67)", dipnotta "K1: <tam ad>".
+  const documentLabels = (outcomes) => {
+    const names = [];
+    outcomes.forEach((outcome) => {
+      (Array.isArray(outcome.ragSources) ? outcome.ragSources : []).forEach((source) => {
+        const name = normalizeText(source?.documentName);
+        if (name && !names.includes(name)) names.push(name);
+      });
+    });
+    // Tek kaynakta işaretçiye gerek yok - "K1" yalnız gürültü olurdu.
+    return new Map(names.map((name, index) => [name, names.length > 1 ? `K${index + 1}` : ""]));
+  };
+
+  const sourceReference = (outcome, labels) => {
+    const sources = Array.isArray(outcome.ragSources) ? outcome.ragSources : [];
+    const cited = sources
+      .map((source) => {
+        const name = normalizeText(source?.documentName);
+        if (!name) return "";
+        const marker = labels.get(name) || "";
+        const pages = pageRanges(source?.pages);
+        const parts = [marker, pages ? `s. ${pages}` : ""].filter(Boolean);
+        // Ne işaretçi ne sayfa varsa (tek belge, sayfasız) atıf anlamsız -
+        // dipnot zaten belgeyi adıyla söylüyor.
+        return parts.join(", ");
+      })
+      .filter(Boolean);
+    return cited.length ? `(${cited.join("; ")})` : "";
+  };
+
+  const sourceNotes = (labels) => {
+    if (!labels.size) return [];
+    const entries = [...labels].map(([name, marker]) => (marker ? `${marker}: ${name}` : name));
+    return [`Kaynak: ${entries.join(" · ")}`];
+  };
+
   const buildDevelopmentNeedsBlock = () => {
     const outcomes = getAnalysis().outcomes || [];
     const targets = outcomes.filter((item) => Number(item.successRate) < 0.70);
-    const rows = targets.map((item, index) => [
-      String(index + 1),
-      `${item.componentLabel ? `${item.componentLabel} — ` : ""}${item.outcomeCode || "Öğrenme Çıktısı"} (${formatPercent(item.successRate)})`,
-      normalizeText(item.decision),
-      Number(item.successRate) < 0.50 ? "Öncelikli" : "Gelişim ihtiyacı"
-    ]);
+    // ragContext yalnızca kayıtlı bir programda (bkz. backend/app/program_catalog.py)
+    // ve RAG servisi yapılandırılmışsa dolu gelir - kapsam dışı derslerde sütun
+    // hiç eklenmez, tablo bugünküyle birebir aynı kalır.
+    const hasRagContext = targets.some((item) => isUseful(item.ragContext));
+    const labels = documentLabels(targets);
+    const rows = targets.map((item, index) => {
+      const row = [
+        String(index + 1),
+        `${item.componentLabel ? `${item.componentLabel} — ` : ""}${item.outcomeCode || "Öğrenme Çıktısı"} (${formatPercent(item.successRate)})`,
+        normalizeText(item.decision),
+        Number(item.successRate) < 0.50 ? "Öncelikli" : "Gelişim ihtiyacı"
+      ];
+      // Atıf teşhisin ARDINA ekleniyor - ayrı sütun değil: A4 genişliğinde
+      // tablo zaten beş sütun ve altıncısı okunabilirliği bozardı. Kaynağı
+      // olmayan (eski analiz, kaydedilmiş çalışma) satır bugünkü gibi görünür.
+      if (hasRagContext) {
+        row.push([normalizeText(item.ragContext), sourceReference(item, labels)].filter(Boolean).join(" "));
+      }
+      return row;
+    });
+    const header = ["Sıra", "Tespit Edilen İhtiyaç", "Değerlendirme Sonucu", "Öncelik Düzeyi"];
+    if (hasRagContext) header.push("Kavramsal Bağlam");
     return {
       heading: "F. GELİŞİM İHTİYAÇLARI VE DEĞERLENDİRME SONUÇLARI",
       paragraphs: ["Bu bölüm uygulanacak etkinlik, kaynak, yöntem veya telafi programını belirlemez; yalnızca öğretmen onaylı sınav verilerinden hareketle gelişim ihtiyacını gösterir."],
-      tables: [[["Sıra", "Tespit Edilen İhtiyaç", "Değerlendirme Sonucu", "Öncelik Düzeyi"], ...rows]]
+      tables: [[header, ...rows]],
+      // Tablonun ALTINA düşen dipnot; hücredeki kısa atıfın karşılığı.
+      notes: hasRagContext ? sourceNotes(labels) : []
     };
   };
 
@@ -501,17 +641,109 @@
     };
   };
 
-  const buildCompositeBlocks = () => [
-    { heading: "A. DEĞERLENDİRME VE EĞİTİM BAĞLAMI", paragraphs: [], tables: [buildContextTable()] },
-    buildCompositeSummaryBlock(),
-    buildCompositeOutcomeBlock(),
-    buildCompositePedagogyBlock(),
-    buildDevelopmentNeedsBlock(),
-    buildSourceBlock(),
-    buildDocumentInfoBlock()
-  ];
+  // --- Ajan izi: "bu raporu kim üretti"nin cevabı ---
+  //
+  // Sayılar backend'den (`AgentTrace.to_wire`), cümleler burada kuruluyor -
+  // kanıt özetiyle (`outcomeEvidence`) aynı desen: hat sayı üretir, sunum
+  // metni tarayıcıda kurulur.
 
-  const getBlocks = () => getAnalysis().assessmentScope === "language-composite" ? buildCompositeBlocks() : [
+  const durationText = (ms) => {
+    const value = Number(ms);
+    if (!Number.isFinite(value)) return "";
+    return value >= 1000 ? `${formatNumber(value / 1000, 1)} sn` : `${Math.round(value)} ms`;
+  };
+
+  // Ajan slug'ına göre "ne yaptı" cümlesi. Bilinmeyen slug `description`a
+  // düşer, böylece hatta yeni bir ajan eklendiğinde tablo bozulmaz - yalnız
+  // daha genel bir cümle gösterir.
+  const AGENT_TASK_TEXT = {
+    "belge-anlama": (out) => [
+      out.questionCount ? `${out.questionCount} soru` : "",
+      out.studentCount ? `${out.studentCount} öğrenci` : ""
+    ].filter(Boolean).join(", ") + " belge sözleşmesine çevrildi",
+    "program-eslestirme": (out) => (out.programId
+      ? `${out.outcomeCount || 0} öğrenme çıktısı öğretim programına bağlandı`
+      : "Kayıtlı öğretim programı bulunamadı") +
+      (out.unmappedQuestionCount ? `; ${out.unmappedQuestionCount} soru eşleşmedi` : ""),
+    "olcme-degerlendirme": (out) =>
+      `${out.measuredQuestionCount || 0} soru, ${out.measuredOutcomeCount || 0} öğrenme çıktısı hesaplandı` +
+      (out.correctedCellTotal ? `; ${out.correctedCellTotal} öğretmen düzeltmesi` : ""),
+    "pedagojik-analiz": (out) =>
+      `${out.outcomeCount || 0} öğrenme çıktısı yorumlandı` +
+      (out.curriculumGroundedCount ? `; ${out.curriculumGroundedCount} müfredat temelli teşhis` : ""),
+    "raporlama": () => "Analiz raporu sözleşmesi kuruldu"
+  };
+
+  const agentTaskText = (entry) => {
+    if (entry.skipped) return "Önceki adım tamamlanamadığı için çalıştırılmadı.";
+    const build = AGENT_TASK_TEXT[entry.agent];
+    const text = build ? normalizeText(build(entry.outputs || {})) : "";
+    return text || normalizeText(entry.description) || "";
+  };
+
+  const agentStatusText = (entry) => {
+    if (entry.skipped) return "Çalıştırılmadı";
+    if (entry.failed) return "Tamamlanamadı";
+    return "Tamam";
+  };
+
+  // Ortak dil modeli turu KENDİ satırında gösteriliyor, ajanlara bölüştürülmüyor.
+  // Sebep: dokuz prompt tek istekte çözülüyor; süreyi paylaştırmak uydurma
+  // olurdu ve tek istekli mimarinin kanıtını da yok ederdi. Ajan satırlarında
+  // yalnız o ajanın kendi hesap süresi görünür (milisaniyeler) - aradaki fark
+  // zaten anlatılmak istenen şey.
+  const llmRoundRow = () => {
+    const round = runtime().trace?.llmRound;
+    if (!round?.promptCount) return null;
+    return [
+      "Dil modeli turu (ortak)",
+      `${round.promptCount} istem tek istekte çözüldü`,
+      durationText(round.durationMs),
+      String(round.promptCount),
+      round.ok ? "Tamam" : "Tamamlanamadı"
+    ];
+  };
+
+  const buildAgentTraceBlock = () => {
+    const agents = getTraceAgents();
+    // İz yoksa bölüm HİÇ üretilmez: kaydedilmiş eski çalışmalarda ve genel dil
+    // değerlendirmesinde rapor bugünküyle birebir aynı kalmalı.
+    if (!agents.length) return null;
+    const rows = agents.map((entry) => [
+      normalizeText(entry.label || entry.agent),
+      agentTaskText(entry),
+      durationText(entry.durationMs),
+      entry.llmCalls?.length ? String(entry.llmCalls.length) : "—",
+      agentStatusText(entry)
+    ]);
+    const round = llmRoundRow();
+    if (round) rows.push(round);
+    return {
+      heading: "I. ANALİZ SÜRECİ VE AJAN İZİ",
+      paragraphs: [
+        "Bu rapor, birbirine sırayla devreden uzman ajanlar tarafından üretilmiştir. " +
+        "Aşağıdaki tablo her adımın ne yaptığını, ne kadar sürdüğünü ve dil modelini " +
+        "kaç kez kullandığını gösterir. Sayısal sonuçların tamamı ölçme adımında " +
+        "hesaplanır; dil modeli hiçbir puanı veya oranı üretmez. Dil modeline " +
+        "ihtiyaç duyan adımların istemleri tek bir istekte toplanır; son satır o " +
+        "ortak turu gösterir."
+      ],
+      tables: [[["Ajan", "Yaptığı İş", "Süre", "Dil Modeli Çağrısı", "Durum"], ...rows]]
+    };
+  };
+
+  const buildCompositeBlocks = () => [
+      { heading: "A. DEĞERLENDİRME VE EĞİTİM BAĞLAMI", paragraphs: [], tables: [buildContextTable()] },
+      buildCompositeSummaryBlock(),
+      buildCompositeOutcomeBlock(),
+      buildCompositePedagogyBlock(),
+      buildDevelopmentNeedsBlock(),
+      buildSourceBlock(),
+      buildDocumentInfoBlock(),
+      buildAgentTraceBlock()
+    ].filter(Boolean);
+
+  const buildComponentBlocks = () => [
       { heading: "A. SINAV VE EĞİTİM BAĞLAMI", paragraphs: [], tables: [buildContextTable()] },
       buildGeneralSummaryBlock(),
       buildQuestionBlock(),
@@ -519,8 +751,13 @@
       buildPedagogyBlock(),
       buildDevelopmentNeedsBlock(),
       buildSourceBlock(),
-      buildDocumentInfoBlock()
-    ];
+      buildDocumentInfoBlock(),
+      buildAgentTraceBlock()
+    ].filter(Boolean);
+
+  const getBlocks = () => getAnalysis().assessmentScope === "language-composite"
+    ? buildCompositeBlocks()
+    : buildComponentBlocks();
 
   const getReportModel = (reportElement) => {
     const model = {
@@ -587,14 +824,55 @@
     return element;
   };
 
-  const renderTable = (rows) => {
+  // Kanıt hücresini ekranda açılır hâle getirir: özet her zaman görünür,
+  // soru bazındaki ayrıntı tıklayınca açılır. Özet metni hücrenin başında
+  // olduğu için geri kalanı ayrıntı sayılır; ikisi de aynı düz metinden
+  // türetildiğinden ekran ile belge asla farklı şey söyleyemez.
+  const evidenceCell = (text, summaryText) => {
+    const td = document.createElement("td");
+    const value = String(text || "");
+    const summary = String(summaryText || "");
+    if (!summary || !value.startsWith(summary) || value.length <= summary.length) {
+      td.textContent = value;
+      return td;
+    }
+    const details = document.createElement("details");
+    details.className = "evidence-details";
+    const summaryElement = document.createElement("summary");
+    summaryElement.textContent = summary;
+    const body = document.createElement("p");
+    body.className = "evidence-detail";
+    body.textContent = value.slice(summary.length).replace(/^\s*—\s*/, "");
+    details.append(summaryElement, body);
+    td.append(details);
+    return td;
+  };
+
+  const renderTable = (rows, details = null) => {
     const table = document.createElement("table");
     rows.forEach((row, rowIndex) => {
       const tr = document.createElement("tr");
-      row.forEach((item) => tr.append(cell(rowIndex === 0 ? "th" : "td", item)));
+      row.forEach((item, columnIndex) => {
+        const isEvidence = details && rowIndex > 0 && columnIndex === details.column;
+        tr.append(isEvidence
+          ? evidenceCell(item, details.summaries?.[rowIndex - 1])
+          : cell(rowIndex === 0 ? "th" : "td", item));
+      });
       table.append(tr);
     });
     return table;
+  };
+
+  // Dipnot: tablodan SONRA gelen küçük punto açıklama. `paragraphs` bu işi
+  // göremezdi - o alan tablonun ÖNÜNDE çiziliyor (dört render hedefinde de).
+  const appendNotes = (section, block) => {
+    (block.notes || []).forEach((note) => {
+      if (!isUseful(note)) return;
+      const p = document.createElement("p");
+      p.className = "report-note";
+      p.textContent = note;
+      section.append(p);
+    });
   };
 
   const renderOutputBody = (reportElement, model) => {
@@ -614,7 +892,10 @@
         p.textContent = paragraph;
         section.append(p);
       });
+      // Kasıtlı olarak `block.details` GEÇİLMİYOR: bu gövde PDF'e olduğu gibi
+      // çizildiği için kapalı bir <details> orada kanıtı görünmez kılardı.
       block.tables.forEach((tableRows) => section.append(renderTable(tableRows)));
+      appendNotes(section, block);
       body.append(section);
     });
   };
@@ -635,7 +916,8 @@
         p.textContent = paragraph;
         section.append(p);
       });
-      block.tables.forEach((tableRows) => section.append(renderTable(tableRows)));
+      block.tables.forEach((tableRows) => section.append(renderTable(tableRows, block.details)));
+      appendNotes(section, block);
       body.append(section);
     });
   };
@@ -674,7 +956,11 @@
     getOutputStatusMessage,
     normalizeText,
     formatNumber,
-    formatPercent
+    formatPercent,
+    // Analiz ekranı da aynı cümleleri kullanıyor (bkz. script.js
+    // renderAgentTrace) - ekran ile rapor asla farklı şey söylememeli.
+    agentTaskText,
+    agentStatusText,
+    durationText
   };
 })();
-

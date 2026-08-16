@@ -531,9 +531,13 @@
           <h2 id="analysis-title">Analiz Süreci</h2>
         </header>
 
+        <!-- Aşağıdaki liste, iz gelmediğinde (kaydedilmiş eski çalışma, genel
+             dil değerlendirmesi) geçerli kalan geri çekilme metnidir. Analiz
+             izi geldiğinde script.js bunu beş ajanın GERÇEK koşusuyla
+             değiştirir - bkz. renderAgentTrace. -->
         <article class="analysis-progress" data-component="Analysis Progress" aria-labelledby="analysis-progress-title">
           <h3 id="analysis-progress-title">Analiz Özeti</h3>
-          <ol>
+          <ol data-agent-trace>
             <li>Veriler öğretmen onayıyla kesinleştirildi.</li>
             <li>Soru ve puan bilgileri kontrol edildi.</li>
             <li>Sorular öğrenme çıktılarıyla eşleştirildi.</li>
@@ -679,6 +683,7 @@
   <script src="assets/js/mahir-pdf-exporter.js"></script>
   <script src="assets/js/mahir-workspace-backup.js"></script>
   <script src="assets/js/mahir-program-catalog.js"></script>
+  <script src="assets/js/mahir-score-corrections.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
