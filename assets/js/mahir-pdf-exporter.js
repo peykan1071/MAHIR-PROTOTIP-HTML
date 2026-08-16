@@ -79,7 +79,16 @@
       height += tableLayout.height + 6;
       return tableLayout;
     });
-    return { height, paragraphLayouts, tableLayouts };
+    // Dipnot: tablodan SONRA, küçük puntoyla. Hücrede kısa atıf duruyor
+    // ("s. 66-67"), belgenin tam adı burada bir kez.
+    const noteLayouts = [];
+    setFont(context, design.metaSize, 400);
+    (block.notes || []).forEach((note) => {
+      const lines = wrapText(context, note, innerWidth);
+      noteLayouts.push(lines);
+      height += lines.length * design.metaLine + 4;
+    });
+    return { height, paragraphLayouts, tableLayouts, noteLayouts };
   };
 
   const measureHeader = (context, model, design, contentWidth) => {
@@ -169,6 +178,11 @@
     });
     item.layout.tableLayouts.forEach((tableLayout) => {
       cursorY = drawTable(context, tableLayout, innerX, cursorY, innerWidth, design) + 6;
+    });
+    setFont(context, design.metaSize, 400);
+    context.fillStyle = colors.muted;
+    (item.layout.noteLayouts || []).forEach((lines) => {
+      cursorY = drawLines(context, lines, innerX, cursorY, design.metaLine) + 4;
     });
   };
 

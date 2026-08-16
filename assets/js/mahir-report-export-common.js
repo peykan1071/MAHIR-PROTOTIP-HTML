@@ -446,17 +446,46 @@
     return parts.join(", ");
   };
 
-  const sourceReference = (outcome) => {
+  // Belgenin RESMÎ adı uzun ("Ortaöğretim Türk Dili ve Edebiyatı Dersi Öğretim
+  // Programı - Türkiye Yüzyılı Maarif Modeli (2024)") ve her satırda tekrarlanması
+  // tabloyu okunamaz kılıyordu. Akademik atıf düzeni: hücrede kısa atıf, belgenin
+  // tam adı tablonun ALTINDA dipnotta - bir kez.
+  //
+  // Tek belge (olağan durum): hücrede "(s. 66-67)", dipnotta "Kaynak: <tam ad>".
+  // Birden çok belge: hücrede "(K1, s. 66-67)", dipnotta "K1: <tam ad>".
+  const documentLabels = (outcomes) => {
+    const names = [];
+    outcomes.forEach((outcome) => {
+      (Array.isArray(outcome.ragSources) ? outcome.ragSources : []).forEach((source) => {
+        const name = normalizeText(source?.documentName);
+        if (name && !names.includes(name)) names.push(name);
+      });
+    });
+    // Tek kaynakta işaretçiye gerek yok - "K1" yalnız gürültü olurdu.
+    return new Map(names.map((name, index) => [name, names.length > 1 ? `K${index + 1}` : ""]));
+  };
+
+  const sourceReference = (outcome, labels) => {
     const sources = Array.isArray(outcome.ragSources) ? outcome.ragSources : [];
     const cited = sources
       .map((source) => {
         const name = normalizeText(source?.documentName);
         if (!name) return "";
+        const marker = labels.get(name) || "";
         const pages = pageRanges(source?.pages);
-        return pages ? `${name}, s. ${pages}` : name;
+        const parts = [marker, pages ? `s. ${pages}` : ""].filter(Boolean);
+        // Ne işaretçi ne sayfa varsa (tek belge, sayfasız) atıf anlamsız -
+        // dipnot zaten belgeyi adıyla söylüyor.
+        return parts.join(", ");
       })
       .filter(Boolean);
-    return cited.length ? `(Kaynak: ${cited.join("; ")})` : "";
+    return cited.length ? `(${cited.join("; ")})` : "";
+  };
+
+  const sourceNotes = (labels) => {
+    if (!labels.size) return [];
+    const entries = [...labels].map(([name, marker]) => (marker ? `${marker}: ${name}` : name));
+    return [`Kaynak: ${entries.join(" · ")}`];
   };
 
   const buildDevelopmentNeedsBlock = () => {
@@ -466,6 +495,7 @@
     // ve RAG servisi yapılandırılmışsa dolu gelir - kapsam dışı derslerde sütun
     // hiç eklenmez, tablo bugünküyle birebir aynı kalır.
     const hasRagContext = targets.some((item) => isUseful(item.ragContext));
+    const labels = documentLabels(targets);
     const rows = targets.map((item, index) => {
       const row = [
         String(index + 1),
@@ -473,11 +503,11 @@
         normalizeText(item.decision),
         Number(item.successRate) < 0.50 ? "Öncelikli" : "Gelişim ihtiyacı"
       ];
-      // Kaynak, teşhisin ARDINA ekleniyor - ayrı sütun değil: A4 genişliğinde
+      // Atıf teşhisin ARDINA ekleniyor - ayrı sütun değil: A4 genişliğinde
       // tablo zaten beş sütun ve altıncısı okunabilirliği bozardı. Kaynağı
       // olmayan (eski analiz, kaydedilmiş çalışma) satır bugünkü gibi görünür.
       if (hasRagContext) {
-        row.push([normalizeText(item.ragContext), sourceReference(item)].filter(Boolean).join(" "));
+        row.push([normalizeText(item.ragContext), sourceReference(item, labels)].filter(Boolean).join(" "));
       }
       return row;
     });
@@ -486,7 +516,9 @@
     return {
       heading: "F. GELİŞİM İHTİYAÇLARI VE DEĞERLENDİRME SONUÇLARI",
       paragraphs: ["Bu bölüm uygulanacak etkinlik, kaynak, yöntem veya telafi programını belirlemez; yalnızca öğretmen onaylı sınav verilerinden hareketle gelişim ihtiyacını gösterir."],
-      tables: [[header, ...rows]]
+      tables: [[header, ...rows]],
+      // Tablonun ALTINA düşen dipnot; hücredeki kısa atıfın karşılığı.
+      notes: hasRagContext ? sourceNotes(labels) : []
     };
   };
 
@@ -678,6 +710,18 @@
     return table;
   };
 
+  // Dipnot: tablodan SONRA gelen küçük punto açıklama. `paragraphs` bu işi
+  // göremezdi - o alan tablonun ÖNÜNDE çiziliyor (dört render hedefinde de).
+  const appendNotes = (section, block) => {
+    (block.notes || []).forEach((note) => {
+      if (!isUseful(note)) return;
+      const p = document.createElement("p");
+      p.className = "report-note";
+      p.textContent = note;
+      section.append(p);
+    });
+  };
+
   const renderOutputBody = (reportElement, model) => {
     const body = reportElement.querySelector("[data-output-body]");
     if (!body) return;
@@ -698,6 +742,7 @@
       // Kasıtlı olarak `block.details` GEÇİLMİYOR: bu gövde PDF'e olduğu gibi
       // çizildiği için kapalı bir <details> orada kanıtı görünmez kılardı.
       block.tables.forEach((tableRows) => section.append(renderTable(tableRows)));
+      appendNotes(section, block);
       body.append(section);
     });
   };
@@ -719,6 +764,7 @@
         section.append(p);
       });
       block.tables.forEach((tableRows) => section.append(renderTable(tableRows, block.details)));
+      appendNotes(section, block);
       body.append(section);
     });
   };

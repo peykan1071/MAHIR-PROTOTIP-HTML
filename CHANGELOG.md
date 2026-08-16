@@ -2,6 +2,14 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Kaynak Gösterimi Dipnota Taşındı - 2026-08-16
+
+- Belgenin resmî adı uzun ve F tablosunun her satırında tekrarlanınca "Kavramsal Bağlam" hücresini okunamaz kılıyordu. Akademik atıf düzenine geçildi: **hücrede kısa atıf** (`(s. 66-67)`), **belgenin tam adı tablonun altında dipnotta**, bir kez (`Kaynak: Ortaöğretim … Öğretim Programı … (2024)`).
+- Birden çok kaynak belge olursa hücrede işaretçi beliriyor (`(K1, s. 66-67)`) ve dipnot ikisini de sayıyor. **Tek belgede işaretçi yok** - "K1" o durumda yalnız gürültü olurdu.
+- Blok modeline `notes` alanı eklendi ve **dört render hedefinin dördü de** güncellendi: ekran önizlemesi, PDF gövdesi, Word dışa aktarıcısı, PDF dışa aktarıcısı. Mevcut `paragraphs` alanı bu işi göremezdi - o alan dört hedefte de tablonun ÖNÜNDE çiziliyor; dipnot tablodan sonra gelmeli.
+- Doğrulama, blok modeliyle yetinmedi: DOM sırası da denetlendi (`h3 → p → table → p.report-note`), Word/PDF dışa aktarıcılarında `notes`un tablolardan sonra basıldığı kaynak üzerinden kontrol edildi.
+- Yeni testler: kısa atıfın hücrede tam adın dipnotta olduğu, tek/çok belge ayrımı, sayfasız kaynak, kaynaksız satır, dipnotun `paragraphs`a sızmadığı.
+
 ## Kaynakta Dosya Adı Yerine Belgenin Resmî Adı - 2026-08-16
 
 - Rapordaki kaynak gösterimi artık **"Ortaöğretim Türk Dili ve Edebiyatı Dersi Öğretim Programı - Türkiye Yüzyılı Maarif Modeli (2024), s. 66-67"** diyor; önce "tdeogr.pdf, s. 66-67" diyordu. Resmî bir rapor dayanağını dosya adıyla gösteremez.

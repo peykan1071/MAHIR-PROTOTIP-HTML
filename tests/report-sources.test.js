@@ -54,64 +54,90 @@ const weak = (extra = {}) => ({
   ...extra
 });
 
-// --- Kaynak, teşhisin ardına ekleniyor (ayrı sütun DEĞİL) ---
-// A4 genişliğinde tablo zaten beş sütun; altıncısı okunabilirliği bozardı.
+const TITLE = "Ortaöğretim Türk Dili ve Edebiyatı Dersi Öğretim Programı - Türkiye Yüzyılı Maarif Modeli (2024)";
 
-const cited = needsBlock([weak({ ragSources: [{ documentName: "tdeogr.pdf", pages: [66] }] })]);
+// --- Hücrede KISA atıf, belgenin tam adı tablonun ALTINDA dipnotta ---
+// Resmî ad uzun; her satırda tekrarlanması tabloyu okunamaz kılıyordu.
+
+const cited = needsBlock([weak({ ragSources: [{ documentName: TITLE, pages: [66, 67] }] })]);
 assert.equal(
   cited.tables[0][0].join(" | "),
   "Sıra | Tespit Edilen İhtiyaç | Değerlendirme Sonucu | Öncelik Düzeyi | Kavramsal Bağlam"
 );
 const cell = cited.tables[0][1][4];
 assert.match(cell, /örtük iletiyi belirleme/, "Teşhis metni korunmalı.");
-assert.match(cell, /\(Kaynak: tdeogr\.pdf, s\. 66\)/);
-assert.ok(cell.indexOf("Kaynak:") > cell.indexOf("örtük"), "Kaynak teşhisin ARDINDA olmalı.");
+assert.match(cell, /\(s\. 66-67\)$/, "Hücrede yalnız kısa atıf olmalı.");
+assert.doesNotMatch(cell, /Ortaöğretim/, "Belgenin tam adı hücrede TEKRARLANMAMALI.");
+
+assert.equal(cited.notes.length, 1, "Dipnot tek satır olmalı.");
+assert.equal(cited.notes[0], `Kaynak: ${TITLE}`);
 
 // --- Ardışık sayfalar aralığa iniyor, kopuklar virgülle ayrılıyor ---
 // Sekiz getirim isabetinin ham sayfa listesi aksi hâlde hücreyi doldururdu.
 
 const cellFor = (pages) =>
-  needsBlock([weak({ ragSources: [{ documentName: "tdeogr.pdf", pages }] })]).tables[0][1][4];
+  needsBlock([weak({ ragSources: [{ documentName: TITLE, pages }] })]).tables[0][1][4];
 
-assert.match(cellFor([66, 67, 68]), /s\. 66-68\)/, "Ardışık sayfalar aralık olmalı.");
-assert.match(cellFor([66, 71]), /s\. 66, 71\)/, "Kopuk sayfalar virgülle ayrılmalı.");
-assert.match(cellFor([66, 67, 71, 72, 90]), /s\. 66-67, 71-72, 90\)/);
-assert.match(cellFor([68, 66, 67]), /s\. 66-68\)/, "Sırasız gelen sayfalar sıralanmalı.");
-assert.match(cellFor([66, 66, 67]), /s\. 66-67\)/, "Yinelenen sayfa tekilleşmeli.");
+assert.match(cellFor([66, 67, 68]), /\(s\. 66-68\)$/, "Ardışık sayfalar aralık olmalı.");
+assert.match(cellFor([66, 71]), /\(s\. 66, 71\)$/, "Kopuk sayfalar virgülle ayrılmalı.");
+assert.match(cellFor([66, 67, 71, 72, 90]), /\(s\. 66-67, 71-72, 90\)$/);
+assert.match(cellFor([68, 66, 67]), /\(s\. 66-68\)$/, "Sırasız gelen sayfalar sıralanmalı.");
+assert.match(cellFor([66, 66, 67]), /\(s\. 66-67\)$/, "Yinelenen sayfa tekilleşmeli.");
 
-// --- İki belge ayrı ayrı anılmalı ---
+// --- İki belge: hücrede işaretçi, dipnotta ikisi de ---
+// Tek belgede işaretçi yok (gürültü olurdu); ikiye çıkınca K1/K2 beliriyor.
 
-const twoDocs = cellFor.call(null, [66]) && needsBlock([weak({
-  ragSources: [
-    { documentName: "tdeogr.pdf", pages: [66, 67] },
-    { documentName: "ek-kilavuz.pdf", pages: [4] }
-  ]
-})]).tables[0][1][4];
-assert.match(twoDocs, /tdeogr\.pdf, s\. 66-67; ek-kilavuz\.pdf, s\. 4/);
+const multi = needsBlock([
+  weak({ ragSources: [{ documentName: TITLE, pages: [66, 67] }] }),
+  weak({ outcomeCode: "TDE4.1", ragSources: [{ documentName: "Ek Kılavuz (2025)", pages: [4] }] })
+]);
+assert.match(multi.tables[0][1][4], /\(K1, s\. 66-67\)$/);
+assert.match(multi.tables[0][2][4], /\(K2, s\. 4\)$/);
+assert.equal(multi.notes[0], `Kaynak: K1: ${TITLE} · K2: Ek Kılavuz (2025)`);
 
-// --- Sayfa bilgisi yoksa yalnız belge adı; kaynak yoksa hiç ek yok ---
+// --- Sayfa bilgisi yoksa hücrede atıf yok; belge yine dipnotta anılır ---
 
-assert.match(cellFor([]), /\(Kaynak: tdeogr\.pdf\)/, "Sayfasız kaynak yalnız adıyla anılmalı.");
-const noSource = needsBlock([weak()]).tables[0][1][4];
-assert.doesNotMatch(noSource, /Kaynak/, "Kaynak yoksa parantez hiç eklenmemeli.");
-assert.match(noSource, /örtük iletiyi belirleme/, "Teşhis yine de görünmeli.");
+const pageless = needsBlock([weak({ ragSources: [{ documentName: TITLE, pages: [] }] })]);
+assert.doesNotMatch(pageless.tables[0][1][4], /\(/, "Sayfasız tek kaynakta atıf anlamsız.");
+assert.equal(pageless.notes[0], `Kaynak: ${TITLE}`, "Belge yine de dipnotta anılmalı.");
+
+// --- Kaynak yoksa ne atıf ne dipnot ---
+
+const noSourceBlock = needsBlock([weak()]);
+assert.doesNotMatch(noSourceBlock.tables[0][1][4], /\(s\./);
+assert.equal(noSourceBlock.notes.length, 0, "Kaynak yoksa dipnot da olmamalı.");
+assert.match(noSourceBlock.tables[0][1][4], /örtük iletiyi belirleme/, "Teşhis yine görünmeli.");
 
 // --- Geriye dönük uyum: ragSources taşımayan eski analiz ---
 
 const legacyOutcome = weak();
 delete legacyOutcome.ragSources;
-const legacy = needsBlock([legacyOutcome]).tables[0][1][4];
-assert.doesNotMatch(legacy, /Kaynak/);
-assert.match(legacy, /örtük iletiyi belirleme/);
+const legacyBlock = needsBlock([legacyOutcome]);
+assert.equal(legacyBlock.notes.length, 0);
+assert.match(legacyBlock.tables[0][1][4], /örtük iletiyi belirleme/);
 
 // --- Teşhis hiç yoksa sütun eklenmemeli (bugünkü davranış korunuyor) ---
 
 const noContext = needsBlock([weak({ ragContext: "", ragSources: [] })]);
 assert.equal(noContext.tables[0][0].length, 4, "Kavramsal Bağlam sütunu hiç eklenmemeli.");
+assert.equal(noContext.notes.length, 0);
 
 // --- Güçlü çıktı F bölümüne hiç girmemeli ---
 
 const strongOnly = needsBlock([weak({ successRate: 0.9 })]);
 assert.equal(strongOnly.tables[0].length, 1, "Yalnız başlık satırı kalmalı.");
+
+// --- Dipnot, tablodan SONRA çiziliyor (paragraphs tablonun ÖNÜNDE) ---
+// Dört render hedefi de once paragraphs, sonra tables, en son notes basıyor;
+// dipnot `paragraphs`a konsaydı tablonun üstünde görünürdü.
+
+const other = sandbox.window.MAHIRReportExport.getReportModel(null).blocks
+  .filter((block) => !block.heading.startsWith("F."));
+assert.ok(other.every((block) => !(block.notes || []).length), "Dipnot yalnız F bölümünde.");
+assert.ok(Array.isArray(cited.paragraphs), "paragraphs alanı korunmalı.");
+assert.ok(
+  cited.paragraphs.every((text) => !text.includes(TITLE)),
+  "Belgenin tam adı paragraphs'a sızmamalı - orası tablonun ÖNÜ."
+);
 
 console.log("report-sources.test.js: tüm kontroller geçti.");
