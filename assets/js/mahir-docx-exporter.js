@@ -96,7 +96,21 @@
   const footerXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="${WORD_NS}">${paragraph("MAHİR — Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı", "Normal", { color: "666666", size: 18, align: "center", after: 0 })}</w:ftr>`;
   const documentRelsXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/></Relationships>`;
   const contentTypesXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>`;
-  const relsXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const relsXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="customXml/mahir-report.xml"/></Relationships>`;
+
+  const bytesToBase64 = (bytes) => {
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    }
+    return btoa(binary);
+  };
+
+  const portableReportXml = () => {
+    const payload = common().getPortableReportPayload();
+    const encoded = bytesToBase64(encoder.encode(JSON.stringify(payload)));
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><mahirReport xmlns="urn:mahir:analysis-report:v1"><payload encoding="base64">${encoded}</payload></mahirReport>`;
+  };
 
   const dosDateTime = () => {
     const date = new Date();
@@ -146,7 +160,8 @@
       { name: "word/document.xml", content: documentXml(reportElement) },
       { name: "word/_rels/document.xml.rels", content: documentRelsXml() },
       { name: "word/footer1.xml", content: footerXml() },
-      { name: "word/styles.xml", content: stylesXml() }
+      { name: "word/styles.xml", content: stylesXml() },
+      { name: "customXml/mahir-report.xml", content: portableReportXml() }
     ]);
     triggerDownload(blob, filename);
     return { filename, size: blob.size };
@@ -154,3 +169,4 @@
 
   window.MAHIRDocxExporter = { downloadReportDocx };
 })();
+

@@ -425,8 +425,8 @@
   });
   const studentRecordDefault = (order = 1) => ({
     id: `student-${order}`,
-    studentNo: `${100 + order}`,
-    fullName: order === 1 ? "Ayşe Yılmaz" : "Mehmet Kaya",
+    studentNo: `DEMO-${String(order).padStart(3, "0")}`,
+    fullName: order === 1 ? "Örnek Kayıt A" : "Örnek Kayıt B",
     answers: { q1: order === 1 ? 8 : 7, q2: order === 1 ? 7 : 6 },
     totalScore: order === 1 ? 15 : 13,
     metadata: {}
@@ -885,8 +885,8 @@
     columns: 4,
     cells: [
       ["Öğrenci No", "Ad Soyad", "Soru 1", "Toplam"],
-      ["101", "Ayşe Yılmaz", "8", "15"],
-      ["102", "Mehmet Kaya", "7", "13"]
+      ["DEMO-001", "Örnek Kayıt A", "8", "15"],
+      ["DEMO-002", "Örnek Kayıt B", "7", "13"]
     ]
   });
 
@@ -912,8 +912,8 @@
     questions: [createQuestion(1), createQuestion(2)],
     answerKey: [createAnswerKey("q1", "A"), createAnswerKey("q2", "B")],
     students: [
-      createStudent("101", "Ayşe Yılmaz", { q1: "A", q2: "B" }, 15),
-      createStudent("102", "Mehmet Kaya", { q1: "A", q2: "C" }, 13)
+      createStudent("DEMO-001", "Örnek Kayıt A", { q1: "A", q2: "B" }, 15),
+      createStudent("DEMO-002", "Örnek Kayıt B", { q1: "A", q2: "C" }, 13)
     ],
     tables: [createTable()],
     images: [createImage()],
@@ -1088,8 +1088,8 @@
     },
     extractStudents() {
       return [
-        createStudent("101", "Ayşe Yılmaz", { q1: "A", q2: "B" }, 15),
-        createStudent("102", "Mehmet Kaya", { q1: "A", q2: "C" }, 13)
+        createStudent("DEMO-001", "Örnek Kayıt A", { q1: "A", q2: "B" }, 15),
+        createStudent("DEMO-002", "Örnek Kayıt B", { q1: "A", q2: "C" }, 13)
       ];
     },
     extractTables() {
@@ -1359,15 +1359,15 @@
     const answerKey = questions.map((question, index) => ({ questionId: question.id, correctAnswer: index % 2 === 0 ? "A" : "B", confidence: 0.9 }));
     const students = [
       {
-        studentNo: "101",
-        fullName: "Ayşe Yılmaz",
+        studentNo: "DEMO-001",
+        fullName: "Örnek Kayıt A",
         answers: Object.fromEntries(questions.map((question, index) => [question.id, index % 2 === 0 ? "A" : "B"])),
         totalScore: 88,
         confidence: 0.9
       },
       {
-        studentNo: "102",
-        fullName: "Mehmet Kaya",
+        studentNo: "DEMO-002",
+        fullName: "Örnek Kayıt B",
         answers: Object.fromEntries(questions.map((question, index) => [question.id, index % 3 === 0 ? "A" : "C"])),
         totalScore: 72,
         confidence: 0.87
@@ -2396,6 +2396,11 @@ const fileUploadBridge = (() => {
     const languageAssessmentField = document.querySelector("[data-language-assessment-field]");
     const componentWeightNote = document.querySelector("[data-component-weight-note]");
     const programDataStatus = document.querySelector("[data-program-data-status]");
+    const generalReportMerger = document.querySelector("[data-general-report-merger]");
+    const generalReportStatus = document.querySelector("[data-general-report-status]");
+    const mergeGeneralReportsButton = document.querySelector("[data-merge-general-reports]");
+    const generalReportInputs = Array.from(document.querySelectorAll("[data-general-report-file]"));
+    const standardDataEntryItems = Array.from(document.querySelectorAll("[data-standard-data-entry]"));
     const contextStatus = document.querySelector("[data-context-status]");
     const saveGroupButton = document.querySelector("[data-save-current-group]");
     const addGroupButton = document.querySelector("[data-add-image-group]");
@@ -2418,6 +2423,7 @@ const fileUploadBridge = (() => {
     let savedGroups = [];
     let currentGroupNumber = 1;
     let finalReviewMode = false;
+    const generalReportFiles = { written: null, listening: null, speaking: null };
     const reportRuntime = window.MAHIRReportRuntime = window.MAHIRReportRuntime || {};
     const componentLabels = {
       written: "Yazılı Sınav",
@@ -2632,8 +2638,10 @@ const fileUploadBridge = (() => {
       const profileId = currentProfileId();
       const profile = profiles[profileId];
       const enabled = Boolean(profile);
+      const generalMode = enabled && component === "general";
       if (languageAssessmentField) languageAssessmentField.hidden = !enabled;
       if (assessmentComponent && !enabled) assessmentComponent.value = "written";
+      updateGeneralReportMode(generalMode, profile);
       if (!componentWeightNote) return;
       componentWeightNote.hidden = !enabled;
       if (!enabled) {
@@ -2892,6 +2900,7 @@ const fileUploadBridge = (() => {
     });
 
     const updateStructureStatus = () => {
+      if ((assessmentComponent?.value || "written") === "general") return true;
       const questions = currentQuestionConfiguration();
       const total = questions.reduce((sum, question) => sum + question.maxScore, 0);
       if (scoreTotal) scoreTotal.textContent = `Toplam puan: ${total.toLocaleString("tr-TR")}`;
@@ -3125,6 +3134,10 @@ const fileUploadBridge = (() => {
       const templateCard = document.querySelector("[data-template-card]");
       const ocrGuidance = document.querySelector("[data-ocr-guidance]");
       const dropzone = document.querySelector("[data-upload-dropzone]");
+      if ((assessmentComponent?.value || "written") === "general") {
+        standardDataEntryItems.forEach((item) => { item.hidden = true; });
+        return;
+      }
       templateCard?.toggleAttribute("hidden", mode !== "template");
       ocrGuidance?.toggleAttribute("hidden", mode !== "images");
       dropzone?.toggleAttribute("hidden", mode === "manual");
@@ -3593,6 +3606,70 @@ const fileUploadBridge = (() => {
       window.MAHIRReportExport?.syncOutputHeader(reportScreen);
     };
 
+    const mergeGeneralReports = () => {
+      if (!mergeGeneralReportsButton || Object.values(generalReportFiles).some((file) => !file)) return;
+      const formData = new FormData();
+      Object.entries(generalReportFiles).forEach(([component, file]) => {
+        formData.append("analysis-report", file, `${component}-${file.name}`);
+      });
+      mergeGeneralReportsButton.disabled = true;
+      mergeGeneralReportsButton.setAttribute("aria-disabled", "true");
+      mergeGeneralReportsButton.textContent = "Raporlar Doğrulanıyor…";
+      setGeneralReportStatus("Raporların ders, sınıf/şube, dönem ve bileşen bilgileri doğrulanıyor.");
+
+      const mergeQuery = new URLSearchParams({ course: currentCourseName(), grade: currentGrade() });
+      fetch(`/mahir-merge-reports?${mergeQuery}`, { method: "POST", body: formData })
+        .then((response) => response.json().catch(() => ({})).then((payload) => ({ response, payload })))
+        .then(({ response, payload }) => {
+          if (!response.ok) throw new Error(payload.message || "Analiz raporları birleştirilemedi.");
+          const exam = payload.exam || {};
+          const analysis = payload.analysis || {};
+          structuredData = {
+            exam,
+            questions: [],
+            students: [],
+            warnings: [],
+            summary: analysis.summary || {}
+          };
+          reportRuntime.structuredData = structuredData;
+          reportRuntime.exam = exam;
+          reportRuntime.analysis = analysis;
+          populateContextFields(exam);
+          renderAnalysis(analysis);
+          screenManager.approveData();
+
+          const analysisProgress = document.querySelector("#analysis-screen .analysis-progress");
+          const analysisTitle = analysisProgress?.querySelector("h3");
+          const analysisSteps = analysisProgress?.querySelector("ol");
+          if (analysisTitle) analysisTitle.textContent = "Genel Değerlendirme Özeti";
+          if (analysisSteps) {
+            analysisSteps.replaceChildren();
+            [
+              "Yazılı sınav analiz raporu doğrulandı.",
+              "Dinleme/izleme sınavı analiz raporu doğrulandı.",
+              "Konuşma sınavı analiz raporu doğrulandı.",
+              "Ders, sınıf/şube, dönem ve okul bilgileri eşleştirildi.",
+              "Bileşenler dersin resmî ağırlıklarına göre birleştirildi.",
+              "Öğrenme çıktıları kendi bileşenlerindeki gerçekleşme düzeyleri korunarak raporlandı."
+            ].forEach((text) => {
+              const item = document.createElement("li");
+              item.textContent = text;
+              analysisSteps.append(item);
+            });
+          }
+          const returnToApproved = document.querySelector("[data-return-to-approved-data]");
+          if (returnToApproved) returnToApproved.hidden = true;
+          setGeneralReportStatus(payload.message, "success");
+          screenManager.showScreen("analysis-screen");
+        })
+        .catch((error) => setGeneralReportStatus(error.message, "error"))
+        .finally(() => {
+          mergeGeneralReportsButton.disabled = false;
+          mergeGeneralReportsButton.setAttribute("aria-disabled", "false");
+          mergeGeneralReportsButton.textContent = "Raporları Doğrula ve Birleştir";
+        });
+    };
+
     const analyzeApprovedData = () => {
       const approvalButton = confirmFinalButton;
       if (!structuredData || !approvalButton) return;
@@ -3740,6 +3817,15 @@ const fileUploadBridge = (() => {
       if (!event.target.closest("[data-outcome-combobox]")) closeOtherOutcomeComboboxes(null);
     });
     assessmentComponent?.addEventListener("change", updateComponentNote);
+    generalReportInputs.forEach((input) => input.addEventListener("change", () => {
+      const component = input.dataset.generalReportFile;
+      const file = input.files?.[0] || null;
+      generalReportFiles[component] = file;
+      const status = document.querySelector(`[data-general-report-file-status="${component}"]`);
+      if (status) status.textContent = file ? file.name : "Rapor seçilmedi.";
+      refreshGeneralReportFiles();
+    }));
+    mergeGeneralReportsButton?.addEventListener("click", mergeGeneralReports);
     document.addEventListener("mahir:preparation-context-changed", () => {
       updateComponentNote();
       loadLearningOutcomes();
@@ -3772,6 +3858,7 @@ const fileUploadBridge = (() => {
       refreshContextStatus();
       window.MAHIRReportExport?.syncOutputHeader(document.querySelector("#report-screen"));
     });
+    configureSourceMode(document.querySelector('[data-source-option]:checked')?.value || "images");
     updateComponentNote();
     loadLearningOutcomes();
     populateContextFields();
@@ -3793,7 +3880,6 @@ const fileUploadBridge = (() => {
     dropzone?.addEventListener("drop", (event) => {
       if (event.dataTransfer?.files?.length) selectFiles(event.dataTransfer.files);
     });
-    configureSourceMode(document.querySelector('[data-source-option]:checked')?.value || "images");
   };
 
   return { init };

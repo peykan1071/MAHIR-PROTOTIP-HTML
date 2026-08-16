@@ -113,6 +113,7 @@ def build_general_evaluation(
         }
 
     component_scores: dict[str, dict[str, float]] = {}
+    component_results: dict[str, dict[str, float | str]] = {}
     skill_evidence: list[dict[str, Any]] = []
     for component in REQUIRED_COMPONENTS:
         analysis = component_analyses[component]
@@ -122,26 +123,85 @@ def build_general_evaluation(
             for student in students
             if student.get("studentRef") not in (None, "")
         }
+        raw_average = (analysis.get("summary") or {}).get("classAverage")
+        if raw_average in (None, "") and component_scores[component]:
+            raw_average = sum(component_scores[component].values()) / len(component_scores[component])
+        try:
+            class_average = float(raw_average)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"{COMPONENT_LABELS[component]} raporunda sınıf ortalaması bulunamadı.") from error
+        weight = profile.weights[component]
+        component_results[component] = {
+            "componentType": component,
+            "componentLabel": COMPONENT_LABELS[component],
+            "classAverage": round(class_average, 2),
+            "weight": weight,
+            "weightedContribution": round(class_average * weight, 2),
+            "maximumContribution": round(100 * weight, 2),
+        }
         for outcome in analysis.get("outcomes") or []:
+            realization_rate = float(outcome.get("realizationRate", outcome.get("successRate", 0.0)))
             skill_evidence.append(
                 {
                     "componentType": component,
                     "componentLabel": COMPONENT_LABELS[component],
                     "learningOutcomeCode": outcome.get("outcomeCode", ""),
+                    "learningOutcomeTheme": outcome.get("outcomeTheme", ""),
+                    "learningOutcomeDescription": outcome.get("outcomeDescription", ""),
                     "fieldSkill": outcome.get("outcomeSkill", ""),
-                    "realizationRate": outcome.get("realizationRate", outcome.get("successRate", 0.0)),
+                    "realizationRate": realization_rate,
+                    "componentWeight": weight,
+                    "weightedContribution": round(realization_rate * weight, 4),
                     "developmentLevel": outcome.get("developmentLevel", outcome.get("category", "")),
+                    "decision": outcome.get("decision", ""),
                 }
             )
 
-    composite = calculate_composite_scores(profile_id, component_scores)
+    weighted_class_average = round(
+        sum(float(item["weightedContribution"]) for item in component_results.values()), 2
+    )
+    has_student_scores = all(component_scores[component] for component in REQUIRED_COMPONENTS)
+    composite = calculate_composite_scores(profile_id, component_scores) if has_student_scores else {
+        "profileId": profile.id,
+        "profileTitle": profile.title,
+        "complete": True,
+        "weights": profile.weights,
+        "missingComponents": [],
+        "missingComponentLabels": [],
+        "studentScores": {},
+        "classAverage": weighted_class_average,
+    }
     return {
         **composite,
         "assessmentScope": "language-composite",
+        "summary": {
+            "classAverage": weighted_class_average,
+            "classSuccessRate": weighted_class_average / 100,
+            "componentCount": len(REQUIRED_COMPONENTS),
+        },
+        "componentResults": component_results,
         "componentEvidence": skill_evidence,
+        "outcomes": [
+            {
+                "outcomeCode": item["learningOutcomeCode"],
+                "outcomeTheme": item["learningOutcomeTheme"],
+                "outcomeDescription": item["learningOutcomeDescription"],
+                "outcomeSkill": item["fieldSkill"],
+                "successRate": item["realizationRate"],
+                "category": item["developmentLevel"],
+                "decision": item["decision"],
+                "componentType": item["componentType"],
+                "componentLabel": item["componentLabel"],
+                "componentWeight": item["componentWeight"],
+                "weightedContribution": item["weightedContribution"],
+            }
+            for item in skill_evidence
+        ],
+        "questions": [],
         "notice": (
-            "Ağırlıklı sonuç sayısal değerlendirme sonucunu; bileşen kanıtları ise "
-            "öğrenme çıktılarının gerçekleşme düzeyi ile gelişmiş ve desteklenmesi gereken becerileri gösterir."
+            "Ağırlıklı sonuç sınıf düzeyindeki genel değerlendirmeyi; bileşen kanıtları ise "
+            "öğrenme çıktılarının kendi sınavlarındaki gerçekleşme düzeyini gösterir. "
+            "Bu rapor öğrenci bazlı e-Okul puanı hesaplamaz."
         ),
     }
 
@@ -188,3 +248,4 @@ def calculate_composite_scores(
         "studentScores": student_scores,
         "classAverage": round(sum(student_scores.values()) / len(student_scores), 2),
     }
+
