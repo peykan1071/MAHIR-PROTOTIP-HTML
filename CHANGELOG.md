@@ -2,6 +2,31 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Teşhis Prompt'u: Bloom Kaldırıldı, Müfredata Demirlendi - 2026-08-16
+
+- **Bloom taksonomisi tamamen kaldırıldı.** Gerekçe ölçüldü: sekiz yanıtın **tamamı** Bloom cümlesiyle açılıyor ("Bu kazanımın bilişsel düzeyi Uygulama ve %55..."), yanıt başına 2-8 kez basamak adı geçiyordu. Buna karşılık **temanın adı 0/8 yanıtta** geçiyor, yalnız 2/8 yanıt müfredattan somut bir öğe anıyordu. Yani getirim kusursuz çalışırken (8/8 kaynak dolu) model, ona **zaten söylediğimiz** şeyi (düzey, oran, şiddet) tekrarlıyor; yalnızca getirimin bilebileceği şeyi - o temanın müfredat metnini - kullanmıyordu.
+- **Teşhisin yeni ekseni: BAĞLAM'a demirleme.** Yanıt artık tema adını tırnak içinde anarak başlamak ve BAĞLAM'dan en az iki somut öğeyi daha (süreç bileşeni, beceri, kavram, metin türü) adıyla anmak zorunda. "Her kazanım için yazılabilecek" genel teşhisler açıkça başarısız sayılıyor.
+- **Sonuç (canlı, sıcak konteyner, 4 tema x 2 oran):**
+
+  | Ölçüt | Önce | Sonra |
+  |---|---|---|
+  | Tema adı yanıtta geçiyor | 0/8 | **7-8/8** |
+  | Somut müfredat öğesi anılıyor | 2/8 | **7-8/8** |
+  | Bloom sözcüğü geçiyor | 8/8 | **0/8** |
+  | Dolgu ("belirli/genellikle/bazı") | 14 kez | **0** |
+  | Ortalama uzunluk | 96 kelime | **66-71 kelime** |
+
+  Korunması şart olan ölçütler bozulmadı: 8/8 dolu, 8/8 doğru şiddet, 0 öneri sızıntısı, 0 reddetme ön eki.
+- Teşhisler artık temaya özgü: "olay, kişi, mekân, zaman gibi yapı unsurlarını tahlil edebilme", "'örtük iletiyi belirme' ve 'metinleri karşılaştırma'", "hikâye ve gezi yazısı türleri", "roman ve tiyatro metinlerinde kelime zenginliği ve üslup özellikleri" gibi müfredatın kendi terimleriyle yazılıyor.
+- **Ölçümde yakalanan üç hata, üçü de düzeltildi ve testle sabitlendi:**
+  - **Örnek sızıntısı:** açılış kuralı önce somut bir örnekle yazılmıştı ("ör. 'Sözün İnceliği' temasında..."); model örneği kopyaladı ve **4. Tema kazanımlarına 1. Tema'nın adıyla başladı** - öğretmene başka bir temanın teşhisini doğruymuş gibi gösteren, hiç tema yazmamaktan kötü bir hata. Prompt'ta kopyalanabilir somut tema adı bırakılmadı.
+  - **Uydurma kazanım kodu:** model sarmal risk cümlesinde var olmayan kodlar üretiyordu; artık yalnızca BAĞLAM'da veya SORU'da geçen kod yazılabiliyor.
+  - **Etkinlik adlandırma:** model öneri kipi kullanmadan "gerekli olan ... analiz **etkinliklerine**" yazabiliyordu. `charter_guard` bunu yakalamıyor çünkü "gerekli olan"ı bilerek koruyor (teşhis dili). Regex genişletmek yerine prompt'ta yapılacak-iş adları yasaklandı.
+- Bloom altyapısı (`_BLOOM_LEVELS_BY_VERB`, `_bloom_level_for`, artık kullanılmayan `_TURKISH_LOWER_MAP`) silindi; `_build_rag_question` bilişsel düzey enjeksiyonu yerine müfredata demirlemeyi istiyor. Şiddet etiketi mekanizması **aynen korundu** - ölçümde 8/8 doğruydu.
+- **Bu değişiklik için `modal deploy` gerekmedi:** canlı teşhis yolu Faz 3'ten beri system prompt'u istemciden gönderiyor (`agents/prompts.py`). `rag_service.SYSTEM_PROMPT` yalnızca eski `queries` biçiminde kullanılıyor ve hizada tutulmak için birlikte güncellendi (drift testi koruyor).
+- Ölçüm betiğindeki bir yanlış pozitif de düzeltildi: çıplak "gerekli" araması, `charter_guard`ın bilerek koruduğu teşhis dilini ("karşılaştırmak için gerekli kavramların yetersiz öğrenilmesi") sızıntı sanıyor ve her koşuda gerçek sızıntıyı görünmez yapıyordu.
+- Yeni testler: prompt sözleşmesi (Bloom yok, demirleme zorunlu, dolgu yasak, uzunluk sınırı, örnek tema adı yok, kod uydurma yasak, etkinlik adlandırma yasak) ve `_build_rag_question` davranışı. Toplam 167 → 176 Python testi.
+
 ## OCR ve Analiz İşlemlerinde Süre Ölçümü - 2026-08-16
 
 - İki uzun işlem (belge okuma ve "Verileri Onayla ve Analize Geç") sessizdi: öğretmen butona basıp bekliyor, ne kadar beklediği hiçbir yere yazılmıyordu. Artık ikisinin de başında ve sonunda süre alınıyor; sonuç **ekranda** (bildirim cümlesinin sonunda), **tarayıcı konsolunda** ve **yerel sunucu konsolunda** görünüyor.

@@ -278,8 +278,8 @@ def _decision(rate: float) -> str:
 # bu iş ajanın kendisine geçti - prompt'lar `pipeline.py::_enqueue_diagnosis_prompts`
 # ile kuyruğa yazılıyor, yanıtlar `PedagogicalAnalysisAgent.apply_llm` içinde
 # aynı sonrası-işlemeden geçiyor. Aşağıdaki yardımcılar (`_build_rag_question`,
-# `_build_rag_retrieval_query`, `_normalize_theme_for_rag`, `_bloom_level_for`)
-# hâlâ oradan çağrılıyor, bu yüzden burada duruyorlar.
+# `_build_rag_retrieval_query`, `_normalize_theme_for_rag`) hâlâ oradan
+# çağrılıyor, bu yüzden burada duruyorlar.
 
 
 
@@ -289,9 +289,6 @@ def _decision(rate: float) -> str:
 # bu yüzden yalnızca burada, sınavın karışık-case "outcomeTheme" alanını o
 # etikete eşleştirmek için Türkçe-doğru büyütme uygulanıyor.
 _TURKISH_UPPER_MAP = str.maketrans({"i": "İ", "ı": "I"})
-# Ters yön: str.lower() "İ" için birleşik noktalı bir "i̇" üretip fiil
-# eşleşmesini bozuyor (bkz. _bloom_level_for).
-_TURKISH_LOWER_MAP = str.maketrans({"İ": "i", "I": "ı"})
 
 
 def _normalize_theme_for_rag(raw_theme: str) -> str:
@@ -331,32 +328,14 @@ def _outcome_identity_parts(outcome: dict[str, Any]) -> list[str]:
     ]
 
 
-# TDE9 kataloğundaki (shared/pilot/tde9/learning-outcomes-template.json) 55
-# kazanımın TAMAMI yalnızca şu beş fiille bitiyor: oluşturabilme (17),
-# yönetebilme (16), yansıtabilme (10), uygulayabilme (8), çözümleyebilme (4).
-# Küme kapalı ve küçük olduğu için bilişsel basamağı modele tahmin ettirmek
-# yerine burada, tek ve gözden geçirilebilir bir yerde sabitliyoruz: canlı
-# ölçümde model kazanım fiilinin kendisini ("Yönetebilme") basamak adı sanıp
-# "altı Bloom basamağından en yüksek düzey" diye niteleyebiliyordu. Eşleşme
-# bulunamazsa (yeni bir ders/program eklendiğinde) alan hiç gönderilmez ve
-# basamağı model kendi seçer - eski davranış korunur.
-_BLOOM_LEVELS_BY_VERB = (
-    ("çözümleyebilme", "Analiz"),        # tahlil etme, ögeler arası ilişki kurma
-    ("yansıtabilme", "Değerlendirme"),   # öğrendiğini gözden geçirme, öz değerlendirme
-    ("yönetebilme", "Uygulama"),         # strateji seçip süreci izleme/denetleme
-    ("uygulayabilme", "Uygulama"),
-    ("oluşturabilme", "Anlama"),         # metinden anlam kurma, yorumlama, çıkarım
-)
-
-
-def _bloom_level_for(description: str) -> str:
-    """Kazanım metnindeki fiilden Bloom basamağını çöz; bulunamazsa boş string."""
-
-    lowered = description.translate(_TURKISH_LOWER_MAP).lower()
-    for verb, level in _BLOOM_LEVELS_BY_VERB:
-        if verb in lowered:
-            return level
-    return ""
+# Burada bir `_BLOOM_LEVELS_BY_VERB` haritası ve `_bloom_level_for` vardı:
+# kazanım fiilinden Bloom basamağını çözüp prompt'a gömüyorlardı. Bloom analizi
+# tamamen kaldırıldı çünkü ölçüm, teşhisin değerini AZALTTIĞINI gösterdi -
+# sekiz yanıtın tamamı Bloom cümlesiyle açılıyor, yanıt başına 2-8 kez basamak
+# adı geçiyor, buna karşılık temanın adı 0/8 yanıtta geçiyor ve yalnız 2/8
+# yanıt müfredattan somut bir öğe anıyordu. Model, ona zaten söylediğimiz şeyi
+# tekrarlamaya harcanıyordu. Teşhisin yeni ekseni müfredata demirleme
+# (bkz. rag_service.py::SYSTEM_PROMPT madde 2).
 
 
 def _build_rag_retrieval_query(outcome: dict[str, Any]) -> str:
@@ -371,11 +350,17 @@ def _build_rag_retrieval_query(outcome: dict[str, Any]) -> str:
 
 def _build_rag_question(outcome: dict[str, Any]) -> str:
     """LLM'e sorulan soru (getirim sorgusu değil - o `_build_rag_retrieval_query`).
-    Kazanımın kimliğine ek olarak gerçek başarı oranını da taşır ki
-    rag_service.py'nin SYSTEM_PROMPT'u kazanımın Bloom bilişsel düzeyini bu
-    oranla kıyaslayabilsin. Kasıtlı olarak TEŞHİS ister, asla "bu nasıl
-    öğretilmeli" demez - MAHİR etkinlik, yöntem veya telafi programı önermez
-    (DEVELOPMENT_CHARTER.md); bu kısıtın fiilen uygulandığı yer bu ifade."""
+
+    Kazanımın kimliğine ek olarak gerçek başarı oranını ve şiddet etiketini
+    taşır. Kapanış emri KASITLI olarak müfredata demirlemeyi istiyor: eskiden
+    "bilişsel düzeyini bu oranla kıyaslayarak teşhis et" diyordu ve model
+    yanıtın tamamını o kıyasa harcayıp getirilen müfredat metnine hiç
+    dokunmuyordu (ölçüldü: tema adı 0/8 yanıtta geçiyordu).
+
+    Kasıtlı olarak TEŞHİS ister, asla "bu nasıl öğretilmeli" demez - MAHİR
+    etkinlik, yöntem veya telafi programı önermez (DEVELOPMENT_CHARTER.md);
+    bu kısıtın fiilen uygulandığı yer bu ifade.
+    """
 
     parts = _outcome_identity_parts(outcome)
     if not parts:
@@ -384,14 +369,14 @@ def _build_rag_question(outcome: dict[str, Any]) -> str:
     percent_text = f"%{round(success_rate * 100)}"
     # Şiddet etiketi eşiğe dayalı, tamamen belirlenimci bir karar - modele
     # bıraktığımızda %55'lik vakaların yarısına "Kritik" dediği ölçüldü.
-    # Burada hesaplayıp soruya gömüyoruz; rag_service.py'nin SYSTEM_PROMPT'u
-    # (madde 4) bu etiketi aynen kullanmakla yükümlü.
+    # Burada hesaplayıp soruya gömüyoruz; SYSTEM_PROMPT (madde 4) bu etiketi
+    # aynen kullanmakla yükümlü.
     severity = "Kritik" if success_rate < _RAG_CRITICAL_THRESHOLD else "Orta"
-    bloom_level = _bloom_level_for(" ".join(parts))
-    bloom_text = f"Bu kazanımın bilişsel düzeyi: {bloom_level}. " if bloom_level else ""
     return (
         f"{' - '.join(parts)} öğrenme çıktısında öğrenciler {percent_text} "
-        f"başarı oranı gösterdi. {bloom_text}"
+        f"başarı oranı gösterdi. "
         f"Bu oran için şiddet etiketi: {severity}. "
-        "Bu kazanımın bilişsel düzeyini bu başarı oranıyla kıyaslayarak teşhis et."
+        "BAĞLAM'daki öğretim programı metninin bu kazanım için öngördüğü "
+        "somut içerik ve bileşenleri adıyla anarak, bu başarı oranının hangi "
+        "bileşende tıkandığını teşhis et."
     )

@@ -4,7 +4,6 @@ import unittest
 from unittest.mock import patch
 
 from backend.app.approved_data_analyzer import (
-    _bloom_level_for,
     _build_rag_question,
     _build_rag_retrieval_query,
     _normalize_theme_for_rag,
@@ -446,53 +445,64 @@ class RecommendationStrippingTests(unittest.TestCase):
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
 
-class BloomLevelTests(unittest.TestCase):
-    # TDE9 kataloğundaki 55 kazanımın tamamı beş fiilden biriyle bitiyor;
-    # basamağı modele bıraktığımızda fiilin kendisini basamak adı sanıyordu.
-    def test_each_catalog_verb_maps_to_a_bloom_step(self):
-        cases = {
-            "metinlerde anlam oluşturabilme": "Anlama",
-            "metinlerde okumayı yönetebilme": "Uygulama",
-            "öğrendiklerini yansıtabilme": "Değerlendirme",
-            "yazım kurallarını uygulayabilme": "Uygulama",
-            "metinleri çözümleyebilme": "Analiz",
-        }
-        for description, expected in cases.items():
-            with self.subTest(description=description):
-                self.assertEqual(_bloom_level_for(description), expected)
+class NoBloomTests(unittest.TestCase):
+    """Bloom taksonomisi kaldırıldı; geri sızmadığını yapısal olarak koruyoruz.
 
-    def test_capitalised_turkish_verb_still_matches(self):
-        # str.lower() "İ" için birleşik noktalı bir karakter üretiyor.
-        self.assertEqual(_bloom_level_for("METİNLERDE ANLAM OLUŞTURABİLME"), "Anlama")
+    Neden kaldırıldı: canlı ölçümde sekiz yanıtın TAMAMI Bloom cümlesiyle
+    açılıyor, yanıt başına 2-8 kez basamak adı geçiyor, buna karşılık temanın
+    adı 0/8 yanıtta geçiyor ve yalnız 2/8 yanıt müfredattan somut bir öğe
+    anıyordu. Model, ona zaten söylediğimiz şeyi tekrarlamaya harcanıyordu.
+    """
 
-    def test_unknown_verb_yields_empty_and_question_omits_the_field(self):
-        self.assertEqual(_bloom_level_for("bir şeyler yapar"), "")
-        question = _build_rag_question({
-            "outcomeTheme": "1. Tema: Sözün İnceliği",
-            "outcomeCode": "XYZ1.1",
-            "outcomeDescription": "bir şeyler yapar",
-            "successRate": 0.4,
-        })
-        self.assertNotIn("bilişsel düzeyi:", question)
-        self.assertIn("şiddet etiketi: Kritik", question)
-
-    def test_known_verb_is_injected_into_question(self):
-        question = _build_rag_question({
+    def _question(self, description="metinlerde anlam oluşturabilme", rate=0.4):
+        return _build_rag_question({
             "outcomeTheme": "1. Tema: Sözün İnceliği",
             "outcomeCode": "TDE1.2",
-            "outcomeDescription": "metinlerde anlam oluşturabilme",
-            "successRate": 0.4,
+            "outcomeDescription": description,
+            "successRate": rate,
         })
-        self.assertIn("Bu kazanımın bilişsel düzeyi: Anlama.", question)
 
-    def test_bloom_level_is_absent_from_retrieval_query(self):
+    def test_question_no_longer_injects_a_cognitive_level(self):
+        for description in (
+            "metinlerde anlam oluşturabilme",
+            "metinleri çözümleyebilme",
+            "öğrendiklerini yansıtabilme",
+            "bir şeyler yapar",
+        ):
+            with self.subTest(description=description):
+                question = self._question(description)
+                self.assertNotIn("bilişsel düzey", question)
+                self.assertNotIn("Bloom", question)
+
+    def test_question_still_carries_the_severity_label(self):
+        # Şiddet mekanizması ölçümde 8/8 doğruydu - Bloom'la birlikte gitmemeli.
+        self.assertIn("şiddet etiketi: Kritik", self._question(rate=0.4))
+        self.assertIn("şiddet etiketi: Orta", self._question(rate=0.6))
+
+    def test_question_asks_for_curriculum_grounding(self):
+        # Eski kapanış emri modelin yanıtı bilişsel kıyasa harcamasına yol
+        # açıyordu; yenisi getirilen müfredat metnine demirlemeyi istiyor.
+        question = self._question()
+        self.assertIn("BAĞLAM", question)
+        self.assertIn("adıyla anarak", question)
+
+    def test_bloom_helpers_are_gone_for_good(self):
+        # Yardımcı geri gelirse prompt'a da geri sızması an meselesi.
+        import backend.app.approved_data_analyzer as analyzer
+
+        self.assertFalse(hasattr(analyzer, "_bloom_level_for"))
+        self.assertFalse(hasattr(analyzer, "_BLOOM_LEVELS_BY_VERB"))
+
+    def test_retrieval_query_stays_free_of_instruction_text(self):
         retrieval_query = _build_rag_retrieval_query({
             "outcomeTheme": "1. Tema: Sözün İnceliği",
             "outcomeCode": "TDE1.2",
             "outcomeDescription": "metinlerde anlam oluşturabilme",
             "successRate": 0.4,
         })
-        self.assertNotIn("bilişsel düzeyi:", retrieval_query)
+        self.assertNotIn("bilişsel düzey", retrieval_query)
+        self.assertNotIn("şiddet etiketi", retrieval_query)
+        self.assertNotIn("BAĞLAM", retrieval_query)
 
 
 class RagQuestionSeverityTests(unittest.TestCase):

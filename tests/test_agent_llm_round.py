@@ -267,5 +267,79 @@ class PromptDriftTests(unittest.TestCase):
         self.assertEqual(prompts.DIAGNOSIS_SYSTEM_PROMPT, rag_service.SYSTEM_PROMPT)
 
 
+class DiagnosisPromptContractTests(unittest.TestCase):
+    """Teşhis prompt'unun taşıması ve TAŞIMAMASI gerekenler.
+
+    Prompt metni üretim davranışının kendisi: canlı ölçüm olmadan kalitesi
+    doğrulanamaz ama sözleşmesi doğrulanabilir. Buradaki testler, ölçümle
+    kazanılmış kararların bir sonraki düzenlemede sessizce geri alınmasını
+    engelliyor.
+    """
+
+    PROMPT = prompts.DIAGNOSIS_SYSTEM_PROMPT
+
+    def test_bloom_taxonomy_is_gone(self):
+        # Kaldırma gerekçesi ölçüldü: 8/8 yanıt Bloom cümlesiyle açılıyordu,
+        # tema adı 0/8 yanıtta geçiyordu.
+        for term in ("Bloom", "bilişsel düzey", "basamak", "Hatırlama", "Yaratma"):
+            with self.subTest(term=term):
+                self.assertNotIn(term, self.PROMPT)
+
+    def test_grounding_is_required_not_suggested(self):
+        # Teşhisi değerli kılan tek şey: yalnız getirimin bilebileceği içeriği
+        # kullanması. İstek "yapabilirsin" değil, ZORUNLULUK olmalı.
+        self.assertIn("DEMİRLE", self.PROMPT)
+        self.assertIn("ZORUNDA", self.PROMPT)
+        self.assertIn("BAŞARISIZ sayılır", self.PROMPT)
+
+    def test_filler_words_are_banned(self):
+        # Ölçüm: "belirli" 14 kez, 8 yanıtın 4'ünde.
+        for word in ("belirli", "genellikle", "bazı", "birtakım"):
+            with self.subTest(word=word):
+                self.assertIn(f'"{word}"', self.PROMPT)
+
+    def test_length_budget_is_stated_as_a_hard_cap(self):
+        # İlk sürüm "40-70 kelime" diyordu ve 8 yanıtın 3'ü 73-75 kelimeye
+        # çıktı; sınırın katı olduğunu söylemek gerekiyor.
+        self.assertIn("EN ÇOK 70 KELİME", self.PROMPT)
+        self.assertIn("40 kelimenin altına da düşme", self.PROMPT)
+
+    def test_theme_name_must_open_the_answer(self):
+        # Ölçüm: demirleme zorunluluğu tek başına tema adını yanıta sokmadı
+        # (2/8). Açılışı şart koşunca 7-8/8'e çıktı.
+        self.assertIn("tema adını tırnak içinde YAZARAK başla", self.PROMPT)
+        self.assertIn("SORU'dan birebir kopyala", self.PROMPT)
+
+    def test_prompt_gives_no_theme_name_as_an_example(self):
+        # BU BİR HATA KAYDIDIR. Açılış kuralı önce örnekle yazılmıştı
+        # (ör. "'Sözün İnceliği' temasında..."); model örneği KOPYALADI ve
+        # 4. Tema kazanımlarına "'Sözün İnceliği' temasında" diye başladı -
+        # yani öğretmene BAŞKA bir temanın teşhisini doğruymuş gibi gösterdi.
+        # Prompt'ta kopyalanabilir somut bir tema adı bulunmamalı.
+        for theme in ("Sözün İnceliği", "Anlam Arayışı", "Anlamın Yapı Taşları", "Dilin Zenginliği"):
+            with self.subTest(theme=theme):
+                self.assertNotIn(theme, self.PROMPT)
+
+    def test_inventing_outcome_codes_is_forbidden(self):
+        # Ölçümde model sarmal risk cümlesinde var olmayan kodlar üretti
+        # (ör. teşhis ettiği kazanımı "gelecekteki kazanım" diye andı).
+        self.assertIn("kod UYDURMA", self.PROMPT)
+
+    def test_activity_names_are_banned_not_just_recommendations(self):
+        # Charter süzgeci "gerekli olan"ı bilerek koruyor (teşhis dili), ama
+        # ölçümde model "gerekli olan ... analiz ETKİNLİKLERİNE" yazdı: öneri
+        # kipi olmadan etkinlik ADLANDIRMAK da charter ihlali.
+        self.assertIn("YAPILACAK İŞ", self.PROMPT)
+        self.assertIn("ne önererek ne de betimleyerek", self.PROMPT)
+
+    def test_measured_mechanisms_survived(self):
+        # Bunlar ölçümde çalışıyordu (8/8 doğru şiddet, 0 öneri sızıntısı);
+        # prompt yeniden yazılırken düşmemeleri şart.
+        self.assertIn("Eksikliğin şiddeti: <etiket>.", self.PROMPT)
+        self.assertIn("Bu bilgi belgede bulunmuyor.", self.PROMPT)
+        self.assertIn("ÇÖZÜM ÖNERME", self.PROMPT)
+        self.assertIn("tek akıcı paragraf", self.PROMPT)
+
+
 if __name__ == "__main__":
     unittest.main()
