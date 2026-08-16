@@ -444,6 +444,20 @@
             <aside class="privacy-notice" aria-label="Kişisel veri koruma bilgisi">
               <strong>KVKK veri minimizasyonu:</strong> Ad-soyad ve T.C. kimlik numarası analiz için kullanılmaz. Okul numarası yalnız öğretmen kontrol ekranında tutulur; analiz ve LLM katmanına oturumluk takma öğrenci referansı aktarılır.
             </aside>
+            <div class="validation-student-count-control" data-validation-student-count-control>
+              <div class="validation-student-count-summary">
+                <span>Beklenen öğrenci sayısı</span>
+                <strong data-validation-expected-count>0</strong>
+              </div>
+              <button class="secondary-button compact-button" type="button" data-edit-validation-student-count>Düzenle</button>
+              <div class="validation-student-count-editor" data-validation-student-count-editor hidden>
+                <label for="validation-student-count">Yeni öğrenci sayısı</label>
+                <input id="validation-student-count" type="number" min="1" max="100" step="1" data-validation-student-count-input>
+                <button class="primary-button compact-button" type="button" data-apply-validation-student-count>Uygula</button>
+                <button class="secondary-button compact-button" type="button" data-cancel-validation-student-count>Vazgeç</button>
+              </div>
+              <p class="validation-student-count-status" data-validation-student-count-status aria-live="polite"></p>
+            </div>
             <p class="notification-message document-read-guidance" data-document-read-guidance aria-live="polite" hidden></p>
             <div class="table-wrap">
               <table class="data-table">
@@ -451,6 +465,10 @@
                 <thead data-validation-student-head></thead>
                 <tbody data-validation-students></tbody>
               </table>
+            </div>
+            <div class="student-record-undo" data-student-record-undo role="status" aria-live="polite" hidden>
+              <span data-student-record-undo-message></span>
+              <button class="secondary-button compact-button" type="button" data-undo-student-record>Geri Al</button>
             </div>
             <div class="button-group student-save-actions" aria-label="Öğrenci verisi kayıt işlemi">
               <button class="secondary-button" data-component="Secondary Button" type="button" data-return-to-upload>Dosya Yükleme Aşamasına Dön</button>

@@ -51,6 +51,10 @@ assert.match(html, /data-merge-general-reports/);
 assert.match(html, /öğrenci bazlı e-Okul puanı hesaplanmaz/);
 assert.match(html, /data-scenario-guidance/);
 assert.match(html, /Yazılı sınavın dayandığı senaryo/);
+assert.match(html, /data-validation-student-count-control/);
+assert.match(html, /Beklenen öğrenci sayısı/);
+assert.match(html, /data-edit-validation-student-count>Düzenle<\/button>/);
+assert.match(html, /data-undo-student-record>Geri Al<\/button>/);
 
 assert.match(script, /if \(total === expected\) \{\s*showFinalReview\(\);\s*return;/);
 assert.match(script, /ocrGuidance\?\.toggleAttribute\("hidden", mode !== "images"\)/);
@@ -64,7 +68,7 @@ assert.match(script, /if \(returnToUploadButton\) returnToUploadButton\.hidden =
 assert.match(script, /sourceMode === "images"[\s\S]*Math\.max\(parsedStudents\.length, selectedFiles\.length \|\| 1\)[\s\S]*Math\.max\(parsedStudents\.length, expectedStudentCount\)/);
 assert.match(script, /Veriler öğretmen kontrolüne sunulmuştur\. Kaydetmeden önce otomatik kontroller çalıştırılacaktır\./);
 assert.doesNotMatch(script, /kontrol edilmesi gereken bir sorun tespit etmedi/);
-assert.match(script, /Bu gruptaki \$\{students\.length\} öğrenci kaydı henüz kaydedilmedi/);
+assert.match(script, /Bu gruptaki \$\{current\} öğrenci kaydı henüz kaydedilmedi/);
 assert.match(script, /Toplam \$\{total\}\/\$\{expected\} öğrenci kaydı korunuyor/);
 assert.doesNotMatch(script, /öğrenci kaydı daha eklenmeden analiz onayı/);
 assert.match(script, /const sourceFile = payload\.fileName \|\| selectedFiles\[payloadIndex\]\?\.name \|\| ""/);
@@ -100,6 +104,14 @@ assert.match(script, /nativeSelect\.dispatchEvent\(new Event\("change"/);
 assert.match(script, /fetch\(`\/mahir-merge-reports\?\$\{mergeQuery\}`/);
 assert.match(script, /Raporları Doğrula ve Birleştir/);
 assert.match(script, /updateGeneralReportMode/);
+assert.match(script, /const removeStudentRecord = \(row\) =>/);
+assert.match(script, /selectedFiles\.splice\(removedFileIndex, 1\)/);
+assert.match(script, /renderCurrentStudents\(students, remainingWarnings\)/);
+assert.match(script, /const undoStudentRecordRemoval = \(\) =>/);
+assert.match(script, /const applyValidationStudentCount = \(\) =>/);
+assert.match(script, /studentCountInput\.value = String\(value\)/);
+assert.match(script, /Fazla kaydı çıkarabilir veya beklenen sayıyı düzenleyebilirsiniz/);
+assert.match(script, /× Kaydı çıkar/);
 assert.doesNotMatch(script, /data-finish-data-entry/);
 assert.doesNotMatch(script, /data-return-to-data/);
 assert.match(styles, /\.post-save-card\[hidden\][\s\S]*\.final-data-review-card\[hidden\][\s\S]*display: none !important/);
@@ -112,5 +124,8 @@ assert.match(html, /MAHİR'den indirilen üç Word \(\.docx\) analiz raporu gere
 assert.match(html, /Word \(\.docx\):[\s\S]*Genel Değerlendirme ekranına yüklenebilir/);
 assert.match(html, /PDF:[\s\S]*Genel Değerlendirme ekranına yüklenemez/);
 assert.match(styles, /\.report-download-guidance[\s\S]*grid-column: 1 \/ -1/);
+assert.match(styles, /\.validation-student-count-control[\s\S]*grid-template-columns/);
+assert.match(styles, /\.student-record-remove-button[\s\S]*cursor: pointer/);
+assert.match(styles, /\.student-record-undo\[hidden\][\s\S]*display: none !important/);
 
 console.log("data-entry-flow.test.js: all assertions passed");

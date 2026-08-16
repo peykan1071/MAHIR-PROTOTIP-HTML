@@ -2406,6 +2406,13 @@ const fileUploadBridge = (() => {
     const addGroupButton = document.querySelector("[data-add-image-group]");
     const confirmFinalButton = document.querySelector("[data-confirm-final-analysis]");
     const returnToUploadButton = document.querySelector("[data-return-to-upload]");
+    const validationStudentCountControl = document.querySelector("[data-validation-student-count-control]");
+    const validationExpectedCount = document.querySelector("[data-validation-expected-count]");
+    const validationStudentCountEditor = document.querySelector("[data-validation-student-count-editor]");
+    const validationStudentCountEditorInput = document.querySelector("[data-validation-student-count-input]");
+    const validationStudentCountStatus = document.querySelector("[data-validation-student-count-status]");
+    const studentRecordUndo = document.querySelector("[data-student-record-undo]");
+    const studentRecordUndoMessage = document.querySelector("[data-student-record-undo-message]");
 
     if (!fileInput || !readButton || typeof FormData === "undefined" || typeof fetch === "undefined") {
       return;
@@ -2423,6 +2430,7 @@ const fileUploadBridge = (() => {
     let savedGroups = [];
     let currentGroupNumber = 1;
     let finalReviewMode = false;
+    let lastRemovedStudentRecord = null;
     const generalReportFiles = { written: null, listening: null, speaking: null };
     const reportRuntime = window.MAHIRReportRuntime = window.MAHIRReportRuntime || {};
     const componentLabels = {
@@ -3192,6 +3200,38 @@ const fileUploadBridge = (() => {
       });
     };
 
+    const setValidationStudentCountEditorOpen = (open) => {
+      if (!validationStudentCountEditor) return;
+      validationStudentCountEditor.hidden = !open;
+      document.querySelector("[data-edit-validation-student-count]")?.toggleAttribute("hidden", open);
+      if (open && validationStudentCountEditorInput) {
+        validationStudentCountEditorInput.value = studentCountInput?.value || "";
+        validationStudentCountEditorInput.focus();
+        validationStudentCountEditorInput.select();
+      }
+    };
+
+    const refreshValidationStudentCountStatus = () => {
+      if (finalReviewMode || validationStudentCountControl?.hidden) return;
+      const expected = Math.max(1, Number(studentCountInput?.value) || 1);
+      const saved = savedGroups.reduce((sum, group) => sum + group.students.length, 0);
+      const current = document.querySelectorAll("[data-student-row]").length;
+      const projected = saved + current;
+      if (validationExpectedCount) validationExpectedCount.textContent = String(expected);
+      if (validationStudentCountEditorInput) validationStudentCountEditorInput.value = String(expected);
+      if (validationStudentCountStatus) {
+        validationStudentCountStatus.textContent = projected === expected
+          ? `Mevcut kayıtlarla ${projected}/${expected} öğrenciye ulaşılıyor.`
+          : projected > expected
+            ? `Mevcut kayıtlar beklenen sayıyı ${projected - expected} öğrenci aşıyor. Fazla kaydı çıkarabilir veya beklenen sayıyı düzenleyebilirsiniz.`
+            : `Mevcut kayıtlarla ${projected}/${expected} öğrenciye ulaşılıyor; ${expected - projected} kayıt daha eklenebilir.`;
+        validationStudentCountStatus.classList.toggle("is-error", projected > expected);
+        validationStudentCountStatus.classList.toggle("is-success", projected === expected);
+      }
+      const approvalMessage = document.querySelector("[data-approval-message]");
+      if (approvalMessage) approvalMessage.textContent = `Bu gruptaki ${current} öğrenci kaydı henüz kaydedilmedi. Grup kaydedildiğinde toplam ${projected}/${expected} öğrenciye ulaşılacaktır.`;
+    };
+
     const renderValidationData = (data, options = {}) => {
       if (!data) return;
       finalReviewMode = Boolean(options.finalReview);
@@ -3211,6 +3251,11 @@ const fileUploadBridge = (() => {
       const documentReadGuidance = document.querySelector("[data-document-read-guidance]");
       const questions = currentQuestionConfiguration();
       const expectedStudentCount = Math.max(1, Number(studentCountInput?.value) || 1);
+      if (validationStudentCountControl) validationStudentCountControl.hidden = Boolean(options.finalReview);
+      if (validationExpectedCount) validationExpectedCount.textContent = String(expectedStudentCount);
+      setValidationStudentCountEditorOpen(false);
+      studentRecordUndo?.setAttribute("hidden", "");
+      lastRemovedStudentRecord = null;
       const privacyWarnings = [];
       const parsedStudents = (data.students || []).map((student, index) => {
         const detectedTckn = looksLikeTckn(student.studentNo);
@@ -3285,7 +3330,8 @@ const fileUploadBridge = (() => {
           ...(showSourceFile ? ["Kaynak Görsel"] : []),
           "Okul Numarası",
           ...questions.map((question) => `S${question.number}`),
-          "Toplam"
+          "Toplam",
+          ...(!options.finalReview ? ["İşlem"] : [])
         ]
           .forEach((label) => {
             const header = document.createElement("th");
@@ -3314,6 +3360,20 @@ const fileUploadBridge = (() => {
           row.append(editableCell(student.scores?.[index], `${student.rowNumber || studentIndex + 1}. satır S${question.number} puanı`, "number", "score"));
         });
         row.append(editableCell(student.totalScore, `${student.rowNumber || studentIndex + 1}. satır toplam puanı`, "number", "totalScore"));
+        if (!options.finalReview) {
+          const actionCell = document.createElement("td");
+          actionCell.className = "student-record-action-cell";
+          const removeButton = document.createElement("button");
+          removeButton.type = "button";
+          removeButton.className = "student-record-remove-button";
+          removeButton.dataset.removeStudentRecord = "";
+          const recordLabel = student.studentNo || student.sourceFile || `${studentIndex + 1}. satır`;
+          removeButton.textContent = "× Kaydı çıkar";
+          removeButton.setAttribute("aria-label", `${recordLabel} öğrenci kaydını bu gruptan çıkar`);
+          removeButton.title = "Bu öğrenci kaydını gruptan çıkar";
+          actionCell.append(removeButton);
+          row.append(actionCell);
+        }
         studentBody?.append(row);
       });
 
@@ -3350,12 +3410,8 @@ const fileUploadBridge = (() => {
       document.querySelector("[data-final-data-review]")?.toggleAttribute("hidden", !options.finalReview);
       if (saveGroupButton) saveGroupButton.hidden = Boolean(options.finalReview);
       if (returnToUploadButton) returnToUploadButton.hidden = Boolean(options.finalReview);
-      if (!options.finalReview) {
-        const approvalMessage = document.querySelector("[data-approval-message]");
-        const projectedTotal = savedStudentCount + students.length;
-        if (approvalMessage) approvalMessage.textContent = `Bu gruptaki ${students.length} öğrenci kaydı henüz kaydedilmedi. Grup kaydedildiğinde toplam ${projectedTotal}/${expectedStudentCount} öğrenciye ulaşılacaktır.`;
-      }
       renderSavedGroups();
+      if (!options.finalReview) refreshValidationStudentCountStatus();
     };
 
     const numberValue = (input) => {
@@ -3410,6 +3466,90 @@ const fileUploadBridge = (() => {
         questions,
         students
       };
+    };
+
+    const renderCurrentStudents = (students, warnings = structuredData?.warnings || []) => {
+      renderValidationData({
+        ...(structuredData || {}),
+        exam: { ...(structuredData?.exam || {}), ...collectContextData() },
+        questions: structuredData?.questions || currentQuestionConfiguration(),
+        students,
+        warnings,
+        summary: { ...(structuredData?.summary || {}), studentCount: students.length }
+      });
+    };
+
+    const removeStudentRecord = (row) => {
+      if (!row || finalReviewMode || saveGroupButton?.hidden) return;
+      const rows = Array.from(document.querySelectorAll("[data-student-row]"));
+      const index = rows.indexOf(row);
+      if (index < 0) return;
+      const students = collectApprovedData().students || [];
+      const [student] = students.splice(index, 1);
+      if (!student) return;
+      const sourceFile = row.dataset.sourceFile || student.sourceFile || "";
+      const originalWarnings = [...(structuredData?.warnings || [])];
+      let removedFile = null;
+      let removedFileIndex = -1;
+      if (sourceFile && !students.some((item) => item.sourceFile === sourceFile)) {
+        removedFileIndex = selectedFiles.findIndex((file) => file.name === sourceFile);
+        if (removedFileIndex >= 0) [removedFile] = selectedFiles.splice(removedFileIndex, 1);
+      }
+      const remainingWarnings = sourceFile
+        ? originalWarnings.filter((warning) => !String(warning).startsWith(`${sourceFile}:`))
+        : originalWarnings;
+      lastRemovedStudentRecord = { student, index, sourceFile, removedFile, removedFileIndex, originalWarnings };
+      renderFilesList();
+      renderCurrentStudents(students, remainingWarnings);
+      if (studentRecordUndoMessage) {
+        studentRecordUndoMessage.textContent = `${sourceFile || student.studentNo || `${index + 1}. satır`} kaynaklı öğrenci kaydı bu gruptan çıkarıldı.`;
+      }
+      studentRecordUndo?.removeAttribute("hidden");
+      lastRemovedStudentRecord = { student, index, sourceFile, removedFile, removedFileIndex, originalWarnings };
+      clearValidationErrors();
+      refreshValidationStudentCountStatus();
+      invalidateAnalysisAfterApprovedDataEdit();
+    };
+
+    const undoStudentRecordRemoval = () => {
+      if (!lastRemovedStudentRecord || finalReviewMode) return;
+      const removed = lastRemovedStudentRecord;
+      const students = collectApprovedData().students || [];
+      students.splice(Math.min(removed.index, students.length), 0, removed.student);
+      if (removed.removedFile) {
+        const fileIndex = removed.removedFileIndex < 0 ? selectedFiles.length : Math.min(removed.removedFileIndex, selectedFiles.length);
+        selectedFiles.splice(fileIndex, 0, removed.removedFile);
+      }
+      renderFilesList();
+      renderCurrentStudents(students, removed.originalWarnings);
+      lastRemovedStudentRecord = null;
+      studentRecordUndo?.setAttribute("hidden", "");
+      clearValidationErrors();
+      refreshValidationStudentCountStatus();
+    };
+
+    const applyValidationStudentCount = () => {
+      const value = Number(validationStudentCountEditorInput?.value);
+      if (!Number.isInteger(value) || value < 1 || value > 100) {
+        validationStudentCountEditorInput?.classList.add("is-invalid");
+        validationStudentCountStatus.textContent = "Öğrenci sayısı 1 ile 100 arasında bir tam sayı olmalıdır.";
+        validationStudentCountStatus.classList.add("is-error");
+        return;
+      }
+      validationStudentCountEditorInput?.classList.remove("is-invalid");
+      if (studentCountInput) studentCountInput.value = String(value);
+      setValidationStudentCountEditorOpen(false);
+      renderSavedGroups();
+      const students = collectApprovedData().students || [];
+      const errors = validateStudents(students, true);
+      const saved = savedGroups.reduce((sum, group) => sum + group.students.length, 0);
+      if (saved + students.length > value) {
+        errors.push({ message: `Bu grup kaydedilirse öğrenci sayısı ${saved + students.length} olacak; güncellenen toplam ${value}.`, input: null });
+      }
+      if (errors.length) showValidationErrors(errors);
+      else clearValidationErrors();
+      refreshValidationStudentCountStatus();
+      invalidateAnalysisAfterApprovedDataEdit();
     };
 
     const renderSavedGroups = () => {
@@ -3529,6 +3669,9 @@ const fileUploadBridge = (() => {
       clearValidationErrors();
       if (saveGroupButton) saveGroupButton.hidden = true;
       if (returnToUploadButton) returnToUploadButton.hidden = true;
+      if (validationStudentCountControl) validationStudentCountControl.hidden = true;
+      document.querySelectorAll("[data-remove-student-record]").forEach((button) => { button.hidden = true; });
+      studentRecordUndo?.setAttribute("hidden", "");
       if (total === expected) {
         showFinalReview();
         return;
@@ -3849,6 +3992,23 @@ const fileUploadBridge = (() => {
     addGroupButton?.addEventListener("click", startNewGroup);
     returnToUploadButton?.addEventListener("click", returnToUpload);
     confirmFinalButton?.addEventListener("click", analyzeApprovedData);
+    document.querySelector("[data-edit-validation-student-count]")?.addEventListener("click", () => setValidationStudentCountEditorOpen(true));
+    document.querySelector("[data-cancel-validation-student-count]")?.addEventListener("click", () => setValidationStudentCountEditorOpen(false));
+    document.querySelector("[data-apply-validation-student-count]")?.addEventListener("click", applyValidationStudentCount);
+    validationStudentCountEditorInput?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        applyValidationStudentCount();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        setValidationStudentCountEditorOpen(false);
+      }
+    });
+    document.querySelector("[data-validation-students]")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-remove-student-record]");
+      if (button) removeStudentRecord(button.closest("[data-student-row]"));
+    });
+    document.querySelector("[data-undo-student-record]")?.addEventListener("click", undoStudentRecordRemoval);
     document.querySelector("[data-validation-students]")?.addEventListener("input", () => {
       invalidateAnalysisAfterApprovedDataEdit();
       refreshResolvedOcrWarnings();

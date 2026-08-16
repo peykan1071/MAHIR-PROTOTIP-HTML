@@ -418,6 +418,134 @@ input[type="checkbox"] {
   margin-top: 18px;
 }
 
+.validation-student-count-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  align-items: center;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid #b9dfe1;
+  border-radius: 10px;
+  background: #f5fbfb;
+}
+
+.validation-student-count-control[hidden],
+.validation-student-count-editor[hidden],
+.student-record-undo[hidden],
+.student-record-remove-button[hidden] {
+  display: none !important;
+}
+
+.validation-student-count-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--color-secondary);
+}
+
+.validation-student-count-summary strong {
+  font-size: 1.35rem;
+}
+
+.validation-student-count-editor {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.validation-student-count-editor label {
+  color: var(--color-secondary);
+  font-weight: 700;
+}
+
+.validation-student-count-editor input {
+  width: 110px;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.validation-student-count-editor input.is-invalid {
+  border-color: #b23b2d;
+  background: #fff4f2;
+  box-shadow: 0 0 0 3px rgb(178 59 45 / 12%);
+}
+
+.validation-student-count-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.validation-student-count-status.is-error {
+  color: #8a2e23;
+}
+
+.validation-student-count-status.is-success {
+  color: #146c5a;
+}
+
+.compact-button {
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+.student-record-action-cell {
+  min-width: 130px;
+  text-align: center;
+}
+
+.student-record-remove-button {
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid #c96559;
+  border-radius: 8px;
+  color: #8a2e23;
+  background: #fff;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.student-record-remove-button:hover {
+  color: #fff;
+  background: #a63a2f;
+}
+
+.student-record-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  color: var(--color-secondary);
+  background: #f2f9fa;
+}
+
+@media (max-width: 720px) {
+  .validation-student-count-control {
+    grid-template-columns: 1fr;
+  }
+
+  .validation-student-count-control > .compact-button {
+    justify-self: start;
+  }
+
+  .student-record-undo {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .exam-structure-heading {
   display: flex;
   justify-content: space-between;
