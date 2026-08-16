@@ -78,6 +78,10 @@ def run_agent_prompts(
         enriched.append({
             "name": str(item.get("name") or ""),
             "answer": answer,
+            # Getirim isabetleri: çağıran taraf bunlara bakıp "kaynak yoksa
+            # teşhis yazma" diyor (bkz. PedagogicalAnalysisAgent.apply_llm).
+            # Düşürülürse getirim çalışsa bile her teşhis sessizce elenir.
+            "sources": (result or {}).get("sources") or [],
             "strippedSentences": stripped,
             "promptChars": len(str(item.get("system") or "")) + len(str(item.get("user") or "")),
             "answerChars": len(answer),

@@ -103,67 +103,95 @@ def _validate_boundary(context: AgentContext, agent_name: str) -> list[AgentIssu
     return issues
 
 
+def _execute(agent, context: AgentContext) -> bool:
+    """Tek ajanı koşturur, izini yazar; ZORUNLU bir ajan düştüyse True döner.
+
+    `ValueError` bilerek yukarı geçer: o, öğretmenin düzeltmesi gereken veri
+    hatasıdır ve sessizce yutulursa öğretmen yanlış veriyle üretilmiş bir
+    raporu doğru sanır.
+    """
+
+    started = time.perf_counter()
+    trace = AgentTrace(agent=agent.name)
+    try:
+        result = agent.run(context)
+        trace.outputs = result.outputs
+        trace.issues = list(result.issues)
+        context.issues.extend(result.issues)
+    except ValueError:
+        trace.failed = True
+        raise
+    except Exception as error:  # noqa: BLE001 - isteğe bağlı bir ajanın arızası
+        # analizi düşürmemeli; zorunlu olan çağırana bildirilir.
+        _logger.exception("Ajan başarısız: %s", agent.name)
+        trace.failed = True
+        failure = AgentIssue(
+            agent=agent.name,
+            code="ajan-arizasi",
+            message=f"{agent.description} adımı tamamlanamadı: {error}",
+            severity="error",
+        )
+        trace.issues = [failure]
+        context.issues.append(failure)
+        return bool(agent.required)
+    else:
+        boundary_issues = _validate_boundary(context, agent.name)
+        if boundary_issues:
+            trace.issues.extend(boundary_issues)
+            context.issues.extend(boundary_issues)
+        return False
+    finally:
+        trace.duration_ms = (time.perf_counter() - started) * 1000
+        context.trace.append(trace)
+
+
 def run_pipeline(
     payload: dict[str, Any],
     component_type: str,
     profile_id: str,
 ) -> AgentContext:
-    """Beş ajanı sırayla koşturur ve dolu bir `AgentContext` döndürür.
+    """Beş ajanı koşturur ve dolu bir `AgentContext` döndürür.
 
     `component_type` / `profile_id` çağıran tarafta doğrulanmış olarak gelir
     (bkz. `approved_data_analyzer.analyze_approved_data`): bunlar istek
     düzeyinde kararlar, ajanların işi değil.
+
+    Üç aşama:
+      1. LLM'den önceki ajanlar koşar; LLM'e ihtiyacı olanlar prompt'larını
+         `context.enqueue_prompt` ile kuyruğa yazar - çağırmaz.
+      2. Kuyruk TEK istekte gönderilir, sonuçlar `apply_llm` ile sahiplerine
+         dağıtılır.
+      3. Sonuca bağımlı ajanlar (Raporlama) koşar.
+
+    Raporlama'nın bilerek en sonda olması, LLM sonuçlarının rapora ulaşmasını
+    paylaşılan referans tesadüfüne değil, akış sırasına bağlıyor.
     """
 
     context = AgentContext(payload=payload, ced=_empty_ced())
     context.scratch["componentType"] = component_type
     context.scratch["profileId"] = profile_id
 
+    before_llm = [agent for agent in PIPELINE if not getattr(agent, "after_llm", False)]
+    after_llm = [agent for agent in PIPELINE if getattr(agent, "after_llm", False)]
+
     aborted = False
-    for agent in PIPELINE:
+    for agent in before_llm:
         if aborted:
             # Zorunlu bir ajan düştü: kalanları koşturmak yanıltıcı olurdu
             # (eksik girdiyle üretilmiş bir rapor, rapor yokluğundan kötüdür).
-            # Yine de ize yazılıyorlar, çünkü "neden çalışmadı" da izlenebilir
-            # olmalı.
+            # Yine de ize yazılıyorlar - "neden çalışmadı" da izlenebilir olmalı.
             context.trace.append(AgentTrace(agent=agent.name, skipped=True))
             continue
+        aborted = _execute(agent, context)
 
-        started = time.perf_counter()
-        trace = AgentTrace(agent=agent.name)
-        try:
-            result = agent.run(context)
-            trace.outputs = result.outputs
-            trace.issues = list(result.issues)
-            context.issues.extend(result.issues)
-        except ValueError:
-            # Öğretmenin düzeltmesi gereken veri hatası - yutulmaz. İz yine de
-            # `finally` içinde kaydedilir, böylece hatanın hangi ajanda
-            # oluştuğu çağıran tarafta görülebilir.
-            trace.failed = True
-            raise
-        except Exception as error:  # noqa: BLE001 - isteğe bağlı bir ajanın arızası
-            # analizi düşürmemeli; zorunlu olan yukarı fırlatılır (aşağıda).
-            _logger.exception("Ajan başarısız: %s", agent.name)
-            trace.failed = True
-            failure = AgentIssue(
-                agent=agent.name,
-                code="ajan-arizasi",
-                message=f"{agent.description} adımı tamamlanamadı: {error}",
-                severity="error",
-            )
-            trace.issues = [failure]
-            context.issues.append(failure)
-            if agent.required:
-                aborted = True
-        else:
-            boundary_issues = _validate_boundary(context, agent.name)
-            if boundary_issues:
-                trace.issues.extend(boundary_issues)
-                context.issues.extend(boundary_issues)
-        finally:
-            trace.duration_ms = (time.perf_counter() - started) * 1000
-            context.trace.append(trace)
+    if not aborted:
+        _flush_llm_queue(context)
+
+    for agent in after_llm:
+        if aborted:
+            context.trace.append(AgentTrace(agent=agent.name, skipped=True))
+            continue
+        aborted = _execute(agent, context)
 
     if aborted:
         failed_agent = next(entry.agent for entry in context.trace if entry.failed)
@@ -172,3 +200,71 @@ def run_pipeline(
         )
 
     return context
+
+
+def _flush_llm_queue(context: AgentContext) -> None:
+    """Kuyruğa yazılmış TÜM ajan prompt'larını tek istekte gönderir.
+
+    Faz 3'ün asıl kazancı burada: kaç ajan LLM kullanırsa kullansın tur sayısı
+    BİR. Ajan başına ayrı HTTP turu atsaydık her yeni LLM'li ajan analize ~3 sn
+    eklerdi (ölçüldü) ve "ek GPU maliyeti yok" iddiası beş ajanda çökerdi.
+
+    Kuyruk boşsa hiç istek atılmaz - kayıtlı olmayan derslerde ve LLM'in
+    yapılandırılmadığı ortamlarda bugünkü davranış aynen korunur.
+
+    Asla istisna fırlatmaz: LLM arızası isteğe bağlı zenginleştirmeyi düşürür,
+    öğretmenin analizini değil. `apply_llm` her hâlükârda çağrılır ki ajanlar
+    "sonuç gelmedi" durumunu kendi sebep koduyla loglayabilsin.
+    """
+
+    from ..approved_data_analyzer import MAHIR_RAG_REMOTE_URL
+
+    if context.llm_queue and MAHIR_RAG_REMOTE_URL:
+        from .llm import run_agent_prompts
+
+        started = time.perf_counter()
+        try:
+            ok, message, results = run_agent_prompts(context.llm_queue, MAHIR_RAG_REMOTE_URL)
+        except Exception:  # noqa: BLE001 - istemci zaten yutuyor; bu son emniyet.
+            _logger.exception("LLM turu istisna verdi")
+            ok, message, results = False, "istisna", None
+
+        if ok and results:
+            context.llm_results = {str(item.get("name")): item for item in results}
+        else:
+            _logger.warning("LLM turu başarısız (%s); ajanlar sonuçsuz devam edecek", message)
+        _logger.info(
+            "LLM turu: prompt=%d sonuc=%d sure=%.1fs",
+            len(context.llm_queue),
+            len(context.llm_results),
+            time.perf_counter() - started,
+        )
+    elif context.llm_queue:
+        _logger.info("LLM turu atlandı: sebep=yapilandirilmamis prompt=%d", len(context.llm_queue))
+
+    for agent in PIPELINE:
+        apply_llm = getattr(agent, "apply_llm", None)
+        if apply_llm is None:
+            continue
+        trace = context.trace_for(agent.name)
+        started = time.perf_counter()
+        try:
+            result = apply_llm(context)
+        except Exception as error:  # noqa: BLE001 - zenginleştirme analizi kesmemeli.
+            _logger.exception("Ajan LLM sonucunu işleyemedi: %s", agent.name)
+            issue = AgentIssue(
+                agent=agent.name,
+                code="llm-sonucu-islenemedi",
+                message=f"{agent.description} adımının LLM sonucu işlenemedi: {error}",
+                severity="error",
+            )
+            context.issues.append(issue)
+            if trace is not None:
+                trace.issues.append(issue)
+            continue
+        if trace is not None and result is not None:
+            trace.outputs.update(result.outputs)
+            trace.issues.extend(result.issues)
+            trace.duration_ms += (time.perf_counter() - started) * 1000
+        if result is not None:
+            context.issues.extend(result.issues)

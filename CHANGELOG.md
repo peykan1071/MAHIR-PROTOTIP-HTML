@@ -2,6 +2,18 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Çok Ajanlı Analiz Hattı - Faz 3: Tek İstekli LLM Turu + Anomali Ajanı - 2026-08-16
+
+- **Bir analizde artık TEK LLM isteği atılıyor**, kaç ajan LLM kullanırsa kullansın. Ajanlar LLM'i doğrudan çağırmıyor; `context.enqueue_prompt(...)` ile prompt'larını kuyruğa yazıyor, orkestratör hepsini tek istekte gönderip sonuçları `apply_llm` ile sahiplerine dağıtıyor.
+- Gerekçesi ölçüldü: her LLM'li ajan kendi HTTP turunu atsaydı analize ~3 sn eklerdi ve beş ajanda "ek GPU maliyeti yok" iddiası çökerdi. Canlı ölçüm: **9 prompt (8 teşhis + 1 anomali) tek turda 16,7 sn**; ikinci bir LLM ajanı eklemenin bedeli tam bir tur değil, ~3 sn oldu.
+- `rag_service.py`'nin `agents` uç noktası birleştirildi: her öğe isteğe bağlı bir `retrieval` bloğu taşıyabiliyor. Getirimli (müfredat teşhisi) ve getirimsiz (anomali) prompt'lar **aynı istekte, aynı vLLM partisinde** çözülüyor. Hiçbir öğe getirim istemiyorsa Qdrant'a hiç dokunulmuyor. Eski `queries` biçimi geriye dönük uyum için duruyor.
+- **Yeni LLM rolü - Ölçme Ajanı'nda anomali tespiti**: "Soru 4: Başarı oranı sıfır", "Soru 3 ve Soru 5: Benzer başarı oranları" gibi bulgular `summary.anomalies` alanına yazılıyor. Kasıtlı anomalili fixture ile canlı doğrulandı. **Hiçbir sayıyı değiştirmiyor** ve LLM'e yalnız SORU düzeyinde toplu istatistik gidiyor - öğrenci satırı gitmiyor, gizlilik kapısına yan kapı açılmıyor. Üçten az soruda prompt hiç kurulmuyor.
+- Pedagojik Analiz Ajanı da kuyruğa taşındı; teşhis prompt'u `backend/app/agents/prompts.py`e geldi (birleşik biçimde system prompt'u çağıran gönderiyor ve bir ajanı tanımlayan şey büyük ölçüde kendi prompt'u). Sunucudaki kopya eski biçim için duruyor; ikisinin ayrışmasını `tests/test_agent_llm_round.py` engelliyor.
+- Raporlama Ajanı artık LLM turundan SONRA koşuyor (`after_llm`), böylece LLM sonuçlarının rapora ulaşması akış sırasına bağlı - önceden üretilmiş sözlüklerin yerinde değiştirilmesi tesadüfüne değil.
+- **Davranış değişikliği:** parti başarısız olduğunda çıktıları TEK TEK yeniden sorgulayan geri çekilme yolu kaldırıldı. N çıktı için N ağ turu, tek istekli mimarinin amacıyla çelişiyordu. Korunan güvence: teşhis bir zenginleştirme - tur başarısız olursa hücreler boş kalır, analiz eksiksiz üretilir, istisna fırlamaz. Testle sabitlendi.
+- Canlı doğrulama: 8/8 teşhis dolu, 0 yanlış şiddet, 0 yanlış Bloom, 0 gerçek öneri sızıntısı.
+- Yeni testler: `tests/test_agent_llm_round.py` (10 test). Ayrıca birim testlerinin canlı GPU'ya istek attığı fark edildi ve yalıtıldı (test paketi 149 sn'den 10 sn'ye indi).
+
 ## Çok Ajanlı Analiz Hattı - Faz 2: Paylaşılan LLM Altyapısı - 2026-08-16
 
 - `rag_service.py`'nin uç noktasına dördüncü bir gövde biçimi eklendi: `{"agents": [{"name", "system", "user"}...]}`. Ajanlar artık kendi prompt'unu gönderebiliyor; önceden `SYSTEM_PROMPT` sabit gömülüydü ve tüm depoda tek bir LLM çağrı noktası vardı. Mevcut üç biçim (`warmup`, `queries`, tekil `question`) aynen korundu.

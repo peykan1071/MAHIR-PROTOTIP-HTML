@@ -91,6 +91,21 @@ class AgentContext:
     # Ajanların birbirine ilettiği, CED'e ait olmayan ara veri (ör. çözümlenen
     # program profili). CED'i tarayıcıya özgü alanlarla kirletmemek için ayrı.
     scratch: dict[str, Any] = field(default_factory=dict)
+    # LLM kuyruğu: ajanlar doğrudan çağırmak yerine prompt'larını buraya yazar,
+    # orkestratör hepsini TEK istekte gönderir. Ajan başına ayrı HTTP turu
+    # atsaydık her yeni LLM'li ajan analize ~3 sn eklerdi ve "ek GPU maliyeti
+    # yok" iddiası beş ajanda çökerdi.
+    llm_queue: list[dict[str, Any]] = field(default_factory=list)
+    llm_results: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+    def enqueue_prompt(self, prompt: dict[str, Any]) -> None:
+        self.llm_queue.append(prompt)
+
+    def llm_result(self, name: str) -> dict[str, Any] | None:
+        """Kuyruğa verilen `name` ile dönen sonucu getirir (yoksa `None` -
+        flush hiç yapılmamış ya da başarısız olmuş olabilir)."""
+
+        return self.llm_results.get(name)
 
     def trace_for(self, agent_name: str) -> AgentTrace | None:
         for entry in self.trace:
@@ -119,3 +134,11 @@ class Agent(Protocol):
     required: bool
 
     def run(self, context: AgentContext) -> AgentResult: ...
+
+    # --- LLM kullanan ajanlar için isteğe bağlı iki geçiş ---
+    # `run` sırasında ajan LLM'i ÇAĞIRMAZ; yalnız `context.enqueue_prompt(...)`
+    # ile prompt'unu kuyruğa yazar. Orkestratör tüm ajanlar koştuktan sonra
+    # kuyruğu tek istekte gönderir ve sonuçları `apply_llm` ile geri dağıtır.
+    # Bu iki metodu uygulamayan ajanlar (bugün üçü) hiç etkilenmez.
+
+    def apply_llm(self, context: AgentContext) -> AgentResult: ...

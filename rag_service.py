@@ -83,6 +83,11 @@ MAX_AGENT_PROMPTS = 16
 MAX_AGENT_PROMPT_CHARS = 8000
 MAX_AGENT_OUTPUT_TOKENS = 1024
 
+# Getirim hiçbir şey bulamadığında dönen metin. `backend/app/` tarafı bu
+# cümleyi tanıyor (`approved_data_analyzer._RAG_NO_ANSWER_TEXT`) ve modelin
+# yanıtının başına eklediği hâlini kırpıyor - iki taraf birebir aynı kalmalı.
+_NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
+
 # Getirim isabetlerinin, EN İYİ isabetin skoruna göre korunma alt sınırı - mutlak
 # bir `score_threshold` DEĞİL. Gerekçe ölçüm: 8 gerçek zayıf öğrenme çıktısı,
 # tema filtresi açık, top_k=8 (64 isabet). Her sorgu aynı şekli veriyor - 2 güçlü
@@ -881,18 +886,28 @@ class RAGInference:
     def _run_agent_prompts(
         self, items: list[dict[str, object]]
     ) -> tuple[bool, str, list[dict[str, object]] | None]:
-        """Çağıranın gönderdiği system/user prompt çiftlerini TEK partide çalıştırır.
+        """Bir analiz turundaki TÜM ajan prompt'larını tek partide çalıştırır.
 
-        `_run_batch_query`in parti mantığını izler ama getirim tarafı hiç yok:
-        Qdrant açılmaz, Volume reload edilmez, gömme yapılmaz. Bu yüzden aynı
-        sayıda öğe için RAG sorgusundan belirgin biçimde hızlıdır - MAHİR'in
-        ajanlarının çoğu müfredat metnine değil, kendi hesapladığı verilere
-        bakarak yorum üretiyor.
+        Her öğe isteğe bağlı bir `retrieval` bloğu taşıyabilir:
 
-        Parti neden: ölçüldü - vLLM'de N dizinin birlikte çözülmesi neredeyse
-        tek dizi kadar sürüyor (darboğaz GPU'nun bellek bant genişliği). Yani
-        beş ajanın beş ayrı prompt'u, tek ajanın bir prompt'uyla aynı maliyete
-        yakın. Ek GPU maliyeti olmadan çok ajanlı olmanın yolu bu.
+            {"name", "system", "user",
+             "retrieval": {"programId", "grade", "theme", "query", "topK"}}
+
+        `retrieval` taşıyanlar için müfredat bağlamı Qdrant'tan getirilip user
+        mesajının başına eklenir ve sonuca `sources` yazılır; taşımayanlar düz
+        prompt olarak gider. İkisi de **aynı `self._llm.chat` çağrısında**
+        çözülür.
+
+        Bu birleştirme Faz 3'ün asıl amacı: eskiden getirimli sorgular
+        `queries`, getirimsizler `agents` biçiminden gidiyordu ve iki ayrı
+        HTTP turu + iki ayrı vLLM partisi demekti. Her yeni LLM'li ajan
+        analize ~3 sn ekliyordu. Artık kaç ajan LLM kullanırsa kullansın tur
+        sayısı BİR - "ek GPU maliyeti yok" iddiası ancak böyle beş ajanda da
+        geçerli kalıyor (ölçüldü: 10 prompt, tek prompt'un 2,6 katı sürede
+        16 katı metin üretiyor).
+
+        Hiçbir öğe `retrieval` taşımıyorsa Qdrant'a HİÇ dokunulmaz - Volume
+        reload ve gömme atlanır.
 
         Çıktılar giriş sırasıyla döner; `name` alanı çağıranın eşleştirme
         yapabilmesi için aynen geri verilir.
@@ -900,34 +915,147 @@ class RAGInference:
 
         from vllm import SamplingParams
 
+        retrieval_indexes = [
+            index for index, item in enumerate(items) if isinstance(item.get("retrieval"), dict)
+        ]
+        contexts: dict[int, str] = {}
+        sources: dict[int, list[dict[str, object]]] = {}
+        if retrieval_indexes:
+            ok, message, contexts, sources = self._retrieve_for(items, retrieval_indexes)
+            if not ok:
+                return False, message, None
+
+        # Getirimi boş çıkan öğe partiye HİÇ girmez: üretecek bağlamı yok ve
+        # bir yanıt uydurmasındansa "belgede bulunmuyor" demesi doğru.
+        generated_indexes = [
+            index
+            for index in range(len(items))
+            if index not in retrieval_indexes or contexts.get(index)
+        ]
+
         conversations = [
             [
-                {"role": "system", "content": str(item.get("system") or "")},
-                {"role": "user", "content": str(item.get("user") or "")},
+                {"role": "system", "content": str(items[index].get("system") or "")},
+                {
+                    "role": "user",
+                    "content": (
+                        f"BAĞLAM:\n{contexts[index]}\n\n{items[index].get('user')}"
+                        if contexts.get(index)
+                        else str(items[index].get("user") or "")
+                    ),
+                },
             ]
-            for item in items
+            for index in generated_indexes
         ]
-        # Tavan uygulanır: çağıran daha büyük isterse sessizce kırpılır, çünkü
-        # bu sınır GPU'yu korumak için var ve pazarlık konusu değil.
-        max_tokens = min(
-            MAX_AGENT_OUTPUT_TOKENS,
-            max(int(_number_or(item.get("maxTokens"), MAX_AGENT_OUTPUT_TOKENS)) for item in items),
-        )
 
-        try:
-            outputs = self._llm.chat(
-                conversations, SamplingParams(temperature=0.1, max_tokens=max_tokens)
+        answers: dict[int, str] = {}
+        if conversations:
+            # Tavan uygulanır: çağıran daha büyük isterse sessizce kırpılır,
+            # çünkü bu sınır GPU'yu korumak için var ve pazarlık konusu değil.
+            max_tokens = min(
+                MAX_AGENT_OUTPUT_TOKENS,
+                max(int(_number_or(item.get("maxTokens"), MAX_AGENT_OUTPUT_TOKENS)) for item in items),
             )
-        except Exception as error:  # noqa: BLE001 - vLLM üretimi üçüncü parti bir ML çağrısı;
-            # bir partinin başarısız olması servis konteynerini çökertmemeli.
-            return False, f"Ajan yanıtları üretilemedi: {error}", None
-        if len(outputs) != len(conversations):
-            return False, "Ajan partisinde yanıt sayısı istek sayısıyla eşleşmedi.", None
+            try:
+                outputs = self._llm.chat(
+                    conversations, SamplingParams(temperature=0.1, max_tokens=max_tokens)
+                )
+            except Exception as error:  # noqa: BLE001 - vLLM üretimi üçüncü parti bir ML çağrısı;
+                # bir partinin başarısız olması servis konteynerini çökertmemeli.
+                return False, f"Ajan yanıtları üretilemedi: {error}", None
+            if len(outputs) != len(conversations):
+                return False, "Ajan partisinde yanıt sayısı istek sayısıyla eşleşmedi.", None
+            answers = {
+                index: output.outputs[0].text.strip()
+                for index, output in zip(generated_indexes, outputs)
+            }
 
         return True, "Ajan yanıtları üretildi.", [
-            {"name": str(item.get("name") or ""), "answer": output.outputs[0].text.strip()}
-            for item, output in zip(items, outputs)
+            {
+                "name": str(item.get("name") or ""),
+                "answer": answers.get(index, _NO_ANSWER_TEXT),
+                "sources": sources.get(index, []),
+            }
+            for index, item in enumerate(items)
         ]
+
+    def _retrieve_for(
+        self, items: list[dict[str, object]], retrieval_indexes: list[int]
+    ) -> tuple[bool, str, dict[int, str], dict[int, list[dict[str, object]]]]:
+        """`retrieval` taşıyan öğeler için müfredat bağlamını getirir.
+
+        Parti başına BİR kez yapılanlar: Volume reload + Qdrant yeniden açma +
+        gömme (hepsi tek `encode` çağrısında). Filtreler (program/sınıf/tema)
+        öğe başına ayrı uygulanmaya devam eder - temalar birbirine karışmaz.
+        """
+
+        from qdrant_client import QdrantClient
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        # Bu konteyner sıcak kalırken başka bir konteynerde (index_pdf) commit
+        # edilmiş yeni belgeleri görebilmek için reload. Volume reload() açık
+        # dosya varken başarısız olur (embedded Qdrant'ın .lock'u dâhil) - bu
+        # yüzden client önce kapatılıp reload'dan sonra yeniden açılıyor.
+        try:
+            self._qdrant.close()
+            rag_storage_volume.reload()
+            self._qdrant = QdrantClient(path=QDRANT_STORAGE_PATH)
+            collection_exists = self._qdrant.collection_exists(QDRANT_COLLECTION_NAME)
+        except Exception as error:  # noqa: BLE001 - Volume/Qdrant altyapı çağrısı.
+            return False, f"Belge dizini tazelenemedi: {error}", {}, {}
+        if not collection_exists:
+            return True, "", {}, {}
+
+        try:
+            query_texts = [
+                str((items[index].get("retrieval") or {}).get("query") or items[index].get("user") or "")
+                for index in retrieval_indexes
+            ]
+            query_vectors = self._embedder.encode(query_texts, normalize_embeddings=True)
+        except Exception as error:  # noqa: BLE001 - gömme üçüncü parti bir ML çağrısı.
+            return False, f"Getirim sorgusu gömülemedi: {error}", {}, {}
+
+        contexts: dict[int, str] = {}
+        sources: dict[int, list[dict[str, object]]] = {}
+        for position, index in enumerate(retrieval_indexes):
+            spec = items[index].get("retrieval") or {}
+            conditions = []
+            if spec.get("programId"):
+                conditions.append(
+                    FieldCondition(key="program_id", match=MatchValue(value=str(spec["programId"])))
+                )
+            if spec.get("grade"):
+                conditions.append(
+                    FieldCondition(key="grade", match=MatchValue(value=str(spec["grade"])))
+                )
+            if spec.get("theme"):
+                conditions.append(
+                    FieldCondition(
+                        key="theme_key", match=MatchValue(value=_theme_match_key(str(spec["theme"])))
+                    )
+                )
+
+            try:
+                hits = self._qdrant.query_points(
+                    collection_name=QDRANT_COLLECTION_NAME,
+                    query=query_vectors[position].tolist(),
+                    query_filter=Filter(must=conditions) if conditions else None,
+                    limit=int(_number_or(spec.get("topK"), DEFAULT_TOP_K)),
+                    with_payload=True,
+                ).points
+            except Exception as error:  # noqa: BLE001 - yerel Qdrant okuması.
+                return False, f"Belge dizininden okunamadı: {error}", {}, {}
+
+            if not hits:
+                continue
+            hits = _drop_weak_hits(hits)
+            contexts[index] = "\n\n---\n\n".join(
+                str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
+                for hit in hits
+            )
+            sources[index] = _build_sources(hits)
+
+        return True, "", contexts, sources
 
     def _run_batch_query(
         self,

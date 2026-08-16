@@ -8,8 +8,28 @@ different story than `analysis["questions"]` and the outcome's own
 """
 
 import unittest
+from unittest.mock import patch
 
 from backend.app.approved_data_analyzer import analyze_approved_data
+
+_no_remote = None
+
+
+def setUpModule():
+    """LLM turunu kapat: bu dosya deterministik kanıt sayılarını sınıyor.
+
+    Ölçme Ajanı her analizde anomali prompt'u kuyruğa yazıyor; uzak adres
+    tanımlı kalırsa bu testler gerçek GPU'ya istek atar (ölçüldü: 0,1 sn yerine
+    18 sn) ve ağa bağımlı olur.
+    """
+
+    global _no_remote
+    _no_remote = patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", "")
+    _no_remote.start()
+
+
+def tearDownModule():
+    _no_remote.stop()
 
 
 def _question(number, outcome_code, theme="1. Tema: Sayılar", max_score=10):

@@ -76,6 +76,24 @@ class AgentLlmTests(unittest.TestCase):
         llm.run_agent_prompts([llm.build_prompt("a", "s", "u", max_tokens=256)], self.url)
         self.assertEqual(_received[0]["agents"][0]["maxTokens"], 256)
 
+    def test_sources_are_passed_through(self):
+        # Getirim isabetleri düşerse çağıran taraf "kaynak yok" sanıp her
+        # teşhisi eler - getirim mükemmel çalışsa bile rapor boş kalır.
+        _response.update({
+            "ok": True,
+            "message": "ok",
+            "structuredData": {"results": [
+                {"name": "ajan-0", "answer": "teşhis", "sources": [{"documentName": "tdeogr.pdf"}]}
+            ]},
+        })
+        _ok, _message, results = llm.run_agent_prompts(self._prompts(1), self.url)
+        self.assertEqual(results[0]["sources"], [{"documentName": "tdeogr.pdf"}])
+
+    def test_missing_sources_becomes_an_empty_list(self):
+        self._reply([("ajan-0", "teşhis")])  # sunucu `sources` göndermezse
+        _ok, _message, results = llm.run_agent_prompts(self._prompts(1), self.url)
+        self.assertEqual(results[0]["sources"], [])
+
     def test_results_keep_input_order(self):
         self._reply([("ajan-0", "birinci"), ("ajan-1", "ikinci"), ("ajan-2", "üçüncü")])
         _ok, _message, results = llm.run_agent_prompts(self._prompts(3), self.url)

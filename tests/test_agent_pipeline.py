@@ -49,6 +49,27 @@ def _payload(**extra):
     }
 
 
+_no_remote = None
+
+
+def setUpModule():
+    """Bu dosya hattın DETERMİNİSTİK davranışını sınıyor; LLM turu kapalı.
+
+    Ölçme Ajanı artık her analizde anomali prompt'u kuyruğa yazıyor. Uzak adres
+    tanımlı kalırsa bu testler gerçek GPU'ya istek atar - yavaş, pahalı ve ağa
+    bağımlı olur (ölçüldü: 10 sn yerine 149 sn). LLM turunun kendisi
+    `test_agent_llm_round.py`de sahte sunucuya karşı sınanıyor.
+    """
+
+    global _no_remote
+    _no_remote = patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", "")
+    _no_remote.start()
+
+
+def tearDownModule():
+    _no_remote.stop()
+
+
 def _run(payload):
     return run_pipeline(payload, component_type="written", profile_id="")
 

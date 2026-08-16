@@ -12,6 +12,7 @@ ve her çağrı `AgentTrace.llm_calls`'a düşecek.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from .. import measurement_engine
@@ -19,6 +20,18 @@ from ..models import CEDValidationIssue
 from ..program_catalog import validate_question_program_context
 from .base import AgentContext, AgentIssue, AgentResult
 from .ced_builder import build_ced_from_payload, outcome_key_for
+from .prompts import DIAGNOSIS_SYSTEM_PROMPT, build_anomaly_prompt
+
+# Anomali yoksa modelin yazması istenen cümle (bkz. prompts.ANOMALY_SYSTEM_PROMPT
+# madde 4). Bu hâlde alan boş bırakılır - rapora "bir şey yok" satırı eklemek
+# gürültüden başka bir şey olmaz.
+_NO_ANOMALY_TEXT = "Belirgin bir tutarsızlık görülmedi"
+
+# Getirimde çekilecek parça sayısı - backend/app/rag_client.py ile aynı
+# gerekçe: parçalar 512 token ve getirim zaten tek temaya kısıtlı.
+_DIAGNOSIS_TOP_K = 8
+
+_logger = logging.getLogger(__name__)
 
 
 class DocumentUnderstandingAgent:
@@ -195,11 +208,45 @@ class MeasurementAgent:
         context.scratch["outcomeMeta"] = outcome_meta
         context.scratch["participatingStudentCount"] = len(students)
 
+        # Anomali rolü: LLM burada ÇAĞRILMAZ, yalnız prompt kuyruğa yazılır.
+        # Tüm ajanların prompt'ları tek istekte gidiyor (bkz. orchestrator
+        # `_flush_llm_queue`) - bu ajanın LLM alması analize ek bir HTTP turu
+        # eklemiyor.
+        prompt = build_anomaly_prompt(
+            [row for rows in evidence_questions.values() for row in rows]
+        )
+        if prompt:
+            context.enqueue_prompt(prompt)
+
         return AgentResult(
             outputs={
                 "measuredQuestionCount": len(question_results),
                 "measuredOutcomeCount": len(outcome_totals),
                 "correctedCellTotal": sum(corrected_cells.values()),
+                "anomalyCheckQueued": bool(prompt),
+            }
+        )
+
+    def apply_llm(self, context: AgentContext) -> AgentResult:
+        """Anomali bulgularını bağlama yazar - hiçbir SAYIYA dokunmaz.
+
+        Sonuç gelmemişse (LLM yapılandırılmamış, tur başarısız ya da soru
+        sayısı üçten az) alan boş kalır; rapor bugünküyle aynı görünür.
+        """
+
+        result = context.llm_result(self.name)
+        if not result:
+            context.scratch["anomalies"] = ""
+            return AgentResult(outputs={"anomalyFindings": 0})
+
+        finding = str(result.get("answer") or "").strip()
+        if finding.startswith(_NO_ANOMALY_TEXT):
+            finding = ""
+        context.scratch["anomalies"] = finding
+        return AgentResult(
+            outputs={
+                "anomalyFindings": finding.count("-") if finding else 0,
+                "llmStrippedSentences": result.get("strippedSentences", 0),
             }
         )
 
@@ -261,18 +308,69 @@ class PedagogicalAnalysisAgent:
                 },
             })
 
-        _attach_rag_context(outcome_results, context.scratch.get("program"))
-
         context.scratch["outcomeResults"] = outcome_results
-        grounded = sum(1 for item in outcome_results if item.get("ragContext"))
-        weak = sum(1 for item in outcome_results if item["successRate"] < 0.70)
+
+        # Müfredat temelli teşhis: LLM burada ÇAĞRILMAZ, zayıf her çıktı için
+        # getirimli bir prompt kuyruğa yazılır. Kuyruk Ölçme Ajanı'nın anomali
+        # prompt'uyla birlikte TEK istekte gidiyor - ajan başına ayrı HTTP turu
+        # atsaydık her LLM'li ajan analize ~3 sn eklerdi.
+        from ..approved_data_analyzer import _RAG_WEAK_THRESHOLD
+
+        queued = _enqueue_diagnosis_prompts(
+            context, outcome_results, context.scratch.get("program")
+        )
+        context.scratch["diagnosisTargets"] = queued
+        weak = sum(1 for item in outcome_results if item["successRate"] < _RAG_WEAK_THRESHOLD)
 
         return AgentResult(
             outputs={
                 "outcomeCount": len(outcome_results),
                 "weakOutcomeCount": weak,
-                "curriculumGroundedCount": grounded,
+                "diagnosisQueued": len(queued),
             }
+        )
+
+    def apply_llm(self, context: AgentContext) -> AgentResult:
+        """Teşhis yanıtlarını `ragContext`e yazar.
+
+        Sonrası-işleme bugünküyle birebir aynı: reddetme ön eki kırpılır,
+        kaynak yoksa çıktı boş bırakılır, charter süzgeci zaten `agents/llm.py`
+        içinde uygulanmıştır. Sonuç gelmemişse (LLM yapılandırılmamış, tur
+        başarısız) `ragContext` boş kalır - RAG arızası öğretmenin analizini
+        asla kesmez.
+        """
+
+        from ..approved_data_analyzer import _RAG_NO_ANSWER_TEXT
+
+        grounded = 0
+        stripped = 0
+        for name, outcome in context.scratch.get("diagnosisTargets", {}).items():
+            code = str(outcome.get("outcomeCode") or "?")
+            result = context.llm_result(name)
+            if not result:
+                _logger.info("RAG atlandı: cikti=%s sebep=sonuc-yok", code)
+                continue
+            if not result.get("sources"):
+                # Kaynak yoksa getirim hiç isabet vermemiştir - filtrelerden
+                # (program/sınıf/tema) biri tutmamış demektir.
+                _logger.info("RAG atlandı: cikti=%s sebep=kaynak-yok", code)
+                continue
+            answer = str(result.get("answer") or "").strip()
+            # startswith + kırpma, tam eşleşme değil: model doğru bağlamla
+            # beslendiğinde bile cevabı sık sık bu cümleyle başlatıp ardından
+            # gerçek teşhisle devam ediyor (gerçek dizin karşısında ölçüldü).
+            if answer.startswith(_RAG_NO_ANSWER_TEXT):
+                answer = answer[len(_RAG_NO_ANSWER_TEXT):].strip()
+            if not answer:
+                _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti", code)
+                continue
+            stripped += int(result.get("strippedSentences") or 0)
+            outcome["ragContext"] = answer
+            grounded += 1
+            _logger.info("RAG dolduruldu: cikti=%s sebep=basarili", code)
+
+        return AgentResult(
+            outputs={"curriculumGroundedCount": grounded, "llmStrippedSentences": stripped}
         )
 
 
@@ -288,6 +386,10 @@ class ReportingAgent:
     name = "raporlama"
     description = "Ölçme ve pedagojik sonuçları MAHİR analiz raporu sözleşmesine dönüştürür."
     required = True
+    # LLM turundan SONRA koşar: rapor, ajanların LLM sonuçlarını da içermeli ve
+    # bu, önceden üretilmiş sözlüklerin yerinde değiştirilmesi tesadüfüne
+    # bağlı kalmamalı (bkz. orchestrator.run_pipeline üç aşama).
+    after_llm = True
 
     def run(self, context: AgentContext) -> AgentResult:
         from ..assessment_profiles import COMPONENT_LABELS, PROFILES
@@ -320,6 +422,9 @@ class ReportingAgent:
                 "classAverage": round(average, 2),
                 "classLearningLevel": average / exam_max if exam_max else 0.0,
                 "classSuccessRate": average / exam_max if exam_max else 0.0,
+                # Ölçme Ajanı'nın anomali bulgusu; hiçbir sayıyı etkilemez,
+                # bulgu yoksa boş string kalır.
+                "anomalies": context.scratch.get("anomalies", ""),
             },
             "questions": context.scratch["questionResults"],
             # `.get`: Pedagojik Analiz isteğe bağlı, düşerse rapor yorumsuz
@@ -334,6 +439,72 @@ class ReportingAgent:
                 "classAverage": context.analysis["summary"]["classAverage"],
             }
         )
+
+
+def _enqueue_diagnosis_prompts(
+    context: AgentContext, outcome_results: list[dict[str, Any]], program: Any
+) -> dict[str, dict[str, Any]]:
+    """Zayıf her öğrenme çıktısı için getirimli teşhis prompt'unu kuyruğa yazar.
+
+    Dönen sözlük: prompt adı -> ilgili çıktı sözlüğü. `apply_llm` yanıtları bu
+    eşlemeyle sahibine bağlıyor; ada göre eşleştirme, sıraya göre eşleştirmenin
+    aksine partiye giren/girmeyen öğe olduğunda da güvenli.
+
+    Program çözülemediyse hiç prompt üretilmez: MAHİR 60+ dersi kapsıyor ama
+    yalnız kayıtlı programların indekslenmiş referans materyali var - kayıtsız
+    bir derste getirim garantili biçimde boş dönerdi.
+    """
+
+    from ..approved_data_analyzer import (
+        _RAG_WEAK_THRESHOLD,
+        _build_rag_question,
+        _build_rag_retrieval_query,
+        _normalize_theme_for_rag,
+    )
+
+    for outcome in outcome_results:
+        outcome["ragContext"] = ""
+
+    if program is None:
+        _logger.info("RAG atlandı: sebep=program-yok")
+        return {}
+
+    targets: dict[str, dict[str, Any]] = {}
+    for outcome in outcome_results:
+        code = str(outcome.get("outcomeCode") or "?")
+        if float(outcome.get("successRate") or 0.0) >= _RAG_WEAK_THRESHOLD:
+            continue
+        question = _build_rag_question(outcome)
+        if not question:
+            _logger.info("RAG atlandı: cikti=%s sebep=soru-bos", code)
+            continue
+        theme = _normalize_theme_for_rag(str(outcome.get("outcomeTheme") or ""))
+        if not theme:
+            # Tema çözülemezse sınıf-geneli aramaya DÜŞÜLMEZ: aynı çıktı kodu
+            # her temada farklı bir kazanıma karşılık geliyor, yanlış temadan
+            # "kaynaklı" görünen bir teşhis hiç teşhis vermemekten kötüdür.
+            _logger.info("RAG atlandı: cikti=%s sebep=tema-cozulemedi", code)
+            continue
+
+        name = f"pedagoji/{outcome.get('outcomeTheme')}|{code}"
+        context.enqueue_prompt({
+            "name": name,
+            "system": DIAGNOSIS_SYSTEM_PROMPT,
+            "user": f"SORU: {question}\n\nYalnızca yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla.",
+            "retrieval": {
+                "programId": program.id,
+                "grade": program.grade,
+                "theme": theme,
+                # Getirimde gömülen metin, üretim talimatından KASITLI ayrı:
+                # başarı oranı ve "teşhis et" emri müfredat düzyazısında
+                # karşılığı olmayan, sorgu vektörünü uzaklaştıran gürültü.
+                "query": _build_rag_retrieval_query(outcome),
+                "topK": _DIAGNOSIS_TOP_K,
+            },
+        })
+        targets[name] = outcome
+
+    return targets
 
 
 def issues_to_ced_validation(issues: list[AgentIssue]) -> list[CEDValidationIssue]:
