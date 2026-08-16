@@ -85,6 +85,15 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        # `SimpleHTTPRequestHandler` yalnızca `Last-Modified` gönderiyor,
+        # `Cache-Control` göndermiyor. Tarayıcı bu durumda SEZGİSEL önbellekleme
+        # uygular: dosyayı sunucuya hiç sormadan kendi kopyasından verir. Bu,
+        # rapor katmanını sessizce ikiye bölüyordu - `mahir-report-export-common.js`
+        # tazelenirken `mahir-pdf-exporter.js` eski kopyadan geldiği için ekranda
+        # görünen dipnot indirilen PDF'e hiç düşmedi. Öğretmenin imzalayacağı
+        # resmî çıktı ekranda gördüğünden farklı olamaz; prototipte önbelleğin
+        # kazandıracağı hiçbir şey bu riski karşılamıyor.
+        self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
     def do_OPTIONS(self) -> None:

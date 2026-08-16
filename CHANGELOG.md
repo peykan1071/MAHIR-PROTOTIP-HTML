@@ -2,6 +2,14 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Prototip Sunucusu Tarayıcı Önbelleğini Kapatıyor - 2026-08-16
+
+- **Bulgu:** Kaynak dipnotu ekranda görünüyor ama indirilen PDF'e hiç düşmüyordu. Kod doğruydu; hata dağıtımdaydı. `SimpleHTTPRequestHandler` yalnızca `Last-Modified` gönderip `Cache-Control` göndermediği için tarayıcı **sezgisel önbelleklemeye** düşüyor ve dosyayı sunucuya hiç sormadan kendi kopyasından veriyor. Rapor katmanı böylece sessizce ikiye bölündü: model tarafı (`mahir-report-export-common.js`) tazelenmişken çıktı tarafı (`mahir-pdf-exporter.js`) eski kopyadan geldi.
+- Artık her yanıt `Cache-Control: no-store` taşıyor. Prototipte önbelleğin kazandıracağı hiçbir şey, öğretmenin imzalayacağı resmî çıktının ekranda gördüğünden farklı olması riskini karşılamıyor.
+- **Teşhis, kullanıcının elindeki PDF'ten yapıldı:** sayfalar gömülü JPEG olarak çıkarılıp okundu. Hücrelerdeki kısa atıflar (`(s. 66-67)`, `(s. 80-81)`) yerindeydi - yani `ragSources` doluydu ve model dipnotu üretmiş olmak zorundaydı, çünkü ikisi de aynı `documentName` alanına bağlı. Geriye tek açıklama kaldı: çizici o modeli görmedi.
+- Yeni testler (4): rapor katmanının üç dosyası ve `index.html` için `no-store`, analiz yanıtları için `no-store`, ve tarayıcıya giden **baytların** depodaki dosyayla birebir aynı olduğu ("sunucu eski kopya servis ediyor" ihtimalini kapatır). Toplam 187 → 191 Python testi.
+- **Sunucunun yeniden başlatılması gerekir** - koşan süreç eski kodu tutuyor. Tarayıcıda bir kez sabit yenileme (Ctrl+F5) eski kopyayı düşürür.
+
 ## Kaynak Gösterimi Dipnota Taşındı - 2026-08-16
 
 - Belgenin resmî adı uzun ve F tablosunun her satırında tekrarlanınca "Kavramsal Bağlam" hücresini okunamaz kılıyordu. Akademik atıf düzenine geçildi: **hücrede kısa atıf** (`(s. 66-67)`), **belgenin tam adı tablonun altında dipnotta**, bir kez (`Kaynak: Ortaöğretim … Öğretim Programı … (2024)`).
