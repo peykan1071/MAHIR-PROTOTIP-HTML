@@ -110,6 +110,20 @@ bulunur.
 
 TDE kodları yalnız **Türk Dili ve Edebiyatı + 9. sınıf** profili seçildiğinde açılır. Başka bir derse TDE kodu gönderilmesi arka uç tarafından da reddedilir. Ayrıntılar için [TDE 9 pilot veri paketi](shared/pilot/tde9/README.md) incelenebilir.
 
+### Referans belgeyi dizine ekleme
+
+Müfredat teşhisinin dayandığı öğretim programı PDF'i şu komutla indekslenir:
+
+```bash
+python -m modal run rag_service.py \
+    --pdf-path "C:\yol\tdeogr.pdf" --program-id tde-9-tymm \
+    --start-page 65 --end-page 97 --replace
+```
+
+- **Belgenin adı komutta yazılmaz**, `rag_service.DOCUMENT_TITLES` kaydından gelir (`--document-title` ile geçersiz kılınabilir). Bu ad öğretmenin raporunda kaynak olarak görünüyor ("Kaynak: Ortaöğretim … Öğretim Programı … (2024), s. 66-67"), bu yüzden dosya adı değil belgenin resmî adıdır. Kayıtta olmayan bir program için komut hata verir - yanlış adla indekslemektense durmak doğrudur.
+- **`--replace` bayrağı, belge adı ya da parçalama değiştiyse ŞARTTIR.** Nokta kimliği içerik adreslidir ve `document_name` o kimliğin parçasıdır: yeni adla yazılan parçalar yeni kimlikler alır, eskiler üzerine yazılmaz ve dizinde aynı içerik iki kez kalır. Getirim bunu hatasızca yutar, yalnız sonuç bozulur.
+- `--start-page`/`--end-page` bu belgede 9. sınıf bölümüdür; PDF hazırlık ve 9-12. sınıfları birlikte kapsıyor.
+
 ## Sistem sınırı ve doğruluk yaklaşımı
 
 MAHİR’in mevcut analiz motoru kurallı ve deterministiktir:

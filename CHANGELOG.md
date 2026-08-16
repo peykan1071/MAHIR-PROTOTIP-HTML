@@ -2,6 +2,16 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Kaynakta Dosya Adı Yerine Belgenin Resmî Adı - 2026-08-16
+
+- Rapordaki kaynak gösterimi artık **"Ortaöğretim Türk Dili ve Edebiyatı Dersi Öğretim Programı - Türkiye Yüzyılı Maarif Modeli (2024), s. 66-67"** diyor; önce "tdeogr.pdf, s. 66-67" diyordu. Resmî bir rapor dayanağını dosya adıyla gösteremez.
+- Ad, indeksleme anında Qdrant payload'ına yazılıyor (`document_name`) - gösterim katmanında çevrilmiyor. Kaynağı yeni `rag_service.DOCUMENT_TITLES` kaydı: `program_id` → resmî ad. `--document-title` ile geçersiz kılınabilir; kayıtta olmayan program için komut **hata veriyor**, sessizce dosya adına düşmüyor. Sebep: yanlış adlı parçalar dizine girdikten sonra ancak temizleyip yeniden indeksleyerek düzelir ve o ana kadar üretilmiş her rapor kaynağını yanlış göstermiş olur.
+- **Kapaktan otomatik çıkarım denenmedi ve nedeni ölçüldü:** TDE9 belgesinin kapağında yıl, metin katmanında `2O24` (harf O, sıfır değil) olarak geçiyor - otomatik çıkarım yılı yanlış yazardı. Kapak düzeni her belgede farklı olduğu için temizleme kuralları da her yeni belgede yeniden yazılmak zorunda kalırdı.
+- **Yeniden indeksleme yapıldı** (118 parça, `--replace` ile). Yeni `--replace` bayrağı önce `clear_index(program_id)` çağırıyor ve **belge adı değiştiğinde şart**: nokta kimliği içerik adresli ve `document_name` o kimliğin parçası, yani yeni adla yazılan parçalar yeni kimlik alır, eskiler üzerine yazılmaz ve dizinde aynı içerik iki adla kalırdı. Getirim bunu hatasızca yutar, yalnız sonuç bozulur.
+- Canlı doğrulama: 8/8 teşhis kaynaklı ve sayfa aralıkları yeniden indekslemeden önceki ile aynı (66-67, 73-74, 80-81, 89-90) - getirim eşdeğer kaldı. Üç geniş sorguda 34 isabetin tamamı yeni adı taşıyor, eski dosya adı dizinde kalmamış.
+- `index_pdf` artık boş `document_name` reddediyor. README'ye indeksleme yordamı ve `--replace` tuzağı eklendi.
+- Yeni testler: kayıt çözümlemesi, geçersiz kılma, bilinmeyen programda hata, ad değişiminin nokta kimliğini değiştirdiğinin kanıtı. Toplam 181 → 187 Python testi. (Testlerden biri gerçek bir kusur yakaladı: yalnız boşluktan oluşan bir `--document-title` kaydı gölgeleyip "ad tanımlı değil" hatası veriyordu.)
+
 ## Müfredat Teşhisinde Kaynak Gösterimi (belge + sayfa) - 2026-08-16
 
 - Raporun F bölümündeki her müfredat temelli teşhisin ardında artık dayandığı kaynak yazıyor: **"(Kaynak: tdeogr.pdf, s. 66-67)"**. D bölümündeki "Kanıtları Gör" bir ORANIN hangi puanlardan geldiğini söylüyordu; bu da bir TEŞHİSİN hangi belge sayfasından geldiğini söylüyor.

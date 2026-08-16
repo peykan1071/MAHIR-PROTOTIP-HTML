@@ -20,6 +20,51 @@ def _hits(*scores):
     return [SimpleNamespace(score=score) for score in scores]
 
 
+class DocumentTitleTests(unittest.TestCase):
+    """Belgenin resmî adı - öğretmenin raporunda kaynak olarak görünen değer."""
+
+    def test_registered_program_resolves_to_its_official_title(self):
+        title = rag_service.resolve_document_title("tde-9-tymm")
+        self.assertIn("Türk Dili ve Edebiyatı Dersi Öğretim Programı", title)
+        self.assertIn("2024", title)
+
+    def test_title_is_not_a_file_name(self):
+        # Resmî bir rapor dayanağını "tdeogr.pdf" diye gösteremez.
+        for program_id, title in rag_service.DOCUMENT_TITLES.items():
+            with self.subTest(program=program_id):
+                self.assertNotIn(".pdf", title.lower())
+
+    def test_override_wins_over_the_registry(self):
+        self.assertEqual(
+            rag_service.resolve_document_title("tde-9-tymm", "Başka Belge (2025)"),
+            "Başka Belge (2025)",
+        )
+
+    def test_unknown_program_raises_instead_of_falling_back(self):
+        # Sessiz geri düşüş olsaydı yanlış adlı parçalar dizine girer ve o ana
+        # kadarki her rapor kaynağını yanlış göstermiş olurdu. Hata,
+        # indekslemeden ÖNCE verilmeli.
+        with self.assertRaises(ValueError) as caught:
+            rag_service.resolve_document_title("bilinmeyen-program")
+        self.assertIn("DOCUMENT_TITLES", str(caught.exception))
+
+    def test_blank_override_falls_back_to_the_registry(self):
+        self.assertEqual(
+            rag_service.resolve_document_title("tde-9-tymm", "   "),
+            rag_service.DOCUMENT_TITLES["tde-9-tymm"],
+        )
+
+    def test_renaming_a_document_changes_its_point_ids(self):
+        # Bu, `--replace` bayrağının VAROLUŞ SEBEBİ: ad değişince parçalar yeni
+        # kimlik alır, eskiler üzerine YAZILMAZ ve dizinde aynı içerik iki adla
+        # kalır. Getirim bunu hatasızca yutar, yalnız sonuç bozulur.
+        old = rag_service._deterministic_point_id("tde-9-tymm", "tdeogr.pdf", 3, "metin")
+        new = rag_service._deterministic_point_id(
+            "tde-9-tymm", rag_service.DOCUMENT_TITLES["tde-9-tymm"], 3, "metin"
+        )
+        self.assertNotEqual(old, new)
+
+
 class DeterministicPointIdTests(unittest.TestCase):
     def test_same_input_gives_same_id(self):
         first = rag_service._deterministic_point_id("tde-9-tymm", "tdeogr.pdf", 7, "metin")

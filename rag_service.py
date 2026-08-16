@@ -376,6 +376,50 @@ def _extract_original_pages(chunk: object, page_offset: int) -> list[int]:
     return sorted(pages)
 
 
+# Program kimliği -> referans belgenin RESMÎ adı. Bu ad Qdrant payload'ına
+# yazılıyor ve oradan öğretmenin raporuna çıkıyor ("Kaynak: ..., s. 66-67"),
+# yani dosya adı ("tdeogr.pdf") değil belgenin kendi kimliği olmalı - resmî
+# bir rapor, dayanağını dosya adıyla göstermez.
+#
+# Neden kayıt, neden elle yazım değil: ad her yeniden indekslemede birebir aynı
+# olmalı. Elle yazılsa iki indeksleme arasında farklılaşabilir ve dizinde aynı
+# belge iki ayrı adla görünürdü. Kod incelemesinden geçmesi de ayrı bir kazanç.
+#
+# Neden kapaktan otomatik çıkarılmıyor: TDE9 belgesinin kapağında yıl, metin
+# katmanında "2O24" (harf O, sıfır değil) olarak geçiyor ve kapak düzeni her
+# belgede farklı - temizleme kuralları her yeni belgede yeniden yazılırdı.
+#
+# Yeni bir referans belge eklendiğinde buraya tek satır eklenir; kayıtta
+# bulunmayan bir program için `--document-title` zorunlu olur.
+DOCUMENT_TITLES = {
+    "tde-9-tymm": (
+        "Ortaöğretim Türk Dili ve Edebiyatı Dersi Öğretim Programı - "
+        "Türkiye Yüzyılı Maarif Modeli (2024)"
+    ),
+}
+
+
+def resolve_document_title(program_id: str, override: str | None = None) -> str:
+    """İndekslenecek belgenin resmî adını çözer; bulunamazsa `ValueError`.
+
+    Sessiz bir geri düşüş (ör. dosya adına dönmek) KASITLI olarak yok: yanlış
+    ada sahip parçalar dizine girdikten sonra ancak `clear_index` + yeniden
+    indeksleme ile düzelir ve bu, o ana kadar üretilmiş her raporun kaynağını
+    yanlış göstermiş olur. Hata, indekslemeden ÖNCE verilmeli.
+    """
+
+    # Önce kırp, sonra geri düş: yalnız boşluktan oluşan bir `--document-title`
+    # (kabuk tırnak hatası) truthy olduğu için kaydı gölgeler ve "ad tanımlı
+    # değil" hatası verirdi - oysa kayıtta ad duruyor.
+    title = (override or "").strip() or (DOCUMENT_TITLES.get(program_id) or "").strip()
+    if not title:
+        raise ValueError(
+            f"'{program_id}' için resmî belge adı tanımlı değil. "
+            "rag_service.DOCUMENT_TITLES'a ekleyin ya da --document-title ile verin."
+        )
+    return title
+
+
 # uuid5 için sabit ad alanı - değeri değişirse aynı içerik farklı ID üretir,
 # yani bu string kalıcı bir şemanın parçasıdır ve DEĞİŞTİRİLMEMELİDİR.
 _POINT_ID_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "mahir-rag-chunk")
@@ -509,6 +553,19 @@ def index_pdf(
     sayfa numaraları (`pages`, kaynak göstermek için) yazılır; tespit
     edilemeyen alanlar `None`/boş liste kalır.
 
+    `document_name` belgenin RESMÎ ADIDIR, dosya adı değil (ör. "Ortaöğretim
+    Türk Dili ve Edebiyatı Dersi Öğretim Programı - Türkiye Yüzyılı Maarif
+    Modeli (2024)"). Bu değer payload'a yazılıp getirimde `sources` içinde geri
+    döner ve oradan öğretmenin raporundaki kaynak gösterimine çıkar - resmî bir
+    rapor dayanağını "tdeogr.pdf" diye gösteremez. Bu fonksiyon değeri
+    doğrulamaz (düz string olarak alır); adı çözen taraf çağırandır
+    (bkz. `DOCUMENT_TITLES` / `resolve_document_title`).
+
+    DİKKAT: `document_name` nokta kimliğinin parçası (`_deterministic_point_id`).
+    Var olan bir belgenin adı değiştirilip yeniden indekslenirse parçalar YENİ
+    kimlikler alır, eskiler üzerine yazılmaz ve dizinde aynı içerik iki adla
+    kalır. Ad değişiminde önce `clear_index(program_id)` çağrılmalı.
+
     Dönüş, `backend/app/remote_ocr_client.py`nin `run_remote_image_group_ocr`
     ile aynı (ok, mesaj, structuredData) kalıbını izler - bu fonksiyon Modal
     üzerinden `.remote()` ile çağrılacağı için hata durumunda İstisna
@@ -517,6 +574,8 @@ def index_pdf(
 
     if not pdf_bytes:
         return False, "PDF verisi boş.", None
+    if not document_name or not document_name.strip():
+        return False, "document_name boş olamaz (belgenin resmî adı gerekli).", None
     if len(pdf_bytes) > MAX_PDF_SIZE_BYTES:
         return False, "PDF 20 MB sınırını aşıyor.", None
     if not program_id or not program_id.strip():
@@ -1287,11 +1346,24 @@ def main(
     question: str = "Bu belge ne hakkında?",
     start_page: int | None = None,
     end_page: int | None = None,
+    document_title: str | None = None,
+    replace: bool = False,
 ) -> None:
     """Uçtan uca örnek kullanım:
 
         modal run rag_service.py --pdf-path C:\\yol\\ornek.pdf --program-id tde-9-tymm \
             --start-page 65 --end-page 97 --question "..."
+
+    Belgenin adı `DOCUMENT_TITLES` kaydından gelir; `--document-title` ile
+    geçersiz kılınabilir. Dosya adı KULLANILMAZ - bu ad öğretmenin raporundaki
+    kaynak gösteriminde görünüyor.
+
+    `--replace`: indekslemeden önce bu programa ait mevcut parçaları siler.
+    Belge adı DEĞİŞTİYSE bu ŞARTTIR. Sebep: nokta kimliği içerik adresli ve
+    `document_name` o kimliğin parçası (`_deterministic_point_id`) - yeni adla
+    yazılan parçalar YENİ kimlikler alır, eskiler üzerine yazılmaz ve dizinde
+    aynı içerik iki kez, iki farklı adla kalır. Getirim bunu hatasızca yutar,
+    yalnız sonuç bozulur.
 
     Bu fonksiyon yalnızca örnektir; hiçbir mevcut MAHIR backend dosyası bunu
     çağırmaz (proje kapsam kararı: yalnızca örnek kod, canlı entegrasyon yok -
@@ -1299,7 +1371,13 @@ def main(
     """
 
     pdf_bytes = Path(pdf_path).read_bytes()
-    document_name = Path(pdf_path).name
+    document_name = resolve_document_title(program_id, document_title)
+
+    if replace:
+        clear_ok, clear_message = clear_index.remote(program_id)
+        print(f"[rag_service] clear_index: ok={clear_ok} mesaj={clear_message}", flush=True)
+        if not clear_ok:
+            return
 
     print(f"[rag_service] '{document_name}' ({program_id}, sayfa {start_page}-{end_page}) dizine ekleniyor...", flush=True)
     index_ok, index_message, index_data = index_pdf.remote(
@@ -1327,7 +1405,11 @@ def main(
 #     rag = modal.Cls.from_name("turkish-rag-system", "RAGInference")
 #
 #     with open("belge.pdf", "rb") as f:
-#         ok, message, data = index_pdf.remote(f.read(), "belge.pdf", "tde-9-tymm")
+#         # İkinci argüman belgenin RESMÎ adı - dosya adı değil (bkz.
+#         # DOCUMENT_TITLES): bu değer öğretmenin raporunda kaynak olarak görünür.
+#         ok, message, data = index_pdf.remote(
+#             f.read(), "Ortaöğretim ... Öğretim Programı (2024)", "tde-9-tymm"
+#         )
 #
 #     ok, message, data = rag().query.remote("Soru metni", 5, "tde-9-tymm")
 #
