@@ -261,6 +261,25 @@ class TraceWireFormatTests(unittest.TestCase):
         self.assertFalse(entry["failed"])
         self.assertFalse(entry["skipped"])
 
+    def test_trace_reports_the_total_wall_clock(self):
+        # Ajan süreleri milisaniye, ortak LLM turu saniyeler mertebesinde;
+        # toplamı ayrıca taşımak tarayıcının "zaman nerede geçti"yi ek bir
+        # alan olmadan gösterebilmesini sağlıyor.
+        _analysis, trace = analyze_approved_data_traced(_payload())
+        self.assertGreaterEqual(trace["totalMs"], 0.0)
+        agent_total = sum(entry["durationMs"] for entry in trace["agents"])
+        self.assertGreaterEqual(
+            trace["totalMs"], agent_total, "Toplam, ajan sürelerinin altına düşemez."
+        )
+
+    def test_general_evaluation_path_still_reports_a_total(self):
+        # Hat koşmayan yol: iz boş ama alanın varlığı öngörülebilir kalmalı.
+        from backend.app.approved_data_analyzer import empty_trace
+
+        self.assertNotIn("totalMs", empty_trace())
+        _analysis, trace = analyze_approved_data_traced(_payload())
+        self.assertIn("totalMs", trace)
+
     def test_wire_trace_carries_no_student_rows(self):
         # Gizlilik kuralı `to_dict` kadar `to_wire` için de geçerli - tarayıcıya
         # giden biçim, gizlilik kapısının arkasına açılan bir yan kapı olmamalı.

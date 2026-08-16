@@ -2842,6 +2842,30 @@ const fileUploadBridge = (() => {
     // konteyneri o inceleme boyunca ayakta tutar.
     const warmUpRag = () => warmUp("/mahir-rag-warmup");
 
+    // --- Süre ölçümü ---
+    //
+    // İki uzun işlem (belge okuma ve analiz) sessizdi: öğretmen butona basıp
+    // bekliyor, ne kadar beklediği hiçbir yere yazılmıyordu. Ölçüm kırılımlı,
+    // çünkü tek bir toplam asıl soruyu yanıtlamıyor - aynı iş soğuk
+    // konteynerde 160 sn, sıcakta 15,7 sn sürebiliyor (ölçüldü).
+    //
+    // Biçimlendirme MAHIRReportExport.durationText'ten geliyor ("16,7 sn" /
+    // "340 ms", tr-TR); ikinci bir biçimlendirici yazmaya gerek yok.
+    const durationText = (ms) => window.MAHIRReportExport?.durationText?.(ms) ?? `${Math.round(ms)} ms`;
+
+    // Isıtmanın üzerinden geçen süre: "neden 45 sn sürdü"nün cevabı çoğu zaman
+    // burada. Kısaysa uzak konteyner hâlâ soğuk demektir.
+    const sinceWarmUp = (path) => (warmUpAt[path] ? durationText(Date.now() - warmUpAt[path]) : "ısıtılmadı");
+
+    const startTimer = (label) => {
+      const began = performance.now();
+      return (fields = {}) => {
+        const elapsed = performance.now() - began;
+        console.info(`[MAHIR][süre] ${label} toplam ${durationText(elapsed)}`, fields);
+        return durationText(elapsed);
+      };
+    };
+
     const selectFiles = (files) => {
       const incoming = Array.from(files || []);
       if (!incoming.length) return;
@@ -3442,6 +3466,9 @@ const fileUploadBridge = (() => {
       approvalButton.textContent = "Analiz Başlatılıyor…";
       showMessage("Öğretmen onaylı veriler analiz motoruna aktarılıyor.");
 
+      // Ölçüm doğrulamalardan sonra, istek gitmeden hemen önce başlıyor.
+      const stopTimer = startTimer("Analiz");
+
       fetch("/mahir-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3459,7 +3486,18 @@ const fileUploadBridge = (() => {
           renderAnalysis(analysis, payload.trace);
           screenManager.approveData();
           screenManager.showScreen("analysis-screen");
-          showMessage("Analiz tamamlandı. Öğrenme kanıtlarına dayalı değerlendirme raporu görüntülenmeye hazırdır.", "success");
+          // Kırılım izden geliyor (Faz 4): `totalMs` sunucudaki toplam,
+          // `llmRound` ortak dil modeli turu. Tarayıcı toplamı ≥ rota ≥ tur
+          // olmalı; aradaki farklar ağ ve JSON taşıması.
+          const round = payload.trace?.llmRound || {};
+          const elapsed = stopTimer({
+            rota: durationText(payload.trace?.totalMs ?? 0),
+            llmTuru: round.promptCount ? durationText(round.durationMs) : "yok",
+            istem: round.promptCount || 0,
+            ajan: payload.trace?.agents?.length || 0,
+            isitmadanBeri: sinceWarmUp("/mahir-rag-warmup")
+          });
+          showMessage(`Analiz tamamlandı. Öğrenme kanıtlarına dayalı değerlendirme raporu görüntülenmeye hazırdır. (${elapsed})`, "success");
         })
         .catch((error) => {
           const approvalMessage = document.querySelector("[data-approval-message]");
@@ -3467,7 +3505,8 @@ const fileUploadBridge = (() => {
             approvalMessage.textContent = error.message;
             approvalMessage.focus({ preventScroll: true });
           }
-          showMessage(error.message, "error");
+          const elapsed = stopTimer({ hata: error.message, isitmadanBeri: sinceWarmUp("/mahir-rag-warmup") });
+          showMessage(`${error.message} (${elapsed})`, "error");
         })
         .finally(() => {
           approvalButton.disabled = false;
@@ -3510,6 +3549,11 @@ const fileUploadBridge = (() => {
           }));
       };
 
+      // Ölçüm burada başlıyor - doğrulamalardan SONRA, istek gitmeden hemen
+      // önce: eksik alan uyarısıyla dönülen yol bir "OCR işlemi" değil.
+      const stopTimer = startTimer("OCR");
+      const uploadedBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+
       // Tek elemanlı liste: aşağıdaki birleştirme mantığı olduğu gibi kalıyor,
       // böylece yanıt sözleşmesi ve renderValidationData girdisi değişmiyor.
       uploadFileGroup(selectedFiles).then((payload) => [payload])
@@ -3542,12 +3586,26 @@ const fileUploadBridge = (() => {
           screenManager.showScreen("validation-screen");
           warmUpRag();
           console.info("[MAHIR] Belge grubu backend alıcısına gönderildi.", { fileCount: selectedFiles.length, studentCount: mergedData.students.length });
-          showMessage(message, "success");
+          const elapsed = stopTimer({
+            dosya: selectedFiles.length,
+            boyut: formatBytes(uploadedBytes),
+            ogrenci: mergedData.students.length,
+            isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
+          });
+          showMessage(`${message} (${elapsed})`, "success");
         })
         .catch((error) => {
           window.clearInterval(progressTimer);
           console.warn("[MAHIR] Dosya backend alıcısına gönderilemedi.", error);
-          showMessage("Belge okuma servisine ulaşılamadı. Prototip sunucusunu çalıştırıp yeniden deneyiniz.", "error");
+          // Hata yolu da ölçülüyor: "45 sn sonra patladı" bilgisi, "45 sn
+          // sürdü" kadar değerli - zaman aşımını yavaşlıktan ayıran şey bu.
+          const elapsed = stopTimer({
+            dosya: selectedFiles.length,
+            boyut: formatBytes(uploadedBytes),
+            hata: error.message,
+            isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
+          });
+          showMessage(`Belge okuma servisine ulaşılamadı. Prototip sunucusunu çalıştırıp yeniden deneyiniz. (${elapsed})`, "error");
           showReport("Backend bağlantısı kurulamadı.");
         })
         .finally(() => {

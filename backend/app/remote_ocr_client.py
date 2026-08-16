@@ -16,6 +16,7 @@ import urllib.request
 import uuid
 
 from .file_receiver import UploadedFile
+from .timing import stage
 
 _REMOTE_TIMEOUT_SECONDS = 300
 _SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
@@ -43,9 +44,17 @@ def run_remote_image_group_ocr(
         headers=headers,
     )
 
+    # Uzak çağrının kendi süresi ayrı ölçülüyor: yerel toplamla arasındaki fark
+    # yerel ayrıştırma, buradaki büyük süre ise uzak konteynerin soğuk
+    # başlangıcı (ölçülen 30-50 sn, gerçek OCR yalnız 7-12 sn). Süreyi dönüş
+    # tipine eklemek yerine burada basmak kasıtlı: 3'lü demet
+    # `run_image_group_ocr` -> `run_existing_backend_flow` -> `do_POST` boyunca
+    # akıyor ve testler ona bağlı; her katmanın kendi satırını basması
+    # `ocr_engine`in bugün yaptığının aynısı.
     try:
-        with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+        with stage("ocr-uzak", dosya=len(uploaded_files), bayt=len(body)):
+            with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
+                payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
         # The worker still answers with its usual {"ok", "message", ...} JSON body even on a
         # non-2xx status - surface that message instead of the generic "HTTP Error 500" text.

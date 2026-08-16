@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 from typing import Any
 
 # Charter süzgeci `charter_guard`a taşındı: kısıt tek bir ajanın değil, LLM
@@ -66,8 +67,23 @@ def analyze_approved_data_traced(
     sözleşmesi, iz ise "bu raporu kim üretti"nin cevabı - taşıma katmanı
     üstverisi. Ayrı tutmak rapor sözleşmesini teknik alanlarla kirletmiyor ve
     kaydedilmiş eski çalışmaları geçerli bırakıyor.
+
+    İze `totalMs` de yazılıyor: ajan süreleri milisaniye mertebesinde, ortak
+    LLM turu ise saniyeler sürüyor - toplamı ayrıca taşımak, tarayıcının
+    "zaman nerede geçti"yi ek bir alan olmadan gösterebilmesini sağlıyor.
+    Ölçüm hatalı yolda YAPILMIYOR: doğrulama hatası istisna olarak çıkıyor ve
+    zaten ölçülecek bir iş yapılmamış oluyor.
     """
 
+    began = time.monotonic()
+    analysis, trace = _analyze_and_trace(payload)
+    trace["totalMs"] = round((time.monotonic() - began) * 1000, 1)
+    return analysis, trace
+
+
+def _analyze_and_trace(
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
     _assert_privacy_safe_students(payload.get("students"))
     questions = payload.get("questions")
     students = payload.get("students")

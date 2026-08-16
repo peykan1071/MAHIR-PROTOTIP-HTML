@@ -2,6 +2,25 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## OCR ve Analiz İşlemlerinde Süre Ölçümü - 2026-08-16
+
+- İki uzun işlem (belge okuma ve "Verileri Onayla ve Analize Geç") sessizdi: öğretmen butona basıp bekliyor, ne kadar beklediği hiçbir yere yazılmıyordu. Artık ikisinin de başında ve sonunda süre alınıyor; sonuç **ekranda** (bildirim cümlesinin sonunda), **tarayıcı konsolunda** ve **yerel sunucu konsolunda** görünüyor.
+- Ölçüm **kırılımlı**, çünkü tek bir toplam asıl soruyu yanıtlamıyor. Canlı doğrulama bunu birebir gösterdi - aynı görsel, arka arkaya iki koşu:
+
+  | Koşu | `ocr-uzak` | `ocr-yerel` | İstemci toplam |
+  |---|---|---|---|
+  | Soğuk konteyner | **54,5 sn** | 54,5 sn | 54,6 sn |
+  | Sıcak konteyner | **5,7 sn** | 5,8 sn | 5,8 sn |
+
+  48,8 saniyelik farkın tamamı `ocr-uzak` satırında; yerel işlemede değil. "Neden 45 sn sürdü" sorusunun cevabı tam olarak budur ve tek bir toplam sayı bunu söyleyemezdi.
+- Yeni `backend/app/timing.py`: tek bağlam yöneticisi (`stage`), tek çıktı biçimi (`[MAHIR][süre] <ad> sure=X.Xs alan=değer`). İki sert kuralı var - **istisnayı asla yutmaz** (ölçüm, ölçtüğü akışın davranışını değiştirmemeli) ve **hata hâlinde de basar** (`hata=evet`), çünkü "45 sn sonra patladı" bilgisi "45 sn sürdü" kadar değerli. `BaseException` yakalanıyor ki yarıda kesilen uzun bir OCR da ölçülsün.
+- Ölçüm noktaları iç içe: `ocr-uzak` (yalnız uzak HTTP çağrısı) ⊂ `ocr-yerel` (yerel alıcının tamamı) ⊂ tarayıcı toplamı; analizde `llmRound` ⊂ `analiz-rota` ⊂ tarayıcı toplamı. Farklar sırasıyla yerel ayrıştırmayı ve ağ+JSON taşımasını veriyor (ölçüldü: analizde 55 ms).
+- Analiz toplamı paralel bir mekanizma yerine **Faz 4'ün izine** eklendi (`trace.totalMs`), böylece tarayıcı elindeki `trace` nesnesinden hem toplamı hem `llmRound.durationMs`i okuyabiliyor. Uzak OCR süresi için dönüş tipi **değiştirilmedi** - 3'lü demet üç katman boyunca akıyor ve testler ona bağlı; her katman kendi satırını basıyor (`ocr_engine`in bugün yaptığının aynısı).
+- Tarayıcı konsolunda `isitmadanBeri` alanı: ısıtma dosya seçilince ateşleniyor ve 30 sn kısılıyor. Isıtmanın üzerinden geçen süre kısaysa konteyner hâlâ soğuk demektir - yorumlamanın anahtarı bu.
+- Süre metni Faz 4'te dışa açılan `MAHIRReportExport.durationText` ile biçimleniyor ("16,7 sn" / "340 ms", tr-TR); ikinci bir biçimlendirici yazılmadı.
+- Rapora süre bilgisi **eklenmedi**: I. bölüm ajan izini gösteriyor, duvar saati ölçümü geliştirici enstrümantasyonu ve resmî belgeye ait değil.
+- Yeni testler: `tests/test_timing.py` (9 test). Toplam 155 → 167 Python testi.
+
 ## Çok Ajanlı Analiz Hattı - Faz 4: İzlenebilirlik Yüzeyi - 2026-08-16
 
 - **Hat üç fazdır çalışıyordu ama öğretmen göremiyordu.** `analyze_approved_data` yalnız `run_pipeline(...).analysis` döndürüyor, beş ajanın izini ve bulgularını o satırda düşürüyordu. Artık `analyze_approved_data_traced` ikisini birlikte veriyor ve iz `/mahir-analyze` yanıtında **`analysis`in KARDEŞİ** olarak taşınıyor - içinde değil, çünkü biri raporun kendisi diğeri raporun nasıl üretildiği. Rapor sözleşmesi değişmedi; kaydedilmiş eski çalışmalar ve tüm eşdeğerlik testleri geçerli kaldı.

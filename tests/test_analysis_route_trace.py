@@ -98,6 +98,12 @@ class AnalysisRouteTraceTests(unittest.TestCase):
         self.assertNotIn("Ö-001", blob)
         self.assertNotIn("scores", blob)
 
+    def test_route_reports_the_server_side_total(self):
+        # Tarayıcı kendi toplamını ölçüyor; aradaki fark ağ ve JSON taşıması.
+        # Sunucu toplamı gövdeye çıkmazsa o fark hesaplanamaz.
+        _status, body = _post(self.server, _PAYLOAD)
+        self.assertGreaterEqual(body["trace"]["totalMs"], 0.0)
+
     def test_validation_error_still_answers_422_without_a_trace(self):
         # Öğretmenin düzeltmesi gereken veri hatası; hat hiç koşmadı, iz de yok.
         broken = {**_PAYLOAD, "students": [{"studentRef": "Ö-001", "scores": [8]}]}

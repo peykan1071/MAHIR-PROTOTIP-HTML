@@ -24,6 +24,7 @@ from .docx_parser import parse_mahir_docx
 from .pdf_parser import parse_score_pdf
 from .spreadsheet_parser import parse_score_xlsx
 from .approved_data_analyzer import analyze_approved_data_traced
+from .timing import stage
 
 
 UPLOAD_PATH = "/mahir-upload"
@@ -181,7 +182,19 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 + ", ".join(f"{r.file_name} ({r.extension})" for r in results),
                 flush=True,
             )
-            flow_ok, flow_message, structured_data = run_existing_backend_flow(uploaded_files, results)
+            # Yerel toplam: isteğin alınmasından yanıtın hazır olmasına kadar.
+            # `remote_ocr_client` kendi satırını ayrıca basıyor; aradaki fark
+            # yerel ayrıştırma, uzak satırdaki büyük süre ise soğuk başlangıç.
+            with stage(
+                "ocr-yerel",
+                dosya=len(uploaded_files),
+                bayt=sum(len(f.content) for f in uploaded_files),
+            ) as measured:
+                flow_ok, flow_message, structured_data = run_existing_backend_flow(
+                    uploaded_files, results
+                )
+                measured["ogrenci"] = len((structured_data or {}).get("students") or [])
+                measured["sonuc"] = "tamam" if flow_ok else "basarisiz"
 
             if flow_ok:
                 self._send_json(
@@ -234,7 +247,10 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
 
         try:
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
-            result, trace = analyze_approved_data_traced(payload)
+            with stage("analiz-rota", soru=len(payload.get("questions") or [])) as measured:
+                result, trace = analyze_approved_data_traced(payload)
+                measured["ogrenci"] = len(payload.get("students") or [])
+                measured["istem"] = (trace.get("llmRound") or {}).get("promptCount", 0)
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
             self._send_json(422, {"ok": False, "message": str(error)})
             return
