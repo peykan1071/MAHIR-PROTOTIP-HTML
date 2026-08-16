@@ -423,6 +423,42 @@
     };
   };
 
+  // "Bu teşhis nereden geldi?" sorusunun cevabı: hangi belgenin hangi sayfası.
+  // D bölümündeki "Kanıtları Gör" bir ORANIN hangi puanlardan geldiğini
+  // söylüyor; bu da bir TEŞHİSİN hangi müfredat sayfasından geldiğini.
+  //
+  // Sayfa numaraları orijinal PDF'e göre (backend `_merge_rag_sources`).
+  // Ardışık sayfalar aralığa indirgeniyor: "s. 66-68", "s. 66, 71" - sekiz
+  // getirim isabetinin sayfa listesi aksi hâlde hücreyi doldururdu.
+  const pageRanges = (pages) => {
+    const sorted = [...new Set((pages || []).filter((page) => Number.isInteger(page) && page > 0))]
+      .sort((a, b) => a - b);
+    const parts = [];
+    let start = null;
+    let previous = null;
+    sorted.forEach((page) => {
+      if (start === null) { start = previous = page; return; }
+      if (page === previous + 1) { previous = page; return; }
+      parts.push(start === previous ? `${start}` : `${start}-${previous}`);
+      start = previous = page;
+    });
+    if (start !== null) parts.push(start === previous ? `${start}` : `${start}-${previous}`);
+    return parts.join(", ");
+  };
+
+  const sourceReference = (outcome) => {
+    const sources = Array.isArray(outcome.ragSources) ? outcome.ragSources : [];
+    const cited = sources
+      .map((source) => {
+        const name = normalizeText(source?.documentName);
+        if (!name) return "";
+        const pages = pageRanges(source?.pages);
+        return pages ? `${name}, s. ${pages}` : name;
+      })
+      .filter(Boolean);
+    return cited.length ? `(Kaynak: ${cited.join("; ")})` : "";
+  };
+
   const buildDevelopmentNeedsBlock = () => {
     const outcomes = getAnalysis().outcomes || [];
     const targets = outcomes.filter((item) => Number(item.successRate) < 0.70);
@@ -437,7 +473,12 @@
         normalizeText(item.decision),
         Number(item.successRate) < 0.50 ? "Öncelikli" : "Gelişim ihtiyacı"
       ];
-      if (hasRagContext) row.push(normalizeText(item.ragContext));
+      // Kaynak, teşhisin ARDINA ekleniyor - ayrı sütun değil: A4 genişliğinde
+      // tablo zaten beş sütun ve altıncısı okunabilirliği bozardı. Kaynağı
+      // olmayan (eski analiz, kaydedilmiş çalışma) satır bugünkü gibi görünür.
+      if (hasRagContext) {
+        row.push([normalizeText(item.ragContext), sourceReference(item)].filter(Boolean).join(" "));
+      }
       return row;
     });
     const header = ["Sıra", "Tespit Edilen İhtiyaç", "Değerlendirme Sonucu", "Öncelik Düzeyi"];

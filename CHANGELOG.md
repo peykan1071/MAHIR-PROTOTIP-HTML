@@ -2,6 +2,16 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Müfredat Teşhisinde Kaynak Gösterimi (belge + sayfa) - 2026-08-16
+
+- Raporun F bölümündeki her müfredat temelli teşhisin ardında artık dayandığı kaynak yazıyor: **"(Kaynak: tdeogr.pdf, s. 66-67)"**. D bölümündeki "Kanıtları Gör" bir ORANIN hangi puanlardan geldiğini söylüyordu; bu da bir TEŞHİSİN hangi belge sayfasından geldiğini söylüyor.
+- **Yeni indeksleme veya yeni sorgu gerekmedi.** Sayfa numaraları Qdrant payload'ında zaten vardı (`pages`) ve uçtan `sources` içinde geri dönüyordu; `PedagogicalAnalysisAgent.apply_llm` yalnız "kaynak var mı" diye bakıp listeyi atıyordu. Artık `outcome["ragSources"]` olarak taşınıyor.
+- Sayfa numaraları **orijinal PDF'e** göre: müfredat PDF'i sınıf/tema aralıklarına bölünerek indeksleniyor ve `rag_service.py::_extract_original_pages` düzeltmesi olmasa numaralar her dilimde 1'den başlardı.
+- Getirim isabetleri belge başına **tek satıra indirgeniyor** ve ardışık sayfalar aralığa iniyor ("s. 66-68", "s. 66, 71"): sekiz isabetin ham sayfa listesi hücreyi doldururdu. Kaynak ayrı sütun değil, teşhisin ardına ekleniyor - A4 genişliğinde tablo zaten beş sütun.
+- Canlı doğrulama (8 zayıf çıktı, 4 tema): **8/8 teşhis kaynaklı.** Sonuç getirimi de doğruluyor - her tema farklı ve ardışık bir aralık gösteriyor ve tema sırasıyla artıyorlar: s. 66-67, 73-74, 80-81, 89-90. Tema filtresinin doğru çalıştığının bağımsız kanıtı.
+- Alan varlığı öngörülebilir: hangi yoldan geçilirse geçilsin (program yok, getirim boş, LLM kapalı) `ragSources` boş liste olarak var. Bozuk kaynak kaydı sessizce eleniyor, analiz kesilmiyor.
+- Yeni testler: `tests/report-sources.test.js` (sayfa aralığı sıkıştırma, iki belge, kaynaksız satır, geriye dönük uyum) ve backend'de kaynak birleştirme testleri. Toplam 176 → 181 Python testi, 6 → 7 node dosyası.
+
 ## Teşhis Prompt'u: Bloom Kaldırıldı, Müfredata Demirlendi - 2026-08-16
 
 - **Bloom taksonomisi tamamen kaldırıldı.** Gerekçe ölçüldü: sekiz yanıtın **tamamı** Bloom cümlesiyle açılıyor ("Bu kazanımın bilişsel düzeyi Uygulama ve %55..."), yanıt başına 2-8 kez basamak adı geçiyordu. Buna karşılık **temanın adı 0/8 yanıtta** geçiyor, yalnız 2/8 yanıt müfredattan somut bir öğe anıyordu. Yani getirim kusursuz çalışırken (8/8 kaynak dolu) model, ona **zaten söylediğimiz** şeyi (düzey, oran, şiddet) tekrarlıyor; yalnızca getirimin bilebileceği şeyi - o temanın müfredat metnini - kullanmıyordu.

@@ -214,6 +214,75 @@ class LlmTraceTests(unittest.TestCase):
                 self.assertEqual(entry["llmCalls"], [])
 
 
+class DiagnosisSourceTests(unittest.TestCase):
+    """Teşhisin dayandığı belge/sayfa öğretmene ulaşıyor mu.
+
+    Veri uçtan zaten geliyordu; `apply_llm` yalnız "kaynak var mı" diye bakıp
+    listeyi atıyordu - teşhis raporda görünüyor ama neye dayandığı görünmüyordu.
+    """
+
+    def _outcomes(self, sources):
+        def fake(items, remote_url):
+            return True, "ok", [
+                {
+                    "name": item["name"],
+                    "answer": "teşhis" if "retrieval" in item else "",
+                    "sources": sources if "retrieval" in item else [],
+                    "strippedSentences": 0,
+                }
+                for item in items
+            ]
+
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+            with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
+                return analyze_approved_data(_tde_payload())["outcomes"]
+
+    def test_document_and_pages_reach_the_analysis(self):
+        outcomes = self._outcomes([
+            {"documentName": "tdeogr.pdf", "pages": [66]},
+            {"documentName": "tdeogr.pdf", "pages": [67]},
+        ])
+        self.assertEqual(
+            outcomes[0]["ragSources"], [{"documentName": "tdeogr.pdf", "pages": [66, 67]}]
+        )
+
+    def test_hits_from_one_document_collapse_to_a_single_entry(self):
+        # Sekiz isabet çoğu zaman aynı belgenin komşu sayfalarından gelir;
+        # hepsini ayrı satır göstermek raporu kaynak listesiyle doldururdu.
+        outcomes = self._outcomes([{"documentName": "tdeogr.pdf", "pages": [66]}] * 8)
+        self.assertEqual(len(outcomes[0]["ragSources"]), 1)
+        self.assertEqual(outcomes[0]["ragSources"][0]["pages"], [66])
+
+    def test_two_documents_stay_separate(self):
+        outcomes = self._outcomes([
+            {"documentName": "tdeogr.pdf", "pages": [66]},
+            {"documentName": "ek-kilavuz.pdf", "pages": [4, 3]},
+        ])
+        by_name = {item["documentName"]: item["pages"] for item in outcomes[0]["ragSources"]}
+        self.assertEqual(by_name["tdeogr.pdf"], [66])
+        self.assertEqual(by_name["ek-kilavuz.pdf"], [3, 4], "Sayfalar sıralı olmalı.")
+
+    def test_malformed_source_entries_are_dropped_not_raised(self):
+        # Uzak uç sözleşmeyi bozarsa alan boş kalır; analiz kesilmez.
+        outcomes = self._outcomes([
+            {"documentName": "", "pages": [5]},
+            {"pages": [7]},
+            {"documentName": "tdeogr.pdf", "pages": ["altmışaltı", -3, None]},
+            "bozuk",
+        ])
+        self.assertEqual(
+            outcomes[0]["ragSources"], [{"documentName": "tdeogr.pdf", "pages": []}]
+        )
+
+    def test_field_is_always_present_even_without_a_diagnosis(self):
+        # Alan varlığı öngörülebilir olmalı - `ragContext` ile aynı ilke.
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
+            outcomes = analyze_approved_data(_tde_payload())["outcomes"]
+        for outcome in outcomes:
+            with self.subTest(code=outcome["outcomeCode"]):
+                self.assertEqual(outcome["ragSources"], [])
+
+
 class AnomalyAgentTests(unittest.TestCase):
     def test_anomaly_prompt_carries_no_student_data(self):
         # Gizlilik kapısı kimlik alanlarını reddediyor; bu prompt o sınırın

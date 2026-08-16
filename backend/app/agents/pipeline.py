@@ -340,13 +340,19 @@ class PedagogicalAnalysisAgent:
         )
 
     def apply_llm(self, context: AgentContext) -> AgentResult:
-        """Teşhis yanıtlarını `ragContext`e yazar.
+        """Teşhis yanıtlarını `ragContext`e, dayandığı kaynakları `ragSources`a yazar.
 
         Sonrası-işleme bugünküyle birebir aynı: reddetme ön eki kırpılır,
         kaynak yoksa çıktı boş bırakılır, charter süzgeci zaten `agents/llm.py`
         içinde uygulanmıştır. Sonuç gelmemişse (LLM yapılandırılmamış, tur
         başarısız) `ragContext` boş kalır - RAG arızası öğretmenin analizini
         asla kesmez.
+
+        `ragSources` Faz 4'ün açıklanabilirlik çizgisini müfredat teşhisine
+        taşıyor: D bölümündeki "Kanıtları Gör" bir oranın hangi PUANLARDAN
+        geldiğini söylüyordu; bu da bir teşhisin hangi BELGE SAYFASINDAN
+        geldiğini söylüyor. Veri zaten uçtan geliyordu (`sources`) ve yalnız
+        "boş mu" diye bakılıp atılıyordu.
         """
 
         from ..approved_data_analyzer import _RAG_NO_ANSWER_TEXT
@@ -375,8 +381,13 @@ class PedagogicalAnalysisAgent:
                 continue
             stripped += int(result.get("strippedSentences") or 0)
             outcome["ragContext"] = answer
+            outcome["ragSources"] = _merge_rag_sources(result.get("sources"))
             grounded += 1
-            _logger.info("RAG dolduruldu: cikti=%s sebep=basarili", code)
+            _logger.info(
+                "RAG dolduruldu: cikti=%s sebep=basarili kaynak=%d",
+                code,
+                len(outcome["ragSources"]),
+            )
 
         return AgentResult(
             outputs={"curriculumGroundedCount": grounded, "llmStrippedSentences": stripped}
@@ -451,6 +462,42 @@ class ReportingAgent:
         )
 
 
+def _merge_rag_sources(sources: Any) -> list[dict[str, Any]]:
+    """Getirim isabetlerini belge başına tek satıra indirger.
+
+    Uçtan sekize kadar isabet dönüyor ve çoğu AYNI belgenin komşu
+    sayfalarından; hepsini olduğu gibi göstermek raporu kaynak listesiyle
+    doldururdu. Belge başına birleştirip sayfaları tekilleştiriyoruz -
+    öğretmenin ihtiyacı "hangi belgenin hangi sayfası", kaç parça çekildiği
+    değil.
+
+    Sayfa numaraları ORİJİNAL PDF'e göre (bkz. rag_service.py
+    `_extract_original_pages`): müfredat PDF'i sınıf/tema aralıklarına
+    bölünerek indeksleniyor ve o düzeltme yapılmasa numaralar her dilimde
+    1'den başlardı.
+    """
+
+    if not isinstance(sources, list):
+        return []
+
+    pages_by_document: dict[str, set[int]] = {}
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        name = str(source.get("documentName") or "").strip()
+        if not name:
+            continue
+        pages = pages_by_document.setdefault(name, set())
+        for page in source.get("pages") or []:
+            if isinstance(page, int) and page > 0:
+                pages.add(page)
+
+    return [
+        {"documentName": name, "pages": sorted(pages)}
+        for name, pages in pages_by_document.items()
+    ]
+
+
 def _enqueue_diagnosis_prompts(
     context: AgentContext, outcome_results: list[dict[str, Any]], program: Any
 ) -> dict[str, dict[str, Any]]:
@@ -472,8 +519,11 @@ def _enqueue_diagnosis_prompts(
         _normalize_theme_for_rag,
     )
 
+    # Alanların varlığı HER ZAMAN öngörülebilir olmalı - hangi yoldan geçilirse
+    # geçilsin (program yok, getirim boş, LLM kapalı) tarayıcı aynı şekli görür.
     for outcome in outcome_results:
         outcome["ragContext"] = ""
+        outcome["ragSources"] = []
 
     if program is None:
         _logger.info("RAG atlandı: sebep=program-yok")
