@@ -3216,7 +3216,10 @@ const fileUploadBridge = (() => {
       readButton.textContent = images ? "Çizelgeleri Oku ve Kontrol Et" : "Verileri Oku ve Kontrol Et";
     };
 
-    const showReport = (text) => {
+    const SAFE_REPORT_INTRO = "Bu rapor; öğretmen tarafından onaylanan sınav verileri, seçilen sınav türü ve ilişkilendirilen öğrenme çıktıları temel alınarak hazırlanmıştır.";
+    const REPORT_UNAVAILABLE_MESSAGE = "Analiz özeti oluşturulamadı. Verileri ve servis bağlantısını kontrol ederek yeniden deneyiniz.";
+
+    const showReportIntro = (text = SAFE_REPORT_INTRO) => {
       const reportTarget = document.querySelector("[data-report-intro]");
       if (!reportTarget) return;
       reportTarget.textContent = text;
@@ -4080,9 +4083,7 @@ const fileUploadBridge = (() => {
             warnings: ["MAHİR belge alanlarını otomatik olarak okuyamadı. Okul numaralarını ve puanları kontrol ekranında tamamlayınız."],
             summary: {}
           });
-          const reportText = payloads.map((payload) => payload.reportText || payload.report || payload.report_text).find(Boolean);
-          const reportRequest = reportText ? Promise.resolve(reportText) : fetch(`/shared/report-example.txt?ts=${Date.now()}`).then((reportResponse) => reportResponse.ok ? reportResponse.text() : message);
-          reportRequest.then(showReport).catch(() => showReport(message));
+          showReportIntro();
           screenManager.showScreen("validation-screen");
           warmUpRag();
           console.info("[MAHIR] Belge grubu backend alıcısına gönderildi.", { fileCount: selectedFiles.length, studentCount: mergedData.students.length });
@@ -4106,7 +4107,7 @@ const fileUploadBridge = (() => {
             isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
           });
           showMessage(`Belge okuma servisine ulaşılamadı. Prototip sunucusunu çalıştırıp yeniden deneyiniz. (${elapsed})`, "error");
-          showReport("Backend bağlantısı kurulamadı.");
+          showReportIntro(REPORT_UNAVAILABLE_MESSAGE);
         })
         .finally(() => {
           readButton.disabled = false;
