@@ -49,10 +49,25 @@
     return `<w:tc><w:tcPr>${width}${gridSpan}${shade}${borders}<w:tcMar><w:top w:w="90" w:type="dxa"/><w:left w:w="120" w:type="dxa"/><w:bottom w:w="90" w:type="dxa"/><w:right w:w="120" w:type="dxa"/></w:tcMar></w:tcPr>${content}</w:tc>`;
   };
 
+  const columnWidthsDxa = (weights, columnCount) => {
+    const normalized = Array.isArray(weights) && weights.length === columnCount
+      ? weights.map((value) => Math.max(Number(value) || 0, 0))
+      : Array.from({ length: columnCount }, () => 1);
+    const total = normalized.reduce((sum, value) => sum + value, 0) || columnCount;
+    let allocated = 0;
+    return normalized.map((value, index) => {
+      const width = index === columnCount - 1
+        ? CONTENT_WIDTH_DXA - allocated
+        : Math.floor(CONTENT_WIDTH_DXA * value / total);
+      allocated += width;
+      return width;
+    });
+  };
+
   const tableXml = (rows, options = {}) => {
     if (!rows?.length) return "";
     const columnCount = Math.max(...rows.map((row) => row.length), 1);
-    const width = Math.floor(CONTENT_WIDTH_DXA / columnCount);
+    const widths = columnWidthsDxa(options.widths, columnCount);
     const tableRows = rows.map((row, rowIndex) => {
       const rowProps = `<w:trPr><w:cantSplit/>${rowIndex === 0 ? "<w:tblHeader/>" : ""}</w:trPr>`;
       const cells = Array.from({ length: columnCount }, (_, index) => {
@@ -63,11 +78,11 @@
           color: header ? "17365D" : "1F1F1F",
           after: 0,
           line: 224
-        }), { width, shade: header ? "D9EAF7" : (labelColumn ? "F8FBFD" : "") });
+        }), { width: widths[index], shade: header ? "D9EAF7" : (labelColumn ? "F8FBFD" : "") });
       }).join("");
       return `<w:tr>${rowProps}${cells}</w:tr>`;
     }).join("");
-    return `<w:tbl><w:tblPr><w:tblW w:w="${CONTENT_WIDTH_DXA}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblInd w:w="0" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="9EBCD3"/><w:left w:val="single" w:sz="4" w:color="9EBCD3"/><w:bottom w:val="single" w:sz="4" w:color="9EBCD3"/><w:right w:val="single" w:sz="4" w:color="9EBCD3"/><w:insideH w:val="single" w:sz="4" w:color="9EBCD3"/><w:insideV w:val="single" w:sz="4" w:color="9EBCD3"/></w:tblBorders></w:tblPr><w:tblGrid>${Array.from({ length: columnCount }, () => `<w:gridCol w:w="${width}"/>`).join("")}</w:tblGrid>${tableRows}</w:tbl>${options.after === false ? "" : paragraph("", "Normal", { after: 70, line: 120 })}`;
+    return `<w:tbl><w:tblPr><w:tblW w:w="${CONTENT_WIDTH_DXA}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblInd w:w="0" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="9EBCD3"/><w:left w:val="single" w:sz="4" w:color="9EBCD3"/><w:bottom w:val="single" w:sz="4" w:color="9EBCD3"/><w:right w:val="single" w:sz="4" w:color="9EBCD3"/><w:insideH w:val="single" w:sz="4" w:color="9EBCD3"/><w:insideV w:val="single" w:sz="4" w:color="9EBCD3"/></w:tblBorders></w:tblPr><w:tblGrid>${widths.map((width) => `<w:gridCol w:w="${width}"/>`).join("")}</w:tblGrid>${tableRows}</w:tbl>${options.after === false ? "" : paragraph("", "Normal", { after: 70, line: 120 })}`;
   };
 
   const sectionBand = (heading) => `<w:tbl><w:tblPr><w:tblW w:w="${CONTENT_WIDTH_DXA}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblInd w:w="0" w:type="dxa"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="2F75B5"/><w:left w:val="single" w:sz="4" w:color="2F75B5"/><w:bottom w:val="single" w:sz="4" w:color="2F75B5"/><w:right w:val="single" w:sz="4" w:color="2F75B5"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="${CONTENT_WIDTH_DXA}"/></w:tblGrid><w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="${CONTENT_WIDTH_DXA}" w:type="dxa"/><w:shd w:fill="2F75B5"/><w:tcMar><w:top w:w="90" w:type="dxa"/><w:left w:w="120" w:type="dxa"/><w:bottom w:w="90" w:type="dxa"/><w:right w:w="120" w:type="dxa"/></w:tcMar></w:tcPr>${paragraph(heading, "SectionTitle", { color: "FFFFFF", bold: true, after: 0, line: 230 })}</w:tc></w:tr></w:tbl>`;
@@ -77,7 +92,7 @@
     return [
     sectionBand(block.heading),
     ...block.paragraphs.map((text) => paragraph(text, "Normal", { after: 70, line: 252 })),
-    ...block.tables.map((table) => tableXml(table, { after: true })),
+    ...block.tables.map((table, index) => tableXml(table, { after: true, widths: block.tableWidths?.[index] })),
     // Dipnot tablodan SONRA ve küçük puntoyla: hücrede kısa atıf ("s. 66-67"),
     // belgenin tam adı burada bir kez (bkz. mahir-report-export-common.js
     // sourceNotes). `paragraphs` bu işi göremez - o alan tablonun önünde.
