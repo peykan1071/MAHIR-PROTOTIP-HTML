@@ -1,5 +1,11 @@
 (() => {
-  const REPORT_TITLE = "SINAV SONUÇLARI ANALİZ RAPORU";
+  const DEFAULT_REPORT_TITLE = "SINAV SONUÇLARI ANALİZ RAPORU";
+  const GENERAL_REPORT_TITLE = "TÜRK DİLİ VE EDEBİYATI GENEL DEĞERLENDİRME RAPORU";
+  const COMPONENT_REPORTS = {
+    written: { label: "Yazılı Sınav", title: "YAZILI SINAV SONUÇLARI ANALİZ RAPORU", summaryHeading: "B. YAZILI SINAV BAŞARI ÖZETİ" },
+    listening: { label: "Dinleme/İzleme Sınavı", title: "DİNLEME/İZLEME SINAVI SONUÇLARI ANALİZ RAPORU", summaryHeading: "B. DİNLEME/İZLEME SINAVI BAŞARI ÖZETİ" },
+    speaking: { label: "Konuşma Sınavı", title: "KONUŞMA SINAVI SONUÇLARI ANALİZ RAPORU", summaryHeading: "B. KONUŞMA SINAVI BAŞARI ÖZETİ" }
+  };
   const BRAND_NAME = "MAHİR";
   const BRAND_EXPANSION = "Maarif Anlayışıyla Hizmet İşleme ve Raporlama Ajanı";
   const SUCCESS_THRESHOLD = 0.5;
@@ -100,6 +106,17 @@
   const getStructuredQuestions = () => runtime().structuredData?.questions || [];
   const getStructuredStudents = () => runtime().structuredData?.students || [];
   const getAnalysis = () => runtime().analysis || {};
+  const getComponentType = () => normalizeText(
+    getAnalysis().component?.componentType || getAnalysis().componentType || getExam().componentType || "written"
+  ).toLowerCase();
+  const getComponentReport = () => COMPONENT_REPORTS[getComponentType()] || null;
+  const getExamTypeLabel = () => valueFrom(getExam(), ["examType"])
+    || normalizeText(getAnalysis().component?.componentLabel || getAnalysis().componentLabel)
+    || getComponentReport()?.label
+    || "";
+  const getReportTitle = () => getAnalysis().assessmentScope === "language-composite"
+    ? GENERAL_REPORT_TITLE
+    : getComponentReport()?.title || DEFAULT_REPORT_TITLE;
   // Analizi ÜRETEN ajanların izi (/mahir-analyze yanıtındaki `trace`). `analysis`in
   // kardeşi, içinde değil: biri raporun kendisi, diğeri raporun nasıl üretildiği.
   const getTraceAgents = () => {
@@ -267,7 +284,7 @@
       { label: "Ders Türü", value: context.courseType, source: "context" },
       { label: "Sınıf/Şube", value: wordClass || context.gradeLevel, source: wordClass ? "word" : "context", required: true },
       { label: "Dönem", value: valueFrom(exam, ["term"]) },
-      { label: "Sınav Türü", value: valueFrom(exam, ["examType"]) },
+      { label: "Sınav Türü", value: getAnalysis().assessmentScope === "language-composite" ? "Genel Değerlendirme" : getExamTypeLabel() },
       { label: "Sınav Tarihi", value: displayDate(valueFrom(exam, ["examDate"])) },
       { label: "Rapor Tarihi", value: dateText() },
       { label: "Analiz Edilen Öğrenci Sayısı", value: summary.participatingStudentCount ? String(summary.participatingStudentCount) : "", required: true }
@@ -339,9 +356,11 @@
 
   const buildGeneralSummaryBlock = () => {
     const summary = getSummary();
+    const component = getComponentReport();
+    const examType = getExamTypeLabel() || "Sınav";
     return {
-      heading: "B. GENEL BAŞARI ÖZETİ",
-      paragraphs: [`Genel değerlendirme: ${summary.participatingStudentCount || 0} öğrencinin sınav sonuçları değerlendirilmiştir.`],
+      heading: component?.summaryHeading || "B. SINAV BAŞARI ÖZETİ",
+      paragraphs: [`${examType}: ${summary.participatingStudentCount || 0} öğrencinin sınav sonuçları değerlendirilmiştir.`],
       tables: [[
         ["Öğrenci Sayısı", "Sınav Ortalaması", "En Yüksek Puan", "En Düşük Puan", "Başarı Oranı"],
         [
@@ -351,7 +370,8 @@
           formatNumber(summary.lowestScore),
           formatPercent(summary.classSuccessRate)
         ]
-      ]]
+      ]],
+      tableWidths: [[18, 22, 20, 20, 20]]
     };
   };
 
@@ -381,7 +401,8 @@
         formatPercent(question.successRate),
         question.level
       ])
-    ]]
+    ]],
+    tableWidths: [[6, 52, 10, 10, 10, 12]]
   });
 
   // "Bu %68 nereden geldi?" sorusunun cevabı. İki parça hâlinde üretilir:
@@ -430,7 +451,8 @@
       // olarak tükettiği için bu alanı hiç görmez ve düz metin basmaya
       // devam eder - o dosyalarda hiçbir değişiklik gerekmiyor.
       details: { column: 1, summaries: evidences.map((evidence) => evidence.summary) },
-      tables: [[["Öğrenme Çıktısı", "Hesaplama Dayanağı", "Başarı %", "Düzey", "Kanıt / Kısa Yorum"], ...rows]]
+      tables: [[["Öğrenme Çıktısı", "Hesaplama Dayanağı", "Başarı %", "Düzey", "Kanıt / Kısa Yorum"], ...rows]],
+      tableWidths: [[23, 29, 9, 13, 26]]
     };
   };
 
@@ -543,6 +565,7 @@
       heading: "F. GELİŞİM İHTİYAÇLARI VE DEĞERLENDİRME SONUÇLARI",
       paragraphs: ["Bu bölüm uygulanacak etkinlik, kaynak, yöntem veya telafi programını belirlemez; yalnızca öğretmen onaylı sınav verilerinden hareketle gelişim ihtiyacını gösterir."],
       tables: [[header, ...rows]],
+      tableWidths: [hasRagContext ? [6, 14, 20, 12, 48] : [8, 28, 42, 22]],
       // Tablonun ALTINA düşen dipnot; hücredeki kısa atıfın karşılığı.
       notes: hasRagContext ? sourceNotes(labels) : []
     };
@@ -598,7 +621,8 @@
       tables: [
         [["Bileşen", "Sınıf Ortalaması", "Ağırlık", "Genel Sonuca Katkı"], ...rows],
         [["Ağırlıklı Genel Sınıf Ortalaması", `${formatNumber(analysis.classAverage)} / 100`]]
-      ]
+      ],
+      tableWidths: [[34, 22, 18, 26], [70, 30]]
     };
   };
 
@@ -617,7 +641,8 @@
           `${formatPercent(item.weightedContribution)} / ${formatPercent(item.componentWeight)}`,
           normalizeText(item.developmentLevel)
         ])
-      ]]
+      ]],
+      tableWidths: [[16, 34, 14, 12, 14, 10]]
     };
   };
 
@@ -637,7 +662,8 @@
     return {
       heading: "D. BÜTÜNCÜL PEDAGOJİK DEĞERLENDİRME",
       paragraphs: ["Bileşenler karşılaştırılırken öğrenme çıktılarının kendi kanıt bağlamı korunmuş; farklı dil becerileri tek bir yapay gerçekleşme yüzdesine indirgenmemiştir."],
-      tables: [[["Bileşen", "Görece Güçlü Alanlar", "Gelişim İhtiyacı Gösteren Alanlar"], ...grouped]]
+      tables: [[["Bileşen", "Görece Güçlü Alanlar", "Gelişim İhtiyacı Gösteren Alanlar"], ...grouped]],
+      tableWidths: [[18, 41, 41]]
     };
   };
 
@@ -733,7 +759,7 @@
   };
 
   const buildCompositeBlocks = () => [
-      { heading: "A. DEĞERLENDİRME VE EĞİTİM BAĞLAMI", paragraphs: [], tables: [buildContextTable()] },
+      { heading: "A. DEĞERLENDİRME VE EĞİTİM BAĞLAMI", paragraphs: [], tables: [buildContextTable()], tableWidths: [[18, 32, 18, 32]] },
       buildCompositeSummaryBlock(),
       buildCompositeOutcomeBlock(),
       buildCompositePedagogyBlock(),
@@ -744,7 +770,7 @@
     ].filter(Boolean);
 
   const buildComponentBlocks = () => [
-      { heading: "A. SINAV VE EĞİTİM BAĞLAMI", paragraphs: [], tables: [buildContextTable()] },
+      { heading: "A. SINAV VE EĞİTİM BAĞLAMI", paragraphs: [], tables: [buildContextTable()], tableWidths: [[18, 32, 18, 32]] },
       buildGeneralSummaryBlock(),
       buildQuestionBlock(),
       buildOutcomeBlock(),
@@ -761,7 +787,7 @@
 
   const getReportModel = (reportElement) => {
     const model = {
-      title: getAnalysis().assessmentScope === "language-composite" ? "DİL BECERİLERİ GENEL DEĞERLENDİRME RAPORU" : REPORT_TITLE,
+      title: getReportTitle(),
       metadata: getMetadata(),
       blocks: getBlocks(),
       generatedAt: new Date().toISOString(),
@@ -848,8 +874,18 @@
     return td;
   };
 
-  const renderTable = (rows, details = null) => {
+  const renderTable = (rows, details = null, widths = null) => {
     const table = document.createElement("table");
+    if (Array.isArray(widths) && widths.length) {
+      const colgroup = document.createElement("colgroup");
+      widths.forEach((width) => {
+        const col = document.createElement("col");
+        col.style.width = `${width}%`;
+        colgroup.append(col);
+      });
+      table.append(colgroup);
+      table.style.tableLayout = "fixed";
+    }
     rows.forEach((row, rowIndex) => {
       const tr = document.createElement("tr");
       row.forEach((item, columnIndex) => {
@@ -894,7 +930,7 @@
       });
       // Kasıtlı olarak `block.details` GEÇİLMİYOR: bu gövde PDF'e olduğu gibi
       // çizildiği için kapalı bir <details> orada kanıtı görünmez kılardı.
-      block.tables.forEach((tableRows) => section.append(renderTable(tableRows)));
+      block.tables.forEach((tableRows, tableIndex) => section.append(renderTable(tableRows, null, block.tableWidths?.[tableIndex])));
       appendNotes(section, block);
       body.append(section);
     });
@@ -916,7 +952,7 @@
         p.textContent = paragraph;
         section.append(p);
       });
-      block.tables.forEach((tableRows) => section.append(renderTable(tableRows, block.details)));
+      block.tables.forEach((tableRows, tableIndex) => section.append(renderTable(tableRows, block.details, block.tableWidths?.[tableIndex])));
       appendNotes(section, block);
       body.append(section);
     });
@@ -926,8 +962,10 @@
     if (!reportElement) return null;
     const model = getReportModel(reportElement);
     const titleTarget = reportElement.querySelector("[data-output-title]");
+    const visibleTitleTarget = reportElement.querySelector("#report-title");
     const list = reportElement.querySelector("[data-output-header] dl");
     if (titleTarget) titleTarget.textContent = model.title;
+    if (visibleTitleTarget) visibleTitleTarget.textContent = model.title;
     if (list) {
       list.replaceChildren();
       model.metadata.forEach((item) => {
