@@ -425,8 +425,8 @@
   });
   const studentRecordDefault = (order = 1) => ({
     id: `student-${order}`,
-    studentNo: `${100 + order}`,
-    fullName: order === 1 ? "Ayşe Yılmaz" : "Mehmet Kaya",
+    studentNo: `DEMO-${String(order).padStart(3, "0")}`,
+    fullName: order === 1 ? "Örnek Kayıt A" : "Örnek Kayıt B",
     answers: { q1: order === 1 ? 8 : 7, q2: order === 1 ? 7 : 6 },
     totalScore: order === 1 ? 15 : 13,
     metadata: {}
@@ -885,8 +885,8 @@
     columns: 4,
     cells: [
       ["Öğrenci No", "Ad Soyad", "Soru 1", "Toplam"],
-      ["101", "Ayşe Yılmaz", "8", "15"],
-      ["102", "Mehmet Kaya", "7", "13"]
+      ["DEMO-001", "Örnek Kayıt A", "8", "15"],
+      ["DEMO-002", "Örnek Kayıt B", "7", "13"]
     ]
   });
 
@@ -912,8 +912,8 @@
     questions: [createQuestion(1), createQuestion(2)],
     answerKey: [createAnswerKey("q1", "A"), createAnswerKey("q2", "B")],
     students: [
-      createStudent("101", "Ayşe Yılmaz", { q1: "A", q2: "B" }, 15),
-      createStudent("102", "Mehmet Kaya", { q1: "A", q2: "C" }, 13)
+      createStudent("DEMO-001", "Örnek Kayıt A", { q1: "A", q2: "B" }, 15),
+      createStudent("DEMO-002", "Örnek Kayıt B", { q1: "A", q2: "C" }, 13)
     ],
     tables: [createTable()],
     images: [createImage()],
@@ -1088,8 +1088,8 @@
     },
     extractStudents() {
       return [
-        createStudent("101", "Ayşe Yılmaz", { q1: "A", q2: "B" }, 15),
-        createStudent("102", "Mehmet Kaya", { q1: "A", q2: "C" }, 13)
+        createStudent("DEMO-001", "Örnek Kayıt A", { q1: "A", q2: "B" }, 15),
+        createStudent("DEMO-002", "Örnek Kayıt B", { q1: "A", q2: "C" }, 13)
       ];
     },
     extractTables() {
@@ -1359,15 +1359,15 @@
     const answerKey = questions.map((question, index) => ({ questionId: question.id, correctAnswer: index % 2 === 0 ? "A" : "B", confidence: 0.9 }));
     const students = [
       {
-        studentNo: "101",
-        fullName: "Ayşe Yılmaz",
+        studentNo: "DEMO-001",
+        fullName: "Örnek Kayıt A",
         answers: Object.fromEntries(questions.map((question, index) => [question.id, index % 2 === 0 ? "A" : "B"])),
         totalScore: 88,
         confidence: 0.9
       },
       {
-        studentNo: "102",
-        fullName: "Mehmet Kaya",
+        studentNo: "DEMO-002",
+        fullName: "Örnek Kayıt B",
         answers: Object.fromEntries(questions.map((question, index) => [question.id, index % 3 === 0 ? "A" : "C"])),
         totalScore: 72,
         confidence: 0.87
@@ -2396,11 +2396,23 @@ const fileUploadBridge = (() => {
     const languageAssessmentField = document.querySelector("[data-language-assessment-field]");
     const componentWeightNote = document.querySelector("[data-component-weight-note]");
     const programDataStatus = document.querySelector("[data-program-data-status]");
+    const generalReportMerger = document.querySelector("[data-general-report-merger]");
+    const generalReportStatus = document.querySelector("[data-general-report-status]");
+    const mergeGeneralReportsButton = document.querySelector("[data-merge-general-reports]");
+    const generalReportInputs = Array.from(document.querySelectorAll("[data-general-report-file]"));
+    const standardDataEntryItems = Array.from(document.querySelectorAll("[data-standard-data-entry]"));
     const contextStatus = document.querySelector("[data-context-status]");
     const saveGroupButton = document.querySelector("[data-save-current-group]");
     const addGroupButton = document.querySelector("[data-add-image-group]");
     const confirmFinalButton = document.querySelector("[data-confirm-final-analysis]");
     const returnToUploadButton = document.querySelector("[data-return-to-upload]");
+    const validationStudentCountControl = document.querySelector("[data-validation-student-count-control]");
+    const validationExpectedCount = document.querySelector("[data-validation-expected-count]");
+    const validationStudentCountEditor = document.querySelector("[data-validation-student-count-editor]");
+    const validationStudentCountEditorInput = document.querySelector("[data-validation-student-count-input]");
+    const validationStudentCountStatus = document.querySelector("[data-validation-student-count-status]");
+    const studentRecordUndo = document.querySelector("[data-student-record-undo]");
+    const studentRecordUndoMessage = document.querySelector("[data-student-record-undo-message]");
 
     if (!fileInput || !readButton || typeof FormData === "undefined" || typeof fetch === "undefined") {
       return;
@@ -2418,6 +2430,8 @@ const fileUploadBridge = (() => {
     let savedGroups = [];
     let currentGroupNumber = 1;
     let finalReviewMode = false;
+    let lastRemovedStudentRecord = null;
+    const generalReportFiles = { written: null, listening: null, speaking: null };
     const reportRuntime = window.MAHIRReportRuntime = window.MAHIRReportRuntime || {};
     const componentLabels = {
       written: "Yazılı Sınav",
@@ -2575,13 +2589,67 @@ const fileUploadBridge = (() => {
       renderQuestionConfiguration();
     };
 
+    const setGeneralReportStatus = (message, state = "") => {
+      if (!generalReportStatus) return;
+      generalReportStatus.textContent = message;
+      generalReportStatus.classList.toggle("is-error", state === "error");
+      generalReportStatus.classList.toggle("is-success", state === "success");
+    };
+
+    const refreshGeneralReportFiles = () => {
+      const selectedCount = Object.values(generalReportFiles).filter(Boolean).length;
+      const complete = selectedCount === 3;
+      if (mergeGeneralReportsButton) {
+        mergeGeneralReportsButton.disabled = !complete;
+        mergeGeneralReportsButton.setAttribute("aria-disabled", String(!complete));
+      }
+      if (!complete) {
+        setGeneralReportStatus(`Genel değerlendirme için MAHİR'den indirilen üç Word (.docx) analiz raporu gereklidir. Seçilen rapor: ${selectedCount}/3.`);
+      }
+    };
+
+    const updateGeneralReportMode = (enabled, profile) => {
+      if (generalReportMerger) generalReportMerger.hidden = !enabled;
+      standardDataEntryItems.forEach((item) => { item.hidden = enabled; });
+      const studentCountField = studentCountInput?.closest("label");
+      const questionCountField = questionCountInput?.closest("label");
+      if (studentCountField) studentCountField.hidden = enabled;
+      if (questionCountField) questionCountField.hidden = enabled;
+      if (scoreTotal) scoreTotal.hidden = enabled;
+      if (questionConfiguration) questionConfiguration.hidden = enabled;
+      if (structureStatus) structureStatus.hidden = enabled;
+      if (programDataStatus) programDataStatus.hidden = enabled || !programDataStatus.textContent;
+      const scenarioGuidance = document.querySelector("[data-scenario-guidance]");
+      if (scenarioGuidance) scenarioGuidance.hidden = enabled;
+
+      const structureTitle = document.querySelector("#exam-structure-title");
+      const structureDescription = structureTitle?.nextElementSibling;
+      if (structureTitle) structureTitle.textContent = enabled ? "Genel Değerlendirme Türü" : "Soru, Puan ve Öğrenme Çıktısı Eşleştirmesi";
+      if (structureDescription) structureDescription.textContent = enabled
+        ? "Genel değerlendirme, aynı gruba ait üç MAHİR analiz raporunun doğrulanıp birleştirilmesiyle oluşturulur."
+        : "Azami puan zorunludur. Öğrenme çıktısı biliniyorsa seçilir; bilinmiyorsa soru bazlı analiz yapılır.";
+
+      if (enabled && profile) {
+        document.querySelector("[data-general-weight-badge]").textContent = Object.values(profile.weights).map((weight) => `%${weight * 100}`).join(" · ");
+        Object.entries(profile.weights).forEach(([component, weight]) => {
+          const target = document.querySelector(`[data-general-report-weight="${component}"]`);
+          if (target) target.textContent = `Genel sonuca etkisi: %${weight * 100}`;
+        });
+        refreshGeneralReportFiles();
+      } else if (!enabled) {
+        configureSourceMode(sourceMode);
+      }
+    };
+
     const updateComponentNote = () => {
       const component = assessmentComponent?.value || "written";
       const profileId = currentProfileId();
       const profile = profiles[profileId];
       const enabled = Boolean(profile);
+      const generalMode = enabled && component === "general";
       if (languageAssessmentField) languageAssessmentField.hidden = !enabled;
       if (assessmentComponent && !enabled) assessmentComponent.value = "written";
+      updateGeneralReportMode(generalMode, profile);
       if (!componentWeightNote) return;
       componentWeightNote.hidden = !enabled;
       if (!enabled) {
@@ -2619,7 +2687,7 @@ const fileUploadBridge = (() => {
       });
     };
 
-    const createOutcomeCombobox = (savedValue, rowIndex) => {
+    const createOutcomeCombobox = (savedValues, rowIndex) => {
       const placeholderText = learningOutcomes.length
         ? "İsteğe bağlı — öğrenme çıktısı seçiniz"
         : "İsteğe bağlı — çıktı verisi bulunmuyor";
@@ -2630,11 +2698,14 @@ const fileUploadBridge = (() => {
       const nativeSelect = document.createElement("select");
       nativeSelect.className = "outcome-native-select";
       nativeSelect.dataset.questionOutcome = "";
+      nativeSelect.multiple = true;
       nativeSelect.tabIndex = -1;
       nativeSelect.setAttribute("aria-hidden", "true");
+      const savedIds = new Set((Array.isArray(savedValues) ? savedValues : [savedValues]).filter(Boolean));
       const placeholder = document.createElement("option");
       placeholder.value = "";
       placeholder.textContent = placeholderText;
+      placeholder.selected = savedIds.size === 0;
       nativeSelect.append(placeholder);
 
       const listboxId = `outcome-listbox-${rowIndex + 1}`;
@@ -2646,7 +2717,7 @@ const fileUploadBridge = (() => {
       trigger.setAttribute("aria-haspopup", "listbox");
       trigger.setAttribute("aria-expanded", "false");
       trigger.setAttribute("aria-controls", listboxId);
-      trigger.setAttribute("aria-label", `Soru ${rowIndex + 1} öğrenme çıktısı`);
+      trigger.setAttribute("aria-label", `Soru ${rowIndex + 1} öğrenme çıktıları`);
       trigger.disabled = !learningOutcomes.length;
 
       const valueText = document.createElement("span");
@@ -2662,19 +2733,19 @@ const fileUploadBridge = (() => {
       listbox.className = "outcome-combobox-listbox";
       listbox.dataset.outcomeListbox = "";
       listbox.setAttribute("role", "listbox");
+      listbox.setAttribute("aria-multiselectable", "true");
       listbox.hidden = true;
 
       let activeIndex = -1;
       const options = [];
-      const selectedIndex = learningOutcomes.findIndex((outcome) => outcome.id === savedValue);
 
       const emptyOption = document.createElement("div");
       emptyOption.id = `${listboxId}-option-0`;
       emptyOption.className = "outcome-combobox-option";
       emptyOption.dataset.optionIndex = "0";
       emptyOption.setAttribute("role", "option");
-      emptyOption.setAttribute("aria-selected", selectedIndex < 0 ? "true" : "false");
-      emptyOption.textContent = placeholderText;
+      emptyOption.setAttribute("aria-selected", savedIds.size ? "false" : "true");
+      emptyOption.textContent = learningOutcomes.length ? "Seçimleri temizle" : placeholderText;
       listbox.append(emptyOption);
       options.push(emptyOption);
 
@@ -2683,7 +2754,7 @@ const fileUploadBridge = (() => {
         const nativeOption = document.createElement("option");
         nativeOption.value = outcome.id;
         nativeOption.textContent = optionText;
-        nativeOption.selected = optionIndex === selectedIndex;
+        nativeOption.selected = savedIds.has(outcome.id);
         nativeSelect.append(nativeOption);
 
         const option = document.createElement("div");
@@ -2692,14 +2763,26 @@ const fileUploadBridge = (() => {
         option.dataset.outcomeOption = outcome.id;
         option.dataset.optionIndex = String(optionIndex + 1);
         option.setAttribute("role", "option");
-        option.setAttribute("aria-selected", optionIndex === selectedIndex ? "true" : "false");
+        option.setAttribute("aria-selected", savedIds.has(outcome.id) ? "true" : "false");
         option.textContent = optionText;
         listbox.append(option);
         options.push(option);
       });
 
-      nativeSelect.value = selectedIndex >= 0 ? learningOutcomes[selectedIndex].id : "";
-      valueText.textContent = selectedIndex >= 0 ? outcomeOptionText(learningOutcomes[selectedIndex]) : placeholderText;
+      const selectedOutcomes = () => learningOutcomes.filter((outcome) => Array.from(nativeSelect.selectedOptions).some((option) => option.value === outcome.id));
+      const refreshSelection = () => {
+        const selected = selectedOutcomes();
+        valueText.textContent = selected.length === 1
+          ? outcomeOptionText(selected[0])
+          : selected.length > 1
+            ? `${selected.length} öğrenme çıktısı seçildi`
+            : placeholderText;
+        emptyOption.setAttribute("aria-selected", selected.length ? "false" : "true");
+        options.slice(1).forEach((option, index) => {
+          option.setAttribute("aria-selected", selected.some((outcome) => outcome.id === learningOutcomes[index]?.id) ? "true" : "false");
+        });
+      };
+      refreshSelection();
 
       const setActiveOption = (nextIndex, { scroll = true } = {}) => {
         if (!options.length) return;
@@ -2711,14 +2794,16 @@ const fileUploadBridge = (() => {
 
       const selectOption = (optionIndex) => {
         if (!options[optionIndex]) return;
-        const outcome = optionIndex > 0 ? learningOutcomes[optionIndex - 1] : null;
-        nativeSelect.value = outcome?.id || "";
-        valueText.textContent = outcome ? outcomeOptionText(outcome) : placeholderText;
-        options.forEach((option, index) => option.setAttribute("aria-selected", index === optionIndex ? "true" : "false"));
+        if (optionIndex === 0) {
+          Array.from(nativeSelect.options).forEach((option) => { option.selected = false; });
+        } else {
+          const nativeOption = nativeSelect.options[optionIndex];
+          if (nativeOption) nativeOption.selected = !nativeOption.selected;
+        }
+        refreshSelection();
         activeIndex = optionIndex;
         nativeSelect.dispatchEvent(new Event("input", { bubbles: true }));
         nativeSelect.dispatchEvent(new Event("change", { bubbles: true }));
-        closeOutcomeCombobox(combobox, { restoreFocus: true });
       };
 
       const openCombobox = () => {
@@ -2737,7 +2822,7 @@ const fileUploadBridge = (() => {
         const availableSpace = Math.max(160, opensUp ? spaceAbove : spaceBelow);
         combobox.classList.toggle("opens-up", opensUp);
         listbox.style.maxHeight = `${Math.max(160, Math.min(eightOptionHeight, availableSpace))}px`;
-        const currentSelectedIndex = learningOutcomes.findIndex((outcome) => outcome.id === nativeSelect.value);
+        const currentSelectedIndex = learningOutcomes.findIndex((outcome) => Array.from(nativeSelect.selectedOptions).some((option) => option.value === outcome.id));
         setActiveOption(currentSelectedIndex >= 0 ? currentSelectedIndex + 1 : 0, { scroll: false });
         options[activeIndex]?.scrollIntoView({ block: "nearest" });
       };
@@ -2753,7 +2838,7 @@ const fileUploadBridge = (() => {
           const direction = event.key === "ArrowDown" ? 1 : -1;
           if (listbox.hidden) {
             openCombobox();
-            if (!nativeSelect.value && direction < 0) setActiveOption(options.length - 1);
+            if (!nativeSelect.selectedOptions.length && direction < 0) setActiveOption(options.length - 1);
           } else {
             setActiveOption(activeIndex < 0 ? (direction > 0 ? 0 : options.length - 1) : activeIndex + direction);
           }
@@ -2793,21 +2878,37 @@ const fileUploadBridge = (() => {
 
     const currentQuestionConfiguration = () => Array.from(questionConfiguration?.querySelectorAll("[data-question-config-row]") || []).map((row, index) => {
       const outcomeSelect = row.querySelector("[data-question-outcome]");
-      const selected = learningOutcomes.find((outcome) => outcome.id === outcomeSelect?.value);
+      const selected = Array.from(outcomeSelect?.selectedOptions || [])
+        .map((option) => learningOutcomes.find((outcome) => outcome.id === option.value))
+        .filter(Boolean);
+      const weight = selected.length ? 1 / selected.length : 0;
+      const outcomes = selected.map((outcome) => ({
+        outcomeCode: outcome.code || "",
+        outcomeDescription: outcome.title || "",
+        outcomeTheme: outcome.theme || "",
+        outcomeSkill: outcome.skill || "",
+        parentOutcomeCode: outcome.parentCode || outcome.code || "",
+        parentOutcomeDescription: outcome.parentTitle || outcome.title || "",
+        outcomeKey: outcome.id || "",
+        weight
+      }));
+      const primary = outcomes[0] || {};
       return {
         number: index + 1,
         maxScore: Number(row.querySelector("[data-question-score]")?.value || 0),
-        outcomeCode: selected?.code || "",
-        outcomeDescription: selected?.title || "",
-        outcomeTheme: selected?.theme || "",
-        outcomeSkill: selected?.skill || "",
-        parentOutcomeCode: selected?.parentCode || selected?.code || "",
-        parentOutcomeDescription: selected?.parentTitle || selected?.title || "",
-        outcomeKey: selected?.id || outcomeSelect?.value || ""
+        outcomes,
+        outcomeCode: primary.outcomeCode || "",
+        outcomeDescription: primary.outcomeDescription || "",
+        outcomeTheme: primary.outcomeTheme || "",
+        outcomeSkill: primary.outcomeSkill || "",
+        parentOutcomeCode: primary.parentOutcomeCode || "",
+        parentOutcomeDescription: primary.parentOutcomeDescription || "",
+        outcomeKey: primary.outcomeKey || ""
       };
     });
 
     const updateStructureStatus = () => {
+      if ((assessmentComponent?.value || "written") === "general") return true;
       const questions = currentQuestionConfiguration();
       const total = questions.reduce((sum, question) => sum + question.maxScore, 0);
       if (scoreTotal) scoreTotal.textContent = `Toplam puan: ${total.toLocaleString("tr-TR")}`;
@@ -2851,8 +2952,14 @@ const fileUploadBridge = (() => {
         outcomeField.hidden = !activeProgramId || (assessmentComponent?.value || "written") === "general";
         const outcomeCaption = document.createElement("span");
         outcomeCaption.className = "outcome-combobox-label";
-        outcomeCaption.textContent = "Öğrenme Çıktısı";
-        outcomeField.append(outcomeCaption, createOutcomeCombobox(saved.outcomeKey, index));
+        outcomeCaption.textContent = "Öğrenme Çıktıları";
+        const savedOutcomeKeys = Array.isArray(saved.outcomes) && saved.outcomes.length
+          ? saved.outcomes.map((outcome) => outcome.outcomeKey).filter(Boolean)
+          : [saved.outcomeKey].filter(Boolean);
+        const outcomeHelp = document.createElement("small");
+        outcomeHelp.className = "outcome-combobox-help";
+        outcomeHelp.textContent = "Birden fazla çıktı seçilebilir; soru puanı seçilen çıktılar arasında eşit paylaşılır.";
+        outcomeField.append(outcomeCaption, createOutcomeCombobox(savedOutcomeKeys, index), outcomeHelp);
         row.append(badge, scoreLabel, outcomeField);
         questionConfiguration.append(row);
       }
@@ -3004,6 +3111,55 @@ const fileUploadBridge = (() => {
       renderFilesList();
     };
 
+    // Uzak OCR işçisinin soğuk başlangıcı ölçülen sürenin %75-85'i (konteyner
+    // açılışı + modelleri GPU'ya yükleme ~30-50 sn; asıl OCR yalnızca 7-12 sn).
+    // Öğretmen dosyalarını seçer seçmez bu hazırlığı başlatıyoruz ki "Verileri
+    // Oku"ya bastığında büyük ölçüde bitmiş olsun. Ateşle-unut: yanıtı
+    // beklenmez, hatası yutulur - ısıtma başarısız olsa da yükleme eskisi gibi
+    // (yalnızca daha yavaş) çalışır.
+    // Tek seferlik değil, kısılmış: öğretmen aynı oturumda ikinci bir grup
+    // yüklediğinde konteyner çoktan kapanmış olabilir, o yüzden yeniden
+    // ısıtılabilmeli - ama her dosya seçiminde tekrar tekrar değil.
+    const WARM_UP_THROTTLE_MS = 30000;
+    const warmUpAt = {};
+    const warmUp = (path) => {
+      const now = Date.now();
+      if (now - (warmUpAt[path] || 0) < WARM_UP_THROTTLE_MS) return;
+      warmUpAt[path] = now;
+      fetch(path).catch(() => {});
+    };
+    const warmUpOcr = () => warmUp("/mahir-ocr-warmup");
+    // RAG'in soğuk başlangıcı daha da uzun (ölçülen ~110 sn: konteyner +
+    // bge-m3 + vLLM/Qwen2.5-7B) ve bugün tam "Onayla ve Analiz Et"e basıldığı
+    // anda ödeniyor. Doğrulama ekranı açılırken ısıtıyoruz: öğretmen puanları
+    // incelerken hazırlık biter, rag_service.py'deki scaledown_window=300 de
+    // konteyneri o inceleme boyunca ayakta tutar.
+    const warmUpRag = () => warmUp("/mahir-rag-warmup");
+
+    // --- Süre ölçümü ---
+    //
+    // İki uzun işlem (belge okuma ve analiz) sessizdi: öğretmen butona basıp
+    // bekliyor, ne kadar beklediği hiçbir yere yazılmıyordu. Ölçüm kırılımlı,
+    // çünkü tek bir toplam asıl soruyu yanıtlamıyor - aynı iş soğuk
+    // konteynerde 160 sn, sıcakta 15,7 sn sürebiliyor (ölçüldü).
+    //
+    // Biçimlendirme MAHIRReportExport.durationText'ten geliyor ("16,7 sn" /
+    // "340 ms", tr-TR); ikinci bir biçimlendirici yazmaya gerek yok.
+    const durationText = (ms) => window.MAHIRReportExport?.durationText?.(ms) ?? `${Math.round(ms)} ms`;
+
+    // Isıtmanın üzerinden geçen süre: "neden 45 sn sürdü"nün cevabı çoğu zaman
+    // burada. Kısaysa uzak konteyner hâlâ soğuk demektir.
+    const sinceWarmUp = (path) => (warmUpAt[path] ? durationText(Date.now() - warmUpAt[path]) : "ısıtılmadı");
+
+    const startTimer = (label) => {
+      const began = performance.now();
+      return (fields = {}) => {
+        const elapsed = performance.now() - began;
+        console.info(`[MAHIR][süre] ${label} toplam ${durationText(elapsed)}`, fields);
+        return durationText(elapsed);
+      };
+    };
+
     const selectFiles = (files) => {
       const incoming = Array.from(files || []);
       if (!incoming.length) return;
@@ -3023,6 +3179,7 @@ const fileUploadBridge = (() => {
       selectedFiles = merged;
       fileInput.value = "";
       renderFilesList();
+      warmUpOcr();
     };
 
     const configureSourceMode = (mode) => {
@@ -3035,6 +3192,10 @@ const fileUploadBridge = (() => {
       const templateCard = document.querySelector("[data-template-card]");
       const ocrGuidance = document.querySelector("[data-ocr-guidance]");
       const dropzone = document.querySelector("[data-upload-dropzone]");
+      if ((assessmentComponent?.value || "written") === "general") {
+        standardDataEntryItems.forEach((item) => { item.hidden = true; });
+        return;
+      }
       templateCard?.toggleAttribute("hidden", mode !== "template");
       ocrGuidance?.toggleAttribute("hidden", mode !== "images");
       dropzone?.toggleAttribute("hidden", mode === "manual");
@@ -3089,6 +3250,38 @@ const fileUploadBridge = (() => {
       });
     };
 
+    const setValidationStudentCountEditorOpen = (open) => {
+      if (!validationStudentCountEditor) return;
+      validationStudentCountEditor.hidden = !open;
+      document.querySelector("[data-edit-validation-student-count]")?.toggleAttribute("hidden", open);
+      if (open && validationStudentCountEditorInput) {
+        validationStudentCountEditorInput.value = studentCountInput?.value || "";
+        validationStudentCountEditorInput.focus();
+        validationStudentCountEditorInput.select();
+      }
+    };
+
+    const refreshValidationStudentCountStatus = () => {
+      if (finalReviewMode || validationStudentCountControl?.hidden) return;
+      const expected = Math.max(1, Number(studentCountInput?.value) || 1);
+      const saved = savedGroups.reduce((sum, group) => sum + group.students.length, 0);
+      const current = document.querySelectorAll("[data-student-row]").length;
+      const projected = saved + current;
+      if (validationExpectedCount) validationExpectedCount.textContent = String(expected);
+      if (validationStudentCountEditorInput) validationStudentCountEditorInput.value = String(expected);
+      if (validationStudentCountStatus) {
+        validationStudentCountStatus.textContent = projected === expected
+          ? `Mevcut kayıtlarla ${projected}/${expected} öğrenciye ulaşılıyor.`
+          : projected > expected
+            ? `Mevcut kayıtlar beklenen sayıyı ${projected - expected} öğrenci aşıyor. Fazla kaydı çıkarabilir veya beklenen sayıyı düzenleyebilirsiniz.`
+            : `Mevcut kayıtlarla ${projected}/${expected} öğrenciye ulaşılıyor; ${expected - projected} kayıt daha eklenebilir.`;
+        validationStudentCountStatus.classList.toggle("is-error", projected > expected);
+        validationStudentCountStatus.classList.toggle("is-success", projected === expected);
+      }
+      const approvalMessage = document.querySelector("[data-approval-message]");
+      if (approvalMessage) approvalMessage.textContent = `Bu gruptaki ${current} öğrenci kaydı henüz kaydedilmedi. Grup kaydedildiğinde toplam ${projected}/${expected} öğrenciye ulaşılacaktır.`;
+    };
+
     const renderValidationData = (data, options = {}) => {
       if (!data) return;
       finalReviewMode = Boolean(options.finalReview);
@@ -3100,6 +3293,7 @@ const fileUploadBridge = (() => {
       reportRuntime.structuredData = structuredData;
       reportRuntime.exam = structuredData.exam;
       reportRuntime.analysis = null;
+      reportRuntime.trace = null;
       const questionBody = document.querySelector("[data-validation-questions]");
       const studentHead = document.querySelector("[data-validation-student-head]");
       const studentBody = document.querySelector("[data-validation-students]");
@@ -3108,6 +3302,11 @@ const fileUploadBridge = (() => {
       const documentReadGuidance = document.querySelector("[data-document-read-guidance]");
       const questions = currentQuestionConfiguration();
       const expectedStudentCount = Math.max(1, Number(studentCountInput?.value) || 1);
+      if (validationStudentCountControl) validationStudentCountControl.hidden = Boolean(options.finalReview);
+      if (validationExpectedCount) validationExpectedCount.textContent = String(expectedStudentCount);
+      setValidationStudentCountEditorOpen(false);
+      studentRecordUndo?.setAttribute("hidden", "");
+      lastRemovedStudentRecord = null;
       const privacyWarnings = [];
       const parsedStudents = (data.students || []).map((student, index) => {
         const detectedTckn = looksLikeTckn(student.studentNo);
@@ -3163,7 +3362,10 @@ const fileUploadBridge = (() => {
       questionBody?.replaceChildren();
       questions.forEach((question) => {
         const row = document.createElement("tr");
-        [question.number, question.maxScore, `${question.outcomeCode}${question.outcomeDescription ? ` — ${question.outcomeDescription}` : ""}`].forEach((value) => {
+        const outcomeSummary = (question.outcomes || []).length
+          ? question.outcomes.map((outcome) => `${outcome.outcomeCode}${outcome.outcomeDescription ? ` — ${outcome.outcomeDescription}` : ""}`).join("; ")
+          : `${question.outcomeCode}${question.outcomeDescription ? ` — ${question.outcomeDescription}` : ""}`;
+        [question.number, question.maxScore, outcomeSummary].forEach((value) => {
           const cell = document.createElement("td");
           cell.className = "readonly-summary";
           cell.textContent = value;
@@ -3179,7 +3381,8 @@ const fileUploadBridge = (() => {
           ...(showSourceFile ? ["Kaynak Görsel"] : []),
           "Okul Numarası",
           ...questions.map((question) => `S${question.number}`),
-          "Toplam"
+          "Toplam",
+          ...(!options.finalReview ? ["İşlem"] : [])
         ]
           .forEach((label) => {
             const header = document.createElement("th");
@@ -3208,6 +3411,20 @@ const fileUploadBridge = (() => {
           row.append(editableCell(student.scores?.[index], `${student.rowNumber || studentIndex + 1}. satır S${question.number} puanı`, "number", "score"));
         });
         row.append(editableCell(student.totalScore, `${student.rowNumber || studentIndex + 1}. satır toplam puanı`, "number", "totalScore"));
+        if (!options.finalReview) {
+          const actionCell = document.createElement("td");
+          actionCell.className = "student-record-action-cell";
+          const removeButton = document.createElement("button");
+          removeButton.type = "button";
+          removeButton.className = "student-record-remove-button";
+          removeButton.dataset.removeStudentRecord = "";
+          const recordLabel = student.studentNo || student.sourceFile || `${studentIndex + 1}. satır`;
+          removeButton.textContent = "× Kaydı çıkar";
+          removeButton.setAttribute("aria-label", `${recordLabel} öğrenci kaydını bu gruptan çıkar`);
+          removeButton.title = "Bu öğrenci kaydını gruptan çıkar";
+          actionCell.append(removeButton);
+          row.append(actionCell);
+        }
         studentBody?.append(row);
       });
 
@@ -3244,12 +3461,8 @@ const fileUploadBridge = (() => {
       document.querySelector("[data-final-data-review]")?.toggleAttribute("hidden", !options.finalReview);
       if (saveGroupButton) saveGroupButton.hidden = Boolean(options.finalReview);
       if (returnToUploadButton) returnToUploadButton.hidden = Boolean(options.finalReview);
-      if (!options.finalReview) {
-        const approvalMessage = document.querySelector("[data-approval-message]");
-        const projectedTotal = savedStudentCount + students.length;
-        if (approvalMessage) approvalMessage.textContent = `Bu gruptaki ${students.length} öğrenci kaydı henüz kaydedilmedi. Grup kaydedildiğinde toplam ${projectedTotal}/${expectedStudentCount} öğrenciye ulaşılacaktır.`;
-      }
       renderSavedGroups();
+      if (!options.finalReview) refreshValidationStudentCountStatus();
     };
 
     const numberValue = (input) => {
@@ -3304,6 +3517,90 @@ const fileUploadBridge = (() => {
         questions,
         students
       };
+    };
+
+    const renderCurrentStudents = (students, warnings = structuredData?.warnings || []) => {
+      renderValidationData({
+        ...(structuredData || {}),
+        exam: { ...(structuredData?.exam || {}), ...collectContextData() },
+        questions: structuredData?.questions || currentQuestionConfiguration(),
+        students,
+        warnings,
+        summary: { ...(structuredData?.summary || {}), studentCount: students.length }
+      });
+    };
+
+    const removeStudentRecord = (row) => {
+      if (!row || finalReviewMode || saveGroupButton?.hidden) return;
+      const rows = Array.from(document.querySelectorAll("[data-student-row]"));
+      const index = rows.indexOf(row);
+      if (index < 0) return;
+      const students = collectApprovedData().students || [];
+      const [student] = students.splice(index, 1);
+      if (!student) return;
+      const sourceFile = row.dataset.sourceFile || student.sourceFile || "";
+      const originalWarnings = [...(structuredData?.warnings || [])];
+      let removedFile = null;
+      let removedFileIndex = -1;
+      if (sourceFile && !students.some((item) => item.sourceFile === sourceFile)) {
+        removedFileIndex = selectedFiles.findIndex((file) => file.name === sourceFile);
+        if (removedFileIndex >= 0) [removedFile] = selectedFiles.splice(removedFileIndex, 1);
+      }
+      const remainingWarnings = sourceFile
+        ? originalWarnings.filter((warning) => !String(warning).startsWith(`${sourceFile}:`))
+        : originalWarnings;
+      lastRemovedStudentRecord = { student, index, sourceFile, removedFile, removedFileIndex, originalWarnings };
+      renderFilesList();
+      renderCurrentStudents(students, remainingWarnings);
+      if (studentRecordUndoMessage) {
+        studentRecordUndoMessage.textContent = `${sourceFile || student.studentNo || `${index + 1}. satır`} kaynaklı öğrenci kaydı bu gruptan çıkarıldı.`;
+      }
+      studentRecordUndo?.removeAttribute("hidden");
+      lastRemovedStudentRecord = { student, index, sourceFile, removedFile, removedFileIndex, originalWarnings };
+      clearValidationErrors();
+      refreshValidationStudentCountStatus();
+      invalidateAnalysisAfterApprovedDataEdit();
+    };
+
+    const undoStudentRecordRemoval = () => {
+      if (!lastRemovedStudentRecord || finalReviewMode) return;
+      const removed = lastRemovedStudentRecord;
+      const students = collectApprovedData().students || [];
+      students.splice(Math.min(removed.index, students.length), 0, removed.student);
+      if (removed.removedFile) {
+        const fileIndex = removed.removedFileIndex < 0 ? selectedFiles.length : Math.min(removed.removedFileIndex, selectedFiles.length);
+        selectedFiles.splice(fileIndex, 0, removed.removedFile);
+      }
+      renderFilesList();
+      renderCurrentStudents(students, removed.originalWarnings);
+      lastRemovedStudentRecord = null;
+      studentRecordUndo?.setAttribute("hidden", "");
+      clearValidationErrors();
+      refreshValidationStudentCountStatus();
+    };
+
+    const applyValidationStudentCount = () => {
+      const value = Number(validationStudentCountEditorInput?.value);
+      if (!Number.isInteger(value) || value < 1 || value > 100) {
+        validationStudentCountEditorInput?.classList.add("is-invalid");
+        validationStudentCountStatus.textContent = "Öğrenci sayısı 1 ile 100 arasında bir tam sayı olmalıdır.";
+        validationStudentCountStatus.classList.add("is-error");
+        return;
+      }
+      validationStudentCountEditorInput?.classList.remove("is-invalid");
+      if (studentCountInput) studentCountInput.value = String(value);
+      setValidationStudentCountEditorOpen(false);
+      renderSavedGroups();
+      const students = collectApprovedData().students || [];
+      const errors = validateStudents(students, true);
+      const saved = savedGroups.reduce((sum, group) => sum + group.students.length, 0);
+      if (saved + students.length > value) {
+        errors.push({ message: `Bu grup kaydedilirse öğrenci sayısı ${saved + students.length} olacak; güncellenen toplam ${value}.`, input: null });
+      }
+      if (errors.length) showValidationErrors(errors);
+      else clearValidationErrors();
+      refreshValidationStudentCountStatus();
+      invalidateAnalysisAfterApprovedDataEdit();
     };
 
     const renderSavedGroups = () => {
@@ -3415,7 +3712,12 @@ const fileUploadBridge = (() => {
         number: currentGroupNumber,
         students: students.map((student) => ({ ...student })),
         sourceMode,
-        documentType: structuredData?.exam?.documentType || inferDocumentType(structuredData)
+        documentType: structuredData?.exam?.documentType || inferDocumentType(structuredData),
+        // Düzeltme sayısı YALNIZ burada yakalanabilir: students yukarıda
+        // DOM'dan (öğretmenin düzelttiği hâliyle) geldi, structuredData ise
+        // hâlâ makinenin okuduğu özgün değerleri tutuyor - ve startNewGroup()
+        // birazdan structuredData'yı null yapıp o özgün değerleri yok edecek.
+        corrections: window.MAHIRScoreCorrections?.diffScores(structuredData?.students, students)
       });
       currentGroupNumber += 1;
       const total = savedGroups.reduce((sum, group) => sum + group.students.length, 0);
@@ -3423,6 +3725,9 @@ const fileUploadBridge = (() => {
       clearValidationErrors();
       if (saveGroupButton) saveGroupButton.hidden = true;
       if (returnToUploadButton) returnToUploadButton.hidden = true;
+      if (validationStudentCountControl) validationStudentCountControl.hidden = true;
+      document.querySelectorAll("[data-remove-student-record]").forEach((button) => { button.hidden = true; });
+      studentRecordUndo?.setAttribute("hidden", "");
       if (total === expected) {
         showFinalReview();
         return;
@@ -3462,6 +3767,9 @@ const fileUploadBridge = (() => {
     const invalidateAnalysisAfterApprovedDataEdit = () => {
       if (!finalReviewMode || !reportRuntime.analysis) return;
       reportRuntime.analysis = null;
+      // İz, analizle birlikte geçersizleşir: eski koşunun ajan kaydını yeni
+      // (henüz üretilmemiş) bir analizin yanında göstermek öğretmeni yanıltır.
+      reportRuntime.trace = null;
       reportRuntime.report = null;
       screenManager.revokeDataApproval();
       document.dispatchEvent(new CustomEvent("mahir:report-reset"));
@@ -3493,11 +3801,129 @@ const fileUploadBridge = (() => {
       if (approvalMessage) approvalMessage.textContent = "Tüm verileri gözden geçiriniz. Açık onay verilmeden analiz başlamaz.";
     };
 
-    const renderAnalysis = (analysis) => {
+    // Analiz ekranındaki "Analiz Özeti" listesini beş ajanın GERÇEK koşusuyla
+    // değiştirir. İz gelmediğinde (kaydedilmiş eski çalışma, genel dil
+    // değerlendirmesi) listeye hiç dokunulmaz - index.html'deki sabit metin
+    // geçerli bir geri çekilme yolu olarak kalır.
+    const renderAgentTrace = (trace) => {
+      const list = document.querySelector("[data-agent-trace]");
+      const agents = Array.isArray(trace?.agents) ? trace.agents : [];
+      if (!list || !agents.length) return;
+      const format = window.MAHIRReportExport;
+      list.replaceChildren();
+      agents.forEach((entry) => {
+        const item = document.createElement("li");
+        // Süre ve LLM sayısı ayrı bir <span>'de: öğretmenin okuduğu cümle ile
+        // teknik ölçüm birbirine karışmasın.
+        const label = document.createElement("strong");
+        label.textContent = entry.label || entry.agent;
+        const task = document.createTextNode(` — ${format?.agentTaskText?.(entry) || ""}`);
+        const meta = document.createElement("span");
+        meta.className = "agent-trace-meta";
+        meta.textContent = [
+          format?.durationText?.(entry.durationMs),
+          entry.llmCalls?.length ? `${entry.llmCalls.length} dil modeli çağrısı` : "",
+          entry.failed || entry.skipped ? format?.agentStatusText?.(entry) : ""
+        ].filter(Boolean).join(" · ");
+        item.dataset.agent = entry.agent;
+        if (entry.failed) item.dataset.agentFailed = "true";
+        if (entry.skipped) item.dataset.agentSkipped = "true";
+        item.append(label, task, meta);
+        list.append(item);
+      });
+
+      // Ortak dil modeli turu ayrı satırda: süre ajanlara bölüştürülmüyor
+      // (dokuz istem tek istekte çözülüyor, paylaştırmak uydurma olurdu).
+      const round = trace.llmRound;
+      if (round?.promptCount) {
+        const item = document.createElement("li");
+        item.dataset.agent = "llm-turu";
+        const label = document.createElement("strong");
+        label.textContent = "Dil modeli turu (ortak)";
+        const meta = document.createElement("span");
+        meta.className = "agent-trace-meta";
+        meta.textContent = [
+          format?.durationText?.(round.durationMs),
+          round.ok ? "" : "Tamamlanamadı"
+        ].filter(Boolean).join(" · ");
+        item.append(label, document.createTextNode(` — ${round.promptCount} istem tek istekte çözüldü`), meta);
+        list.append(item);
+      }
+    };
+
+    const renderAnalysis = (analysis, trace) => {
       const reportScreen = document.querySelector("#report-screen");
       if (reportScreen?.dataset.reportLocked === "true") return;
       reportRuntime.analysis = analysis;
+      // İz raporun İÇİNDE değil yanında taşınıyor; rapor sözleşmesi teknik
+      // alanlarla kirlenmesin diye (bkz. backend `analyze_approved_data_traced`).
+      reportRuntime.trace = trace || null;
+      renderAgentTrace(trace);
       window.MAHIRReportExport?.syncOutputHeader(reportScreen);
+    };
+
+    const mergeGeneralReports = () => {
+      if (!mergeGeneralReportsButton || Object.values(generalReportFiles).some((file) => !file)) return;
+      const formData = new FormData();
+      Object.entries(generalReportFiles).forEach(([component, file]) => {
+        formData.append("analysis-report", file, `${component}-${file.name}`);
+      });
+      mergeGeneralReportsButton.disabled = true;
+      mergeGeneralReportsButton.setAttribute("aria-disabled", "true");
+      mergeGeneralReportsButton.textContent = "Raporlar Doğrulanıyor…";
+      setGeneralReportStatus("Raporların ders, sınıf/şube, dönem ve bileşen bilgileri doğrulanıyor.");
+
+      const mergeQuery = new URLSearchParams({ course: currentCourseName(), grade: currentGrade() });
+      fetch(`/mahir-merge-reports?${mergeQuery}`, { method: "POST", body: formData })
+        .then((response) => response.json().catch(() => ({})).then((payload) => ({ response, payload })))
+        .then(({ response, payload }) => {
+          if (!response.ok) throw new Error(payload.message || "Analiz raporları birleştirilemedi.");
+          const exam = payload.exam || {};
+          const analysis = payload.analysis || {};
+          structuredData = {
+            exam,
+            questions: [],
+            students: [],
+            warnings: [],
+            summary: analysis.summary || {}
+          };
+          reportRuntime.structuredData = structuredData;
+          reportRuntime.exam = exam;
+          reportRuntime.analysis = analysis;
+          populateContextFields(exam);
+          renderAnalysis(analysis);
+          screenManager.approveData();
+
+          const analysisProgress = document.querySelector("#analysis-screen .analysis-progress");
+          const analysisTitle = analysisProgress?.querySelector("h3");
+          const analysisSteps = analysisProgress?.querySelector("ol");
+          if (analysisTitle) analysisTitle.textContent = "Genel Değerlendirme Özeti";
+          if (analysisSteps) {
+            analysisSteps.replaceChildren();
+            [
+              "Yazılı sınav analiz raporu doğrulandı.",
+              "Dinleme/izleme sınavı analiz raporu doğrulandı.",
+              "Konuşma sınavı analiz raporu doğrulandı.",
+              "Ders, sınıf/şube, dönem ve okul bilgileri eşleştirildi.",
+              "Bileşenler dersin resmî ağırlıklarına göre birleştirildi.",
+              "Öğrenme çıktıları kendi bileşenlerindeki gerçekleşme düzeyleri korunarak raporlandı."
+            ].forEach((text) => {
+              const item = document.createElement("li");
+              item.textContent = text;
+              analysisSteps.append(item);
+            });
+          }
+          const returnToApproved = document.querySelector("[data-return-to-approved-data]");
+          if (returnToApproved) returnToApproved.hidden = true;
+          setGeneralReportStatus(payload.message, "success");
+          screenManager.showScreen("analysis-screen");
+        })
+        .catch((error) => setGeneralReportStatus(error.message, "error"))
+        .finally(() => {
+          mergeGeneralReportsButton.disabled = false;
+          mergeGeneralReportsButton.setAttribute("aria-disabled", "false");
+          mergeGeneralReportsButton.textContent = "Raporları Doğrula ve Birleştir";
+        });
     };
 
     const analyzeApprovedData = () => {
@@ -3511,6 +3937,17 @@ const fileUploadBridge = (() => {
         return;
       }
       const analysisPayload = {
+        ...approvedData,
+        // "Bu %68 nereden geldi?" cevabının parçası: kaç puan hücresinin
+        // öğretmen tarafından düzeltildiği. Grup bazında kaydedilen sayımlara,
+        // son inceleme ekranında yapılan EK düzenlemeler eklenir - bu aşamada
+        // structuredData zaten birleştirilmiş (düzeltilmiş) değerleri tuttuğu
+        // için buradaki fark yalnızca sonradan yapılanları verir, mükerrer
+        // sayım olmaz.
+        correctedCells: (window.MAHIRScoreCorrections?.mergeCorrections(
+          ...savedGroups.map((group) => group.corrections),
+          window.MAHIRScoreCorrections.diffScores(structuredData?.students, approvedData.students)
+        ) || {}).byQuestionIndex || {},
         exam: approvedData.exam,
         questions: approvedData.questions,
         students: (approvedData.students || []).map((student, index) => ({
@@ -3529,6 +3966,9 @@ const fileUploadBridge = (() => {
       approvalButton.textContent = "Analiz Başlatılıyor…";
       showMessage("Öğretmen onaylı veriler analiz motoruna aktarılıyor.");
 
+      // Ölçüm doğrulamalardan sonra, istek gitmeden hemen önce başlıyor.
+      const stopTimer = startTimer("Analiz");
+
       fetch("/mahir-analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3543,10 +3983,21 @@ const fileUploadBridge = (() => {
             reportRuntime.languageComponentAnalyses = reportRuntime.languageComponentAnalyses || {};
             reportRuntime.languageComponentAnalyses[selectedComponent] = analysis;
           }
-          renderAnalysis(analysis);
+          renderAnalysis(analysis, payload.trace);
           screenManager.approveData();
           screenManager.showScreen("analysis-screen");
-          showMessage("Analiz tamamlandı. Öğrenme kanıtlarına dayalı değerlendirme raporu görüntülenmeye hazırdır.", "success");
+          // Kırılım izden geliyor (Faz 4): `totalMs` sunucudaki toplam,
+          // `llmRound` ortak dil modeli turu. Tarayıcı toplamı ≥ rota ≥ tur
+          // olmalı; aradaki farklar ağ ve JSON taşıması.
+          const round = payload.trace?.llmRound || {};
+          const elapsed = stopTimer({
+            rota: durationText(payload.trace?.totalMs ?? 0),
+            llmTuru: round.promptCount ? durationText(round.durationMs) : "yok",
+            istem: round.promptCount || 0,
+            ajan: payload.trace?.agents?.length || 0,
+            isitmadanBeri: sinceWarmUp("/mahir-rag-warmup")
+          });
+          showMessage(`Analiz tamamlandı. Öğrenme kanıtlarına dayalı değerlendirme raporu görüntülenmeye hazırdır. (${elapsed})`, "success");
         })
         .catch((error) => {
           const approvalMessage = document.querySelector("[data-approval-message]");
@@ -3554,7 +4005,8 @@ const fileUploadBridge = (() => {
             approvalMessage.textContent = error.message;
             approvalMessage.focus({ preventScroll: true });
           }
-          showMessage(error.message, "error");
+          const elapsed = stopTimer({ hata: error.message, isitmadanBeri: sinceWarmUp("/mahir-rag-warmup") });
+          showMessage(`${error.message} (${elapsed})`, "error");
         })
         .finally(() => {
           approvalButton.disabled = false;
@@ -3572,6 +4024,7 @@ const fileUploadBridge = (() => {
       if (sourceMode === "manual") {
         renderValidationData({ exam: {}, students: [], warnings: ["Veriler elle girilecektir."], summary: {} });
         screenManager.showScreen("validation-screen");
+        warmUpRag();
         return;
       }
       if (!selectedFiles.length) return;
@@ -3580,17 +4033,30 @@ const fileUploadBridge = (() => {
       readButton.setAttribute("aria-disabled", "true");
       readButton.textContent = selectedFiles.length > 1 ? `${selectedFiles.length} Belge Okunuyor…` : "Belge Okunuyor…";
 
-      const uploadFile = (file) => {
+      // Dosya başına ayrı istek DEĞİL, hepsi tek istekte: her istek uzak OCR
+      // işçisinde ayrı bir konteyner açtırıyordu, yani N fotoğraf = N kez
+      // (ölçülen) 30-50 sn'lik model yükleme. Hem yerel alıcı hem uzak işçi bir
+      // istekteki görsel grubunu tek çağrıda işliyor (file_receiver.py
+      // run_image_group_ocr / ocr_worker.py _run_image_group_ocr) ve ikisinin de
+      // sınırı 10 dosya - arayüzün kendi sınırıyla aynı.
+      const uploadFileGroup = (files) => {
         const formData = new FormData();
-        formData.append("exam-file", file);
+        files.forEach((file) => formData.append("exam-file", file));
         return fetch("/mahir-upload", { method: "POST", body: formData })
           .then((response) => response.json().catch(() => ({})).then((payload) => {
-            if (!response.ok) throw new Error(payload.message || `${file.name} işlenemedi.`);
+            if (!response.ok) throw new Error(payload.message || `${files.length} belge işlenemedi.`);
             return payload;
           }));
       };
 
-      Promise.all(selectedFiles.map(uploadFile))
+      // Ölçüm burada başlıyor - doğrulamalardan SONRA, istek gitmeden hemen
+      // önce: eksik alan uyarısıyla dönülen yol bir "OCR işlemi" değil.
+      const stopTimer = startTimer("OCR");
+      const uploadedBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+
+      // Tek elemanlı liste: aşağıdaki birleştirme mantığı olduğu gibi kalıyor,
+      // böylece yanıt sözleşmesi ve renderValidationData girdisi değişmiyor.
+      uploadFileGroup(selectedFiles).then((payload) => [payload])
         .then((payloads) => {
           const mergedData = payloads.reduce((merged, payload, payloadIndex) => {
             const data = payload.structuredData || {};
@@ -3618,13 +4084,28 @@ const fileUploadBridge = (() => {
           const reportRequest = reportText ? Promise.resolve(reportText) : fetch(`/shared/report-example.txt?ts=${Date.now()}`).then((reportResponse) => reportResponse.ok ? reportResponse.text() : message);
           reportRequest.then(showReport).catch(() => showReport(message));
           screenManager.showScreen("validation-screen");
+          warmUpRag();
           console.info("[MAHIR] Belge grubu backend alıcısına gönderildi.", { fileCount: selectedFiles.length, studentCount: mergedData.students.length });
-          showMessage(message, "success");
+          const elapsed = stopTimer({
+            dosya: selectedFiles.length,
+            boyut: formatBytes(uploadedBytes),
+            ogrenci: mergedData.students.length,
+            isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
+          });
+          showMessage(`${message} (${elapsed})`, "success");
         })
         .catch((error) => {
           window.clearInterval(progressTimer);
           console.warn("[MAHIR] Dosya backend alıcısına gönderilemedi.", error);
-          showMessage("Belge okuma servisine ulaşılamadı. Prototip sunucusunu çalıştırıp yeniden deneyiniz.", "error");
+          // Hata yolu da ölçülüyor: "45 sn sonra patladı" bilgisi, "45 sn
+          // sürdü" kadar değerli - zaman aşımını yavaşlıktan ayıran şey bu.
+          const elapsed = stopTimer({
+            dosya: selectedFiles.length,
+            boyut: formatBytes(uploadedBytes),
+            hata: error.message,
+            isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
+          });
+          showMessage(`Belge okuma servisine ulaşılamadı. Prototip sunucusunu çalıştırıp yeniden deneyiniz. (${elapsed})`, "error");
           showReport("Backend bağlantısı kurulamadı.");
         })
         .finally(() => {
@@ -3647,6 +4128,15 @@ const fileUploadBridge = (() => {
       if (!event.target.closest("[data-outcome-combobox]")) closeOtherOutcomeComboboxes(null);
     });
     assessmentComponent?.addEventListener("change", updateComponentNote);
+    generalReportInputs.forEach((input) => input.addEventListener("change", () => {
+      const component = input.dataset.generalReportFile;
+      const file = input.files?.[0] || null;
+      generalReportFiles[component] = file;
+      const status = document.querySelector(`[data-general-report-file-status="${component}"]`);
+      if (status) status.textContent = file ? file.name : "Rapor seçilmedi.";
+      refreshGeneralReportFiles();
+    }));
+    mergeGeneralReportsButton?.addEventListener("click", mergeGeneralReports);
     document.addEventListener("mahir:preparation-context-changed", () => {
       updateComponentNote();
       loadLearningOutcomes();
@@ -3670,6 +4160,23 @@ const fileUploadBridge = (() => {
     addGroupButton?.addEventListener("click", startNewGroup);
     returnToUploadButton?.addEventListener("click", returnToUpload);
     confirmFinalButton?.addEventListener("click", analyzeApprovedData);
+    document.querySelector("[data-edit-validation-student-count]")?.addEventListener("click", () => setValidationStudentCountEditorOpen(true));
+    document.querySelector("[data-cancel-validation-student-count]")?.addEventListener("click", () => setValidationStudentCountEditorOpen(false));
+    document.querySelector("[data-apply-validation-student-count]")?.addEventListener("click", applyValidationStudentCount);
+    validationStudentCountEditorInput?.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        applyValidationStudentCount();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        setValidationStudentCountEditorOpen(false);
+      }
+    });
+    document.querySelector("[data-validation-students]")?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-remove-student-record]");
+      if (button) removeStudentRecord(button.closest("[data-student-row]"));
+    });
+    document.querySelector("[data-undo-student-record]")?.addEventListener("click", undoStudentRecordRemoval);
     document.querySelector("[data-validation-students]")?.addEventListener("input", () => {
       invalidateAnalysisAfterApprovedDataEdit();
       refreshResolvedOcrWarnings();
@@ -3679,6 +4186,7 @@ const fileUploadBridge = (() => {
       refreshContextStatus();
       window.MAHIRReportExport?.syncOutputHeader(document.querySelector("#report-screen"));
     });
+    configureSourceMode(document.querySelector('[data-source-option]:checked')?.value || "images");
     updateComponentNote();
     loadLearningOutcomes();
     populateContextFields();
@@ -3700,7 +4208,6 @@ const fileUploadBridge = (() => {
     dropzone?.addEventListener("drop", (event) => {
       if (event.dataTransfer?.files?.length) selectFiles(event.dataTransfer.files);
     });
-    configureSourceMode(document.querySelector('[data-source-option]:checked')?.value || "images");
   };
 
   return { init };

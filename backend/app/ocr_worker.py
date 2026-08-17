@@ -27,6 +27,7 @@ from .file_receiver import (
 )
 
 UPLOAD_PATH = "/mahir-upload"
+WARMUP_PATH = "/mahir-warmup"
 SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
 
 
@@ -35,13 +36,39 @@ class OCRWorkerHandler(BaseHTTPRequestHandler):
 
     def end_headers(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         super().end_headers()
 
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.end_headers()
+
+    def do_GET(self) -> None:
+        """Ön-ısıtma: konteyneri ayağa kaldırıp modelleri GPU'ya yükletir.
+
+        Ölçüldü (bkz. `modal app logs mahir-ocr-worker`): bir isteğin 50-57
+        saniyesinin 30-50'si konteyner açılışı + model yükleme, yalnızca 7-12
+        saniyesi gerçek OCR. Bu uç nokta o hazırlığı, öğretmen daha dosyalarını
+        seçerken tetiklemek için var - hiç predict çalıştırmaz.
+
+        `ensure_available()` idempotenttir (`ocr_engine._get_pipeline` tek
+        seferlik kurulum yapar), bu yüzden sıcak bir konteynerde anında döner.
+        Paylaşılan parola doğrulaması bilinçli olarak uygulanmıyor: uç nokta
+        hiçbir veri kabul etmiyor ve hiçbir şey döndürmüyor, tek etkisi bu
+        konteyneri hazırlamak.
+        """
+
+        if self.path != WARMUP_PATH:
+            self._send_json(404, {"ok": False, "message": "Bilinmeyen alıcı yolu."})
+            return
+
+        try:
+            ocr_engine.ensure_available()
+        except RuntimeError as error:
+            self._send_json(503, {"ok": False, "ready": False, "message": str(error)})
+            return
+        self._send_json(200, {"ok": True, "ready": True, "message": "OCR hattı hazır."})
 
     def do_POST(self) -> None:
         if self.path != UPLOAD_PATH:

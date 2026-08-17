@@ -265,14 +265,58 @@
               </label>
             </div>
             <p class="preparation-helper" data-component-weight-note hidden></p>
+            <p class="notification-message scenario-guidance" data-scenario-guidance>
+              Yazılı sınavın dayandığı senaryo, konu-soru dağılım tablosu veya zümre kararına göre soru sayısını, azami puanları ve ilişkili öğrenme çıktılarını seçiniz. Bir soru birden fazla çıktıyla; aynı çıktı birden fazla soruyla ilişkilendirilebilir. Bir soruya birden fazla çıktı seçildiğinde soru puanı çıktılar arasında eşit paylaşılır.
+            </p>
             <p class="notification-message program-data-status" data-program-data-status aria-live="polite" hidden></p>
             <div class="question-configuration-list" data-question-configuration></div>
             <p class="notification-message exam-structure-status" data-exam-structure-status aria-live="polite">
-              Her soru için azami puanı ve öğrenme çıktısını seçiniz.
+              Her soru için azami puanı ve ilişkili öğrenme çıktısını ya da çıktılarını seçiniz.
             </p>
           </article>
 
-          <article class="data-source-card" aria-labelledby="data-source-title">
+          <article class="general-report-merger" data-general-report-merger aria-labelledby="general-report-merger-title" hidden>
+            <div class="general-report-merger-heading">
+              <div>
+                <p class="data-entry-kicker">Rapor birleştirme</p>
+                <h3 id="general-report-merger-title">Üç Bileşenli Genel Değerlendirme</h3>
+                <p>MAHİR tarafından oluşturulan yazılı, dinleme/izleme ve konuşma analiz raporlarını yükleyiniz. Sistem; ders, sınıf/şube, dönem ve bileşen uyumunu doğruladıktan sonra genel değerlendirmeyi oluşturur.</p>
+              </div>
+              <p class="general-weight-badge" data-general-weight-badge>%70 · %15 · %15</p>
+            </div>
+
+            <div class="general-report-slots">
+              <label class="general-report-slot" data-general-report-slot="written">
+                <span class="general-report-slot-title">Yazılı Sınav Analiz Raporu</span>
+                <span class="general-report-slot-weight" data-general-report-weight="written">Genel sonuca etkisi: %70</span>
+                <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-general-report-file="written">
+                <span class="general-report-file-status" data-general-report-file-status="written">Rapor seçilmedi.</span>
+              </label>
+              <label class="general-report-slot" data-general-report-slot="listening">
+                <span class="general-report-slot-title">Dinleme/İzleme Sınavı Analiz Raporu</span>
+                <span class="general-report-slot-weight" data-general-report-weight="listening">Genel sonuca etkisi: %15</span>
+                <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-general-report-file="listening">
+                <span class="general-report-file-status" data-general-report-file-status="listening">Rapor seçilmedi.</span>
+              </label>
+              <label class="general-report-slot" data-general-report-slot="speaking">
+                <span class="general-report-slot-title">Konuşma Sınavı Analiz Raporu</span>
+                <span class="general-report-slot-weight" data-general-report-weight="speaking">Genel sonuca etkisi: %15</span>
+                <input type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" data-general-report-file="speaking">
+                <span class="general-report-file-status" data-general-report-file-status="speaking">Rapor seçilmedi.</span>
+              </label>
+            </div>
+
+            <p class="notification-message general-report-status" data-general-report-status aria-live="polite">
+              Genel değerlendirme için MAHİR'den indirilen üç Word (.docx) analiz raporu gereklidir.
+            </p>
+            <p class="general-report-privacy-note"><strong>Kişisel verilerin korunması:</strong> Birleştirme işleminde öğrenci adı, okul numarası veya T.C. kimlik numarası kullanılmaz. Genel sonuç, raporlardaki sınıf düzeyi kanıtlardan oluşturulur; öğrenci bazlı e-Okul puanı hesaplanmaz.</p>
+            <div class="button-group general-report-actions">
+              <button class="secondary-button" type="button" data-target-screen="preparation-screen">Geri</button>
+              <button class="primary-button" type="button" data-merge-general-reports disabled aria-disabled="true">Raporları Doğrula ve Birleştir</button>
+            </div>
+          </article>
+
+          <article class="data-source-card" aria-labelledby="data-source-title" data-standard-data-entry>
             <div>
               <p class="data-entry-kicker">Veri giriş yolu</p>
               <h3 id="data-source-title">Veriyi nasıl eklemek istiyorsunuz?</h3>
@@ -286,14 +330,14 @@
             </div>
           </article>
 
-          <dl class="ocr-guidance-list" data-personal-data-warning>
+          <dl class="ocr-guidance-list" data-personal-data-warning data-standard-data-entry>
             <div>
               <dt>Kişisel verilerin korunması</dt>
               <dd>Öğrenci adı, soyadı, T.C. kimlik numarası ve gereksiz diğer kişisel verileri yüklemeyiniz veya girmeyiniz. Öğrencinin ayırt edilmesi için yalnızca okul numarasını kullanınız.</dd>
             </div>
           </dl>
 
-          <article class="ocr-guidance-card" aria-labelledby="ocr-guidance-title" data-ocr-guidance>
+          <article class="ocr-guidance-card" aria-labelledby="ocr-guidance-title" data-ocr-guidance data-standard-data-entry>
             <div class="ocr-guidance-copy">
               <p class="data-entry-kicker">Görsel OCR için gerekli yapı</p>
               <h3 id="ocr-guidance-title">Soru Bazlı Puan Çizelgesi</h3>
@@ -327,7 +371,7 @@
             </figure>
           </article>
 
-          <article class="template-download-card" aria-labelledby="template-download-title" data-template-card hidden>
+          <article class="template-download-card" aria-labelledby="template-download-title" data-template-card data-standard-data-entry hidden>
             <div>
               <p class="data-entry-kicker">Önerilen yöntem</p>
               <h3 id="template-download-title">MAHİR Veri Giriş Şablonu</h3>
@@ -338,7 +382,7 @@
             </a>
           </article>
 
-          <div class="upload-box document-upload-box" data-component="Upload Box" data-upload-dropzone role="group" aria-labelledby="upload-title">
+          <div class="upload-box document-upload-box" data-component="Upload Box" data-upload-dropzone data-standard-data-entry role="group" aria-labelledby="upload-title">
             <div class="upload-symbol" aria-hidden="true">↑</div>
             <h3 id="upload-title" data-upload-title>Soru bazlı puan çizelgelerini yükleyin</h3>
             <p data-upload-description>Her öğrenci için üç satırlı Soru Bazlı Puan Çizelgesinin fotoğrafını seçin. Bir grupta en fazla 10 görsel yükleyebilirsiniz.</p>
@@ -347,13 +391,13 @@
             <p class="upload-rules" data-upload-rules>JPG, PNG veya WEBP · En fazla 10 görsel · Dosya başına 20 MB</p>
           </div>
 
-          <div class="uploaded-files-list" data-uploaded-files-list aria-live="polite" hidden></div>
+          <div class="uploaded-files-list" data-uploaded-files-list data-standard-data-entry aria-live="polite" hidden></div>
 
-          <p class="notification-message upload-status-message" data-component="Notification Message" data-upload-status aria-live="polite">
+          <p class="notification-message upload-status-message" data-component="Notification Message" data-upload-status data-standard-data-entry aria-live="polite">
             Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır.
           </p>
 
-          <div class="button-group data-entry-actions" aria-label="Veri ekleme işlemleri">
+          <div class="button-group data-entry-actions" data-standard-data-entry aria-label="Veri ekleme işlemleri">
             <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="preparation-screen">Geri</button>
             <button class="primary-button" data-component="Primary Button" type="button" data-read-document disabled aria-disabled="true">Çizelgeleri Oku ve Kontrol Et</button>
           </div>
@@ -400,6 +444,20 @@
             <aside class="privacy-notice" aria-label="Kişisel veri koruma bilgisi">
               <strong>KVKK veri minimizasyonu:</strong> Ad-soyad ve T.C. kimlik numarası analiz için kullanılmaz. Okul numarası yalnız öğretmen kontrol ekranında tutulur; analiz ve LLM katmanına oturumluk takma öğrenci referansı aktarılır.
             </aside>
+            <div class="validation-student-count-control" data-validation-student-count-control>
+              <div class="validation-student-count-summary">
+                <span>Beklenen öğrenci sayısı</span>
+                <strong data-validation-expected-count>0</strong>
+              </div>
+              <button class="secondary-button compact-button" type="button" data-edit-validation-student-count>Düzenle</button>
+              <div class="validation-student-count-editor" data-validation-student-count-editor hidden>
+                <label for="validation-student-count">Yeni öğrenci sayısı</label>
+                <input id="validation-student-count" type="number" min="1" max="100" step="1" data-validation-student-count-input>
+                <button class="primary-button compact-button" type="button" data-apply-validation-student-count>Uygula</button>
+                <button class="secondary-button compact-button" type="button" data-cancel-validation-student-count>Vazgeç</button>
+              </div>
+              <p class="validation-student-count-status" data-validation-student-count-status aria-live="polite"></p>
+            </div>
             <p class="notification-message document-read-guidance" data-document-read-guidance aria-live="polite" hidden></p>
             <div class="table-wrap">
               <table class="data-table">
@@ -407,6 +465,10 @@
                 <thead data-validation-student-head></thead>
                 <tbody data-validation-students></tbody>
               </table>
+            </div>
+            <div class="student-record-undo" data-student-record-undo role="status" aria-live="polite" hidden>
+              <span data-student-record-undo-message></span>
+              <button class="secondary-button compact-button" type="button" data-undo-student-record>Geri Al</button>
             </div>
             <div class="button-group student-save-actions" aria-label="Öğrenci verisi kayıt işlemi">
               <button class="secondary-button" data-component="Secondary Button" type="button" data-return-to-upload>Dosya Yükleme Aşamasına Dön</button>
@@ -469,9 +531,13 @@
           <h2 id="analysis-title">Analiz Süreci</h2>
         </header>
 
+        <!-- Aşağıdaki liste, iz gelmediğinde (kaydedilmiş eski çalışma, genel
+             dil değerlendirmesi) geçerli kalan geri çekilme metnidir. Analiz
+             izi geldiğinde script.js bunu beş ajanın GERÇEK koşusuyla
+             değiştirir - bkz. renderAgentTrace. -->
         <article class="analysis-progress" data-component="Analysis Progress" aria-labelledby="analysis-progress-title">
           <h3 id="analysis-progress-title">Analiz Özeti</h3>
-          <ol>
+          <ol data-agent-trace>
             <li>Veriler öğretmen onayıyla kesinleştirildi.</li>
             <li>Soru ve puan bilgileri kontrol edildi.</li>
             <li>Sorular öğrenme çıktılarıyla eşleştirildi.</li>
@@ -557,6 +623,10 @@
             <button class="secondary-button" data-component="Secondary Button" type="button" data-download-approved-word disabled aria-disabled="true">Word Olarak İndir</button>
             <button class="primary-button" data-component="Primary Button" type="button" data-download-approved-pdf disabled aria-disabled="true">PDF Olarak İndir</button>
           </div>
+          <aside class="report-download-guidance" aria-label="Rapor dosyası kullanım bilgisi">
+            <p><strong>Word (.docx):</strong> Rapor tek başına kullanılabilir. Dil derslerine ait yazılı, dinleme/izleme ve konuşma raporlarının Word kopyası ayrıca Genel Değerlendirme ekranına yüklenebilir.</p>
+            <p><strong>PDF:</strong> Görüntüleme, paylaşma ve arşivleme içindir; Genel Değerlendirme ekranına yüklenemez.</p>
+          </aside>
           <p class="report-output-validation-message" data-output-validation-message data-pdf-exclude hidden></p>
         </div>
       </section>
@@ -613,6 +683,7 @@
   <script src="assets/js/mahir-pdf-exporter.js"></script>
   <script src="assets/js/mahir-workspace-backup.js"></script>
   <script src="assets/js/mahir-program-catalog.js"></script>
+  <script src="assets/js/mahir-score-corrections.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

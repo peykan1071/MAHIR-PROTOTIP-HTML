@@ -228,6 +228,102 @@ input[type="checkbox"] {
   background: #fbfefe;
 }
 
+.general-report-merger {
+  display: grid;
+  gap: 20px;
+  padding: 22px;
+  border: 1px solid #b9dfe1;
+  border-radius: 12px;
+  background: #fbfefe;
+}
+
+.general-report-merger[hidden] {
+  display: none !important;
+}
+
+[data-standard-data-entry][hidden] {
+  display: none !important;
+}
+
+.general-report-merger-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 20px;
+}
+
+.general-report-merger-heading h3,
+.general-report-merger-heading p {
+  margin: 0;
+}
+
+.general-weight-badge {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: var(--color-secondary);
+  background: #e7f3f4;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.general-report-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.general-report-slot {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.general-report-slot-title {
+  color: var(--color-secondary);
+  font-weight: 800;
+}
+
+.general-report-slot-weight,
+.general-report-file-status {
+  color: var(--color-muted);
+  font-size: 0.92rem;
+}
+
+.general-report-slot input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #f8fbfc;
+}
+
+.general-report-file-status {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.general-report-privacy-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 4px solid #26734d;
+  border-radius: 8px;
+  color: #214f39;
+  background: #f2fbf6;
+}
+
+.general-report-actions {
+  justify-content: flex-end;
+}
+
 .report-context-card,
 .saved-groups-card,
 .validation-errors-card,
@@ -322,6 +418,134 @@ input[type="checkbox"] {
   margin-top: 18px;
 }
 
+.validation-student-count-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  align-items: center;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid #b9dfe1;
+  border-radius: 10px;
+  background: #f5fbfb;
+}
+
+.validation-student-count-control[hidden],
+.validation-student-count-editor[hidden],
+.student-record-undo[hidden],
+.student-record-remove-button[hidden] {
+  display: none !important;
+}
+
+.validation-student-count-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--color-secondary);
+}
+
+.validation-student-count-summary strong {
+  font-size: 1.35rem;
+}
+
+.validation-student-count-editor {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.validation-student-count-editor label {
+  color: var(--color-secondary);
+  font-weight: 700;
+}
+
+.validation-student-count-editor input {
+  width: 110px;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.validation-student-count-editor input.is-invalid {
+  border-color: #b23b2d;
+  background: #fff4f2;
+  box-shadow: 0 0 0 3px rgb(178 59 45 / 12%);
+}
+
+.validation-student-count-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.validation-student-count-status.is-error {
+  color: #8a2e23;
+}
+
+.validation-student-count-status.is-success {
+  color: #146c5a;
+}
+
+.compact-button {
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+.student-record-action-cell {
+  min-width: 130px;
+  text-align: center;
+}
+
+.student-record-remove-button {
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid #c96559;
+  border-radius: 8px;
+  color: #8a2e23;
+  background: #fff;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.student-record-remove-button:hover {
+  color: #fff;
+  background: #a63a2f;
+}
+
+.student-record-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  color: var(--color-secondary);
+  background: #f2f9fa;
+}
+
+@media (max-width: 720px) {
+  .validation-student-count-control {
+    grid-template-columns: 1fr;
+  }
+
+  .validation-student-count-control > .compact-button {
+    justify-self: start;
+  }
+
+  .student-record-undo {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .exam-structure-heading {
   display: flex;
   justify-content: space-between;
@@ -366,6 +590,11 @@ input[type="checkbox"] {
   font-weight: 700;
 }
 
+.outcome-combobox-help {
+  color: var(--color-muted);
+  line-height: 1.35;
+}
+
 /* Author styles must not override the native hidden state. */
 .exam-count-grid label[hidden] {
   display: none;
@@ -386,6 +615,10 @@ input[type="checkbox"] {
 .question-configuration-list {
   display: grid;
   gap: 12px;
+}
+
+.question-configuration-list[hidden] {
+  display: none !important;
 }
 
 .question-configuration-row {
@@ -827,6 +1060,47 @@ button[aria-disabled="true"] {
   vertical-align: top;
 }
 
+/* "Kanıtları Gör": D bölümünde her oranın hangi sorulardan ve kaç öğrenciden
+   hesaplandığı. Yalnız ekran önizlemesinde açılır olur - indirilen Word/PDF
+   belgesinde aynı metin düz olarak yer alır (bkz. mahir-report-export-common.js
+   renderOutputBody, block.details'i kasıtlı olarak geçmiyor). */
+.report-preview-sections .evidence-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.report-preview-sections .evidence-details > summary::marker {
+  color: var(--color-border);
+}
+
+.report-preview-sections .evidence-detail {
+  margin: 6px 0 0;
+  font-weight: 400;
+}
+
+/* Tablo dipnotu: hücrede kısa atıf ("s. 66-67"), belgenin tam adı burada bir
+   kez. Küçük punto ve soluk renk, dipnotu tablo içeriğinden ayırıyor. */
+.report-note {
+  margin: 6px 0 0;
+  font-size: 0.85em;
+  color: var(--color-muted, #59697a);
+}
+
+/* Analiz ekranındaki ajan izi: her satır bir uzman ajanın gerçek koşusu.
+   Süre ve dil modeli sayımı ayrı satırda ve soluk - öğretmenin okuduğu cümle
+   ile teknik ölçüm birbirine karışmasın. */
+.analysis-progress .agent-trace-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.85em;
+  color: var(--color-muted, #59697a);
+}
+
+.analysis-progress li[data-agent-failed],
+.analysis-progress li[data-agent-skipped] {
+  color: var(--color-muted, #59697a);
+}
+
 .report-intro {
   margin: 0;
 }
@@ -845,6 +1119,16 @@ button[aria-disabled="true"] {
 
   .exam-structure-heading {
     display: grid;
+  }
+
+  .general-report-merger-heading,
+  .general-report-slots {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .general-weight-badge {
+    justify-self: start;
   }
 }
 
@@ -2208,6 +2492,23 @@ body:has(#welcome-screen.active-screen) .welcome-footer-social svg {
   width: 100%;
   min-width: 150px;
   white-space: nowrap;
+}
+
+.report-download-guidance {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 7px;
+  padding: 13px 15px;
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  color: var(--color-secondary);
+  background: #f2f9fa;
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.report-download-guidance p {
+  margin: 0;
 }
 
 .report-output-validation-message {

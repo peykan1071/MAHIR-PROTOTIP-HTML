@@ -1,11 +1,17 @@
-"""Analyze teacher-approved MAHIR question and student score data."""
+﻿"""Analyze teacher-approved MAHIR question and student score data."""
 
 from __future__ import annotations
 
-from collections import defaultdict
+import logging
+import os
 import re
+import time
 from typing import Any
 
+# Charter süzgeci `charter_guard`a taşındı: kısıt tek bir ajanın değil, LLM
+# üreten her ajanın sorunu. Takma ad, mevcut çağrı yerlerini ve testleri
+# değiştirmeden bırakmak için.
+from .charter_guard import strip_recommendation_sentences as _strip_recommendation_sentences
 from .assessment_profiles import (
     COMPONENT_LABELS,
     GENERAL,
@@ -14,12 +20,70 @@ from .assessment_profiles import (
     build_general_evaluation,
     profile_for_course,
 )
-from .program_catalog import validate_question_program_context
+# `defaultdict` ve `validate_question_program_context` artık burada değil:
+# ölçme toplamları `measurement_engine`e, program eşleştirme ise
+# `agents/pipeline.py::ProgramMappingAgent`a taşındı.
+
+_DEFAULT_MAHIR_RAG_REMOTE_URL = "https://hakanergul--turkish-rag-system-raginference-web-query.modal.run"
+# Varsayılan, deploy edilmiş RAG servisinin adresi olarak koda gömülü - terminalde
+# her seferinde MAHIR_RAG_REMOTE_URL ayarlamaya gerek yok. Farklı bir deploy'a
+# (ör. test ortamı) işaret etmek gerekirse env var yine de bunu geçersiz kılar.
+MAHIR_RAG_REMOTE_URL = os.environ.get("MAHIR_RAG_REMOTE_URL", _DEFAULT_MAHIR_RAG_REMOTE_URL)
+_RAG_WEAK_THRESHOLD = 0.70  # assets/js/mahir-report-export-common.js:buildDevelopmentNeedsBlock ile aynı eşik
+_RAG_CRITICAL_THRESHOLD = 0.50  # aynı dosyadaki "Öncelikli" / Kritik eşiği
+_RAG_NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
+
+# ragContext'in boş kalmasının SEKİZ farklı sebebi var ve hepsi aynı boş stringi
+# üretiyor - raporda "bazı satırlar boş" görüntüsünün hangisinden kaynaklandığı
+# aksi hâlde ayırt edilemiyor. Her dal sunucu loguna tek satır sebep kodu yazar;
+# API yanıtı ve rapor bilinçli olarak değişmez (öğretmen teknik mesaj görmemeli).
+_logger = logging.getLogger(__name__)
 
 
 def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
-    """Validate approved browser data and return deterministic analysis results."""
+    """Validate approved browser data and return deterministic analysis results.
 
+    İmza kasıtlı olarak değişmedi: hattın "sayıları değiştirmiyoruz" güvencesini
+    koruyan eşdeğerlik ve altın değer testlerinin tamamı buna bağlı. Ajan izine
+    de ihtiyacı olan çağıran (`file_receiver`) `analyze_approved_data_traced`
+    kullanır.
+    """
+
+    return analyze_approved_data_traced(payload)[0]
+
+
+def empty_trace() -> dict[str, Any]:
+    """Hattın koşmadığı yollar için boş iz - alanın varlığı her zaman öngörülebilir."""
+
+    return {"agents": [], "issues": []}
+
+
+def analyze_approved_data_traced(
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Analizi ve onu ÜRETEN ajan izini birlikte döndürür.
+
+    İz `analysis`in içine değil KARDEŞİNE konuyor: `analysis` öğretmenin rapor
+    sözleşmesi, iz ise "bu raporu kim üretti"nin cevabı - taşıma katmanı
+    üstverisi. Ayrı tutmak rapor sözleşmesini teknik alanlarla kirletmiyor ve
+    kaydedilmiş eski çalışmaları geçerli bırakıyor.
+
+    İze `totalMs` de yazılıyor: ajan süreleri milisaniye mertebesinde, ortak
+    LLM turu ise saniyeler sürüyor - toplamı ayrıca taşımak, tarayıcının
+    "zaman nerede geçti"yi ek bir alan olmadan gösterebilmesini sağlıyor.
+    Ölçüm hatalı yolda YAPILMIYOR: doğrulama hatası istisna olarak çıkıyor ve
+    zaten ölçülecek bir iş yapılmamış oluyor.
+    """
+
+    began = time.monotonic()
+    analysis, trace = _analyze_and_trace(payload)
+    trace["totalMs"] = round((time.monotonic() - began) * 1000, 1)
+    return analysis, trace
+
+
+def _analyze_and_trace(
+    payload: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
     _assert_privacy_safe_students(payload.get("students"))
     questions = payload.get("questions")
     students = payload.get("students")
@@ -45,86 +109,63 @@ def analyze_approved_data(payload: dict[str, Any]) -> dict[str, Any]:
                 "Genel değerlendirme için yazılı, dinleme/izleme ve konuşma bileşenlerine ait "
                 "onaylanmış öğrenme kanıtları gereklidir."
             )
-        return build_general_evaluation(course_profile.id, component_analyses)
+        # Genel dil değerlendirmesi hattı koşturmuyor - bileşen analizleri zaten
+        # üretilmiş, burada yalnız ağırlıklandırılıyorlar. İz boş döner ve yüzey
+        # bunu bugünkü davranışa düşerek karşılar.
+        return build_general_evaluation(course_profile.id, component_analyses), empty_trace()
     if not isinstance(questions, list) or not questions:
         raise ValueError("Analiz için en az bir soru bulunmalıdır.")
     if not isinstance(students, list) or not students:
         raise ValueError("Analiz için en az bir öğrenci bulunmalıdır.")
 
-    validate_question_program_context(course_name, exam.get("grade"), questions)
+    # Buradan sonrası beş uzman ajanın işi (bkz. backend/app/agents/): Belge
+    # Anlama -> Program Eşleştirme -> Ölçme -> Pedagojik Analiz -> Raporlama.
+    # Yukarıdaki kontroller İSTEK düzeyinde (bileşen türü, ağırlık profili,
+    # gizlilik kapısı) ve ajanların işi değil, bu yüzden burada kalıyor.
+    #
+    # Import fonksiyon içinde: `agents` paketi bu modülden normalleştirme ve
+    # eşik yardımcılarını alıyor, modül seviyesinde import döngü kurardı.
+    from .agents.base import trace_of
+    from .agents.orchestrator import run_pipeline
 
-    normalized_questions = [_normalize_question(item, index) for index, item in enumerate(questions, 1)]
-    participating = [
-        _normalize_student(item, normalized_questions, index)
-        for index, item in enumerate(students, 1)
-    ]
-    if not participating:
-        raise ValueError("Sınava katılan öğrenci bulunmadığı için analiz oluşturulamadı.")
+    context = run_pipeline(payload, component_type, profile_id)
+    return context.analysis, trace_of(context)
 
-    question_results = []
-    outcome_totals: dict[str, dict[str, Any]] = defaultdict(
-        lambda: {"earned": 0.0, "possible": 0.0, "skill": ""}
-    )
-    for question_index, question in enumerate(normalized_questions):
-        earned = sum(student["scores"][question_index] for student in participating)
-        possible = question["maxScore"] * len(participating)
-        rate = earned / possible if possible else 0.0
-        question_results.append({
-            **question,
-            "earnedScore": earned,
-            "possibleScore": possible,
-            "realizationRate": rate,
-            "successRate": rate,
-        })
-        outcome_key = " | ".join(
-            value for value in (question["outcomeTheme"], question["outcomeCode"]) if value
-        ) or f"Soru {question['number']}"
-        outcome_totals[outcome_key]["earned"] += earned
-        outcome_totals[outcome_key]["possible"] += possible
-        outcome_totals[outcome_key]["skill"] = question["outcomeSkill"]
+def _normalize_corrected_cells(raw: Any) -> dict[int, int]:
+    """`{"0": 2, "3": 1}` -> `{0: 2, 3: 1}` (soru indeksi -> düzeltilen hücre sayısı).
 
-    outcome_results = []
-    for outcome_key, totals in outcome_totals.items():
-        rate = totals["earned"] / totals["possible"] if totals["possible"] else 0.0
-        theme, separator, code = outcome_key.rpartition(" | ")
-        outcome_results.append(
-            {
-                "outcomeCode": code if separator else outcome_key,
-                "outcomeTheme": theme if separator else "",
-                "outcomeSkill": totals["skill"],
-                "earnedScore": totals["earned"],
-                "possibleScore": totals["possible"],
-                "successRate": rate,
-                "realizationRate": rate,
-                "developmentLevel": _category(rate),
-                "category": _category(rate),
-                "decision": _decision(rate),
-            }
-        )
+    Öğretmenin kaç puan hücresini düzelttiği yalnız tarayıcıda bilinebiliyor
+    (bkz. `assets/js/mahir-score-corrections.js`), bu yüzden analiz yüküyle
+    birlikte geliyor. Sayıya güvenilmiyor: bozuk, negatif veya sayı olmayan
+    girdiler sessizce elenir - bu alan yalnız bir açıklanabilirlik göstergesi,
+    hiçbir puanı veya oranı etkilemediği için bir doğrulama hatası fırlatıp
+    öğretmenin analizini engellemesi orantısız olurdu.
+    """
 
-    average = sum(student["calculatedTotal"] for student in participating) / len(participating)
-    exam_max = sum(question["maxScore"] for question in normalized_questions)
+    if not isinstance(raw, dict):
+        return {}
+    normalized: dict[int, int] = {}
+    for key, value in raw.items():
+        try:
+            index = int(key)
+            count = int(value)
+        except (TypeError, ValueError):
+            continue
+        if index >= 0 and count > 0:
+            normalized[index] = count
+    return normalized
+
+
+def _normalize_outcome(item: dict[str, Any], weight: float) -> dict[str, Any]:
     return {
-        "exam": {
-            **exam,
-            "componentType": component_type,
-            "componentLabel": COMPONENT_LABELS[component_type],
-            "weightingProfileId": profile_id or None,
-            "componentWeight": PROFILES[profile_id].weights.get(component_type) if profile_id else None,
-        },
-        "summary": {
-            "questionCount": len(normalized_questions),
-            "studentCount": len(students),
-            "participatingStudentCount": len(participating),
-            "absentStudentCount": 0,
-            "examMaxScore": exam_max,
-            "classAverage": round(average, 2),
-            "classLearningLevel": average / exam_max if exam_max else 0.0,
-            "classSuccessRate": average / exam_max if exam_max else 0.0,
-        },
-        "questions": question_results,
-        "outcomes": outcome_results,
-        "students": participating,
+        "outcomeCode": str(item.get("outcomeCode") or "").strip(),
+        "outcomeDescription": str(item.get("outcomeDescription") or "").strip(),
+        "outcomeTheme": str(item.get("outcomeTheme") or "").strip(),
+        "outcomeSkill": str(item.get("outcomeSkill") or "").strip(),
+        "parentOutcomeCode": str(item.get("parentOutcomeCode") or "").strip(),
+        "parentOutcomeDescription": str(item.get("parentOutcomeDescription") or "").strip(),
+        "outcomeKey": str(item.get("outcomeKey") or "").strip(),
+        "weight": weight,
     }
 
 
@@ -135,16 +176,40 @@ def _normalize_question(item: Any, fallback_number: int) -> dict[str, Any]:
     max_score = _number(item.get("maxScore"))
     if max_score <= 0:
         raise ValueError(f"{number}. sorunun azami puanı sıfırdan büyük olmalıdır.")
+
+    raw_outcomes = item.get("outcomes")
+    outcome_fields = (
+        "outcomeCode",
+        "outcomeDescription",
+        "outcomeTheme",
+        "outcomeSkill",
+        "parentOutcomeCode",
+        "parentOutcomeDescription",
+        "outcomeKey",
+    )
+    outcome_items = [
+        entry
+        for entry in raw_outcomes
+        if isinstance(entry, dict) and any(entry.get(field) for field in outcome_fields)
+    ] if isinstance(raw_outcomes, list) else []
+    if not outcome_items and any(item.get(field) for field in ("outcomeCode", "outcomeDescription", "outcomeKey")):
+        outcome_items = [item]
+    weight = 1.0 / len(outcome_items) if outcome_items else 1.0
+    outcomes = [_normalize_outcome(entry, weight) for entry in outcome_items]
+    primary = outcomes[0] if outcomes else _normalize_outcome({}, 1.0)
     return {
         "number": number,
         "maxScore": max_score,
-        "outcomeCode": str(item.get("outcomeCode") or "").strip(),
-        "outcomeDescription": str(item.get("outcomeDescription") or "").strip(),
-        "outcomeTheme": str(item.get("outcomeTheme") or "").strip(),
-        "outcomeSkill": str(item.get("outcomeSkill") or "").strip(),
-        "parentOutcomeCode": str(item.get("parentOutcomeCode") or "").strip(),
-        "parentOutcomeDescription": str(item.get("parentOutcomeDescription") or "").strip(),
-        "outcomeKey": str(item.get("outcomeKey") or "").strip(),
+        "outcomes": outcomes,
+        **{field: primary[field] for field in (
+            "outcomeCode",
+            "outcomeDescription",
+            "outcomeTheme",
+            "outcomeSkill",
+            "parentOutcomeCode",
+            "parentOutcomeDescription",
+            "outcomeKey",
+        )},
     }
 
 
@@ -242,3 +307,112 @@ def _decision(rate: float) -> str:
     if rate >= 0.50:
         return "Öğrenme çıktısının gerçekleşme düzeyini geliştirecek öğrenme yaşantılarına ihtiyaç vardır."
     return "Öğrenme çıktısına ilişkin öğrenme kanıtları ilave desteğe ihtiyaç olduğunu göstermektedir."
+
+
+# Burada bir `_attach_rag_context` vardı: zayıf çıktıları toplayıp `rag_client`
+# üzerinden tek partide sorguluyor, yanıtları `ragContext`e yazıyordu. Faz 3'te
+# bu iş ajanın kendisine geçti - prompt'lar `pipeline.py::_enqueue_diagnosis_prompts`
+# ile kuyruğa yazılıyor, yanıtlar `PedagogicalAnalysisAgent.apply_llm` içinde
+# aynı sonrası-işlemeden geçiyor. Aşağıdaki yardımcılar (`_build_rag_question`,
+# `_build_rag_retrieval_query`, `_normalize_theme_for_rag`) hâlâ oradan
+# çağrılıyor, bu yüzden burada duruyorlar.
+
+
+
+# Standart Unicode .upper() Türkçe 'i'/'ı' ayrımını kaybediyor (ikisi de düz
+# "I"ya dönüşüyor) - rag_service.py'nin PDF'ten çıkardığı tema etiketleri
+# (ör. "SÖZÜN İNCELİĞİ") zaten belgedeki doğru büyük/küçük harfle saklanıyor,
+# bu yüzden yalnızca burada, sınavın karışık-case "outcomeTheme" alanını o
+# etikete eşleştirmek için Türkçe-doğru büyütme uygulanıyor.
+_TURKISH_UPPER_MAP = str.maketrans({"i": "İ", "ı": "I"})
+
+
+def _normalize_theme_for_rag(raw_theme: str) -> str:
+    """`"1. Tema: Sözün İnceliği"` -> `"SÖZÜN İNCELİĞİ"` - rag_service.py'nin
+    `index_pdf`'in PDF'ten çıkardığı ham tema etiketiyle (bkz. `_run_query`'nin
+    `theme` filtresi) eşleşmesi için "N. Tema:" önekini atıp Türkçe-doğru
+    büyük harfe çevirir."""
+
+    without_prefix = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", raw_theme, flags=re.IGNORECASE).strip()
+    return without_prefix.translate(_TURKISH_UPPER_MAP).upper()
+
+
+def _outcome_identity_parts(outcome: dict[str, Any]) -> list[str]:
+    """Tema + kod + kazanım metni + beceri - kod TEK BAŞINA asla yeterli değil,
+    aynı kod (ör. TDE1.2) dört TDE9 temasının her birinde farklı bir kazanıma
+    karşılık geliyor. Kazanım metni (`outcomeDescription`, süreç bileşeni
+    seçilmişse ayrıca üst kazanımın metni) müfredat PDF'iyle aynı dilde yazıldığı
+    için hem getirimin hem de bilişsel düzey teşhisinin asıl dayanağı."""
+
+    descriptions = [
+        str(value)
+        for value in (outcome.get("outcomeDescription"), outcome.get("parentOutcomeDescription"))
+        if value
+    ]
+    # Süreç bileşeni seçilmemişse script.js parentOutcomeDescription'ı kazanım
+    # metninin kendisiyle dolduruyor - aynı cümleyi iki kez göndermeyelim.
+    unique_descriptions = list(dict.fromkeys(descriptions))
+    return [
+        str(part)
+        for part in (
+            outcome.get("outcomeTheme"),
+            outcome.get("outcomeCode"),
+            *unique_descriptions,
+            outcome.get("outcomeSkill"),
+        )
+        if part
+    ]
+
+
+# Burada bir `_BLOOM_LEVELS_BY_VERB` haritası ve `_bloom_level_for` vardı:
+# kazanım fiilinden Bloom basamağını çözüp prompt'a gömüyorlardı. Bloom analizi
+# tamamen kaldırıldı çünkü ölçüm, teşhisin değerini AZALTTIĞINI gösterdi -
+# sekiz yanıtın tamamı Bloom cümlesiyle açılıyor, yanıt başına 2-8 kez basamak
+# adı geçiyor, buna karşılık temanın adı 0/8 yanıtta geçiyor ve yalnız 2/8
+# yanıt müfredattan somut bir öğe anıyordu. Model, ona zaten söylediğimiz şeyi
+# tekrarlamaya harcanıyordu. Teşhisin yeni ekseni müfredata demirleme
+# (bkz. rag_service.py::SYSTEM_PROMPT madde 2).
+
+
+def _build_rag_retrieval_query(outcome: dict[str, Any]) -> str:
+    """Vektör getiriminde gömülecek metin - üretim talimatından KASITLI olarak
+    ayrı tutuluyor (bkz. `_build_rag_question`). Başarı oranı ve "teşhis et"
+    emri müfredat PDF'inde hiçbir karşılığı olmayan, sorgu vektörünü müfredat
+    düzyazısından uzaklaştıran gürültü; getirim sorgusu yalnızca kazanımın
+    kendi içeriğini taşır."""
+
+    return " - ".join(_outcome_identity_parts(outcome))
+
+
+def _build_rag_question(outcome: dict[str, Any]) -> str:
+    """LLM'e sorulan soru (getirim sorgusu değil - o `_build_rag_retrieval_query`).
+
+    Kazanımın kimliğine ek olarak gerçek başarı oranını ve şiddet etiketini
+    taşır. Kapanış emri KASITLI olarak müfredata demirlemeyi istiyor: eskiden
+    "bilişsel düzeyini bu oranla kıyaslayarak teşhis et" diyordu ve model
+    yanıtın tamamını o kıyasa harcayıp getirilen müfredat metnine hiç
+    dokunmuyordu (ölçüldü: tema adı 0/8 yanıtta geçiyordu).
+
+    Kasıtlı olarak TEŞHİS ister, asla "bu nasıl öğretilmeli" demez - MAHİR
+    etkinlik, yöntem veya telafi programı önermez (DEVELOPMENT_CHARTER.md);
+    bu kısıtın fiilen uygulandığı yer bu ifade.
+    """
+
+    parts = _outcome_identity_parts(outcome)
+    if not parts:
+        return ""
+    success_rate = float(outcome.get("successRate") or 0.0)
+    percent_text = f"%{round(success_rate * 100)}"
+    # Şiddet etiketi eşiğe dayalı, tamamen belirlenimci bir karar - modele
+    # bıraktığımızda %55'lik vakaların yarısına "Kritik" dediği ölçüldü.
+    # Burada hesaplayıp soruya gömüyoruz; SYSTEM_PROMPT (madde 4) bu etiketi
+    # aynen kullanmakla yükümlü.
+    severity = "Kritik" if success_rate < _RAG_CRITICAL_THRESHOLD else "Orta"
+    return (
+        f"{' - '.join(parts)} öğrenme çıktısında öğrenciler {percent_text} "
+        f"başarı oranı gösterdi. "
+        f"Bu oran için şiddet etiketi: {severity}. "
+        "BAĞLAM'daki öğretim programı metninin bu kazanım için öngördüğü "
+        "somut içerik ve bileşenleri adıyla anarak, bu başarı oranının hangi "
+        "bileşende tıkandığını teşhis et."
+    )

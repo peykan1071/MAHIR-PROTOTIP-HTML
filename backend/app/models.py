@@ -50,6 +50,7 @@ class CEDQuestion:
     text: str | None = None
     max_score: float | None = None
     learning_outcome_ids: list[str] = field(default_factory=list)
+    learning_outcome_weights: dict[str, float] = field(default_factory=dict)
     answer_key: str | None = None
 
 

@@ -2,3 +2,9 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Yerel paylaşılan parolalar - uzak servislerin (OCR/RAG) X-MAHIR-*-Key
+# doğrulaması bu değerlerle çalışır ve ASLA depoya girmemelidir.
+secrets.local.txt
+.env
+.env.*

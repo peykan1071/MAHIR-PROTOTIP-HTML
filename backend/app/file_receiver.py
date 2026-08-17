@@ -14,23 +14,26 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from .docx_parser import parse_mahir_docx
+from .analysis_report_parser import parse_analysis_report_docx
+from .general_report_merger import merge_component_reports
 from .pdf_parser import parse_score_pdf
 from .spreadsheet_parser import parse_score_xlsx
-from .approved_data_analyzer import analyze_approved_data
-from .measurement_engine import build_measured_ced_document
-from .pedagogical_analysis import analyze_learning_outcomes
-from .program_mapper import load_learning_outcomes
-from .reporting_engine import generate_report, write_report
+from .approved_data_analyzer import analyze_approved_data_traced
+from .timing import stage
 
 
 UPLOAD_PATH = "/mahir-upload"
 ANALYZE_PATH = "/mahir-analyze"
+MERGE_REPORTS_PATH = "/mahir-merge-reports"
+OCR_WARMUP_PATH = "/mahir-ocr-warmup"
+RAG_WARMUP_PATH = "/mahir-rag-warmup"
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 MAX_FILES_PER_UPLOAD = 10
 MAX_REQUEST_SIZE = MAX_UPLOAD_SIZE * MAX_FILES_PER_UPLOAD
@@ -48,7 +51,15 @@ ALLOWED_EXTENSIONS = {
     ".xlsx",
 }
 IMAGE_EXTENSIONS = {".gif", ".jpeg", ".jpg", ".png", ".webp"}
-MAHIR_OCR_REMOTE_URL = os.environ.get("MAHIR_OCR_REMOTE_URL", "")
+_DEFAULT_MAHIR_OCR_REMOTE_URL = "https://hakanergul--mahir-ocr-worker-ocr-worker.modal.run"
+# Dağıtılmış OCR işçisinin adresi koda gömülü - `approved_data_analyzer.py`'deki
+# `MAHIR_RAG_REMOTE_URL` ile aynı desen. Modal'ın ürettiği URL bir daha dağıtım
+# yapılana kadar değişmiyor, bu yüzden sunucuyu her başlatışta aynı pencerede
+# env değişkeni ayarlamaya gerek yok - unutulduğunda sunucu hata vermeden
+# OCR'sız "pass-through" moduna düşüyordu (bkz. README'deki uyarı). Farklı bir
+# dağıtıma (ör. test ortamı) işaret etmek gerekirse env var yine geçersiz kılar;
+# boş string vermek OCR'ı bilinçli olarak kapatır.
+MAHIR_OCR_REMOTE_URL = os.environ.get("MAHIR_OCR_REMOTE_URL", _DEFAULT_MAHIR_OCR_REMOTE_URL)
 
 
 @dataclass(frozen=True)
@@ -77,16 +88,73 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        # `SimpleHTTPRequestHandler` yalnızca `Last-Modified` gönderiyor,
+        # `Cache-Control` göndermiyor. Tarayıcı bu durumda SEZGİSEL önbellekleme
+        # uygular: dosyayı sunucuya hiç sormadan kendi kopyasından verir. Bu,
+        # rapor katmanını sessizce ikiye bölüyordu - `mahir-report-export-common.js`
+        # tazelenirken `mahir-pdf-exporter.js` eski kopyadan geldiği için ekranda
+        # görünen dipnot indirilen PDF'e hiç düşmedi. Öğretmenin imzalayacağı
+        # resmî çıktı ekranda gördüğünden farklı olamaz; prototipte önbelleğin
+        # kazandıracağı hiçbir şey bu riski karşılamıyor.
+        self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.end_headers()
 
+    def do_GET(self) -> None:
+        """Serve the prototype, but intercept the warm-up pings first.
+
+        The browser can't call the remote services itself (it never learns
+        their URLs, and they are on another origin), so both pings are proxied
+        here. They must return *immediately*: a remote call blocks for 30-110 s
+        while a cold container loads its models, and the teacher is meanwhile
+        picking files or reviewing scores - nothing may wait on it.
+        """
+
+        request_path = urlparse(self.path).path
+        if request_path == OCR_WARMUP_PATH:
+            # OCR ısıtması dosyalar seçilir seçilmez tetikleniyor; soğuk
+            # başlangıcı (~30-50 sn) "Verileri Oku"nun beklemesinden çıkarır.
+            from .remote_ocr_client import warm_up_remote_ocr
+
+            self._start_warm_up(MAHIR_OCR_REMOTE_URL, warm_up_remote_ocr)
+            return
+        if request_path == RAG_WARMUP_PATH:
+            # RAG ısıtması doğrulama ekranı açılınca tetikleniyor; öğretmen
+            # puanları incelerken ~110 sn'lik soğuk başlangıç biter ve
+            # scaledown_window=300 sayesinde analize kadar sıcak kalır. URL
+            # burada değil analiz modülünde tanımlı - modül üzerinden okunuyor
+            # ki testler onu yamalayabilsin.
+            from . import approved_data_analyzer
+            from .rag_client import warm_up_remote_rag
+
+            self._start_warm_up(approved_data_analyzer.MAHIR_RAG_REMOTE_URL, warm_up_remote_rag)
+            return
+        super().do_GET()
+
+    def _start_warm_up(self, remote_url: str, warm_up) -> None:
+        """Uzak ısıtmayı daemon thread'e atıp anında yanıt döner."""
+
+        if not remote_url:
+            # Uzak servis yapılandırılmamış (ör. OCR'sız yerel geliştirme):
+            # ısıtılacak bir şey yok, sessizce başarılı dön.
+            self._send_json(200, {"ok": True, "started": False})
+            return
+
+        threading.Thread(
+            target=warm_up, args=(remote_url,), name=warm_up.__name__, daemon=True
+        ).start()
+        self._send_json(200, {"ok": True, "started": True})
+
     def do_POST(self) -> None:
         request_path = urlparse(self.path).path
         if request_path == ANALYZE_PATH:
             self._handle_analysis_request()
+            return
+        if request_path == MERGE_REPORTS_PATH:
+            self._handle_general_report_merge()
             return
         if request_path != UPLOAD_PATH:
             self._send_json(404, {"ok": False, "message": "Bilinmeyen alıcı yolu."})
@@ -129,7 +197,19 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 + ", ".join(f"{r.file_name} ({r.extension})" for r in results),
                 flush=True,
             )
-            flow_ok, flow_message, structured_data = run_existing_backend_flow(uploaded_files, results)
+            # Yerel toplam: isteğin alınmasından yanıtın hazır olmasına kadar.
+            # `remote_ocr_client` kendi satırını ayrıca basıyor; aradaki fark
+            # yerel ayrıştırma, uzak satırdaki büyük süre ise soğuk başlangıç.
+            with stage(
+                "ocr-yerel",
+                dosya=len(uploaded_files),
+                bayt=sum(len(f.content) for f in uploaded_files),
+            ) as measured:
+                flow_ok, flow_message, structured_data = run_existing_backend_flow(
+                    uploaded_files, results
+                )
+                measured["ogrenci"] = len((structured_data or {}).get("students") or [])
+                measured["sonuc"] = "tamam" if flow_ok else "basarisiz"
 
             if flow_ok:
                 self._send_json(
@@ -177,11 +257,27 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {"ok": False, "message": "Onaylanan veri alınamadı."})
             return
 
+        from .agents.base import trace_of
+        from .agents.orchestrator import PipelineError
+
         try:
             payload = json.loads(self.rfile.read(content_length).decode("utf-8"))
-            result = analyze_approved_data(payload)
+            with stage("analiz-rota", soru=len(payload.get("questions") or [])) as measured:
+                result, trace = analyze_approved_data_traced(payload)
+                measured["ogrenci"] = len(payload.get("students") or [])
+                measured["istem"] = (trace.get("llmRound") or {}).get("promptCount", 0)
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
             self._send_json(422, {"ok": False, "message": str(error)})
+            return
+        except PipelineError as error:
+            # Zorunlu bir ajan düştü. İzi de göndermek kasıtlı: hangi ajanın
+            # düştüğü, hangilerinin atlandığı ve öncekilerin ne ürettiği,
+            # hatanın kendisi kadar değerli - `PipelineError` bu kısmi bağlamı
+            # tam da bunun için taşıyor.
+            self._send_json(
+                500,
+                {"ok": False, "message": str(error), "trace": trace_of(error.context)},
+            )
             return
 
         self._send_json(
@@ -190,6 +286,50 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 "ok": True,
                 "message": "Öğretmen onaylı veriler analiz motoruna aktarıldı.",
                 "analysis": result,
+                # Analizi ÜRETEN ajanların izi: hangi ajan ne kadar sürdü, ne
+                # üretti, LLM'i kaç kez kullandı. `analysis`in kardeşi, içinde
+                # değil - rapor sözleşmesi teknik alanlarla kirlenmemeli.
+                "trace": trace,
+            },
+        )
+
+    def _handle_general_report_merge(self) -> None:
+        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        content_type = self.headers.get("Content-Type", "")
+        if content_length <= 0:
+            self._send_json(400, {"ok": False, "message": "Analiz raporları alınamadı."})
+            return
+        if content_length > MAX_UPLOAD_SIZE * 3:
+            self._send_json(413, {"ok": False, "message": "Üç raporun toplam boyutu 60 MB sınırını aşıyor."})
+            return
+
+        uploaded_files = extract_uploaded_files(self.rfile.read(content_length), content_type)
+        if len(uploaded_files) != 3:
+            self._send_json(400, {"ok": False, "message": "Genel değerlendirme için üç MAHİR Word analiz raporu yüklenmelidir."})
+            return
+        if any(validate_file_name(file.file_name).extension != ".docx" for file in uploaded_files):
+            self._send_json(400, {"ok": False, "message": "Genel değerlendirmede yalnız MAHİR Word analiz raporları (.docx) kullanılabilir."})
+            return
+
+        try:
+            reports = [parse_analysis_report_docx(file.content) for file in uploaded_files]
+            query = parse_qs(urlparse(self.path).query)
+            exam, analysis = merge_component_reports(
+                reports,
+                expected_course=(query.get("course") or [""])[0],
+                expected_grade=(query.get("grade") or [""])[0],
+            )
+        except ValueError as error:
+            self._send_json(422, {"ok": False, "message": str(error)})
+            return
+
+        self._send_json(
+            200,
+            {
+                "ok": True,
+                "message": "Üç bileşen raporu doğrulandı ve genel değerlendirme oluşturuldu.",
+                "exam": exam,
+                "analysis": analysis,
             },
         )
 
@@ -297,45 +437,18 @@ def run_existing_backend_flow(
             },
         )
 
-    if file_check.extension != ".csv":
-        return True, "Belge alındı ve öğretmen kontrolüne hazırlandı.", None
-
-    project_root = Path(__file__).resolve().parents[2]
-    temporary_dir = project_root / "backend" / ".tmp"
-    temporary_dir.mkdir(exist_ok=True)
-    uploaded_csv_path = temporary_dir / "uploaded-sample-exam.csv"
-
-    try:
-        uploaded_csv_path.write_bytes(uploaded_file.content)
-        outcomes_path = project_root / "shared" / "sample-learning-outcomes.json"
-        student_results_path = project_root / "shared" / "sample-student-results.json"
-        report_path = project_root / "shared" / "report-example.txt"
-        document, question_rates, outcome_rates = build_measured_ced_document(
-            uploaded_csv_path,
-            outcomes_path,
-            student_results_path,
-        )
-        learning_outcomes = load_learning_outcomes(outcomes_path)
-        analysis_results = analyze_learning_outcomes(outcome_rates, learning_outcomes)
-        report_text = generate_report(
-            document,
-            question_rates,
-            outcome_rates,
-            analysis_results,
-            learning_outcomes,
-        )
-        write_report(report_text, report_path)
-        print(report_text, end="", flush=True)
-        return True, "Dosya başarıyla işlendi.", None
-    except (OSError, ValueError) as error:
-        return False, str(error), None
-    finally:
-        if uploaded_csv_path.exists():
-            uploaded_csv_path.unlink()
-        try:
-            temporary_dir.rmdir()
-        except OSError:
-            pass
+    # Buraya kadar tanınmayan her biçim öğretmen kontrol ekranına düşer.
+    #
+    # Eskiden burada bir `.csv` dalı vardı: yüklenen dosyayı diske yazıp
+    # `measurement_engine`/`pedagogical_analysis`/`reporting_engine` zincirini
+    # koşturuyor, sonucu `shared/report-example.txt`e yazıp konsola basıyordu.
+    # Üç sebeple kaldırıldı: (1) arayüzdeki dosya girişi `.csv` kabul etmiyor,
+    # yani öğretmen bu dalı hiç tetikleyemiyordu; (2) tetiklense bile yüklenen
+    # içeriği kullanmayıp sabit `shared/sample-*.json` dosyalarını okuyordu;
+    # (3) tarayıcıya `None` döndüğü için öğretmen sonucu zaten göremiyordu.
+    # O zincirin gerçek karşılığı artık canlı akışta: `analyze_approved_data`
+    # beş uzman ajanı koşturuyor (bkz. backend/app/agents/).
+    return True, "Belge alındı ve öğretmen kontrolüne hazırlandı.", None
 
 
 def run_image_group_ocr(uploaded_files: list[UploadedFile]) -> tuple[bool, str, dict[str, object] | None]:

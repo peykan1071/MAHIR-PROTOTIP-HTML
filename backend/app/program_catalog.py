@@ -53,14 +53,19 @@ def validate_question_program_context(
 
     program = resolve_program(course_name, grade)
     for question in questions:
-        code = str(question.get("outcomeCode") or "").strip()
-        key = str(question.get("outcomeKey") or "").strip()
-        has_tde_code = code.upper().startswith("TDE") or key.casefold().startswith("tema")
-        if has_tde_code and program is None:
-            raise ValueError(
-                "Türk Dili ve Edebiyatı öğrenme çıktısı kodları yalnız tanımlı "
-                "Türk Dili ve Edebiyatı ders-sınıf profilinde kullanılabilir."
-            )
-        if program and code and not code.upper().startswith(program.outcome_prefix):
-            raise ValueError("Seçilen öğrenme çıktısı kodu bu ders programıyla eşleşmiyor.")
+        raw_outcomes = question.get("outcomes")
+        mappings = raw_outcomes if isinstance(raw_outcomes, list) and raw_outcomes else [question]
+        for mapping in mappings:
+            if not isinstance(mapping, dict):
+                continue
+            code = str(mapping.get("outcomeCode") or "").strip()
+            key = str(mapping.get("outcomeKey") or "").strip()
+            has_tde_code = code.upper().startswith("TDE") or key.casefold().startswith("tema")
+            if has_tde_code and program is None:
+                raise ValueError(
+                    "Türk Dili ve Edebiyatı öğrenme çıktısı kodları yalnız tanımlı "
+                    "Türk Dili ve Edebiyatı ders-sınıf profilinde kullanılabilir."
+                )
+            if program and code and not code.upper().startswith(program.outcome_prefix):
+                raise ValueError("Seçilen öğrenme çıktısı kodu bu ders programıyla eşleşmiyor.")
     return program
