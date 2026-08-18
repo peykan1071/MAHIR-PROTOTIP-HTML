@@ -32,7 +32,7 @@ vm.runInContext(commonSource, sandbox);
 const modelFor = (componentType, assessmentScope = "component") => {
   sandbox.window.MAHIRReportRuntime = {
     structuredData: {
-      exam: { componentType },
+      exam: { componentType, examSequence: componentType === "written" ? "1. Yazılı Sınav" : componentType === "listening" ? "1. Dinleme/İzleme Sınavı" : "1. Konuşma Sınavı" },
       questions: [],
       students: []
     },
@@ -57,7 +57,8 @@ const modelFor = (componentType, assessmentScope = "component") => {
   assert.equal(model.blocks[1].heading, summaryHeading);
   assert.match(model.blocks[1].paragraphs[0], new RegExp(`^${label}`));
   const contextRows = model.blocks[0].tables[0];
-  assert.equal(contextRows.find((row) => row[2] === "Sınav Türü")[3], label);
+  assert.equal(contextRows.find((row) => row[0] === "Sınav Türü")[1], label);
+  assert.equal(contextRows.find((row) => row[0] === "Dönem")[2], "Sınav Sırası");
 });
 
 [
@@ -71,7 +72,7 @@ const modelFor = (componentType, assessmentScope = "component") => {
 
 const general = modelFor("general", "language-composite");
 assert.equal(general.title, "TÜRK DİLİ VE EDEBİYATI GENEL DEĞERLENDİRME RAPORU");
-assert.equal(general.blocks[0].tables[0].find((row) => row[2] === "Sınav Türü")[3], "Genel Değerlendirme");
+assert.equal(general.blocks[0].tables[0].find((row) => row[0] === "Sınav Türü")[1], "Genel Değerlendirme");
 assert.equal(sandbox.window.MAHIRReportExport.getDownloadFilename("pdf"), "MAHIR_Genel_Degerlendirme_Raporu.pdf");
 
 const written = modelFor("written");
@@ -101,6 +102,7 @@ sandbox.window.MAHIRReportRuntime.structuredData.exam = {
   district: "PALANDÖKEN", schoolName: "MEHMET AKİF ANADOLU LİSESİ",
   teacherName: "Zülal ÜLKER DAŞTAN", academicYear: "2025-2026", classSection: "9-A",
   term: "1. Dönem", examDate: "2025-10-15", assessmentBasis: "MÜFREDAT",
+  examSequence: "2. Yazılı Sınav",
   documentNo: "1", approvalInfo: "OKUL MÜDÜRLÜĞÜNE SUNULACAKTIR"
 };
 const completedHeaderModel = sandbox.window.MAHIRReportExport.getReportModel(null);
@@ -108,6 +110,8 @@ const completedHeaderRows = completedHeaderModel.blocks[0].tables[0].flat();
 ["ERZURUM", "PALANDÖKEN", "MEHMET AKİF ANADOLU LİSESİ", "Zülal ÜLKER DAŞTAN", "2025-2026", "9-A"]
   .forEach((value) => assert.ok(completedHeaderRows.includes(value)));
 assert.ok(!completedHeaderModel.validation.missing.includes("Okul/Kurum Adı"));
+assert.ok(completedHeaderRows.includes("2. Yazılı Sınav"));
+assert.equal(sandbox.window.MAHIRReportExport.getPortableReportPayload().exam.examSequence, "2. Yazılı Sınav");
 assert.equal(completedHeaderModel.title, "DİNLEME/İZLEME SINAVI SONUÇLARI ANALİZ RAPORU");
 
 // Okul numarası ve puan gibi etiketsiz sayısallar kurumsal üstbilgiye sızamaz.

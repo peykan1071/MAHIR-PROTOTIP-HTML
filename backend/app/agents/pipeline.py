@@ -249,6 +249,12 @@ class MeasurementAgent:
             # olurdu - bu ajanınki ajan adıyla aynı, Pedagojik'inkiler
             # "pedagoji/..." biçiminde ve ajan adı "pedagojik-analiz".
             prompt["agent"] = self.name
+            exam = context.payload.get("exam") or {}
+            prompt["user"] = (
+                f"SINAV TÜRÜ: {exam.get('examType') or context.scratch.get('componentType')}\n"
+                f"SINAV SIRASI: {exam.get('examSequence') or 'Belirtilmedi'}\n"
+                + str(prompt.get("user") or "")
+            )
             context.enqueue_prompt(prompt)
 
         return AgentResult(
@@ -592,6 +598,7 @@ def _enqueue_diagnosis_prompts(
             "system": DIAGNOSIS_SYSTEM_PROMPT if is_weak else STRENGTH_SYSTEM_PROMPT,
             "user": (
                 f"SINAV TÜRÜ: {(context.payload.get('exam') or {}).get('examType') or context.scratch.get('componentType')}\n"
+                f"SINAV SIRASI: {(context.payload.get('exam') or {}).get('examSequence') or 'Belirtilmedi'}\n"
                 f"SEÇİLMİŞ ÖĞRENME ÇIKTISI: {outcome.get('outcomeCode')} — {outcome.get('outcomeDescription')}\n"
                 + (
                     f"ÜST ÖĞRENME ÇIKTISI: {outcome.get('parentOutcomeCode')} — {outcome.get('parentOutcomeDescription')}\n"
