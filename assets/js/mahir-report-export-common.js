@@ -309,6 +309,7 @@
       { label: "Ders Türü", value: context.courseType, source: "context" },
       { label: "Sınıf/Şube", value: verifiedInstitutionValue({ value: wordClass || context.gradeLevel }, ["value"]), source: wordClass ? "word" : "context", required: true },
       { label: "Dönem", value: valueFrom(exam, ["term"]) },
+      { label: "Sınav Sırası", value: valueFrom(exam, ["examSequence"]) },
       { label: "Sınav Türü", value: getAnalysis().assessmentScope === "language-composite" ? "Genel Değerlendirme" : getExamTypeLabel() },
       { label: "Sınav Tarihi", value: displayDate(valueFrom(exam, ["examDate"])) },
       { label: "Rapor Tarihi", value: dateText() },
@@ -344,6 +345,7 @@
     if (!isUseful(valueFrom(exam, ["district", "town"]))) missing.push("İlçe");
     if (!isUseful(valueFrom(exam, ["academicYear", "educationYear"]))) missing.push("Eğitim Öğretim Yılı");
     if (!isUseful(valueFrom(exam, ["term"]))) missing.push("Dönem");
+    if (getAnalysis().assessmentScope !== "language-composite" && !isUseful(valueFrom(exam, ["examSequence"]))) missing.push("Sınav Sırası");
     if (!isUseful(valueFrom(exam, ["examDate"]))) missing.push("Sınav Tarihi");
     if (!isUseful(valueFrom(exam, ["teachingProgram", "curriculumName"]))) missing.push("Öğretim Programı");
     if (getAnalysis().assessmentScope !== "language-composite" && !summary.participatingStudentCount) missing.push("Analiz Edilen Öğrenci Sayısı");
@@ -372,8 +374,9 @@
     ["Öğretim Kademesi", metadataValue("Öğretim Kademesi"), "Okul Türü", metadataValue("Okul Türü")],
     ["Program Türü", displayValue(metadataValue("Program Türü")), "Alan / Dal", displayValue(metadataValue("Alan/Dal"))],
     ["Ders", metadataValue("Ders"), "Sınıf / Şube", metadataValue("Sınıf/Şube")],
-    ["Dönem", metadataValue("Dönem"), "Sınav Türü", metadataValue("Sınav Türü")],
-    ["Sınav Tarihi", metadataValue("Sınav Tarihi"), "Analiz Edilen Öğrenci Sayısı", metadataValue("Analiz Edilen Öğrenci Sayısı")]
+    ["Dönem", metadataValue("Dönem"), "Sınav Sırası", metadataValue("Sınav Sırası")],
+    ["Sınav Türü", metadataValue("Sınav Türü"), "Sınav Tarihi", metadataValue("Sınav Tarihi")],
+    ["Analiz Edilen Öğrenci Sayısı", metadataValue("Analiz Edilen Öğrenci Sayısı"), "", ""]
   ];
 
   const buildGeneralSummaryBlock = () => {
@@ -872,6 +875,7 @@
         grade: exam.grade || "",
         classSection: exam.classSection || exam.className || "",
         term: exam.term || "",
+        examSequence: exam.examSequence || "",
         examDate: exam.examDate || "",
         componentType,
         examType: componentLabel,

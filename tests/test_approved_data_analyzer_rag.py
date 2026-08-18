@@ -115,6 +115,7 @@ class RagContextAttachmentTests(unittest.TestCase):
     def test_strong_outcome_gets_grounded_context(self):
         payload = _weak_tde_payload()
         payload["exam"]["examType"] = "Dinleme/İzleme Sınavı"
+        payload["exam"]["examSequence"] = "2. Dinleme/İzleme Sınavı"
         payload["exam"]["componentType"] = "listening"
         payload["students"][0]["scores"] = [90]  # successRate 0.90 >= eşik (0.70)
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
@@ -123,6 +124,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         mock_query.assert_called_once()
         prompt = _diagnosis_prompts(mock_query)[0]
         self.assertIn("Dinleme/İzleme Sınavı", prompt["user"])
+        self.assertIn("SINAV SIRASI: 2. Dinleme/İzleme Sınavı", prompt["user"])
         self.assertIn("TDE1.2", prompt["user"])
         self.assertEqual(result["outcomes"][0]["ragContext"], "Seçili çıktı güçlü düzeydedir.")
 

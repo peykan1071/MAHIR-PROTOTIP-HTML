@@ -55,6 +55,7 @@ assert.match(html, /data-validation-student-count-control/);
 assert.match(html, /Beklenen öğrenci sayısı/);
 assert.match(html, /data-edit-validation-student-count>Düzenle<\/button>/);
 assert.match(html, /data-undo-student-record>Geri Al<\/button>/);
+assert.match(html, /Sınav Sırası <select data-exam-field="examSequence" data-required-context>/);
 
 assert.match(script, /if \(total === expected\) \{\s*showFinalReview\(\);\s*return;/);
 assert.match(script, /ocrGuidance\?\.toggleAttribute\("hidden", mode !== "images"\)/);
@@ -79,6 +80,10 @@ assert.match(script, /sourceFile: row\.dataset\.sourceFile \|\| ""/);
 assert.match(script, /OCR okuyamadı; veri öğretmen tarafından tamamlandı/);
 assert.match(script, /studentRef: student\.technicalId \|\| `Ö-/);
 assert.match(script, /studentIdentityMode: "session-pseudonymized"/);
+assert.match(script, /written: \["1\. Yazılı Sınav", "2\. Yazılı Sınav"\]/);
+assert.match(script, /listening: \["1\. Dinleme\/İzleme Sınavı", "2\. Dinleme\/İzleme Sınavı"\]/);
+assert.match(script, /speaking: \["1\. Konuşma Sınavı", "2\. Konuşma Sınavı"\]/);
+assert.match(script, /updateExamSequenceOptions\(component\)/);
 assert.doesNotMatch(script, /students: \(approvedData\.students \|\| \[\]\)\.map\(\(student, index\) => \(\{\s*\.\.\.student/);
 assert.match(script, /MAHİR şablonuna uygun öğrenci tablosu bulunamadı/);
 assert.match(script, /aşağıda açılan \$\{expectedStudentCount\} boş satırı elle tamamlayabilirsiniz/);

@@ -2402,6 +2402,8 @@ const fileUploadBridge = (() => {
     const generalReportInputs = Array.from(document.querySelectorAll("[data-general-report-file]"));
     const standardDataEntryItems = Array.from(document.querySelectorAll("[data-standard-data-entry]"));
     const contextStatus = document.querySelector("[data-context-status]");
+    const examSequenceField = document.querySelector("[data-exam-sequence-field]");
+    const examSequenceSelect = document.querySelector('[data-exam-field="examSequence"]');
     const saveGroupButton = document.querySelector("[data-save-current-group]");
     const addGroupButton = document.querySelector("[data-add-image-group]");
     const confirmFinalButton = document.querySelector("[data-confirm-final-analysis]");
@@ -2439,6 +2441,11 @@ const fileUploadBridge = (() => {
       speaking: "Konuşma Sınavı",
       general: "Genel Değerlendirme"
     };
+    const examSequenceOptions = {
+      written: ["1. Yazılı Sınav", "2. Yazılı Sınav"],
+      listening: ["1. Dinleme/İzleme Sınavı", "2. Dinleme/İzleme Sınavı"],
+      speaking: ["1. Konuşma Sınavı", "2. Konuşma Sınavı"]
+    };
     const profiles = {
       "tde-70-15-15": {
         title: "Türk Dili ve Edebiyatı",
@@ -2475,6 +2482,7 @@ const fileUploadBridge = (() => {
       academicYear: ["academicYear", "educationYear"],
       classSection: ["classSection", "grade", "className"],
       term: ["term"],
+      examSequence: ["examSequence"],
       examDate: ["examDate"],
       teachingProgram: ["teachingProgram", "curriculumName"],
       assessmentBasis: ["assessmentBasis", "measurementBasis"],
@@ -2525,6 +2533,20 @@ const fileUploadBridge = (() => {
     };
 
     const collectContextData = () => Object.fromEntries(contextInputs().map((input) => [input.dataset.examField, input.value.trim()]));
+
+    const updateExamSequenceOptions = (component) => {
+      if (!examSequenceSelect || !examSequenceField) return;
+      const options = examSequenceOptions[component] || [];
+      const previousValue = examSequenceSelect.value;
+      examSequenceSelect.replaceChildren(new Option("Seçiniz", ""));
+      options.forEach((value) => examSequenceSelect.add(new Option(value, value)));
+      examSequenceSelect.value = options.includes(previousValue) ? previousValue : "";
+      const enabled = options.length > 0;
+      examSequenceField.hidden = !enabled;
+      examSequenceSelect.disabled = !enabled;
+      examSequenceSelect.toggleAttribute("data-required-context", enabled);
+      if (!enabled) examSequenceSelect.value = "";
+    };
 
     const normalizeDateInputValue = (value) => {
       const text = usefulValue(value);
@@ -2658,13 +2680,17 @@ const fileUploadBridge = (() => {
     };
 
     const updateComponentNote = () => {
-      const component = assessmentComponent?.value || "written";
+      let component = assessmentComponent?.value || "written";
       const profileId = currentProfileId();
       const profile = profiles[profileId];
       const enabled = Boolean(profile);
       const generalMode = enabled && component === "general";
       if (languageAssessmentField) languageAssessmentField.hidden = !enabled;
-      if (assessmentComponent && !enabled) assessmentComponent.value = "written";
+      if (assessmentComponent && !enabled) {
+        assessmentComponent.value = "written";
+        component = "written";
+      }
+      updateExamSequenceOptions(component);
       updateGeneralReportMode(generalMode, profile);
       if (!componentWeightNote) return;
       componentWeightNote.hidden = !enabled;
