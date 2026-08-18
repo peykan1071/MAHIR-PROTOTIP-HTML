@@ -49,19 +49,32 @@
     return y + lines.length * lineHeight;
   };
 
-  const measureTable = (context, table, width, design) => {
+  const normalizeColumnWidths = (weights, columnCount, width) => {
+    const normalized = Array.isArray(weights) && weights.length === columnCount
+      ? weights.map((value) => Math.max(Number(value) || 0, 0))
+      : Array.from({ length: columnCount }, () => 1);
+    const total = normalized.reduce((sum, value) => sum + value, 0) || columnCount;
+    let allocated = 0;
+    return normalized.map((value, index) => {
+      const columnWidth = index === columnCount - 1 ? width - allocated : width * value / total;
+      allocated += columnWidth;
+      return columnWidth;
+    });
+  };
+
+  const measureTable = (context, table, width, design, weights = null) => {
     const columnCount = Math.max(...table.map((row) => row.length), 1);
-    const columnWidth = width / columnCount;
+    const columnWidths = normalizeColumnWidths(weights, columnCount, width);
     const rowLayouts = table.map((row, rowIndex) => {
       const cells = Array.from({ length: columnCount }, (_, index) => {
         setFont(context, design.tableSize, rowIndex === 0 || (index === 0 && columnCount === 2) ? 800 : 400);
-        const lines = wrapText(context, row[index] || "", columnWidth - design.tableCellPaddingX * 2);
+        const lines = wrapText(context, row[index] || "", columnWidths[index] - design.tableCellPaddingX * 2);
         return { lines, header: rowIndex === 0, label: index === 0 && columnCount === 2 };
       });
       const height = Math.max(21, Math.max(...cells.map((cell) => cell.lines.length * design.tableLine + design.tableCellPaddingY * 2)));
       return { cells, height };
     });
-    return { columnWidth, rowLayouts, height: rowLayouts.reduce((sum, row) => sum + row.height, 0) };
+    return { columnWidths, rowLayouts, height: rowLayouts.reduce((sum, row) => sum + row.height, 0) };
   };
 
   const measureBlock = (context, block, design, contentWidth) => {
@@ -74,8 +87,8 @@
       paragraphLayouts.push(lines);
       height += lines.length * design.bodyLine + 4;
     });
-    const tableLayouts = block.tables.map((table) => {
-      const tableLayout = measureTable(context, table, innerWidth, design);
+    const tableLayouts = block.tables.map((table, index) => {
+      const tableLayout = measureTable(context, table, innerWidth, design, block.tableWidths?.[index]);
       height += tableLayout.height + 6;
       return tableLayout;
     });
@@ -142,16 +155,19 @@
     const { colors } = design;
     let cursorY = y;
     tableLayout.rowLayouts.forEach((row) => {
+      let cursorX = x;
       row.cells.forEach((cell, columnIndex) => {
-        const cellX = x + columnIndex * tableLayout.columnWidth;
+        const columnWidth = tableLayout.columnWidths[columnIndex];
+        const cellX = cursorX;
         context.fillStyle = cell.header ? colors.paleBlue : (cell.label ? colors.light : "#ffffff");
-        context.fillRect(cellX, cursorY, tableLayout.columnWidth, row.height);
+        context.fillRect(cellX, cursorY, columnWidth, row.height);
         context.strokeStyle = colors.border;
         context.lineWidth = 1;
-        context.strokeRect(cellX, cursorY, tableLayout.columnWidth, row.height);
+        context.strokeRect(cellX, cursorY, columnWidth, row.height);
         context.fillStyle = cell.header ? colors.navy : colors.ink;
         setFont(context, design.tableSize, cell.header || cell.label ? 800 : 400);
         drawLines(context, cell.lines, cellX + design.tableCellPaddingX, cursorY + design.tableCellPaddingY, design.tableLine);
+        cursorX += columnWidth;
       });
       cursorY += row.height;
     });

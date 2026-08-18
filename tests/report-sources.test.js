@@ -62,9 +62,9 @@ const TITLE = "Ortaöğretim Türk Dili ve Edebiyatı Dersi Öğretim Programı 
 const cited = needsBlock([weak({ ragSources: [{ documentName: TITLE, pages: [66, 67] }] })]);
 assert.equal(
   cited.tables[0][0].join(" | "),
-  "Sıra | Tespit Edilen İhtiyaç | Değerlendirme Sonucu | Öncelik Düzeyi | Kavramsal Bağlam"
+  "Öğrenme Odağı | Öğrenme Kanıtının Gösterdiği Düzey | Pedagojik Yön | Kaynak Temelli Öneri"
 );
-const cell = cited.tables[0][1][4];
+const cell = cited.tables[0][1][3];
 assert.match(cell, /örtük iletiyi belirleme/, "Teşhis metni korunmalı.");
 assert.match(cell, /\(s\. 66-67\)$/, "Hücrede yalnız kısa atıf olmalı.");
 assert.doesNotMatch(cell, /Ortaöğretim/, "Belgenin tam adı hücrede TEKRARLANMAMALI.");
@@ -76,7 +76,7 @@ assert.equal(cited.notes[0], `Kaynak: ${TITLE}`);
 // Sekiz getirim isabetinin ham sayfa listesi aksi hâlde hücreyi doldururdu.
 
 const cellFor = (pages) =>
-  needsBlock([weak({ ragSources: [{ documentName: TITLE, pages }] })]).tables[0][1][4];
+  needsBlock([weak({ ragSources: [{ documentName: TITLE, pages }] })]).tables[0][1][3];
 
 assert.match(cellFor([66, 67, 68]), /\(s\. 66-68\)$/, "Ardışık sayfalar aralık olmalı.");
 assert.match(cellFor([66, 71]), /\(s\. 66, 71\)$/, "Kopuk sayfalar virgülle ayrılmalı.");
@@ -91,22 +91,22 @@ const multi = needsBlock([
   weak({ ragSources: [{ documentName: TITLE, pages: [66, 67] }] }),
   weak({ outcomeCode: "TDE4.1", ragSources: [{ documentName: "Ek Kılavuz (2025)", pages: [4] }] })
 ]);
-assert.match(multi.tables[0][1][4], /\(K1, s\. 66-67\)$/);
-assert.match(multi.tables[0][2][4], /\(K2, s\. 4\)$/);
+assert.match(multi.tables[0][1][3], /\(K1, s\. 66-67\)$/);
+assert.match(multi.tables[0][2][3], /\(K2, s\. 4\)$/);
 assert.equal(multi.notes[0], `Kaynak: K1: ${TITLE} · K2: Ek Kılavuz (2025)`);
 
 // --- Sayfa bilgisi yoksa hücrede atıf yok; belge yine dipnotta anılır ---
 
 const pageless = needsBlock([weak({ ragSources: [{ documentName: TITLE, pages: [] }] })]);
-assert.doesNotMatch(pageless.tables[0][1][4], /\(/, "Sayfasız tek kaynakta atıf anlamsız.");
+assert.doesNotMatch(pageless.tables[0][1][3], /\(s\./, "Sayfasız tek kaynakta sayfa atfı olmamalı.");
 assert.equal(pageless.notes[0], `Kaynak: ${TITLE}`, "Belge yine de dipnotta anılmalı.");
 
 // --- Kaynak yoksa ne atıf ne dipnot ---
 
 const noSourceBlock = needsBlock([weak()]);
-assert.doesNotMatch(noSourceBlock.tables[0][1][4], /\(s\./);
+assert.doesNotMatch(noSourceBlock.tables[0][1][3], /\(s\./);
 assert.equal(noSourceBlock.notes.length, 0, "Kaynak yoksa dipnot da olmamalı.");
-assert.match(noSourceBlock.tables[0][1][4], /örtük iletiyi belirleme/, "Teşhis yine görünmeli.");
+assert.match(noSourceBlock.tables[0][1][3], /örtük iletiyi belirleme/, "Kaynak metni yine görünmeli.");
 
 // --- Geriye dönük uyum: ragSources taşımayan eski analiz ---
 
@@ -114,26 +114,29 @@ const legacyOutcome = weak();
 delete legacyOutcome.ragSources;
 const legacyBlock = needsBlock([legacyOutcome]);
 assert.equal(legacyBlock.notes.length, 0);
-assert.match(legacyBlock.tables[0][1][4], /örtük iletiyi belirleme/);
+assert.match(legacyBlock.tables[0][1][3], /örtük iletiyi belirleme/);
 
 // --- Teşhis hiç yoksa sütun eklenmemeli (bugünkü davranış korunuyor) ---
 
 const noContext = needsBlock([weak({ ragContext: "", ragSources: [] })]);
-assert.equal(noContext.tables[0][0].length, 4, "Kavramsal Bağlam sütunu hiç eklenmemeli.");
+assert.equal(noContext.tables[0][0].length, 4);
+assert.equal(noContext.tables[0][1][3], "—");
 assert.equal(noContext.notes.length, 0);
 
-// --- Güçlü çıktı F bölümüne hiç girmemeli ---
+// --- Güçlü çıktı varsa F bölümü boş kalmamalı ---
 
 const strongOnly = needsBlock([weak({ successRate: 0.9 })]);
-assert.equal(strongOnly.tables[0].length, 1, "Yalnız başlık satırı kalmalı.");
+assert.equal(strongOnly.tables[0].length, 2, "Güçlü çıktı satırı F bölümünde görünmeli.");
+assert.match(strongOnly.paragraphs[0], /doğrulanmış eğitim kaynakları/);
+assert.equal(strongOnly.tables[0][1][2], "Zenginleştirme");
 
 // --- Dipnot, tablodan SONRA çiziliyor (paragraphs tablonun ÖNÜNDE) ---
 // Dört render hedefi de once paragraphs, sonra tables, en son notes basıyor;
 // dipnot `paragraphs`a konsaydı tablonun üstünde görünürdü.
 
 const other = sandbox.window.MAHIRReportExport.getReportModel(null).blocks
-  .filter((block) => !block.heading.startsWith("F."));
-assert.ok(other.every((block) => !(block.notes || []).length), "Dipnot yalnız F bölümünde.");
+  .filter((block) => !block.heading.startsWith("F.") && !block.heading.startsWith("G."));
+assert.ok(other.every((block) => !(block.notes || []).length), "Kaynak notları yalnız öneri ve kaynak bölümlerinde olmalı.");
 assert.ok(Array.isArray(cited.paragraphs), "paragraphs alanı korunmalı.");
 assert.ok(
   cited.paragraphs.every((text) => !text.includes(TITLE)),

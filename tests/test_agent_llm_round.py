@@ -118,9 +118,10 @@ class SingleRoundTests(unittest.TestCase):
 
         self.assertEqual([item["name"] for item in calls[0]], ["olcme-degerlendirme"])
 
-    def test_no_request_at_all_when_queue_is_empty(self):
-        # İki soruluk sınav: anomali için örüntü yok. Güçlü sonuçlar olduğu
-        # için teşhis de yok -> hiç istek atılmamalı.
+    def test_strong_outcomes_are_also_sent_in_the_single_round(self):
+        # İki soruluk sınavda anomali örüntüsü yoktur; buna rağmen güçlü
+        # öğrenme çıktıları, başarıyı sürdürme ve zenginleştirme bağlamı için
+        # Pedagojik Analiz Ajanı tarafından aynı tek LLM turuna alınır.
         payload = _tde_payload()
         payload["questions"] = payload["questions"][:2]
         payload["students"] = [{"studentRef": "Ö-001", "scores": [10, 10]}]
@@ -130,7 +131,9 @@ class SingleRoundTests(unittest.TestCase):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 analyze_approved_data(payload)
 
-        self.assertEqual(calls, [], "Kuyruk boşsa ağ turu harcanmamalı.")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(calls[0]), 2)
+        self.assertTrue(all(item["name"].startswith("pedagoji/") for item in calls[0]))
 
     def test_no_request_when_remote_is_not_configured(self):
         calls, fake = _capture()
@@ -284,6 +287,26 @@ class DiagnosisSourceTests(unittest.TestCase):
 
 
 class AnomalyAgentTests(unittest.TestCase):
+    def test_no_llm_prompt_carries_institutional_identity(self):
+        payload = _tde_payload()
+        payload["exam"].update({
+            "schoolName": "Örnek Kimlikli Okul",
+            "teacherName": "Örnek Kimlikli Öğretmen",
+            "province": "Örnek İl",
+            "district": "Örnek İlçe",
+            "documentNumber": "EVRAK-123",
+        })
+        calls, fake = _capture()
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+            with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
+                analyze_approved_data(payload)
+
+        blob = "\n".join(item["system"] + item["user"] for item in calls[0])
+        for private_value in (
+            "Örnek Kimlikli Okul", "Örnek Kimlikli Öğretmen", "Örnek İl", "Örnek İlçe", "EVRAK-123"
+        ):
+            self.assertNotIn(private_value, blob)
+
     def test_anomaly_prompt_carries_no_student_data(self):
         # Gizlilik kapısı kimlik alanlarını reddediyor; bu prompt o sınırın
         # arkasına yan kapı açmamalı. Yalnız SORU düzeyinde toplu değer gider.

@@ -13,6 +13,7 @@ ve her çağrı `AgentTrace.llm_calls`'a düşecek.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from .. import measurement_engine
@@ -25,7 +26,7 @@ from .ced_builder import (
     outcome_key_for_mapping,
     outcome_mappings_for,
 )
-from .prompts import DIAGNOSIS_SYSTEM_PROMPT, build_anomaly_prompt
+from .prompts import DIAGNOSIS_SYSTEM_PROMPT, STRENGTH_SYSTEM_PROMPT, build_anomaly_prompt
 
 # Anomali yoksa modelin yazması istenen cümle (bkz. prompts.ANOMALY_SYSTEM_PROMPT
 # madde 4). Bu hâlde alan boş bırakılır - rapora "bir şey yok" satırı eklemek
@@ -35,6 +36,13 @@ _NO_ANOMALY_TEXT = "Belirgin bir tutarsızlık görülmedi"
 # Getirimde çekilecek parça sayısı - backend/app/rag_client.py ile aynı
 # gerekçe: parçalar 512 token ve getirim zaten tek temaya kısıtlı.
 _DIAGNOSIS_TOP_K = 8
+
+# LLM/RAG bir kaynak bulsa bile yanıt seçilen sınav becerisine saparsa metni
+# rapora taşımayız. Hücreyi sessizce boş bırakmak yerine öğretmene nedenini
+# açıklarız; bu cümle kaynak iddiası veya pedagojik içerik üretmez.
+_RAG_SCOPE_REJECTED_TEXT = (
+    "Seçilen sınav türü ve öğrenme çıktısıyla uyumlu, doğrulanmış bir kaynak bağlamı oluşturulamadı."
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -311,6 +319,8 @@ class PedagogicalAnalysisAgent:
             meta = outcome_meta.get(outcome_key, {})
             questions = evidence_questions.get(outcome_key, [])
             outcome_results.append({
+                "componentType": context.scratch["componentType"],
+                "componentLabel": str((context.payload.get("exam") or {}).get("examType") or ""),
                 "outcomeCode": meta.get("code") or (code if separator else outcome_key),
                 "outcomeTheme": meta.get("theme") or (theme if separator else ""),
                 "outcomeSkill": meta.get("skill", ""),
@@ -398,6 +408,11 @@ class PedagogicalAnalysisAgent:
                 _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti", code)
                 continue
             stripped += int(result.get("strippedSentences") or 0)
+            if not _answer_matches_outcome_scope(answer, outcome):
+                _logger.info("RAG atlandı: cikti=%s sebep=baglam-sapmasi", code)
+                outcome["ragContext"] = _RAG_SCOPE_REJECTED_TEXT
+                outcome["ragSources"] = []
+                continue
             outcome["ragContext"] = answer
             outcome["ragSources"] = _merge_rag_sources(result.get("sources"))
             grounded += 1
@@ -519,7 +534,7 @@ def _merge_rag_sources(sources: Any) -> list[dict[str, Any]]:
 def _enqueue_diagnosis_prompts(
     context: AgentContext, outcome_results: list[dict[str, Any]], program: Any
 ) -> dict[str, dict[str, Any]]:
-    """Zayıf her öğrenme çıktısı için getirimli teşhis prompt'unu kuyruğa yazar.
+    """Seçilmiş her öğrenme çıktısı için getirimli pedagojik prompt kuyruğa yazar.
 
     Dönen sözlük: prompt adı -> ilgili çıktı sözlüğü. `apply_llm` yanıtları bu
     eşlemeyle sahibine bağlıyor; ada göre eşleştirme, sıraya göre eşleştirmenin
@@ -550,9 +565,12 @@ def _enqueue_diagnosis_prompts(
     targets: dict[str, dict[str, Any]] = {}
     for outcome in outcome_results:
         code = str(outcome.get("outcomeCode") or "?")
-        if float(outcome.get("successRate") or 0.0) >= _RAG_WEAK_THRESHOLD:
-            continue
-        question = _build_rag_question(outcome)
+        is_weak = float(outcome.get("successRate") or 0.0) < _RAG_WEAK_THRESHOLD
+        question = _build_rag_question(outcome) if is_weak else (
+            f"{' - '.join(str(part) for part in (outcome.get('outcomeTheme'), outcome.get('outcomeCode'), outcome.get('outcomeDescription'), outcome.get('outcomeSkill')) if part)} "
+            f"öğrenme çıktısında başarı oranı %{round(float(outcome.get('successRate') or 0.0) * 100)}. "
+            "BAĞLAM'daki somut süreç bileşenlerine dayanarak güçlü alanı ve başarının sürdürülme odağını açıkla."
+        )
         if not question:
             _logger.info("RAG atlandı: cikti=%s sebep=soru-bos", code)
             continue
@@ -571,8 +589,18 @@ def _enqueue_diagnosis_prompts(
             # `_flush_llm_queue`). Ağa çıkmaz: `llm.run_agent_prompts` gövdeyi
             # beyaz listeyle kuruyor.
             "agent": PedagogicalAnalysisAgent.name,
-            "system": DIAGNOSIS_SYSTEM_PROMPT,
-            "user": f"SORU: {question}\n\nYalnızca yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla.",
+            "system": DIAGNOSIS_SYSTEM_PROMPT if is_weak else STRENGTH_SYSTEM_PROMPT,
+            "user": (
+                f"SINAV TÜRÜ: {(context.payload.get('exam') or {}).get('examType') or context.scratch.get('componentType')}\n"
+                f"SEÇİLMİŞ ÖĞRENME ÇIKTISI: {outcome.get('outcomeCode')} — {outcome.get('outcomeDescription')}\n"
+                + (
+                    f"ÜST ÖĞRENME ÇIKTISI: {outcome.get('parentOutcomeCode')} — {outcome.get('parentOutcomeDescription')}\n"
+                    if outcome.get("parentOutcomeCode")
+                    and outcome.get("parentOutcomeCode") != outcome.get("outcomeCode")
+                    else ""
+                )
+                + f"SORU: {question}\n\nYalnızca bu sınav türü, seçilmiş öğrenme çıktısı ve yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla."
+            ),
             "retrieval": {
                 "programId": program.id,
                 "grade": program.grade,
@@ -587,6 +615,28 @@ def _enqueue_diagnosis_prompts(
         targets[name] = outcome
 
     return targets
+
+
+def _answer_matches_outcome_scope(answer: str, outcome: dict[str, Any]) -> bool:
+    """Başka kazanım kodu veya sınav becerisine sapan LLM yanıtını reddet."""
+
+    allowed_codes = {
+        str(value).upper() for value in (outcome.get("outcomeCode"), outcome.get("parentOutcomeCode")) if value
+    }
+    mentioned_codes = {code.upper() for code in re.findall(r"\bTDE\d+(?:\.\d+)+\b", answer, re.IGNORECASE)}
+    if mentioned_codes - allowed_codes:
+        return False
+    component = str(outcome.get("componentType") or "").lower()
+    normalized = answer.casefold()
+    forbidden = {
+        "listening": (
+            "okuma beceri", "okuma strateji", "yazma beceri", "konuşma beceri",
+            "mülakat yap", "mülakatta konuş", "söyleşi yap", "sözlü anlatım",
+        ),
+        "speaking": ("okuma beceri", "yazma beceri", "dinleme/izleme beceri", "dinleme beceri"),
+    }.get(component, ())
+    selected_text = " ".join(str(outcome.get(key) or "") for key in ("outcomeDescription", "parentOutcomeDescription")).casefold()
+    return not any(term in normalized and term not in selected_text for term in forbidden)
 
 
 def issues_to_ced_validation(issues: list[AgentIssue]) -> list[CEDValidationIssue]:

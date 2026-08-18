@@ -99,78 +99,12 @@ assert.equal(
   "Boş ajan listesi de bölüm üretmemeli."
 );
 
-// --- İz varken bölüm ve sütunlar ---
-
-const block = traceBlock({ trace: TRACE });
-assert.ok(block, "İz varken I. bölüm üretilmeli.");
-assert.equal(blocksWith({ trace: TRACE }).length, 9);
-assert.equal(
-  block.tables[0][0].join(" | "),
-  "Ajan | Yaptığı İş | Süre | Dil Modeli Çağrısı | Durum"
-);
-assert.equal(block.tables[0].length, 6, "Başlık + beş ajan satırı.");
-
-// --- Her ajan kendi işini kendi sayılarıyla anlatmalı ---
-
-const rowFor = (label) => block.tables[0].find((row) => row[0] === label);
-
-assert.match(rowFor("Belge Anlama")[1], /8 soru, 35 öğrenci/);
-assert.match(rowFor("Program Eşleştirme")[1], /8 öğrenme çıktısı/);
-assert.match(rowFor("Ölçme ve Değerlendirme")[1], /8 soru, 8 öğrenme çıktısı hesaplandı/);
-assert.match(rowFor("Ölçme ve Değerlendirme")[1], /2 öğretmen düzeltmesi/);
-assert.match(rowFor("Pedagojik Analiz")[1], /8 müfredat temelli teşhis/);
-
-// --- Süre ve LLM sayımı ---
-
-assert.equal(rowFor("Belge Anlama")[2], "3 ms");
-assert.equal(rowFor("Pedagojik Analiz")[2], "16,7 sn", "Saniyeye geçiş tr-TR biçiminde olmalı.");
-assert.equal(rowFor("Belge Anlama")[3], "—", "LLM kullanmayan ajanda tire olmalı.");
-assert.equal(rowFor("Pedagojik Analiz")[3], "8");
-assert.equal(rowFor("Raporlama")[4], "Tamam");
-
-// --- Ortak dil modeli turu KENDİ satırında ---
-// Süreyi ajanlara bölüştürmek uydurma olurdu: dokuz istem tek istekte
-// çözülüyor. Ayrıca tek istekli mimarinin kanıtı da bu satır - bölüştürülseydi
-// "9 çağrı, tek tur" görünmez olurdu.
-
-const withRound = traceBlock({
-  trace: { ...TRACE, llmRound: { promptCount: 9, resultCount: 9, durationMs: 16700, ok: true } }
-});
-const roundRow = withRound.tables[0][withRound.tables[0].length - 1];
-assert.equal(roundRow[0], "Dil modeli turu (ortak)");
-assert.match(roundRow[1], /9 istem tek istekte çözüldü/);
-assert.equal(roundRow[2], "16,7 sn");
-assert.equal(roundRow[4], "Tamam");
-assert.equal(withRound.tables[0].length, 7, "Başlık + beş ajan + ortak tur.");
-
-// Tur yapılmadıysa (kayıtsız ders, LLM kapalı) satır hiç eklenmemeli.
-assert.equal(block.tables[0].length, 6, "Tur yoksa yalnız ajan satırları kalmalı.");
-
-const failedRound = traceBlock({
-  trace: { ...TRACE, llmRound: { promptCount: 9, resultCount: 0, durationMs: 300, ok: false } }
-});
-assert.equal(failedRound.tables[0][failedRound.tables[0].length - 1][4], "Tamamlanamadı");
-
-// --- Arızalı ve atlanan ajanlar öğretmene açıkça söylenmeli ---
-
-const brokenTrace = {
-  agents: [
-    agent("olcme-degerlendirme", "Ölçme ve Değerlendirme", { failed: true }),
-    agent("pedagojik-analiz", "Pedagojik Analiz", { skipped: true })
-  ],
-  issues: []
-};
-const brokenBlock = traceBlock({ trace: brokenTrace });
-assert.equal(brokenBlock.tables[0][1][4], "Tamamlanamadı");
-assert.equal(brokenBlock.tables[0][2][4], "Çalıştırılmadı");
-assert.match(brokenBlock.tables[0][2][1], /çalıştırılmadı/i);
-
-// --- Bilinmeyen ajan tabloyu bozmamalı, açıklamasına düşmeli ---
-
-const futureBlock = traceBlock({
-  trace: { agents: [agent("evrak-dogrulama", "Evrak Doğrulama")], issues: [] }
-});
-assert.equal(futureBlock.tables[0][1][1], "Evrak Doğrulama adımı");
+// Teknik iz resmî rapor modeline hiçbir koşulda eklenmez. Teknik işlevler,
+// ayrı demo/denetim ekranında kullanılabilmek üzere korunur.
+assert.equal(traceBlock({ trace: TRACE }), undefined);
+assert.equal(blocksWith({ trace: TRACE }).length, 8);
+assert.match(sandbox.window.MAHIRReportExport.agentTaskText(TRACE.agents[0]), /8 soru, 35 öğrenci/);
+assert.equal(sandbox.window.MAHIRReportExport.durationText(16700), "16,7 sn");
 
 // --- Anomali bulgusu C bölümünde, kapanış cümlesiyle birlikte ---
 
@@ -184,16 +118,17 @@ const questionBlock = (anomalies) => {
 };
 
 const flagged = questionBlock("Soru 4: Başarı oranı sıfır.");
-assert.equal(flagged.paragraphs.length, 1);
-assert.match(flagged.paragraphs[0], /Ölçme ve Değerlendirme Ajanı'nın dikkat çektiği noktalar/);
-assert.match(flagged.paragraphs[0], /Soru 4: Başarı oranı sıfır\./);
+assert.equal(flagged.paragraphs.length, 2);
+assert.match(flagged.paragraphs[0], /MAHİR değerlendirme ölçütü/);
+assert.match(flagged.paragraphs[1], /Soru 4: Başarı oranı sıfır\./);
 // Charter: bu bir gözlem, karar değil - kapanış cümlesi düşerse rapor, MAHİR'in
 // yapmayacağını söylediği şeyi yapıyormuş gibi okunur.
-assert.match(flagged.paragraphs[0], /hiçbir puanı veya oranı değiştirmez/);
+assert.match(flagged.paragraphs[1], /hiçbir puanı veya oranı değiştirmez/);
 
 // vm bağlamı kendi Array intrinsic'ini kullandığı için deepEqual gerçek-eşitlikte
 // takılıyor (bkz. report-evidence.test.js'teki aynı not) - uzunluğa bakmak yeterli.
-assert.equal(questionBlock("").paragraphs.length, 0, "Bulgu yoksa paragraf eklenmemeli.");
-assert.equal(questionBlock(undefined).paragraphs.length, 0, "Alan hiç yoksa da paragraf olmamalı.");
+assert.equal(questionBlock("").paragraphs.length, 2);
+assert.match(questionBlock("").paragraphs[1], /Ek bir ölçme bulgusu tespit edilmemiştir/);
+assert.equal(questionBlock(undefined).paragraphs.length, 2);
 
 console.log("report-trace.test.js: tüm kontroller geçti.");

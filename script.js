@@ -2509,6 +2509,21 @@ const fileUploadBridge = (() => {
       return "";
     };
 
+    const institutionFieldNames = new Set([
+      "province", "district", "schoolName", "teacherName", "academicYear",
+      "classSection", "teachingProgram"
+    ]);
+    const isVerifiedInstitutionValue = (field, value, exam) => {
+      if (!institutionFieldNames.has(field)) return true;
+      const text = usefulValue(value);
+      if (!text) return false;
+      if (/^\d+(?:[.,]\d+)?$/.test(text) && field !== "classSection") return false;
+      if (field === "classSection" && /^\d+(?:[.,]\d+)?$/.test(text)) return false;
+      const verified = exam?.verifiedMetadataFields;
+      return exam?.metadataSource === "labeled-template"
+        || (Array.isArray(verified) && verified.includes(field));
+    };
+
     const collectContextData = () => Object.fromEntries(contextInputs().map((input) => [input.dataset.examField, input.value.trim()]));
 
     const normalizeDateInputValue = (value) => {
@@ -2524,7 +2539,7 @@ const fileUploadBridge = (() => {
       const missing = contextInputs().filter((input) => input.hasAttribute("data-required-context") && !usefulValue(input.value));
       contextStatus.textContent = missing.length
         ? `Rapor için ${missing.length} zorunlu alan henüz eksik. Belgeden okunabilen bilgiler otomatik yerleştirilecek; kalan alanları öğretmen tamamlayacaktır.`
-        : "Raporun A ve H bölümleri için gerekli bilgiler tamamlandı.";
+        : "Raporun kurumsal üstbilgileri için gerekli bilgiler tamamlandı.";
       contextStatus.classList.toggle("is-error", missing.length > 0);
       contextStatus.classList.toggle("is-success", missing.length === 0);
     };
@@ -2536,7 +2551,8 @@ const fileUploadBridge = (() => {
       };
       contextInputs().forEach((input) => {
         const field = input.dataset.examField;
-        const detected = readAliasedValue(exam, examFieldAliases[field] || [field]);
+        const candidate = readAliasedValue(exam, examFieldAliases[field] || [field]);
+        const detected = isVerifiedInstitutionValue(field, candidate, exam) ? candidate : "";
         const rawValue = detected || automaticDefaults[field] || "";
         const value = input.type === "date" ? normalizeDateInputValue(rawValue) : rawValue;
         const teacherEdited = input.dataset.valueSource === "teacher";
@@ -3216,7 +3232,10 @@ const fileUploadBridge = (() => {
       readButton.textContent = images ? "Çizelgeleri Oku ve Kontrol Et" : "Verileri Oku ve Kontrol Et";
     };
 
-    const showReport = (text) => {
+    const SAFE_REPORT_INTRO = "Bu rapor; öğretmen tarafından onaylanan sınav verileri, seçilen sınav türü ve ilişkilendirilen öğrenme çıktıları temel alınarak hazırlanmıştır.";
+    const REPORT_UNAVAILABLE_MESSAGE = "Analiz özeti oluşturulamadı. Verileri ve servis bağlantısını kontrol ederek yeniden deneyiniz.";
+
+    const showReportIntro = (text = SAFE_REPORT_INTRO) => {
       const reportTarget = document.querySelector("[data-report-intro]");
       if (!reportTarget) return;
       reportTarget.textContent = text;
@@ -4080,9 +4099,7 @@ const fileUploadBridge = (() => {
             warnings: ["MAHİR belge alanlarını otomatik olarak okuyamadı. Okul numaralarını ve puanları kontrol ekranında tamamlayınız."],
             summary: {}
           });
-          const reportText = payloads.map((payload) => payload.reportText || payload.report || payload.report_text).find(Boolean);
-          const reportRequest = reportText ? Promise.resolve(reportText) : fetch(`/shared/report-example.txt?ts=${Date.now()}`).then((reportResponse) => reportResponse.ok ? reportResponse.text() : message);
-          reportRequest.then(showReport).catch(() => showReport(message));
+          showReportIntro();
           screenManager.showScreen("validation-screen");
           warmUpRag();
           console.info("[MAHIR] Belge grubu backend alıcısına gönderildi.", { fileCount: selectedFiles.length, studentCount: mergedData.students.length });
@@ -4106,7 +4123,7 @@ const fileUploadBridge = (() => {
             isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
           });
           showMessage(`Belge okuma servisine ulaşılamadı. Prototip sunucusunu çalıştırıp yeniden deneyiniz. (${elapsed})`, "error");
-          showReport("Backend bağlantısı kurulamadı.");
+          showReportIntro(REPORT_UNAVAILABLE_MESSAGE);
         })
         .finally(() => {
           readButton.disabled = false;
@@ -4291,7 +4308,7 @@ const reportApprovalManager = (() => {
 
     try {
       await window.MAHIRDocxExporter.downloadReportDocx(reportScreen, {
-        filename: "MAHIR_Sinav_Sonuclari_Analiz_Raporu.docx"
+        filename: window.MAHIRReportExport.getDownloadFilename("docx")
       });
     } catch (error) {
       console.error("[MAHIR] Word dosyası oluşturulamadı.", error);
@@ -4316,7 +4333,7 @@ const reportApprovalManager = (() => {
 
     try {
       await window.MAHIRPdfExporter.downloadReportPdf(reportScreen, {
-        filename: "MAHIR_Sinav_Sonuclari_Analiz_Raporu.pdf"
+        filename: window.MAHIRReportExport.getDownloadFilename("pdf")
       });
     } catch (error) {
       console.error("[MAHIR] PDF oluşturulamadı.", error);

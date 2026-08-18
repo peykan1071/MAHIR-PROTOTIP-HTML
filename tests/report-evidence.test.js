@@ -79,7 +79,7 @@ const block = outcomeBlock(analysisWith(fullEvidence));
 // takılıyor; sütunları metin olarak karşılaştırmak hem yeterli hem okunaklı.
 assert.equal(
   block.tables[0][0].join(" | "),
-  "Öğrenme Çıktısı | Hesaplama Dayanağı | Başarı % | Düzey | Kanıt / Kısa Yorum"
+  "Öğrenme Çıktısı | Öğrenme Kanıtının Dayanağı | Gerçekleşme Düzeyi (%) | Gelişim Düzeyi | Kanıta Dayalı Kısa Değerlendirme"
 );
 assert.equal(block.details.column, 1, "Açılır kanıt 2. sütunda olmalı.");
 

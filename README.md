@@ -223,6 +223,15 @@ MAHIR-PROTOTIP-HTML/
 - Pilot verilerinde `P001`, `P002` gibi takma kimlikler kullanılmalıdır.
 - Mevcut sürüm yerel prototiptir; üretim ortamına yönelik kimlik doğrulama, yetkilendirme, kayıt politikası ve KVKK uyumluluk kontrolleri ayrıca tamamlanmalıdır.
 - Gelecekte haricî bir LLM API’si kullanıldığında doğrudan kişisel veriler modele gönderilmeyecektir.
+- Okul/kurum adı, öğretmen adı, il, ilçe, okul numarası ve diğer kimlik belirleyici kurumsal alanlar LLM/RAG istemlerine gönderilmez. Genel değerlendirmede öğrenci eşleştirmesi yalnız oturumluk takma referanslarla yapılır.
+
+## Resmî yazı ve EBYS demo sınırı
+
+MAHİR, onaylanan analiz raporundan okul/kurum müdürlüğüne hitap eden bir üst yazı taslağı, konu, belge türü, ek listesi ve yönlendirme paketi oluşturabilir. Bu akış yarışmanın ikinci görevi olan resmî yazı taslaklama ve birim yönlendirmeyi gösterir.
+
+**EBYS entegrasyonu demo ortamında simüle edilmektedir. Demo işlemi gerçek EBYS sistemine belge göndermez.** Uygulama gerçek bir EBYS evrak sayısı, kayıt tarihi, paraf veya elektronik imza üretmez. Bunlar yalnız yetkili kurum entegrasyonu sonrasında EBYS tarafından oluşturulabilir. Demo akışı `Taslak → Öğretmen kontrolü → Demo aktarımı → Paraf bekliyor → Elektronik imza bekliyor` durumlarını görünür kılar ve indirilebilir bir demo aktarım paketi üretir.
+
+Resmî Word/PDF raporunda teknik ajan çalışma izi bulunmaz. Teknik süreler ve model çağrıları yalnız demo/denetim ekranında tutulur; resmî rapor öğretmen ve okul/kurum yetkilisi için imza alanlarıyla sona erer.
 
 ## Kaynak ilkesi
 
