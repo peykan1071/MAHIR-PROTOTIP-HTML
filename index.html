@@ -589,7 +589,7 @@
             <div>
               <p class="data-entry-kicker">Rapor bilgilerini tamamlama</p>
               <h3 id="report-context-title">Sınav ve Belge Bilgileri</h3>
-              <p>MAHİR, yüklenen belgede bulunan bilgileri otomatik olarak yerleştirir. Belgede bulunmayan alanları öğretmen bu son aşamada tamamlar; bilgiler raporun A ve H bölümlerine aktarılır.</p>
+              <p>MAHİR, yüklenen belgede bulunan kurumsal bilgileri otomatik olarak yerleştirir. Öğretmen yalnız doğrulanabilen eksik üstbilgileri tamamlar; analiz dayanakları ve kullanılan kaynaklar MAHİR tarafından oluşturulur.</p>
             </div>
           </div>
           <p class="notification-message context-status" data-context-status aria-live="polite">Belgeden okunan bilgiler yerleştiriliyor. Yalnız eksik kalan alanları tamamlayınız.</p>
@@ -603,12 +603,8 @@
             <label>Dönem <select data-exam-field="term" data-required-context><option value="">Seçiniz</option><option>1. Dönem</option><option>2. Dönem</option></select></label>
             <label>Sınav Tarihi <input type="date" data-exam-field="examDate" data-required-context></label>
             <label>Öğretim Programı <input type="text" data-exam-field="teachingProgram" data-required-context></label>
-            <label>Ölçme ve Değerlendirme Dayanağı <input type="text" data-exam-field="assessmentBasis" data-required-context></label>
-            <label>Senaryo / Örnek Evrak <input type="text" data-exam-field="scenarioInfo" placeholder="Varsa belirtiniz"></label>
-            <label>Diğer Dayanaklar <input type="text" data-exam-field="otherSources" placeholder="Varsa belirtiniz"></label>
-            <label>Belge / Rapor No <input type="text" data-exam-field="documentNo" data-required-context></label>
-            <label>İletim / Onay Bilgisi <input type="text" data-exam-field="approvalInfo" data-required-context placeholder="Örn. Okul Müdürlüğüne sunulacaktır."></label>
           </div>
+          <p class="report-download-guidance"><strong>Not:</strong> Ölçme ve değerlendirme dayanakları, kullanılan kaynaklar ve resmî işlem durumu öğretmenden serbest metin olarak istenmez; MAHİR tarafından doğrulanmış verilerden oluşturulur.</p>
         </article>
 
         <p class="report-intro" data-report-intro>Öğretmen onaylı veriler esas alınarak oluşturulan rapor aşağıda, indirilecek belgeyle aynı bölüm sırasıyla sunulmuştur.</p>
@@ -629,6 +625,28 @@
           </aside>
           <p class="report-output-validation-message" data-output-validation-message data-pdf-exclude hidden></p>
         </div>
+
+        <section class="report-context-card ebys-demo-card" data-ebys-demo data-pdf-exclude aria-labelledby="ebys-demo-title">
+          <div class="exam-structure-heading">
+            <div>
+              <p class="data-entry-kicker">Görev 2 · Resmî yazı taslağı ve birim yönlendirme</p>
+              <h3 id="ebys-demo-title">EBYS Aktarım Demosu</h3>
+              <p>Onaylanan analiz raporundan üst yazı taslağı, ek listesi ve okul yönetimine yönlendirme paketi hazırlanır.</p>
+            </div>
+          </div>
+          <p class="notification-message"><strong>EBYS entegrasyonu demo ortamında simüle edilmektedir.</strong> Demo: Bu işlem gerçek EBYS sistemine belge göndermez.</p>
+          <div class="button-group">
+            <button class="secondary-button" type="button" data-ebys-prepare>Resmî Yazıyı Hazırla</button>
+            <button class="secondary-button" type="button" data-ebys-download-letter hidden>Üst Yazıyı Word Olarak İndir</button>
+            <button class="primary-button" type="button" data-ebys-transfer disabled aria-disabled="true">EBYS Demo'ya Aktar</button>
+          </div>
+          <div data-ebys-preview hidden></div>
+          <label class="report-final-approval-label" data-ebys-approval-wrap hidden>
+            <input type="checkbox" data-ebys-approval>
+            Üst yazı taslağını ve ek listesini öğretmen olarak kontrol ettim.
+          </label>
+          <p class="report-output-validation-message" data-ebys-status aria-live="polite"></p>
+        </section>
       </section>
     </div>
   </main>
@@ -679,6 +697,7 @@
   </div>
 
   <script src="assets/js/mahir-report-export-common.js"></script>
+  <script src="assets/js/mahir-ebys-demo.js"></script>
   <script src="assets/js/mahir-docx-exporter.js"></script>
   <script src="assets/js/mahir-pdf-exporter.js"></script>
   <script src="assets/js/mahir-workspace-backup.js"></script>

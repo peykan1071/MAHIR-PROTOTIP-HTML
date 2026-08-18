@@ -2509,6 +2509,21 @@ const fileUploadBridge = (() => {
       return "";
     };
 
+    const institutionFieldNames = new Set([
+      "province", "district", "schoolName", "teacherName", "academicYear",
+      "classSection", "teachingProgram"
+    ]);
+    const isVerifiedInstitutionValue = (field, value, exam) => {
+      if (!institutionFieldNames.has(field)) return true;
+      const text = usefulValue(value);
+      if (!text) return false;
+      if (/^\d+(?:[.,]\d+)?$/.test(text) && field !== "classSection") return false;
+      if (field === "classSection" && /^\d+(?:[.,]\d+)?$/.test(text)) return false;
+      const verified = exam?.verifiedMetadataFields;
+      return exam?.metadataSource === "labeled-template"
+        || (Array.isArray(verified) && verified.includes(field));
+    };
+
     const collectContextData = () => Object.fromEntries(contextInputs().map((input) => [input.dataset.examField, input.value.trim()]));
 
     const normalizeDateInputValue = (value) => {
@@ -2524,7 +2539,7 @@ const fileUploadBridge = (() => {
       const missing = contextInputs().filter((input) => input.hasAttribute("data-required-context") && !usefulValue(input.value));
       contextStatus.textContent = missing.length
         ? `Rapor için ${missing.length} zorunlu alan henüz eksik. Belgeden okunabilen bilgiler otomatik yerleştirilecek; kalan alanları öğretmen tamamlayacaktır.`
-        : "Raporun A ve H bölümleri için gerekli bilgiler tamamlandı.";
+        : "Raporun kurumsal üstbilgileri için gerekli bilgiler tamamlandı.";
       contextStatus.classList.toggle("is-error", missing.length > 0);
       contextStatus.classList.toggle("is-success", missing.length === 0);
     };
@@ -2536,7 +2551,8 @@ const fileUploadBridge = (() => {
       };
       contextInputs().forEach((input) => {
         const field = input.dataset.examField;
-        const detected = readAliasedValue(exam, examFieldAliases[field] || [field]);
+        const candidate = readAliasedValue(exam, examFieldAliases[field] || [field]);
+        const detected = isVerifiedInstitutionValue(field, candidate, exam) ? candidate : "";
         const rawValue = detected || automaticDefaults[field] || "";
         const value = input.type === "date" ? normalizeDateInputValue(rawValue) : rawValue;
         const teacherEdited = input.dataset.valueSource === "teacher";
@@ -4292,7 +4308,7 @@ const reportApprovalManager = (() => {
 
     try {
       await window.MAHIRDocxExporter.downloadReportDocx(reportScreen, {
-        filename: "MAHIR_Sinav_Sonuclari_Analiz_Raporu.docx"
+        filename: window.MAHIRReportExport.getDownloadFilename("docx")
       });
     } catch (error) {
       console.error("[MAHIR] Word dosyası oluşturulamadı.", error);
@@ -4317,7 +4333,7 @@ const reportApprovalManager = (() => {
 
     try {
       await window.MAHIRPdfExporter.downloadReportPdf(reportScreen, {
-        filename: "MAHIR_Sinav_Sonuclari_Analiz_Raporu.pdf"
+        filename: window.MAHIRReportExport.getDownloadFilename("pdf")
       });
     } catch (error) {
       console.error("[MAHIR] PDF oluşturulamadı.", error);

@@ -70,6 +70,11 @@
     return "";
   };
 
+  const verifiedInstitutionValue = (source, keys) => {
+    const value = valueFrom(source, keys);
+    return /^\d+(?:[.,]\d+)?$/.test(value) ? "" : value;
+  };
+
   const optionText = (selector) => {
     const element = document.querySelector(selector);
     if (!element || element.disabled || !element.value) return "";
@@ -102,7 +107,15 @@
     };
   };
 
-  const getExam = () => runtime().structuredData?.exam || runtime().analysis?.exam || {};
+  // Analiz anındaki sınav sözleşmesini, öğretmenin rapor ekranında sonradan
+  // tamamladığı güncel üstbilgiyle birleştir. Sınav türünün güvenilir kaynağı
+  // aşağıdaki getComponentType/getComponentReport zinciridir; bu birleşim İl,
+  // okul, öğretmen vb. son onay alanlarının A/H bölümlerine ulaşması içindir.
+  const getExam = () => ({
+    ...(runtime().analysis?.exam || {}),
+    ...(runtime().structuredData?.exam || {}),
+    ...(runtime().exam || {})
+  });
   const getStructuredQuestions = () => runtime().structuredData?.questions || [];
   const getStructuredStudents = () => runtime().structuredData?.students || [];
   const getAnalysis = () => runtime().analysis || {};
@@ -110,13 +123,24 @@
     getAnalysis().component?.componentType || getAnalysis().componentType || getExam().componentType || "written"
   ).toLowerCase();
   const getComponentReport = () => COMPONENT_REPORTS[getComponentType()] || null;
-  const getExamTypeLabel = () => valueFrom(getExam(), ["examType"])
+  const getExamTypeLabel = () => getComponentReport()?.label
     || normalizeText(getAnalysis().component?.componentLabel || getAnalysis().componentLabel)
-    || getComponentReport()?.label
+    || valueFrom(getExam(), ["examType"])
     || "";
   const getReportTitle = () => getAnalysis().assessmentScope === "language-composite"
     ? GENERAL_REPORT_TITLE
     : getComponentReport()?.title || DEFAULT_REPORT_TITLE;
+  const getDownloadFilename = (extension = "docx") => {
+    const suffix = String(extension || "docx").replace(/^\.+/, "").toLowerCase();
+    const baseName = getAnalysis().assessmentScope === "language-composite"
+      ? "MAHIR_Genel_Degerlendirme_Raporu"
+      : ({
+          written: "MAHIR_Yazili_Sinav_Sonuclari_Analiz_Raporu",
+          listening: "MAHIR_Dinleme_Izleme_Sinavi_Sonuclari_Analiz_Raporu",
+          speaking: "MAHIR_Konusma_Sinavi_Sonuclari_Analiz_Raporu"
+        }[getComponentType()] || "MAHIR_Sinav_Sonuclari_Analiz_Raporu");
+    return `${baseName}.${suffix}`;
+  };
   // Analizi ÜRETEN ajanların izi (/mahir-analyze yanıtındaki `trace`). `analysis`in
   // kardeşi, içinde değil: biri raporun kendisi, diğeri raporun nasıl üretildiği.
   const getTraceAgents = () => {
@@ -154,14 +178,15 @@
     }).format(rounded)}`;
   };
 
-  const successLevel = (rate, fallback = "") => {
-    if (isUseful(fallback)) return normalizeText(fallback);
+  const EMPTY_MARK = "—";
+  const displayValue = (value) => isUseful(value) ? normalizeText(value) : EMPTY_MARK;
+  const successLevel = (rate) => {
     const value = Number(rate);
-    if (!Number.isFinite(value)) return "Belirlenmedi";
-    if (value >= 0.85) return "Çok güçlü";
-    if (value >= 0.70) return "Güçlü";
-    if (value >= 0.50) return "Gelişmekte";
-    return "Destek gerekli";
+    if (!Number.isFinite(value)) return EMPTY_MARK;
+    if (value >= 0.85) return "Beklenen düzeyin üzerinde";
+    if (value >= 0.70) return "Beklenen düzeyde";
+    if (value >= 0.50) return "Gelişimi sürmekte";
+    return "Gelişim desteği öncelikli";
   };
 
   const getQuestionOutcomes = (question = {}, structuredQuestion = {}) => {
@@ -265,24 +290,24 @@
     const exam = getExam();
     const context = getContext();
     const summary = getSummary();
-    const schoolName = valueFrom(exam, ["schoolName", "school", "institutionName"]);
-    const teacherName = valueFrom(exam, ["teacherName", "teacher", "teacherFullName"]);
+    const schoolName = verifiedInstitutionValue(exam, ["schoolName", "school", "institutionName"]);
+    const teacherName = verifiedInstitutionValue(exam, ["teacherName", "teacher", "teacherFullName"]);
     const wordCourse = valueFrom(exam, ["courseName", "course"]);
     const wordClass = valueFrom(exam, ["classSection", "grade", "className"]);
 
     return [
-      { label: "İl", value: valueFrom(exam, ["province", "city"]) },
-      { label: "İlçe", value: valueFrom(exam, ["district", "town"]) },
+      { label: "İl", value: verifiedInstitutionValue(exam, ["province", "city"]) },
+      { label: "İlçe", value: verifiedInstitutionValue(exam, ["district", "town"]) },
       { label: "Okul/Kurum Adı", value: schoolName, source: "word", required: true },
       { label: "Öğretmenin Adı Soyadı", value: teacherName, source: "word", required: true },
-      { label: "Eğitim Öğretim Yılı", value: valueFrom(exam, ["academicYear", "educationYear"]) },
+      { label: "Eğitim Öğretim Yılı", value: verifiedInstitutionValue(exam, ["academicYear", "educationYear"]) },
       { label: "Öğretim Kademesi", value: context.educationStage, source: "context" },
       { label: "Okul Türü", value: context.schoolType, source: "context" },
       { label: "Program Türü", value: context.programType, source: "context" },
       { label: "Alan/Dal", value: context.fieldBranch, source: "context" },
       { label: "Ders", value: wordCourse || context.course, source: wordCourse ? "word" : "context", required: true },
       { label: "Ders Türü", value: context.courseType, source: "context" },
-      { label: "Sınıf/Şube", value: wordClass || context.gradeLevel, source: wordClass ? "word" : "context", required: true },
+      { label: "Sınıf/Şube", value: verifiedInstitutionValue({ value: wordClass || context.gradeLevel }, ["value"]), source: wordClass ? "word" : "context", required: true },
       { label: "Dönem", value: valueFrom(exam, ["term"]) },
       { label: "Sınav Türü", value: getAnalysis().assessmentScope === "language-composite" ? "Genel Değerlendirme" : getExamTypeLabel() },
       { label: "Sınav Tarihi", value: displayDate(valueFrom(exam, ["examDate"])) },
@@ -321,9 +346,6 @@
     if (!isUseful(valueFrom(exam, ["term"]))) missing.push("Dönem");
     if (!isUseful(valueFrom(exam, ["examDate"]))) missing.push("Sınav Tarihi");
     if (!isUseful(valueFrom(exam, ["teachingProgram", "curriculumName"]))) missing.push("Öğretim Programı");
-    if (!isUseful(valueFrom(exam, ["assessmentBasis", "measurementBasis"]))) missing.push("Ölçme ve Değerlendirme Dayanağı");
-    if (!isUseful(valueFrom(exam, ["documentNo", "reportNo"]))) missing.push("Belge / Rapor No");
-    if (!isUseful(valueFrom(exam, ["approvalInfo", "transmissionInfo"]))) missing.push("İletim / Onay Bilgisi");
     if (getAnalysis().assessmentScope !== "language-composite" && !summary.participatingStudentCount) missing.push("Analiz Edilen Öğrenci Sayısı");
 
     const conflicts = [
@@ -348,7 +370,7 @@
     ["Okul / Kurum Adı", metadataValue("Okul/Kurum Adı"), "Öğretmenin Adı Soyadı", metadataValue("Öğretmenin Adı Soyadı")],
     ["Eğitim Öğretim Yılı", metadataValue("Eğitim Öğretim Yılı"), "Rapor Tarihi", metadataValue("Rapor Tarihi")],
     ["Öğretim Kademesi", metadataValue("Öğretim Kademesi"), "Okul Türü", metadataValue("Okul Türü")],
-    ["Program Türü", metadataValue("Program Türü"), "Alan / Dal", metadataValue("Alan/Dal")],
+    ["Program Türü", displayValue(metadataValue("Program Türü")), "Alan / Dal", displayValue(metadataValue("Alan/Dal"))],
     ["Ders", metadataValue("Ders"), "Sınıf / Şube", metadataValue("Sınıf/Şube")],
     ["Dönem", metadataValue("Dönem"), "Sınav Türü", metadataValue("Sınav Türü")],
     ["Sınav Tarihi", metadataValue("Sınav Tarihi"), "Analiz Edilen Öğrenci Sayısı", metadataValue("Analiz Edilen Öğrenci Sayısı")]
@@ -381,18 +403,15 @@
   // eklenmez; "bir şey bulunmadı" satırı gürültüden başka bir şey olmaz.
   const anomalyParagraphs = () => {
     const finding = normalizeText(getSummary().anomalies);
-    if (!isUseful(finding)) return [];
-    return [
-      `Ölçme ve Değerlendirme Ajanı'nın dikkat çektiği noktalar: ${finding} ` +
-      "Bu gözlem hiçbir puanı veya oranı değiştirmez."
-    ];
+    const basis = "Gerçekleşme düzeyi, öğretmen tarafından onaylanan öğrenci puanlarının sorunun azami puanına oranlanmasıyla hesaplanmıştır. MAHİR değerlendirme ölçütü: %85–100 beklenen düzeyin üzerinde, %70–84,99 beklenen düzeyde, %50–69,99 gelişimi sürmekte, %0–49,99 gelişim desteği öncelikli.";
+    return [basis, isUseful(finding) ? `Dikkat çeken ölçme bulguları: ${finding} Bu gözlem hiçbir puanı veya oranı değiştirmez.` : "Ek bir ölçme bulgusu tespit edilmemiştir."];
   };
 
   const buildQuestionBlock = () => ({
-    heading: "C. SORU BAZLI BAŞARI ANALİZİ",
+    heading: "C. SORU BAZINDA ÖĞRENME KANITLARI",
     paragraphs: anomalyParagraphs(),
     tables: [[
-      ["Soru", "Öğrenme Çıktısı / Kazanım", "Azami Puan", "Ortalama", "Başarı %", "Durum"],
+      ["Soru", "İlişkilendirilen Öğrenme Çıktısı", "Azami Puan", "Ortalama Puan", "Gerçekleşme Düzeyi (%)", "Düzey"],
       ...getQuestionRows().map((question) => [
         String(question.number),
         question.outcomeDescription,
@@ -440,34 +459,47 @@
       [normalizeText(outcome.outcomeTheme), normalizeText(outcome.outcomeCode || outcome.learningOutcome), normalizeText(outcome.outcomeSkill)].filter(Boolean).join(" — "),
       [evidences[index].summary, evidences[index].detail].filter(Boolean).join(" — "),
       formatPercent(outcome.successRate),
-      successLevel(outcome.successRate, outcome.category),
+      successLevel(outcome.successRate),
       normalizeText(outcome.decision)
     ]);
     return {
-      heading: "D. ÖĞRENME ÇIKTILARI ANALİZİ",
-      paragraphs: ["Başarı düzeyleri, rapor hazırlanırken kullanılan ölçütlere göre sınıflandırılır; gerekli görüldüğünde değerlendirme eşikleri açıklama bölümünde belirtilir. \"Hesaplama Dayanağı\" sütunu, her oranın hangi sorulardan ve kaç öğrenciden hesaplandığını gösterir."],
+      heading: "D. ÖĞRENME ÇIKTILARI VE ÖĞRENME KANITLARI ANALİZİ",
+      paragraphs: ["Öğrenme kanıtının dayanağı, gerçekleşme düzeyinin hangi sorulardan ve kaç öğrencinin öğretmen tarafından onaylanan puanlarından hesaplandığını gösterir."],
       // Ekranda 2. sütun açılır bir kanıta dönüşür; diğer render hedefleri
       // (PDF gövdesi, Word ve PDF dışa aktarıcıları) blok modelini genel
       // olarak tükettiği için bu alanı hiç görmez ve düz metin basmaya
       // devam eder - o dosyalarda hiçbir değişiklik gerekmiyor.
       details: { column: 1, summaries: evidences.map((evidence) => evidence.summary) },
-      tables: [[["Öğrenme Çıktısı", "Hesaplama Dayanağı", "Başarı %", "Düzey", "Kanıt / Kısa Yorum"], ...rows]],
+      tables: [[["Öğrenme Çıktısı", "Öğrenme Kanıtının Dayanağı", "Gerçekleşme Düzeyi (%)", "Gelişim Düzeyi", "Kanıta Dayalı Kısa Değerlendirme"], ...rows]],
       tableWidths: [[23, 29, 9, 13, 26]]
     };
   };
 
   const buildPedagogyBlock = () => {
     const outcomes = getAnalysis().outcomes || [];
-    const strong = outcomes.filter((item) => Number(item.successRate) >= 0.70);
-    const development = outcomes.filter((item) => Number(item.successRate) < 0.70);
+    const label = (item) => [normalizeText(item.outcomeCode || item.learningOutcome), normalizeText(item.outcomeDescription || item.outcomeSkill)].filter(Boolean).join(" — ") || "Öğrenme çıktısı";
+    const list = (items) => items.length
+      ? items.map((item) => `${label(item)} (${formatPercent(item.successRate)})`).join("; ")
+      : EMPTY_MARK;
+    const above = outcomes.filter((item) => Number(item.successRate) >= 0.85);
+    const expected = outcomes.filter((item) => Number(item.successRate) >= 0.70 && Number(item.successRate) < 0.85);
+    const developing = outcomes.filter((item) => Number(item.successRate) >= 0.50 && Number(item.successRate) < 0.70);
+    const priority = outcomes.filter((item) => Number(item.successRate) < 0.50);
+    const noPriority = priority.length === 0;
     return {
       heading: "E. PEDAGOJİK DEĞERLENDİRME",
-      paragraphs: [],
+      paragraphs: [noPriority
+        ? "MAHİR değerlendirme ölçütlerine göre öncelikli gelişim desteği gerektiren bir alan tespit edilmedi."
+        : "Öğrenme kanıtları, öncelikli gelişim desteği gerektiren alanlar bulunduğunu göstermektedir."],
       tables: [[
-        [`Güçlü öğrenme alanları: ${strong.map((item) => `${item.outcomeCode} (${formatPercent(item.successRate)})`).join("; ")}`],
-        [`Geliştirilmesi gereken öğrenme alanları: ${development.map((item) => `${item.outcomeCode} (${formatPercent(item.successRate)})`).join("; ")}`],
-        ["Değerlendirme, öğretmen tarafından onaylanan soru puanları ile resmî öğrenme çıktısı ve beceri eşleştirmeleri esas alınarak yapılmıştır."]
-      ]]
+        ["Değerlendirme Boyutu", "Kanıta Dayalı Pedagojik Sonuç"],
+        ["Beklenen düzeyin üzerinde", list(above)],
+        ["Beklenen düzeyde", list(expected)],
+        ["Gelişimi sürmekte", list(developing)],
+        ["Öncelikli gelişim desteği", list(priority)],
+        ["Bütüncül değerlendirme", "Öğrenme kanıtları her öğrenme çıktısının kendi soru ve beceri bağlamı korunarak değerlendirilmiştir."]
+      ]],
+      tableWidths: [[28, 72]]
     };
   };
 
@@ -538,64 +570,77 @@
 
   const buildDevelopmentNeedsBlock = () => {
     const outcomes = getAnalysis().outcomes || [];
-    const targets = outcomes.filter((item) => Number(item.successRate) < 0.70);
-    // ragContext yalnızca kayıtlı bir programda (bkz. backend/app/program_catalog.py)
-    // ve RAG servisi yapılandırılmışsa dolu gelir - kapsam dışı derslerde sütun
-    // hiç eklenmez, tablo bugünküyle birebir aynı kalır.
-    const hasRagContext = targets.some((item) => isUseful(item.ragContext));
-    const labels = documentLabels(targets);
-    const rows = targets.map((item, index) => {
-      const row = [
-        String(index + 1),
-        `${item.componentLabel ? `${item.componentLabel} — ` : ""}${item.outcomeCode || "Öğrenme Çıktısı"} (${formatPercent(item.successRate)})`,
-        normalizeText(item.decision),
-        Number(item.successRate) < 0.50 ? "Öncelikli" : "Gelişim ihtiyacı"
-      ];
-      // Atıf teşhisin ARDINA ekleniyor - ayrı sütun değil: A4 genişliğinde
-      // tablo zaten beş sütun ve altıncısı okunabilirliği bozardı. Kaynağı
-      // olmayan (eski analiz, kaydedilmiş çalışma) satır bugünkü gibi görünür.
-      if (hasRagContext) {
-        row.push([normalizeText(item.ragContext), sourceReference(item, labels)].filter(Boolean).join(" "));
-      }
-      return row;
+    const labels = documentLabels(outcomes);
+    const direction = (rate) => rate >= 0.85 ? "Zenginleştirme" : rate >= 0.70 ? "Derinleştirme ve sürdürme" : rate >= 0.50 ? "Gelişimi destekleme" : "Öncelikli destekleme";
+    const rows = outcomes.map((item) => {
+      const focus = [normalizeText(item.componentLabel), normalizeText(item.outcomeCode || item.learningOutcome), normalizeText(item.outcomeDescription || item.outcomeSkill)].filter(Boolean).join(" — ");
+      const evidence = `Gerçekleşme düzeyi ${formatPercent(item.successRate)}; ${successLevel(item.successRate).toLocaleLowerCase("tr-TR")}.`;
+      const rawRecommendation = normalizeText(item.ragContext).replace(/\bBAĞLAM(?:'daki|daki|da)?\b/gi, "doğrulanmış kaynak");
+      const recommendation = isUseful(rawRecommendation) ? rawRecommendation : EMPTY_MARK;
+      return [focus || "Öğrenme çıktısı", evidence, direction(Number(item.successRate)), [recommendation, sourceReference(item, labels)].filter(Boolean).join(" ")];
     });
-    const header = ["Sıra", "Tespit Edilen İhtiyaç", "Değerlendirme Sonucu", "Öncelik Düzeyi"];
-    if (hasRagContext) header.push("Kavramsal Bağlam");
     return {
-      heading: "F. GELİŞİM İHTİYAÇLARI VE DEĞERLENDİRME SONUÇLARI",
-      paragraphs: ["Bu bölüm uygulanacak etkinlik, kaynak, yöntem veya telafi programını belirlemez; yalnızca öğretmen onaylı sınav verilerinden hareketle gelişim ihtiyacını gösterir."],
-      tables: [[header, ...rows]],
-      tableWidths: [hasRagContext ? [6, 14, 20, 12, 48] : [8, 28, 42, 22]],
-      // Tablonun ALTINA düşen dipnot; hücredeki kısa atıfın karşılığı.
-      notes: hasRagContext ? sourceNotes(labels) : []
+      heading: getAnalysis().assessmentScope === "language-composite" ? "E. ÖĞRENMEYİ DESTEKLEME VE ZENGİNLEŞTİRME ÖNERİLERİ" : "F. ÖĞRENMEYİ DESTEKLEME VE ZENGİNLEŞTİRME ÖNERİLERİ",
+      paragraphs: ["Öneriler, öğretmen tarafından onaylanan öğrenme kanıtları ile seçilmiş öğrenme çıktıları ve doğrulanmış eğitim kaynakları esas alınarak hazırlanmıştır. Uygulanacak öğrenme yaşantısına öğretmen karar verir."],
+      tables: [[["Öğrenme Odağı", "Öğrenme Kanıtının Gösterdiği Düzey", "Pedagojik Yön", "Kaynak Temelli Öneri"], ...rows]],
+      tableWidths: [[24, 20, 18, 38]],
+      notes: sourceNotes(labels)
     };
   };
 
   const buildSourceBlock = () => {
-    const context = getContext();
-    const exam = getExam();
-    const sourceScope = context.sourceScope || [];
+    const analysis = getAnalysis();
+    const evidence = analysis.assessmentScope === "language-composite" ? (analysis.componentEvidence || []) : (analysis.outcomes || []);
+    const collected = new Map();
+    evidence.forEach((item) => {
+      (Array.isArray(item.ragSources) ? item.ragSources : []).forEach((source) => {
+        const name = normalizeText(source.documentName);
+        if (!name) return;
+        const current = collected.get(name) || { name, type: normalizeText(source.documentType || source.sourceType) || "Doğrulanmış eğitim kaynağı", pages: [], focuses: [] };
+        current.pages.push(...(Array.isArray(source.pages) ? source.pages : []));
+        const focus = normalizeText(item.outcomeCode || item.learningOutcomeCode || item.learningOutcome);
+        if (focus && !current.focuses.includes(focus)) current.focuses.push(focus);
+        collected.set(name, current);
+      });
+    });
+    const rows = [...collected.values()].map((source) => [
+      source.type,
+      source.name,
+      source.focuses.length ? source.focuses.join(", ") : EMPTY_MARK,
+      pageRanges(source.pages) ? `s. ${pageRanges(source.pages)}` : EMPTY_MARK,
+      "Pedagojik değerlendirme ve kaynak temelli önerinin doğrulanması"
+    ]);
+    if (!rows.length) rows.push([EMPTY_MARK, EMPTY_MARK, EMPTY_MARK, EMPTY_MARK, EMPTY_MARK]);
     return {
-      heading: "G. ANALİZDE ESAS ALINAN EĞİTİM BAĞLAMI VE KAYNAKLAR",
-      paragraphs: ["Bu rapor; seçilen eğitim bağlamı, ilgili öğretim programı, ölçme ve değerlendirme esasları ile doğrulanmış sınav verileri esas alınarak hazırlanmıştır."],
-      tables: [[
-        ["Eğitim Bağlamı", sourceScope.join(" / "), "İnceleme Kapsamı", "Öğretmen tarafından onaylanan sınav verileri"],
-        ["Öğretim Programı", valueFrom(exam, ["teachingProgram", "curriculumName"]), "Ölçme ve Değerlendirme Dayanağı", valueFrom(exam, ["assessmentBasis", "measurementBasis"])],
-        ["Senaryo / Örnek Evrak", valueFrom(exam, ["scenarioInfo", "scenario", "sampleDocument"]) || "Bulunmuyor", "Diğer Dayanaklar", valueFrom(exam, ["otherSources", "otherReferences"]) || "Bulunmuyor"]
-      ]]
+      heading: analysis.assessmentScope === "language-composite" ? "F. ANALİZDE YARARLANILAN KAYNAKLAR VE DAYANAKLAR" : "G. ANALİZDE YARARLANILAN KAYNAKLAR VE DAYANAKLAR",
+      paragraphs: ["Bu bölüm, analiz ve kaynak temelli öneriler hazırlanırken MAHİR tarafından gerçekten kullanılan doğrulanmış kaynakları gösterir."],
+      tables: [[["Kaynak Türü", "Kaynağın Resmî Adı", "İlgili Öğrenme Odağı", "Kullanılan Bölüm/Sayfa", "Rapordaki Kullanım Amacı"], ...rows]],
+      tableWidths: [[16, 30, 17, 15, 22]],
+      notes: ["Nicel sonuçlar öğretmen tarafından onaylanan sınav verilerinden hesaplanmış; pedagojik açıklama ve öneriler yalnız tabloda belirtilen doğrulanmış kaynaklarla sınırlandırılmıştır."]
     };
   };
 
   const buildDocumentInfoBlock = () => {
     const exam = getExam();
+    const composite = getAnalysis().assessmentScope === "language-composite";
+    const reference = `MAHIR-${getComponentType().toUpperCase()}-${dateText().replace(/\D/g, "")}`;
     return {
-      heading: "H. BELGE BİLGİLERİ",
-      paragraphs: [],
-      tables: [[
-        ["Düzenleyen Öğretmen", valueFrom(exam, ["teacherName", "teacher", "teacherFullName"]), "Kurum", valueFrom(exam, ["schoolName", "school", "institutionName"])],
-        ["Rapor Tarihi", dateText(), "Belge / Rapor No", valueFrom(exam, ["documentNo", "reportNo"])],
-        ["İletim / Onay Bilgisi", valueFrom(exam, ["approvalInfo", "transmissionInfo"]), "Belge Durumu", "Öğretmen tarafından onaylandı"]
-      ]]
+      heading: composite ? "G. RESMÎ İŞLEM VE ONAY BİLGİLERİ" : "H. RESMÎ İŞLEM VE ONAY BİLGİLERİ",
+      paragraphs: ["Bu raporun verileri öğretmen tarafından onaylanmıştır. Kurumsal paraf ve elektronik imza işlemleri, yetkili elektronik belge yönetim sistemi üzerinden ayrıca tamamlanır."],
+      tables: [
+        [
+          ["Düzenleyen Öğretmen", displayValue(verifiedInstitutionValue(exam, ["teacherName", "teacher", "teacherFullName"])), "Kurum", displayValue(verifiedInstitutionValue(exam, ["schoolName", "school", "institutionName"]))],
+          ["Rapor Tarihi", dateText(), "MAHİR Rapor Referansı", reference],
+          ["Veri Onayı", "Öğretmen tarafından onaylandı", "Kurumsal İşlem Durumu", "Paraf / elektronik imza bekliyor"],
+          ["EBYS Evrak Sayısı", EMPTY_MARK, "EBYS İşlem Tarihi", EMPTY_MARK]
+        ],
+        [
+          ["Düzenleyen Öğretmen", "Okul / Kurum Yetkilisi"],
+          ["Ad Soyad: ................................................\nİmza: .........................................................", "Ad Soyad / Unvan: ...................................\nParaf / İmza: .............................................."]
+        ]
+      ],
+      tableWidths: [[18, 32, 18, 32], [50, 50]],
+      keepTogether: true
     };
   };
 
@@ -615,8 +660,7 @@
     return {
       heading: "B. AĞIRLIKLI GENEL SONUÇ",
       paragraphs: [
-        analysis.notice || "Üç sınav bileşeni, ders için belirlenen resmî ağırlıklara göre birleştirilmiştir.",
-        "Öğrenci bazlı e-Okul puanı bu sınıf düzeyi raporundan hesaplanmaz."
+        analysis.notice || "Aynı öğrenci grubuna ait yazılı, dinleme/izleme ve konuşma puanları öğrenci bazında sırasıyla %70, %15 ve %15 ağırlıklarla birleştirilmiş; sınıf ortalaması bu birleşik puanlardan hesaplanmıştır."
       ],
       tables: [
         [["Bileşen", "Sınıf Ortalaması", "Ağırlık", "Genel Sonuca Katkı"], ...rows],
@@ -639,7 +683,7 @@
           normalizeText(item.fieldSkill),
           formatPercent(item.realizationRate),
           `${formatPercent(item.weightedContribution)} / ${formatPercent(item.componentWeight)}`,
-          normalizeText(item.developmentLevel)
+          successLevel(item.realizationRate)
         ])
       ]],
       tableWidths: [[16, 34, 14, 12, 14, 10]]
@@ -655,8 +699,8 @@
       const development = items.filter((item) => Number(item.realizationRate) < 0.70);
       return [
         label,
-        strong.length ? strong.map((item) => `${item.learningOutcomeCode} (${formatPercent(item.realizationRate)})`).join("; ") : "Belirlenmedi",
-        development.length ? development.map((item) => `${item.learningOutcomeCode} (${formatPercent(item.realizationRate)})`).join("; ") : "Belirlenmedi"
+        strong.length ? strong.map((item) => `${item.learningOutcomeCode} (${formatPercent(item.realizationRate)})`).join("; ") : EMPTY_MARK,
+        development.length ? development.map((item) => `${item.learningOutcomeCode} (${formatPercent(item.realizationRate)})`).join("; ") : EMPTY_MARK
       ];
     });
     return {
@@ -765,8 +809,7 @@
       buildCompositePedagogyBlock(),
       buildDevelopmentNeedsBlock(),
       buildSourceBlock(),
-      buildDocumentInfoBlock(),
-      buildAgentTraceBlock()
+      buildDocumentInfoBlock()
     ].filter(Boolean);
 
   const buildComponentBlocks = () => [
@@ -777,8 +820,7 @@
       buildPedagogyBlock(),
       buildDevelopmentNeedsBlock(),
       buildSourceBlock(),
-      buildDocumentInfoBlock(),
-      buildAgentTraceBlock()
+      buildDocumentInfoBlock()
     ].filter(Boolean);
 
   const getBlocks = () => getAnalysis().assessmentScope === "language-composite"
@@ -801,14 +843,20 @@
     const runtime = window.MAHIRReportRuntime || {};
     const analysis = runtime.analysis || {};
     const exam = runtime.exam || runtime.structuredData?.exam || {};
+    const componentType = getComponentType();
+    const componentLabel = getExamTypeLabel();
     const portableAnalysis = {
       summary: analysis.summary || {},
       questions: Array.isArray(analysis.questions) ? analysis.questions : [],
       outcomes: Array.isArray(analysis.outcomes) ? analysis.outcomes : [],
       assessmentScope: analysis.assessmentScope || exam.assessmentScope || "component",
-      componentType: analysis.component?.componentType || exam.componentType || "written",
-      componentLabel: analysis.component?.componentLabel || exam.examType || "",
-      componentWeight: analysis.component?.componentWeight ?? null
+      componentType,
+      componentLabel,
+      componentWeight: analysis.component?.componentWeight ?? null,
+      cohortEvidence: (Array.isArray(analysis.students) ? analysis.students : []).map((student) => ({
+        studentRef: normalizeText(student.studentRef),
+        calculatedTotal: Number(student.calculatedTotal)
+      })).filter((student) => /^Ö-\d{3,}$/.test(student.studentRef) && Number.isFinite(student.calculatedTotal))
     };
     return {
       schema: "mahir.analysis-report",
@@ -825,8 +873,8 @@
         classSection: exam.classSection || exam.className || "",
         term: exam.term || "",
         examDate: exam.examDate || "",
-        componentType: exam.componentType || portableAnalysis.componentType,
-        examType: exam.examType || portableAnalysis.componentLabel,
+        componentType,
+        examType: componentLabel,
         weightingProfileId: exam.weightingProfileId || "",
         programId: exam.programId || "",
         teachingProgram: exam.teachingProgram || exam.curriculumName || "",
@@ -838,8 +886,8 @@
       },
       analysis: portableAnalysis,
       privacy: {
-        scope: "aggregate-class-evidence",
-        excludedFields: ["students", "studentRef", "studentNo", "fullName", "tckn"]
+        scope: "pseudonymous-cohort-evidence",
+        excludedFields: ["studentNo", "fullName", "tckn", "schoolNameFromLlmContext", "teacherNameFromLlmContext"]
       }
     };
   };
@@ -989,6 +1037,7 @@
     design,
     getReportModel,
     getPortableReportPayload,
+    getDownloadFilename,
     syncOutputHeader,
     validateModel,
     getOutputStatusMessage,

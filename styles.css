@@ -2544,3 +2544,25 @@ body:has(#welcome-screen.active-screen) .welcome-footer-social svg {
     min-width: 0;
   }
 }
+.ebys-demo-card [data-ebys-preview] {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.ebys-demo-card [data-ebys-preview] table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ebys-demo-card [data-ebys-preview] th,
+.ebys-demo-card [data-ebys-preview] td {
+  padding: 0.75rem;
+  border: 1px solid var(--color-border, #c8d8e6);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ebys-demo-card [data-ebys-preview] th {
+  width: 12rem;
+  color: var(--color-navy, #173a63);
+}

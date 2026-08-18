@@ -121,7 +121,7 @@ def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
         for index in range(0, len(row) - 1, 2):
             values[_normalise_label(row[index])] = row[index + 1].strip()
 
-    return {
+    exam = {
         "province": values.get("il", ""),
         "district": values.get("ilce", ""),
         "schoolName": values.get("okul adi", ""),
@@ -141,6 +141,18 @@ def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
         "approvalInfo": values.get("iletim onay bilgisi", ""),
         "documentPage": values.get("belge sayfa no", ""),
     }
+    verified_labels = {
+        "province": "il", "district": "ilce", "schoolName": "okul adi",
+        "teacherName": "ogretmenin adi soyadi", "academicYear": "egitim ogretim yili",
+        "classSection": "sinif sube", "teachingProgram": "ogretim programi",
+        "assessmentBasis": "olcme ve degerlendirme dayanagi",
+    }
+    exam["verifiedMetadataFields"] = [
+        field for field, label in verified_labels.items() if values.get(label, "").strip()
+    ]
+    if exam["verifiedMetadataFields"]:
+        exam["metadataSource"] = "labeled-template"
+    return exam
 
 
 def _parse_questions(rows: list[list[str]]) -> list[dict[str, object]]:

@@ -10,6 +10,7 @@ from backend.app.approved_data_analyzer import (
     _strip_recommendation_sentences,
     analyze_approved_data,
 )
+from backend.app.agents.pipeline import _answer_matches_outcome_scope
 
 _FAKE_REMOTE_URL = "https://fake.example/web_query"
 
@@ -111,16 +112,50 @@ class RagContextAttachmentTests(unittest.TestCase):
         mock_query.assert_not_called()
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
-    def test_strong_outcome_is_not_queried(self):
+    def test_strong_outcome_gets_grounded_context(self):
         payload = _weak_tde_payload()
+        payload["exam"]["examType"] = "Dinleme/İzleme Sınavı"
+        payload["exam"]["componentType"] = "listening"
         payload["students"][0]["scores"] = [90]  # successRate 0.90 >= eşik (0.70)
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with _llm_patch() as mock_query:
+            with _llm_patch(side_effect=_llm_reply(("Seçili çıktı güçlü düzeydedir.", [{"documentName": "x"}]))) as mock_query:
                 result = analyze_approved_data(payload)
-        # Tek soruluk sınavda anomali prompt'u da kurulmuyor (örüntü için en az
-        # üç soru gerekli), yani kuyruk tamamen boş ve hiç tur atılmıyor.
-        mock_query.assert_not_called()
-        self.assertEqual(result["outcomes"][0]["ragContext"], "")
+        mock_query.assert_called_once()
+        prompt = _diagnosis_prompts(mock_query)[0]
+        self.assertIn("Dinleme/İzleme Sınavı", prompt["user"])
+        self.assertIn("TDE1.2", prompt["user"])
+        self.assertEqual(result["outcomes"][0]["ragContext"], "Seçili çıktı güçlü düzeydedir.")
+
+    def test_foreign_code_or_skill_is_rejected(self):
+        outcome = {
+            "outcomeCode": "TDE3.3", "componentType": "speaking",
+            "outcomeDescription": "konuşmada kural uygulayabilme",
+        }
+        self.assertFalse(_answer_matches_outcome_scope("TDE2.2.3 okuma becerileri eksiktir.", outcome))
+        self.assertTrue(_answer_matches_outcome_scope("TDE3.3 konuşma becerisi güçlüdür.", outcome))
+
+    def test_listening_rejects_interview_and_reading_drift(self):
+        outcome = {
+            "outcomeCode": "TDE1.2", "componentType": "listening",
+            "outcomeDescription": "dinlediği/izlediği metinde anlam oluşturabilme",
+        }
+        self.assertFalse(_answer_matches_outcome_scope("Öğrenciler mülakatta konuşur ve iletiyi belirler.", outcome))
+        self.assertTrue(_answer_matches_outcome_scope("Öğrenciler mülakat metnini dinleyerek iletiyi belirler.", outcome))
+        self.assertFalse(_answer_matches_outcome_scope("Okuma stratejileri uygulanmalıdır.", outcome))
+        self.assertTrue(_answer_matches_outcome_scope("Dinlediği metindeki açık ve örtük iletiyi belirler.", outcome))
+
+    def test_rejected_listening_drift_is_reported_without_the_unsafe_context(self):
+        payload = _weak_tde_payload()
+        payload["exam"]["examType"] = "Dinleme/İzleme Sınavı"
+        payload["exam"]["componentType"] = "listening"
+        canned = ("Öğrenciler mülakatta konuşarak açık ve örtük iletiyi belirler.", [{"documentName": "x"}])
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch("backend.app.agents.llm.run_agent_prompts", side_effect=_llm_reply(canned)):
+                result = analyze_approved_data(payload)
+        context = result["outcomes"][0]["ragContext"]
+        self.assertIn("doğrulanmış bir kaynak bağlamı oluşturulamadı", context)
+        self.assertNotIn("mülakat", context)
+        self.assertEqual(result["outcomes"][0]["ragSources"], [])
 
     def test_weak_registered_outcome_attaches_answer(self):
         canned = (
@@ -173,6 +208,21 @@ class RagContextAttachmentTests(unittest.TestCase):
         # Süreç bileşeni seçilmediğinde script.js üst kazanım metnini kazanımın
         # kendisiyle dolduruyor - aynı cümle iki kez gönderilmemeli.
         self.assertEqual(retrieval_query.count("metinlerde anlam oluşturabilme"), 1)
+
+    def test_process_component_query_carries_child_and_parent_outcome(self):
+        outcome = {
+            "outcomeTheme": "2. Tema: Anlam Arayışı",
+            "outcomeCode": "TDE2.2.3",
+            "outcomeDescription": "Çıkarım yapar.",
+            "parentOutcomeCode": "TDE2.2",
+            "parentOutcomeDescription": "Anlam oluşturabilme",
+            "outcomeSkill": "Okuma",
+        }
+        retrieval_query = _build_rag_retrieval_query(outcome)
+        self.assertIn("TDE2.2.3", retrieval_query)
+        self.assertIn("TDE2.2", retrieval_query)
+        self.assertIn("Çıkarım yapar", retrieval_query)
+        self.assertIn("Anlam oluşturabilme", retrieval_query)
 
     def test_no_answer_in_document_leaves_ragcontext_empty(self):
         canned = (True, "Yanıt üretildi.", {"answer": "Bu bilgi belgede bulunmuyor.", "sources": []})

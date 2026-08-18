@@ -38,7 +38,8 @@
     const align = options.align ? `<w:jc w:val="${options.align}"/>` : "";
     const keepNext = options.keepNext ? "<w:keepNext/>" : "";
     const spacing = `<w:spacing w:after="${options.after ?? 80}" w:line="${options.line ?? 252}" w:lineRule="auto"/>`;
-    return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${keepNext}${align}${spacing}</w:pPr><w:r><w:rPr>${bold}${color}${size}</w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
+    const content = escapeXml(text).replace(/\r?\n/g, '</w:t><w:br/><w:t xml:space="preserve">');
+    return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${keepNext}${align}${spacing}</w:pPr><w:r><w:rPr>${bold}${color}${size}</w:rPr><w:t xml:space="preserve">${content}</w:t></w:r></w:p>`;
   };
 
   const cell = (content, options = {}) => {
@@ -188,6 +189,45 @@
     return { filename, size: blob.size };
   };
 
-  window.MAHIRDocxExporter = { downloadReportDocx };
+  const officialLetterDocumentXml = (pkg) => {
+    const letter = pkg?.coverLetter || {};
+    const attachments = Array.isArray(pkg?.attachments) ? pkg.attachments : [];
+    const attachmentText = attachments.map((item) => `Ek-${item.order}: ${item.name}`).join("\n") || "—";
+    const body = [
+      paragraph("T.C.", "ReportTitle", { bold: true, align: "center", after: 30 }),
+      paragraph("MİLLÎ EĞİTİM BAKANLIĞI", "ReportTitle", { bold: true, align: "center", after: 30 }),
+      paragraph(letter.institutionName || "—", "ReportTitle", { bold: true, align: "center", after: 220 }),
+      tableXml([
+        ["Sayı", "—"],
+        ["Konu", letter.subject || "—"],
+        ["Tarih", "—"]
+      ], { widths: [16, 84] }),
+      paragraph(pkg?.routing?.addressee || "OKUL / KURUM MÜDÜRLÜĞÜNE", "ReportTitle", { bold: true, align: "center", after: 220 }),
+      paragraph(letter.body || "—", "Normal", { after: 260, line: 300 }),
+      paragraph("Bilgilerinizi ve gereğini arz ederim.", "Normal", { after: 300, line: 300 }),
+      paragraph(letter.signatoryName || "—", "Normal", { bold: true, align: "right", after: 20 }),
+      paragraph(letter.signatoryRole || "Öğretmen", "Normal", { align: "right", after: 260 }),
+      paragraph("Ekler:", "Normal", { bold: true, after: 20 }),
+      paragraph(attachmentText, "Normal", { after: 180 })
+    ].join("");
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${WORD_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body}<w:sectPr><w:footerReference w:type="default" r:id="rId1"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="900" w:right="1100" w:bottom="850" w:left="1100" w:header="480" w:footer="480"/></w:sectPr></w:body></w:document>`;
+  };
+
+  const downloadOfficialLetterDocx = async (pkg) => {
+    if (!pkg?.coverLetter) throw new Error("Üst yazı taslağı bulunamadı.");
+    const blob = buildZip([
+      { name: "[Content_Types].xml", content: contentTypesXml() },
+      { name: "_rels/.rels", content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>` },
+      { name: "word/document.xml", content: officialLetterDocumentXml(pkg) },
+      { name: "word/_rels/document.xml.rels", content: documentRelsXml() },
+      { name: "word/footer1.xml", content: footerXml() },
+      { name: "word/styles.xml", content: stylesXml() }
+    ]);
+    const filename = "MAHIR_EBYS_Ust_Yazi_Taslagi.docx";
+    triggerDownload(blob, filename);
+    return { filename, size: blob.size };
+  };
+
+  window.MAHIRDocxExporter = { downloadReportDocx, downloadOfficialLetterDocx };
 })();
 

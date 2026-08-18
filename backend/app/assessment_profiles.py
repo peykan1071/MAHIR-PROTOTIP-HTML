@@ -61,7 +61,10 @@ PROFILES = {
 
 
 def _normalized_course_name(course_name: str) -> str:
-    value = unicodedata.normalize("NFKC", str(course_name or "")).casefold().strip()
+    value = unicodedata.normalize("NFKC", str(course_name or "")).translate(
+        str.maketrans({"I": "ı", "İ": "i"})
+    )
+    value = value.casefold().strip()
     return " ".join(value.split())
 
 
@@ -117,7 +120,7 @@ def build_general_evaluation(
     skill_evidence: list[dict[str, Any]] = []
     for component in REQUIRED_COMPONENTS:
         analysis = component_analyses[component]
-        students = analysis.get("students") or []
+        students = analysis.get("cohortEvidence") or analysis.get("students") or []
         component_scores[component] = {
             str(student.get("studentRef")): float(student.get("calculatedTotal", 0))
             for student in students
@@ -154,6 +157,8 @@ def build_general_evaluation(
                     "weightedContribution": round(realization_rate * weight, 4),
                     "developmentLevel": outcome.get("developmentLevel", outcome.get("category", "")),
                     "decision": outcome.get("decision", ""),
+                    "ragContext": outcome.get("ragContext", ""),
+                    "ragSources": outcome.get("ragSources", []),
                 }
             )
 
@@ -161,6 +166,13 @@ def build_general_evaluation(
         sum(float(item["weightedContribution"]) for item in component_results.values()), 2
     )
     has_student_scores = all(component_scores[component] for component in REQUIRED_COMPONENTS)
+    if has_student_scores:
+        reference_students = set(component_scores[REQUIRED_COMPONENTS[0]])
+        if any(set(component_scores[component]) != reference_students for component in REQUIRED_COMPONENTS[1:]):
+            raise ValueError(
+                "Yüklenen raporlar aynı öğrenci grubuna ait değildir; takma öğrenci kodları "
+                "ve katılımcı sayıları birbiriyle uyuşmalıdır."
+            )
     composite = calculate_composite_scores(profile_id, component_scores) if has_student_scores else {
         "profileId": profile.id,
         "profileTitle": profile.title,
@@ -175,9 +187,10 @@ def build_general_evaluation(
         **composite,
         "assessmentScope": "language-composite",
         "summary": {
-            "classAverage": weighted_class_average,
-            "classSuccessRate": weighted_class_average / 100,
+            "classAverage": composite["classAverage"],
+            "classSuccessRate": composite["classAverage"] / 100,
             "componentCount": len(REQUIRED_COMPONENTS),
+            "participatingStudentCount": len(composite.get("studentScores") or {}),
         },
         "componentResults": component_results,
         "componentEvidence": skill_evidence,
@@ -194,14 +207,16 @@ def build_general_evaluation(
                 "componentLabel": item["componentLabel"],
                 "componentWeight": item["componentWeight"],
                 "weightedContribution": item["weightedContribution"],
+                "ragContext": item["ragContext"],
+                "ragSources": item["ragSources"],
             }
             for item in skill_evidence
         ],
         "questions": [],
         "notice": (
-            "Ağırlıklı sonuç sınıf düzeyindeki genel değerlendirmeyi; bileşen kanıtları ise "
-            "öğrenme çıktılarının kendi sınavlarındaki gerçekleşme düzeyini gösterir. "
-            "Bu rapor öğrenci bazlı e-Okul puanı hesaplamaz."
+            "Aynı öğrenci grubuna ait yazılı, dinleme/izleme ve konuşma puanları öğrenci "
+            "bazında belirlenen ağırlıklarla birleştirilmiş; sınıf ortalaması bu birleşik "
+            "puanlardan hesaplanmıştır. Öğrenme kanıtları her bileşenin kendi bağlamında korunur."
         ),
     }
 

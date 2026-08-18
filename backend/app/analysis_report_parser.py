@@ -7,11 +7,41 @@ import json
 import zipfile
 from io import BytesIO
 from typing import Any
+import unicodedata
 from xml.etree import ElementTree
 
 
 MANIFEST_PATH = "customXml/mahir-report.xml"
 MAX_MANIFEST_SIZE = 2 * 1024 * 1024
+
+
+def _normalize(value: object) -> str:
+    text = unicodedata.normalize("NFKD", str(value or "")).casefold()
+    text = "".join(character for character in text if not unicodedata.combining(character)).strip()
+    return " ".join(text.split())
+
+
+def _repair_legacy_component_type(payload: dict[str, Any]) -> None:
+    """Repair manifests whose exporter persisted a stale written component."""
+
+    analysis = payload.get("analysis") or {}
+    exam = payload.get("exam") or {}
+    skills = {
+        _normalize(outcome.get("outcomeSkill"))
+        for outcome in analysis.get("outcomes") or []
+        if isinstance(outcome, dict) and _normalize(outcome.get("outcomeSkill"))
+    }
+    if skills and skills <= {"dinleme/izleme", "dinleme", "izleme"}:
+        component, label = "listening", "Dinleme/İzleme Sınavı"
+    elif skills and skills <= {"konusma"}:
+        component, label = "speaking", "Konuşma Sınavı"
+    elif skills and skills <= {"okuma", "yazma"}:
+        component, label = "written", "Yazılı Sınav"
+    else:
+        return
+    analysis["componentType"] = component
+    exam["componentType"] = component
+    exam["examType"] = label
 
 
 def parse_analysis_report_docx(content: bytes) -> dict[str, Any]:
@@ -47,4 +77,5 @@ def parse_analysis_report_docx(content: bytes) -> dict[str, Any]:
         raise ValueError("MAHİR analiz raporunda sınav bağlamı veya analiz verisi eksik.")
     if "students" in payload["analysis"]:
         raise ValueError("Rapor, genel değerlendirme için gerekli veri minimizasyonu koşulunu sağlamıyor.")
+    _repair_legacy_component_type(payload)
     return payload

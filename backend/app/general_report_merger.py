@@ -23,7 +23,8 @@ REQUIRED_CONTEXT_FIELDS = {
 
 
 def _normalize(value: object) -> str:
-    text = unicodedata.normalize("NFKC", str(value or "")).casefold().strip()
+    text = unicodedata.normalize("NFKC", str(value or "")).translate(str.maketrans({"I": "ı", "İ": "i"}))
+    text = text.casefold().strip()
     return " ".join(text.split())
 
 
@@ -50,7 +51,7 @@ def merge_component_reports(
     for report in reports:
         exam = report["exam"]
         analysis = report["analysis"]
-        component = str(exam.get("componentType") or analysis.get("componentType") or "").strip()
+        component = str(analysis.get("componentType") or exam.get("componentType") or "").strip()
         if component not in REQUIRED_COMPONENTS:
             raise ValueError("Her rapor yazılı, dinleme/izleme veya konuşma bileşenlerinden birine ait olmalıdır.")
         if component in by_component:
@@ -98,5 +99,6 @@ def merge_component_reports(
         "examType": "Genel Değerlendirme",
         "assessmentScope": "language-composite",
         "weightingProfileId": profile.id,
+        "participatingStudentCount": len(general_analysis.get("studentScores") or {}),
     }
     return general_exam, general_analysis

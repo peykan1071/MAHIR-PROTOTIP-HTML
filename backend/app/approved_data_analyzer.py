@@ -77,7 +77,13 @@ def analyze_approved_data_traced(
 
     began = time.monotonic()
     analysis, trace = _analyze_and_trace(payload)
-    trace["totalMs"] = round((time.monotonic() - began) * 1000, 1)
+    measured_total = (time.monotonic() - began) * 1000
+    # Tek tek ajan süreleri ayrı ayrı ölçülüp yuvarlandığından çok hızlı yerel
+    # koşularda bunların toplamı, duvar saati ölçümünün yuvarlanmış değerini
+    # birkaç onda milisaniye aşabilir. İzde matematiksel olarak imkânsız bir
+    # görünüm oluşmaması için toplam süre en az ajan sürelerinin toplamıdır.
+    agent_total = sum(float(item.get("durationMs") or 0) for item in trace.get("agents", []))
+    trace["totalMs"] = round(max(measured_total, agent_total), 1)
     return analysis, trace
 
 
@@ -338,7 +344,7 @@ def _normalize_theme_for_rag(raw_theme: str) -> str:
 
 
 def _outcome_identity_parts(outcome: dict[str, Any]) -> list[str]:
-    """Tema + kod + kazanım metni + beceri - kod TEK BAŞINA asla yeterli değil,
+    """Tema + alt/ana kod + kazanım metni + beceri - kod TEK BAŞINA asla yeterli değil,
     aynı kod (ör. TDE1.2) dört TDE9 temasının her birinde farklı bir kazanıma
     karşılık geliyor. Kazanım metni (`outcomeDescription`, süreç bileşeni
     seçilmişse ayrıca üst kazanımın metni) müfredat PDF'iyle aynı dilde yazıldığı
@@ -357,6 +363,7 @@ def _outcome_identity_parts(outcome: dict[str, Any]) -> list[str]:
         for part in (
             outcome.get("outcomeTheme"),
             outcome.get("outcomeCode"),
+            outcome.get("parentOutcomeCode"),
             *unique_descriptions,
             outcome.get("outcomeSkill"),
         )
