@@ -8,6 +8,11 @@ const dataPath = path.resolve(__dirname, "..", "shared", "pilot", "tde9", "learn
 const payload = JSON.parse(fs.readFileSync(dataPath, "utf8"));
 const outcomes = payload.learning_outcomes;
 
+assert.equal(
+  payload.source.program,
+  "Ortaöğretim Türk Dili ve Edebiyatı Dersi Öğretim Programı (Hazırlık, 9, 10, 11 ve 12. Sınıflar) - Türkiye Yüzyılı Maarif Modeli"
+);
+
 assert.equal(outcomes.length, 54);
 assert.deepEqual(
   outcomes.reduce((counts, outcome) => {
@@ -42,17 +47,17 @@ assert.equal(
 );
 
 const revisedTitles = {
-  "tema1-tde3-4": "Söyleyiş inceliğinin konuşmasına etkisiyle ilgili süreci değerlendirebilme",
-  "tema1-tde4-4": "Edebî söyleyişin inceliğini yansıttığı yazısında yazma sürecini değerlendirebilme",
+  "tema1-tde3-4": "Söyleyiş inceliğinin konuşmasına etkisini yansıtabilme",
+  "tema1-tde4-4": "Edebî söyleyişin inceliğini yansıttığı yazısına yönelik değerlendirmelerini yansıtabilme",
   "tema2-tde3-3": "Konusunu ana düşünce etrafında detaylandırdığı konuşmasında kural uygulayabilme",
-  "tema2-tde3-4": "Konuşmasının içeriğinde kullandığı unsurların konuşmasına olan etkisine yönelik süreci değerlendirebilme",
-  "tema2-tde4-4": "Beğeni ve eleştirilerini dile getirdiği yazısına yönelik yazma sürecini değerlendirebilme",
-  "tema3-tde3-4": "Edebî metinlerdeki yapısal inceliklerin konuşmaya etkisine yönelik süreci değerlendirebilme",
-  "tema3-tde4-4": "Yapısını incelikle ördüğü yazısına yönelik yazma sürecini değerlendirebilme",
-  "tema4-tde1-4": "“Dilin Zenginliği” temasında ele alınan metinlerde dinleme/izleme sürecini değerlendirebilme",
-  "tema4-tde2-4": "“Dilin Zenginliği” temasında ele alınan metinlere yönelik okuma sürecini değerlendirebilme",
-  "tema4-tde3-4": "Kullandığı dil özelliklerinin konuşmasına etkisine yönelik süreci değerlendirebilme",
-  "tema4-tde4-4": "Beğeni ve eleştirilerini dile getirdiği yazısına yönelik yazma sürecini değerlendirebilme"
+  "tema2-tde3-4": "Konuşmasının içeriğinde kullandığı unsurların konuşmasına olan etkisini yansıtabilme",
+  "tema2-tde4-4": "Yazısına yönelik değerlendirmelerini konu ve diğer yazma unsurları bağlamında yansıtabilme",
+  "tema3-tde3-4": "Edebî metinlerdeki yapısal inceliklerin konuşmaya etkisine yönelik değerlendirmelerini yansıtabilme",
+  "tema3-tde4-4": "Yapısını incelikle ördüğü yazısına yönelik değerlendirmelerini yansıtabilme",
+  "tema4-tde1-4": "“Dilin Zenginliği” temasında ele alınan metinlere yönelik değerlendirmelerini yansıtabilme",
+  "tema4-tde2-4": "“Dilin Zenginliği” temasında ele alınan metinlere yönelik değerlendirmelerini yansıtabilme",
+  "tema4-tde3-4": "Kullandığı dil özelliklerinin konuşmasına etkisine yönelik değerlendirmelerini yansıtabilme",
+  "tema4-tde4-4": "Yazısına yönelik değerlendirmelerini üslup ve diğer yazma unsurları bağlamında yansıtabilme"
 };
 for (const [id, title] of Object.entries(revisedTitles)) {
   assert.equal(outcomes.find((outcome) => outcome.id === id).title, title);
