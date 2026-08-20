@@ -743,6 +743,26 @@ input[type="checkbox"] {
   cursor: pointer;
 }
 
+.outcome-combobox-option-heading {
+  display: block;
+}
+
+.outcome-combobox-indicators {
+  margin: 0.45rem 0 0 1.15rem;
+  padding: 0;
+  color: var(--color-text-muted, #52616b);
+  font-size: 0.88em;
+  line-height: 1.45;
+}
+
+.outcome-combobox-indicators li + li {
+  margin-top: 0.2rem;
+}
+
+.outcome-combobox-option[aria-selected="true"] .outcome-combobox-indicators {
+  color: inherit;
+}
+
 .outcome-combobox-option.is-active {
   color: var(--color-secondary);
   background: #e7f3f4;

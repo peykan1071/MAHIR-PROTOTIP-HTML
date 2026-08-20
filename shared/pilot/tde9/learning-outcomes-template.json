@@ -15,114 +15,2527 @@
     ]
   },
   "learning_outcomes": [
-    { "id": "tema1-tde1-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE1.1", "title": "“Sözün İnceliği” temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema1-tde1-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE1.2", "title": "“Sözün İnceliği” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema1-tde2-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE2.1", "title": "“Sözün İnceliği” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma", "processComponents": [
-      { "code": "TDE2.1.1", "title": "İnceler ve görüş oluşturur." },
-      { "code": "TDE2.1.2", "title": "Seçim yapar." }
-    ] },
-    { "id": "tema1-tde2-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE2.2", "title": "“Sözün İnceliği” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma", "processComponents": [
-      { "code": "TDE2.2.1", "title": "“Sözün İnceliği” temasında ele alınan metinlerden hareketle edebiyatın güzel sanatlarla ve diğer disiplinlerle ilişkisini ön bilgileriyle bağlantı kurarak belirler." },
-      { "code": "TDE2.2.2", "title": "“Sözün İnceliği” temasında başlık ve görsellerden hareketle metnin yazılış amacını tahmin ederek ele alınan metinlerdeki açık ve örtük iletiyi belirler." },
-      { "code": "TDE2.2.3", "title": "Metin öncesi tahminleriyle okuma içeriğini ve okuduğu metinleri taşıdıkları estetik değer, dil kullanımı vb. açılardan karşılaştırır." },
-      { "code": "TDE2.2.4", "title": "“Sözün İnceliği” temasında ele alınan metinlerden hareketle edebiyata ilişkin estetik, imge, sembol, hayal gücü, çağrışım vb. kavramları açıklayarak metnin konusunu, temasını, yardımcı ve ana düşüncesini, söz sanatlarını ve metin ile yazar arasındaki ilişkiyi belirleyerek çıkarım yapar." },
-      { "code": "TDE2.2.5", "title": "Söz sanatlarının metni zenginleştirmek ve etkileyici hâle getirmek için üstlendiği rolü fark eder ve metindeki gerçek-kurgu, öznel-nesnel ifadeleri ayırt ederek metinleri sınıflandırır." }
-    ] },
-    { "id": "tema1-tde3-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE3.1", "title": "Söyleyişin inceliğini kullanarak akıcı bir konuşma süreci yönetebilme", "skill": "Konuşma" },
-    { "id": "tema1-tde3-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE3.2", "title": "Muhatabını ikna etmek için söyleyiş inceliklerine yer veren bir konuşma içeriği oluşturabilme", "skill": "Konuşma" },
-    { "id": "tema1-tde3-3", "theme": "1. Tema: Sözün İnceliği", "code": "TDE3.3", "title": "Muhatabını ikna etmek için söyleyiş inceliklerine yer veren bir konuşmada kural uygulayabilme", "skill": "Konuşma" },
-    { "id": "tema1-tde3-4", "theme": "1. Tema: Sözün İnceliği", "code": "TDE3.4", "title": "Söyleyiş inceliğinin konuşmasına etkisiyle ilgili süreci değerlendirebilme", "skill": "Konuşma" },
-    { "id": "tema1-tde4-1", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.1", "title": "Edebî söyleyişin inceliğini yansıtmak için paragraf düzeyindeki bir yazısında süreci yönetebilme", "skill": "Yazma", "processComponents": [
-      { "code": "TDE4.1.1", "title": "Seçim yapar." }, { "code": "TDE4.1.2", "title": "İlişkiyi sürdürür." }
-    ] },
-    { "id": "tema1-tde4-2", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.2", "title": "Edebî söyleyişin inceliğini yansıtan metinlerden edindiği söz varlığını kullanarak yazısına içerik oluşturabilme", "skill": "Yazma", "processComponents": [
-      { "code": "TDE4.2.1", "title": "Ön bilgilerle bağlantı kurar." }, { "code": "TDE4.2.2", "title": "Tahmin eder." },
-      { "code": "TDE4.2.3", "title": "Karşılaştırır." }, { "code": "TDE4.2.4", "title": "Sınıflandırır." },
-      { "code": "TDE4.2.5", "title": "Yeniden ifade eder." }, { "code": "TDE4.2.6", "title": "Tepki verir." },
-      { "code": "TDE4.2.7", "title": "Görsel ögeleri kullanır." }, { "code": "TDE4.2.8", "title": "Sunar." }
-    ] },
-    { "id": "tema1-tde4-3", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.3", "title": "Edebî söyleyişin inceliğini yansıttığı yazısında kural uygulayabilme", "skill": "Yazma", "processComponents": [
-      { "code": "TDE4.3.1", "title": "Plan hazırlar." }, { "code": "TDE4.3.2", "title": "Düşünceyi geliştirme yollarını kullanır." },
-      { "code": "TDE4.3.3", "title": "Uygun söz varlığı kullanır." }, { "code": "TDE4.3.4", "title": "İletileri açık ve örtük biçimde ifade eder." },
-      { "code": "TDE4.3.5", "title": "Türkçe dil yapılarını uygular." }, { "code": "TDE4.3.6", "title": "Bağdaşıklık ögelerini kullanır." },
-      { "code": "TDE4.3.7", "title": "Yazım kurallarını uygular." }, { "code": "TDE4.3.8", "title": "Noktalama kurallarını uygular." }
-    ] },
-    { "id": "tema1-tde4-4", "theme": "1. Tema: Sözün İnceliği", "code": "TDE4.4", "title": "Edebî söyleyişin inceliğini yansıttığı yazısında yazma sürecini değerlendirebilme", "skill": "Yazma", "processComponents": [
-      { "code": "TDE4.4.1", "title": "Kendini değerlendirir." }, { "code": "TDE4.4.2", "title": "Tepki verir." }
-    ] },
-
-    { "id": "tema2-tde1-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE1.1", "title": "“Anlam Arayışı” temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema2-tde1-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE1.2", "title": "“Anlam Arayışı” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema2-tde2-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE2.1", "title": "“Anlam Arayışı” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma", "processComponents": [
-      { "code": "TDE2.1.1", "title": "İnceler ve görüş oluşturur." }, { "code": "TDE2.1.2", "title": "Seçim yapar." }
-    ] },
-    { "id": "tema2-tde2-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE2.2", "title": "“Anlam Arayışı” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma", "processComponents": [
-      { "code": "TDE2.2.1", "title": "Ön bilgilerle bağlantı kurar." }, { "code": "TDE2.2.2", "title": "Tahmin eder." },
-      { "code": "TDE2.2.3", "title": "Çıkarım yapar." }, { "code": "TDE2.2.4", "title": "Karşılaştırır." },
-      { "code": "TDE2.2.5", "title": "Sınıflandırır." }, { "code": "TDE2.2.6", "title": "Tepki verir." }
-    ] },
-    { "id": "tema2-tde3-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE3.1", "title": "Konusunu ana düşünce etrafında detaylandırdığı akıcı bir konuşma sürecini yönetebilme", "skill": "Konuşma" },
-    { "id": "tema2-tde3-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE3.2", "title": "Konusunu ana düşünce etrafında detaylandırdığı konuşma içeriğini oluşturabilme", "skill": "Konuşma" },
-    { "id": "tema2-tde3-3", "theme": "2. Tema: Anlam Arayışı", "code": "TDE3.3", "title": "Konusunu ana düşünce etrafında detaylandırdığı konuşmasında kural uygulayabilme", "skill": "Konuşma" },
-    { "id": "tema2-tde3-4", "theme": "2. Tema: Anlam Arayışı", "code": "TDE3.4", "title": "Konuşmasının içeriğinde kullandığı unsurların konuşmasına olan etkisine yönelik süreci değerlendirebilme", "skill": "Konuşma" },
-    { "id": "tema2-tde4-1", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.1", "title": "Konu zenginliği ve çeşitliliğini sağlayan edebî metinlerde yazma sürecini yönetebilme", "skill": "Yazma", "processComponents": [
-      { "code": "TDE4.1.1", "title": "Seçim yapar." }, { "code": "TDE4.1.2", "title": "İlişkiyi sürdürür." }
-    ] },
-    { "id": "tema2-tde4-2", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.2", "title": "Yazısını zenginleştirecek içerik oluşturabilme", "skill": "Yazma", "processComponents": [
-      { "code": "TDE4.2.1", "title": "Ön bilgilerle bağlantı kurar." }, { "code": "TDE4.2.2", "title": "Tahmin eder." },
-      { "code": "TDE4.2.3", "title": "Karşılaştırır." }, { "code": "TDE4.2.4", "title": "Sınıflandırır." },
-      { "code": "TDE4.2.5", "title": "Yeniden ifade eder." }, { "code": "TDE4.2.6", "title": "Tepki verir." },
-      { "code": "TDE4.2.7", "title": "Görsel ögeleri kullanır." }, { "code": "TDE4.2.8", "title": "Sunar." }
-    ] },
-    { "id": "tema2-tde4-3", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.3", "title": "Konu zenginliği ve çeşitliliğini sağlayan yazısında kural uygulayabilme", "skill": "Yazma", "processComponents": [
-      { "code": "TDE4.3.1", "title": "Plan hazırlar." }, { "code": "TDE4.3.2", "title": "Düşünceyi geliştirme yollarını kullanır." },
-      { "code": "TDE4.3.3", "title": "Uygun söz varlığı kullanır." }, { "code": "TDE4.3.4", "title": "İletileri açık ve örtük biçimde ifade eder." },
-      { "code": "TDE4.3.5", "title": "Türkçe dil yapılarını uygular." }, { "code": "TDE4.3.6", "title": "Bağdaşıklık ögelerini kullanır." },
-      { "code": "TDE4.3.7", "title": "Yazım kurallarını uygular." }, { "code": "TDE4.3.8", "title": "Noktalama kurallarını uygular." }
-    ] },
-    { "id": "tema2-tde4-4", "theme": "2. Tema: Anlam Arayışı", "code": "TDE4.4", "title": "Beğeni ve eleştirilerini dile getirdiği yazısına yönelik yazma sürecini değerlendirebilme", "skill": "Yazma", "processComponents": [
-      { "code": "TDE4.4.1", "title": "Kendini değerlendirir." }, { "code": "TDE4.4.2", "title": "Tepki verir." }
-    ] },
-
-    { "id": "tema3-tde1-1", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE1.1", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde dinleme/izlemeyi yönetebilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema3-tde1-2", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE1.2", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema3-tde1-3", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE1.3", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinleri çözümleyebilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema3-tde2-1", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE2.1", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma", "processComponents": [
-      { "code": "TDE2.1.1", "title": "İnceler ve görüş oluşturur." }, { "code": "TDE2.1.2", "title": "Seçim yapar." }
-    ] },
-    { "id": "tema3-tde2-2", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE2.2", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma", "processComponents": [
-      { "code": "TDE2.2.1", "title": "Ön bilgilerle bağlantı kurar." }, { "code": "TDE2.2.2", "title": "Tahmin eder." },
-      { "code": "TDE2.2.3", "title": "Çıkarım yapar." }, { "code": "TDE2.2.4", "title": "Karşılaştırır." },
-      { "code": "TDE2.2.5", "title": "Sınıflandırır." }, { "code": "TDE2.2.6", "title": "Tepki verir." }
-    ] },
-    { "id": "tema3-tde2-3", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE2.3", "title": "“Anlamın Yapı Taşları” temasında ele alınan metinleri çözümleyebilme", "skill": "Okuma", "processComponents": [
-      { "code": "TDE2.3.1", "title": "Parçaları belirler." }, { "code": "TDE2.3.2", "title": "Parçalar arasındaki ilişkileri belirler." },
-      { "code": "TDE2.3.3", "title": "Parçalar arasındaki etkileşimleri belirler." }
-    ] },
-    { "id": "tema3-tde3-1", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE3.1", "title": "Edebî metinlerde yapısal inceliklere odaklanan akıcı bir konuşma sürecini yönetebilme", "skill": "Konuşma" },
-    { "id": "tema3-tde3-2", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE3.2", "title": "Benzetme, karşılaştırma yaparak yapısal özellikleri ortaya koyduğu bir konuşma içeriği oluşturabilme", "skill": "Konuşma" },
-    { "id": "tema3-tde3-3", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE3.3", "title": "Benzetme, karşılaştırma yaparak yapısal özellikleri ortaya koyduğu bir konuşmada kural uygulayabilme", "skill": "Konuşma" },
-    { "id": "tema3-tde3-4", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE3.4", "title": "Edebî metinlerdeki yapısal inceliklerin konuşmaya etkisine yönelik süreci değerlendirebilme", "skill": "Konuşma" },
-    { "id": "tema3-tde4-1", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE4.1", "title": "Yapısını incelikle ördüğü bir yazılı anlatım sürecini yönetebilme", "skill": "Yazma" },
-    { "id": "tema3-tde4-2", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE4.2", "title": "Yapısı incelikle örülmüş edebî metinlerden edindiği söz varlığını kullanarak yazısı için içerik oluşturabilme", "skill": "Yazma" },
-    { "id": "tema3-tde4-3", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE4.3", "title": "Yapısını incelikle ördüğü yazısında kural uygulayabilme", "skill": "Yazma" },
-    { "id": "tema3-tde4-4", "theme": "3. Tema: Anlamın Yapı Taşları", "code": "TDE4.4", "title": "Yapısını incelikle ördüğü yazısına yönelik yazma sürecini değerlendirebilme", "skill": "Yazma" },
-
-    { "id": "tema4-tde1-1", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE1.1", "title": "“Dilin Zenginliği” temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema4-tde1-2", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE1.2", "title": "“Dilin Zenginliği” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema4-tde1-3", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE1.3", "title": "“Dilin Zenginliği” temasında ele alınan metinleri çözümleyebilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema4-tde1-4", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE1.4", "title": "“Dilin Zenginliği” temasında ele alınan metinlerde dinleme/izleme sürecini değerlendirebilme", "skill": "Dinleme/İzleme" },
-    { "id": "tema4-tde2-1", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE2.1", "title": "“Dilin Zenginliği” temasında ele alınan metinlerde okumayı yönetebilme", "skill": "Okuma" },
-    { "id": "tema4-tde2-2", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE2.2", "title": "“Dilin Zenginliği” temasında ele alınan metinlerde anlam oluşturabilme", "skill": "Okuma" },
-    { "id": "tema4-tde2-3", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE2.3", "title": "“Dilin Zenginliği” temasında ele alınan metinleri çözümleyebilme", "skill": "Okuma" },
-    { "id": "tema4-tde2-4", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE2.4", "title": "“Dilin Zenginliği” temasında ele alınan metinlere yönelik okuma sürecini değerlendirebilme", "skill": "Okuma" },
-    { "id": "tema4-tde3-1", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE3.1", "title": "Dilin zenginliğini kullandığı akıcı bir konuşma sürecini yönetebilme", "skill": "Konuşma" },
-    { "id": "tema4-tde3-2", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE3.2", "title": "Konusunu dilin zenginliğinden yararlanarak oluşturduğu konuşma içeriğini oluşturabilme", "skill": "Konuşma" },
-    { "id": "tema4-tde3-3", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE3.3", "title": "Konusunu dilin zenginliğinden yararlanarak oluşturduğu konuşmasında kural uygulayabilme", "skill": "Konuşma" },
-    { "id": "tema4-tde3-4", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE3.4", "title": "Kullandığı dil özelliklerinin konuşmasına etkisine yönelik süreci değerlendirebilme", "skill": "Konuşma" },
-    { "id": "tema4-tde4-1", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE4.1", "title": "Öz yaşam öyküsünü oluşturabilmek için bir yazılı anlatım sürecini yönetebilme", "skill": "Yazma" },
-    { "id": "tema4-tde4-2", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE4.2", "title": "Öz yaşam öyküsünü aktarmak için kendi üslup özelliklerini yansıtan bir yazılı anlatım içeriği oluşturabilme", "skill": "Yazma" },
-    { "id": "tema4-tde4-3", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE4.3", "title": "Öz yaşam öyküsünü aktarmak için kendi üslup özelliklerini yansıtan yazısında kural uygulayabilme", "skill": "Yazma" },
-    { "id": "tema4-tde4-4", "theme": "4. Tema: Dilin Zenginliği", "code": "TDE4.4", "title": "Beğeni ve eleştirilerini dile getirdiği yazısına yönelik yazma sürecini değerlendirebilme", "skill": "Yazma" }
+    {
+      "id": "tema1-tde1-1",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE1.1",
+      "title": "“Sözün İnceliği” temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Metni dinlemeye/izlemeye başlamadan önce dinleme/izleme amacını belirler.",
+            "Dinleme/izleme yapmadan önce metnin içerik ve türüne yönelik tahminlerde bulunur.",
+            "Dinleyeceği/izleyeceği metin için uygun dinleme/izleme yöntem ve stratejisi seçer."
+          ]
+        },
+        {
+          "code": "TDE1.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Dinleme/izleme kurallarını uygulayarak dinlemeyi/izlemeyi sürdürür."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde1-2",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE1.2",
+      "title": "“Sözün İnceliği” temasında ele alınan metinlerde anlam oluşturabilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "“Sözün İnceliği” temasında ele alınan dinleme/izleme metnindeki bilgiler ile ön bilgileri arasında bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE1.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metnin başlık ve görsellerinden hareketle metnin yazılış amacını tahmin eder."
+          ]
+        },
+        {
+          "code": "TDE1.2.3",
+          "title": "Çıkarım yapar.",
+          "indicators": [
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metinde açıkça sunulan bilgileri belirler.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metinden hareketle çıkarımlar yapar.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metinde açıkça ifade edilen neden-sonuç, koşul, varsayım bilgilerini belirler.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metnin konu ve/veya temasını belirler.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metnin yardımcı düşüncelerini belirler.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metinde ana düşünceyi duyguyu belirler.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metinde yazarın (senarist/yönetmen/şair) metni yazma amacını belirler.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metinde yer alan bilgilerin sunuluş şeklini inceler.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metindeki karakterlerin davranışlarından duygu ve düşüncelerine yönelik çıkarımlar yapar.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metin ile yazar (senarist/yönetmen/şair) arasındaki ilişkiyi belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.4",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "“Sözün İnceliği” temasında ele alınan metinde dinleme/izleme öncesi tahminleri ile metnin içeriğini karşılaştırır.",
+            "“Sözün İnceliği” temasında ele alınan dinlediği/izlediği metni belirlenen ölçütlere (içerik,tür, şekil, dönem, zihniyet, üslup, ileti) göre karşılaştırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde2-1",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE2.1",
+      "title": "“Sözün İnceliği” temasında ele alınan metinlerde okumayı yönetebilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.1.1",
+          "title": "İnceler ve görüş oluşturur.",
+          "indicators": [
+            "Metni okumaya başlamadan önce okuma amacını belirler.",
+            "Okumadan önce metnin içerik ve türüne yönelik tahminlerde bulunur."
+          ]
+        },
+        {
+          "code": "TDE2.1.2",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Okuyacağı metin için uygun okuma yöntem ve stratejisi seçer.",
+            "Seçtiği okuma stratejisi ile okumayı sürdürür."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde2-2",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE2.2",
+      "title": "“Sözün İnceliği” temasında ele alınan metinlerde anlam oluşturabilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "“Sözün İnceliği” temasında ele alınan metinlerden hareketle edebiyatın güzel sanatlarla ve diğer disiplinlerle ilişkisini ön bilgileriyle bağlantı kurarak belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "“Sözün İnceliği” temasında başlık ve görsellerden hareketle metnin yazılış amacını tahmin ederek ele alınan metinlerdeki açık ve örtük iletiyi belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.3",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Metin öncesi tahminleriyle okuma içeriğini ve okuduğu metinleri taşıdıkları estetik değer, dil kullanımı vb. açılardan karşılaştırır."
+          ]
+        },
+        {
+          "code": "TDE2.2.4",
+          "title": "Çıkarım yapar.",
+          "indicators": [
+            "“Sözün İnceliği” temasında ele alınan metinlerden hareketle edebiyata ilişkin estetik, imge, sembol, hayal gücü, çağrışım vb. kavramları açıklayarak metnin konusunu, temasını, yardımcı ve ana düşüncesini, söz sanatlarını ve metin ile yazar arasındaki ilişkiyi belirleyerek çıkarım yapar."
+          ]
+        },
+        {
+          "code": "TDE2.2.5",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Söz sanatlarının metni zenginleştirmek ve etkileyici hâle getirmek için üstlendiği rolü fark eder ve metindeki gerçek-kurgu, öznel-nesnel ifadeleri ayırt ederek metinleri sınıflandırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde3-1",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE3.1",
+      "title": "Söyleyişin inceliğini kullanarak akıcı bir konuşma süreci yönetebilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Konuşmasının amacına (ikna etme, bilgilendirme) karar verir.",
+            "Konuşmasının özelliklerini (hazırlıklı/hazırlıksız, süre, hedef kitle) belirler.",
+            "Konuşmanın türünü, yöntem ve stratejisini belirler."
+          ]
+        },
+        {
+          "code": "TDE3.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Konuşmasında engelleri ortadan kaldırır.",
+            "Konuşma amacına uygun olarak seçtiği stratejiyi yapılandırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde3-2",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE3.2",
+      "title": "Muhatabını ikna etmek için söyleyiş inceliklerine yer veren bir konuşma içeriği oluşturabilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Konuşmasında belirlediği amaca yönelik ön bilgileriyle bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE3.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Hedef kitlenin özelliklerine yönelik tahminlerde bulunarak konuşmasının giriş, gelişme ve sonuç bölümlerini tasarlar."
+          ]
+        },
+        {
+          "code": "TDE3.2.3",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Konuşmasının amacına uygun ana düşünceyi belirlerken karşılaştırma içeren iletiler oluşturur."
+          ]
+        },
+        {
+          "code": "TDE3.2.4",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Dilin kullanım alanına (özel, mesleki, kamusal alan ve eğitim alanı) göre konuşmasının içeriğini belirler."
+          ]
+        },
+        {
+          "code": "TDE3.2.5",
+          "title": "Yeniden ifade eder.",
+          "indicators": [
+            "Konuşmasının türüne göre bilgi toplar (Hazırlıklı konuşmada bilgi toplar, hazırlıksız konuşmada not alır.).",
+            "Söz varlığını kullanarak konuşmasının içeriğini düzenler."
+          ]
+        },
+        {
+          "code": "TDE3.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Konuşmasını planlarken dil işlevlerini kullanır."
+          ]
+        },
+        {
+          "code": "TDE3.2.7",
+          "title": "Sesle anlam oluşturur.",
+          "indicators": [
+            "Konuşmasında beden dilini doğru bir şekilde kullanacağını göz önünde bulundurur.",
+            "Konuşmasını diksiyon ve telaffuzu etkin bir şekilde kullanacak şekilde planlar."
+          ]
+        },
+        {
+          "code": "TDE3.2.8",
+          "title": "Görsel ögeleri kullanır.",
+          "indicators": [
+            "Konuşma içeriğini desteklemek için kullanacağı görsel ve işitsel ögelere karar verir."
+          ]
+        },
+        {
+          "code": "TDE3.2.9",
+          "title": "Sunar.",
+          "indicators": [
+            "Yapacağı konuşmanın plan taslağını sunar.",
+            "Aldığı geri bildirimler ile plan taslağına son şeklini verir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde3-3",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE3.3",
+      "title": "Muhatabını ikna etmek için söyleyiş inceliklerine yer veren bir konuşmada kural uygulayabilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.3.1",
+          "title": "Plan hazırlar.",
+          "indicators": [
+            "Konuşmasına planına uygun bir şekilde başlar.",
+            "Konuşmasını dikkat çekici bir girişle başlatır."
+          ]
+        },
+        {
+          "code": "TDE3.3.2",
+          "title": "Düşünceyi geliştirme yollarını kullanır.",
+          "indicators": [
+            "Konuşmasını desteklemek amacıyla düşünceyi geliştirme yollarını kullanır.",
+            "Duygu, düşünce ve hayallerini kendine özgü bir üslupla ifade eder."
+          ]
+        },
+        {
+          "code": "TDE3.3.3",
+          "title": "Uygun söz varlığı kullanır.",
+          "indicators": [
+            "Söz varlığını bağlama uygun şekilde kullanır.",
+            "Ana düşünce ve destekleyici bilgilerle konuşmasını sürdürür.",
+            "Konuşmasını hedef kitleye uygun bir söz varlığı ve üslupla sürdürür."
+          ]
+        },
+        {
+          "code": "TDE3.3.4",
+          "title": "İletileri açık ve örtük biçimde ifade eder.",
+          "indicators": [
+            "Vermek istediği iletileri açık veya örtük bir şekilde ifade eder.",
+            "Duygu, düşünce ve hayallerini tutarlı bir şekilde ifade eder.",
+            "Konuşmayı başlatma, sürdürme ve bitirme ifadelerini etkili kullanır.",
+            "Millî ve manevi değerlere ve kültürel unsurlara dikkat ederek konuşmasını sürdürür.",
+            "Konuşmasında toplumsal hassasiyet oluşturacak ögeler (siyaset, din, etnisite vb.) kullanmaktan kaçınır.",
+            "Konuşmasında olumlu tutum ve değerleri vurgular."
+          ]
+        },
+        {
+          "code": "TDE3.3.5",
+          "title": "Türkçe dil yapılarını uygular.",
+          "indicators": [
+            "Konuşmasında Türkçenin dil yapısını ve işlevini amacına uygun kullanır."
+          ]
+        },
+        {
+          "code": "TDE3.3.6",
+          "title": "Bağdaşıklık ögelerini kullanır.",
+          "indicators": [
+            "Konuşmasını bağdaşıklık ögelerine dikkat ederek yapar."
+          ]
+        },
+        {
+          "code": "TDE3.3.7",
+          "title": "Beden dilini ve mekânı kullanır.",
+          "indicators": [
+            "Konuşmasında beden dilini doğru bir şekilde kullanır.",
+            "Konuşmasında diksiyon ve telaffuzu etkin bir şekilde kullanır.",
+            "Konuşmasında mekânı etkin bir şekilde kullanır.",
+            "Konuşmasında zamanı verimli bir şekilde kullanır.",
+            "Konuşma sürecinde dinleyici ile etkileşim kurar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde3-4",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE3.4",
+      "title": "Söyleyiş inceliğinin konuşmasına etkisiyle ilgili süreci değerlendirebilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.4.1",
+          "title": "Kendini değerlendirir.",
+          "indicators": [
+            "Konuşma sürecindeki davranış, duygu ve düşüncelerini değerlendirir.",
+            "Konuşmasını içerik yönünden değerlendirir.",
+            "Konuşmasını dil ve anlatım yönünden değerlendirir.",
+            "Konuşmasını paydaşların görüşlerine göre değerlendirir."
+          ]
+        },
+        {
+          "code": "TDE3.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Genel geri bildirimlere bağlı olarak bundan sonra yapacağı konuşmalar için kendisine yeni hedefler belirler.",
+            "Özgün konuşmacı kimliğini oluşturur.",
+            "Konuşmasını dijital ortamlar için yeniden düzenleyebilir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde4-1",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE4.1",
+      "title": "Edebî söyleyişin inceliğini yansıtmak için paragraf düzeyindeki bir yazısında süreci yönetebilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Yazma amacına (ikna etme, bilgilendirme, resmî yazışma) karar verir.",
+            "Yazacağı metnin özelliklerini (süre, hedef kitle) belirler.",
+            "Yazacağı metnin türünü, kullanacağı yöntem ve stratejisini belirler."
+          ]
+        },
+        {
+          "code": "TDE4.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Yazma süreci ile ilgili engelleri ortadan kaldırır.",
+            "Yazma amacına uygun olarak seçtiği stratejiyi yapılandırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde4-2",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE4.2",
+      "title": "Edebî söyleyişin inceliğini yansıtan metinlerden edindiği söz varlığını kullanarak yazısına içerik oluşturabilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Yazma amacına yönelik ön bilgileriyle bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE4.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Hedef kitlenin özelliklerine yönelik tahminlerde bulunarak yazacağı metnin türünü ve içeriğini belirler.",
+            "Metnin türüne göre kullanacağı yapı unsurlarını belirler."
+          ]
+        },
+        {
+          "code": "TDE4.2.3",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Yazma amacı ve yazacağı metnin özelliklerine göre ana düşünceye ve vermek istediği iletiye karar verir.",
+            "Planını oluştururken karşılaştırma içeren iletiler oluşturur."
+          ]
+        },
+        {
+          "code": "TDE4.2.4",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Yazılı anlatımın kullanım alanına (özel, mesleki, eğitim ve kamusal) göre içeriğini belirler."
+          ]
+        },
+        {
+          "code": "TDE4.2.5",
+          "title": "Yeniden ifade eder.",
+          "indicators": [
+            "Söz varlığını kullanarak yazısının içeriğini düzenler."
+          ]
+        },
+        {
+          "code": "TDE4.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Yazma sürecini planlarken dil işlevlerinin kullanımına karar verir."
+          ]
+        },
+        {
+          "code": "TDE4.2.7",
+          "title": "Görsel ögeleri kullanır.",
+          "indicators": [
+            "Yazma içeriğini desteklemek için kullanacağı görsel ve işitsel ögelere karar verir."
+          ]
+        },
+        {
+          "code": "TDE4.2.8",
+          "title": "Sunar.",
+          "indicators": [
+            "Yazacağı metnin plan taslağını sunar.",
+            "Aldığı geri bildirimler ile plan taslağına son şeklini verir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde4-3",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE4.3",
+      "title": "Edebî söyleyişin inceliğini yansıttığı yazısında kural uygulayabilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.3.1",
+          "title": "Plan hazırlar.",
+          "indicators": [
+            "Yazmaya planına uygun bir şekilde başlar.",
+            "Yazısını dikkat çekici bir girişle başlatır."
+          ]
+        },
+        {
+          "code": "TDE4.3.2",
+          "title": "Düşünceyi geliştirme yollarını kullanır.",
+          "indicators": [
+            "Yazısını desteklemek amacıyla anlatım biçimi ve düşünceyi geliştirme yollarından yararlanır.",
+            "Duygu, düşünce ve hayallerini kendine özgü bir üslupla ifade eder."
+          ]
+        },
+        {
+          "code": "TDE4.3.3",
+          "title": "Uygun söz varlığı kullanır.",
+          "indicators": [
+            "Söz varlığını (deyim, atasözü, mecaz ve terim) bağlama uygun şekilde kullanır.",
+            "Ana düşünce ve destekleyici bilgilerle yazma sürecine devam eder.",
+            "Yazısını hedef kitleye uygun bir söz varlığı ve üslupla sürdürür."
+          ]
+        },
+        {
+          "code": "TDE4.3.4",
+          "title": "İletileri açık ve örtük biçimde ifade eder.",
+          "indicators": [
+            "Vermek istediği iletileri açık veya örtük bir şekilde ifade eder.",
+            "Duygu, düşünce ve hayallerini tutarlı bir şekilde ifade eder.",
+            "Yazmayı başlatma, sürdürme ve bitirme ifadelerini etkili kullanır.",
+            "Millî ve manevi değerler ile kültürel unsurlara dikkat ederek yazma sürecine devam eder.",
+            "Yazısında toplumsal hassasiyet oluşturacak ögeler (siyaset, din, etnisite vb.) kullanmaktan kaçınır.",
+            "Yazısının içeriğine uygun başlık belirler.",
+            "Yazısında olumlu tutum ve değerleri vurgular."
+          ]
+        },
+        {
+          "code": "TDE4.3.5",
+          "title": "Türkçe dil yapılarını uygular.",
+          "indicators": [
+            "Yazısında Türkçe dil yapılarını, işlevine uygun kullanır.",
+            "Türkçeyi bilinçli ve özenli (yabancı kelimelerin yerine Türkçelerini kullanması) kullanır."
+          ]
+        },
+        {
+          "code": "TDE4.3.6",
+          "title": "Bağdaşıklık ögelerini kullanır.",
+          "indicators": [
+            "Yazısını bağdaşıklık ögelerine dikkat ederek yazar."
+          ]
+        },
+        {
+          "code": "TDE4.3.7",
+          "title": "Yazım kurallarını uygular.",
+          "indicators": [
+            "Yazısında yazım kurallarını etkili bir şekilde kullanır."
+          ]
+        },
+        {
+          "code": "TDE4.3.8",
+          "title": "Noktalama kurallarını uygular.",
+          "indicators": [
+            "Yazısında noktalama kurallarını etkili bir şekilde kullanır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema1-tde4-4",
+      "theme": "1. Tema: Sözün İnceliği",
+      "code": "TDE4.4",
+      "title": "Edebî söyleyişin inceliğini yansıttığı yazısında yazma sürecini değerlendirebilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.4.1",
+          "title": "Kendini değerlendirir.",
+          "indicators": [
+            "Yazma sürecindeki davranış, duygu ve düşüncelerini değerlendirir.",
+            "Yazısını içerik yönünden değerlendirir.",
+            "Yazısını dil ve anlatım yönünden değerlendirir.",
+            "Yazısını paydaşların görüşlerine göre değerlendirir."
+          ]
+        },
+        {
+          "code": "TDE4.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Genel geri bildirimlere bağlı olarak bundan sonra yazacağı metin ile ilgili kendisine yeni hedefler belirler.",
+            "Özgün yazar kimliğini oluşturur.",
+            "Yazısını sınıf/okul panolarında ya da okulun resmî çevrim içi ortamlarında paylaşır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde1-1",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE1.1",
+      "title": "“Anlam Arayışı” temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Metni dinlemeye/izlemeye başlamadan önce dinleme/izleme amacını belirler.",
+            "Dinleme/izleme yapmadan önce metnin içerik ve türüne yönelik tahminlerde bulunur.",
+            "Dinleyeceği/izleyeceği metin için uygun dinleme/izleme yöntem ve stratejisi seçer."
+          ]
+        },
+        {
+          "code": "TDE1.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Dinleme/izleme kurallarını uygulayarak dinlemeyi/izlemeyi sürdürür."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde1-2",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE1.2",
+      "title": "“Anlam Arayışı” temasında ele alınan metinlerde anlam oluşturabilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Dinleme/izleme metnindeki bilgiler ile ön bilgileri arasında bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE1.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Dinlediği/izlediği metnin başlık ve görsellerinden hareketle metnin yazılış amacını tahmin eder.",
+            "Dinlediği/izlediği metindeki söz varlığının anlamını bağlamdan hareketle belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.3",
+          "title": "Çıkarım yapar.",
+          "indicators": [
+            "Dinlediği/izlediği metinde açıkça sunulan bilgileri belirler.",
+            "Dinlediği/izlediği metinlerden hareketle çıkarımlar yapar.",
+            "Dinlediği/izlediği metinde açıkça ifade edilen neden-sonuç, koşul, varsayım bilgilerini belirler.",
+            "Dinlediği/izlediği metnin konu ve/veya temasını belirler.",
+            "Dinlediği/izlediği metnin yardımcı düşüncelerini belirler.",
+            "Dinlediği/izlediği metinde ana düşünceyi/duyguyu belirler.",
+            "Dinlediği/izlediği metnin yazar (şair/senarist/yönetmen) tarafından yazılma amacını belirler.",
+            "Dinlediği/izlediği metinde yer alan bilgilerin sunuluş şeklini inceler.",
+            "Dinlediği/izlediği metindeki karakterlerin davranışlarından duygu ve düşüncelerine yönelik çıkarımlar yapar.",
+            "Dinlediği/izlediği metin ile yazar (senarist/yönetmen/şair) arasındaki ilişkiyi belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.4",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Metni dinleme/izleme sürecinden önce metne ilişkin tahminleri ile dinledikten/izledikten sonraki tespitlerini karşılaştırır.",
+            "Dinlediği/izlediği metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre karşılaştırır."
+          ]
+        },
+        {
+          "code": "TDE1.2.5",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Dinlediği/izlediği metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre sınıflandırır.",
+            "Dinlediği/izlediği metinde gerçek ve kurgu arasındaki farkı belirler.",
+            "Dinlediği/izlediği metindeki öznel ve nesnel ifadeleri ayırt eder.",
+            "Dinlediği/izlediği metindeki bilgilerin güvenilir olup olmadığını belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Dinlediği/izlediği metni özetler.",
+            "Dinlediği/izlediği metinlere yönelik geri bildirimler sunar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde2-1",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE2.1",
+      "title": "“Anlam Arayışı” temasında ele alınan metinlerde okumayı yönetebilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.1.1",
+          "title": "İnceler ve görüş oluşturur.",
+          "indicators": [
+            "Metni okumaya başlamadan önce okuma amacını belirler.",
+            "Okumadan önce metnin içerik ve türüne yönelik tahminlerde bulunur."
+          ]
+        },
+        {
+          "code": "TDE2.1.2",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Okuyacağı metin için uygun okuma yöntem ve stratejisi seçer.",
+            "Seçtiği okuma stratejisi ile okumayı sürdürür."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde2-2",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE2.2",
+      "title": "“Anlam Arayışı” temasında ele alınan metinlerde anlam oluşturabilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Okuma metnindeki bilgiler ile ön bilgileri arasında bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE2.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Okuyacağı metnin başlık ve görsellerinden hareketle metnin yazılış amacını tahmin eder.",
+            "Metindeki söz varlığının anlamını bağlamdan hareketle belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.3",
+          "title": "Çıkarım yapar.",
+          "indicators": [
+            "Metinde açıkça sunulan bilgileri belirler.",
+            "Metinlerden hareketle çıkarımlar yapar.",
+            "Metinde açıkça ifade edilen neden-sonuç, koşul, varsayım bilgilerini belirler.",
+            "Metnin konu ve/veya temasını belirler.",
+            "Metnin yardımcı düşüncelerini belirler.",
+            "Metnin ana düşüncesini/duygusunu belirler.",
+            "Yazarın metni yazma amacını belirler.",
+            "Metinde yer alan bilgilerin sunuluş şeklini inceler.",
+            "Metinde geçen söz sanatlarını belirler.",
+            "Metindeki karakterlerin davranışlarından duygu ve düşüncelerine yönelik çıkarımlar yapar.",
+            "Metin ile yazar arasındaki ilişkiyi belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.4",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Metin öncesi tahminleri ile okuma içeriğini karşılaştırır.",
+            "Okuduğu metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre karşılaştırır."
+          ]
+        },
+        {
+          "code": "TDE2.2.5",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Okuduğu metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre sınıflandırır.",
+            "Metindeki gerçek ve kurgu arasındaki farkı belirler.",
+            "Metindeki öznel ve nesnel ifadeleri ayırt eder.",
+            "Metindeki bilgilerin güvenilir olup olmadığını belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Metni özetler.",
+            "Okuduğu metinlere yönelik geri bildirimler sunar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde3-1",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE3.1",
+      "title": "Konusunu ana düşünce etrafında detaylandırdığı akıcı bir konuşma sürecini yönetebilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Konuşmasının amacına (ikna etme, bilgilendirme) karar verir.",
+            "Konuşmasının özelliklerini (hazırlıklı/hazırlıksız, süre, hedef kitle) belirler.",
+            "Konuşmanın türünü, yöntem ve stratejisini belirler."
+          ]
+        },
+        {
+          "code": "TDE3.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Konuşmasında engelleri ortadan kaldırır.",
+            "Konuşma amacına uygun olarak seçtiği stratejiyi yapılandırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde3-2",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE3.2",
+      "title": "Konusunu ana düşünce etrafında detaylandırdığı konuşma içeriğini oluşturabilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Konuşmasında belirlediği amaca yönelik ön bilgileriyle bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE3.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Hedef kitlenin özelliklerine yönelik tahminlerde bulunarak konuşmasının giriş, gelişme ve sonuç bölümlerini tasarlar."
+          ]
+        },
+        {
+          "code": "TDE3.2.3",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Konuşmasının amacına uygun ana düşünceyi belirlerken karşılaştırma içeren iletiler oluşturur."
+          ]
+        },
+        {
+          "code": "TDE3.2.4",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Dilin kullanım alanına (özel, mesleki, kamusal alan ve eğitim alanı) göre konuşmasının içeriğini belirler."
+          ]
+        },
+        {
+          "code": "TDE3.2.5",
+          "title": "Yeniden ifade eder.",
+          "indicators": [
+            "Konuşmasının türüne göre bilgi toplar (Hazırlıklı konuşmada bilgi toplar, hazırlıksız konuşmada not alır.).",
+            "Söz varlığını kullanarak konuşmasının içeriğini düzenler."
+          ]
+        },
+        {
+          "code": "TDE3.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Konuşmasını planlarken dil işlevlerini kullanır."
+          ]
+        },
+        {
+          "code": "TDE3.2.7",
+          "title": "Sesle anlam oluşturur.",
+          "indicators": [
+            "Konuşmasında beden dilini doğru bir şekilde kullanacağını göz önünde bulundurur.",
+            "Konuşmasını diksiyon ve telaffuzu etkin bir şekilde kullanacak şekilde planlar."
+          ]
+        },
+        {
+          "code": "TDE3.2.8",
+          "title": "Görsel ögeleri kullanır.",
+          "indicators": [
+            "Konuşma içeriğini desteklemek için kullanacağı görsel ve işitsel ögelere karar verir."
+          ]
+        },
+        {
+          "code": "TDE3.2.9",
+          "title": "Sunar.",
+          "indicators": [
+            "Yapacağı konuşmanın plan taslağını sunar.",
+            "Aldığı geri bildirimler ile plan taslağına son şeklini verir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde3-3",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE3.3",
+      "title": "Konusunu ana düşünce etrafında detaylandırdığı konuşmasında kural uygulayabilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.3.1",
+          "title": "Plan hazırlar.",
+          "indicators": [
+            "Konuşmasına planına uygun bir şekilde başlar.",
+            "Konuşmasını dikkat çekici bir girişle başlatır."
+          ]
+        },
+        {
+          "code": "TDE3.3.2",
+          "title": "Düşünceyi geliştirme yollarını kullanır.",
+          "indicators": [
+            "Konuşmasını desteklemek amacıyla düşünceyi geliştirme yollarını kullanır.",
+            "Duygu, düşünce ve hayallerini kendine özgü bir üslupla ifade eder."
+          ]
+        },
+        {
+          "code": "TDE3.3.3",
+          "title": "Uygun söz varlığı kullanır.",
+          "indicators": [
+            "Söz varlığını bağlama uygun şekilde kullanır.",
+            "Ana düşünce ve destekleyici bilgilerle konuşmasını sürdürür.",
+            "Konuşmasını hedef kitleye uygun bir söz varlığı ve üslupla sürdürür."
+          ]
+        },
+        {
+          "code": "TDE3.3.4",
+          "title": "İletileri açık ve örtük biçimde ifade eder.",
+          "indicators": [
+            "Vermek istediği iletileri açık veya örtük bir şekilde ifade eder.",
+            "Duygu, düşünce ve hayallerini tutarlı bir şekilde ifade eder.",
+            "Konuşmayı başlatma, sürdürme ve bitirme ifadelerini etkili kullanır.",
+            "Millî ve manevi değerlere ve kültürel unsurlara dikkat ederek konuşmasını sürdürür.",
+            "Konuşmasında toplumsal hassasiyet oluşturacak ögeler (siyaset, din, etnisite vb.) kullanmaktan kaçınır.",
+            "Konuşmasında olumlu tutum ve değerleri vurgular."
+          ]
+        },
+        {
+          "code": "TDE3.3.5",
+          "title": "Türkçe dil yapılarını uygular.",
+          "indicators": [
+            "Konuşmasında Türkçenin dil yapısını ve işlevini amacına uygun kullanır."
+          ]
+        },
+        {
+          "code": "TDE3.3.6",
+          "title": "Bağdaşıklık ögelerini kullanır.",
+          "indicators": [
+            "Konuşmasını bağdaşıklık ögelerine dikkat ederek yapar."
+          ]
+        },
+        {
+          "code": "TDE3.3.7",
+          "title": "Beden dilini ve mekânı kullanır.",
+          "indicators": [
+            "Konuşmasında beden dilini doğru bir şekilde kullanır.",
+            "Konuşmasında diksiyon ve telaffuzu etkin bir şekilde kullanır.",
+            "Konuşmasında mekânı etkin bir şekilde kullanır.",
+            "Konuşmasında zamanı verimli bir şekilde kullanır.",
+            "Konuşma sürecinde dinleyici ile etkileşim kurar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde3-4",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE3.4",
+      "title": "Konuşmasının içeriğinde kullandığı unsurların konuşmasına olan etkisine yönelik süreci değerlendirebilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.4.1",
+          "title": "Kendini değerlendirir.",
+          "indicators": [
+            "Konuşma sürecindeki davranış, duygu ve düşüncelerini değerlendirir.",
+            "Konuşmasını içerik yönünden değerlendirir.",
+            "Konuşmasını dil ve anlatım yönünden değerlendirir.",
+            "Konuşmasını paydaşların görüşlerine göre değerlendirir."
+          ]
+        },
+        {
+          "code": "TDE3.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Genel geri bildirimlere bağlı olarak bundan sonra yapacağı konuşmalar için kendisine yeni hedefler belirler.",
+            "Özgün konuşmacı kimliğini oluşturur.",
+            "Konuşmasını dijital ortamlar için yeniden düzenleyebilir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde4-1",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE4.1",
+      "title": "Konu zenginliği ve çeşitliliğini sağlayan edebî metinlerde yazma sürecini yönetebilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Yazma amacına (ikna etme, bilgilendirme, resmî yazışma) karar verir.",
+            "Yazacağı metnin özelliklerini (süre, hedef kitle) belirler.",
+            "Yazacağı metnin türünü, kullanacağı yöntem ve stratejisini belirler."
+          ]
+        },
+        {
+          "code": "TDE4.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Yazma süreci ile ilgili engelleri ortadan kaldırır.",
+            "Yazma amacına uygun olarak seçtiği stratejiyi yapılandırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde4-2",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE4.2",
+      "title": "Yazısını zenginleştirecek içerik oluşturabilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Yazma amacına yönelik ön bilgileriyle bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE4.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Hedef kitlenin özelliklerine yönelik tahminlerde bulunarak yazacağı metnin türünü ve içeriğini belirler.",
+            "Metnin türüne göre kullanacağı yapı unsurlarını belirler."
+          ]
+        },
+        {
+          "code": "TDE4.2.3",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Yazma amacı ve yazacağı metnin özelliklerine göre ana düşünceye ve vermek istediği iletiye karar verir.",
+            "Planını oluştururken karşılaştırma içeren iletiler oluşturur."
+          ]
+        },
+        {
+          "code": "TDE4.2.4",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Yazılı anlatımın kullanım alanına (özel, mesleki, eğitim ve kamusal) göre içeriğini belirler."
+          ]
+        },
+        {
+          "code": "TDE4.2.5",
+          "title": "Yeniden ifade eder.",
+          "indicators": [
+            "Söz varlığını kullanarak yazısının içeriğini düzenler."
+          ]
+        },
+        {
+          "code": "TDE4.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Yazma sürecini planlarken dil işlevlerinin kullanımına karar verir."
+          ]
+        },
+        {
+          "code": "TDE4.2.7",
+          "title": "Görsel ögeleri kullanır.",
+          "indicators": [
+            "Yazma içeriğini desteklemek için kullanacağı görsel ve işitsel ögelere karar verir."
+          ]
+        },
+        {
+          "code": "TDE4.2.8",
+          "title": "Sunar.",
+          "indicators": [
+            "Yazacağı metnin plan taslağını sunar.",
+            "Aldığı geri bildirimler ile plan taslağına son şeklini verir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde4-3",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE4.3",
+      "title": "Konu zenginliği ve çeşitliliğini sağlayan yazısında kural uygulayabilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.3.1",
+          "title": "Plan hazırlar.",
+          "indicators": [
+            "Yazmaya planına uygun bir şekilde başlar.",
+            "Yazısını dikkat çekici bir girişle başlatır."
+          ]
+        },
+        {
+          "code": "TDE4.3.2",
+          "title": "Düşünceyi geliştirme yollarını kullanır.",
+          "indicators": [
+            "Yazısını desteklemek amacıyla anlatım biçimi ve düşünceyi geliştirme yollarından yararlanır.",
+            "Duygu, düşünce ve hayallerini kendine özgü bir üslupla ifade eder."
+          ]
+        },
+        {
+          "code": "TDE4.3.3",
+          "title": "Uygun söz varlığı kullanır.",
+          "indicators": [
+            "Söz varlığını (deyim, atasözü, mecaz ve terim) bağlama uygun şekilde kullanır.",
+            "Ana düşünce ve destekleyici bilgilerle yazma sürecine devam eder.",
+            "Yazısını hedef kitleye uygun bir söz varlığı ve üslupla sürdürür."
+          ]
+        },
+        {
+          "code": "TDE4.3.4",
+          "title": "İletileri açık ve örtük biçimde ifade eder.",
+          "indicators": [
+            "Vermek istediği iletileri açık veya örtük bir şekilde ifade eder.",
+            "Duygu, düşünce ve hayallerini tutarlı bir şekilde ifade eder.",
+            "Yazmayı başlatma, sürdürme ve bitirme ifadelerini etkili kullanır.",
+            "Millî ve manevi değerler ile kültürel unsurlara dikkat ederek yazma sürecine devam eder.",
+            "Yazısında toplumsal hassasiyet oluşturacak ögeler (siyaset, din, etnisite vb.) kullanmaktan kaçınır.",
+            "Yazısının içeriğine uygun başlık belirler.",
+            "Yazısında olumlu tutum ve değerleri vurgular."
+          ]
+        },
+        {
+          "code": "TDE4.3.5",
+          "title": "Türkçe dil yapılarını uygular.",
+          "indicators": [
+            "Yazısında Türkçe dil yapılarını, işlevine uygun kullanır.",
+            "Türkçeyi bilinçli ve özenli (yabancı kelimelerin yerine Türkçelerini kullanması) kullanır."
+          ]
+        },
+        {
+          "code": "TDE4.3.6",
+          "title": "Bağdaşıklık ögelerini kullanır.",
+          "indicators": [
+            "Yazısını bağdaşıklık ögelerine dikkat ederek yazar."
+          ]
+        },
+        {
+          "code": "TDE4.3.7",
+          "title": "Yazım kurallarını uygular.",
+          "indicators": [
+            "Yazısında yazım kurallarını etkili bir şekilde kullanır."
+          ]
+        },
+        {
+          "code": "TDE4.3.8",
+          "title": "Noktalama kurallarını uygular.",
+          "indicators": [
+            "Yazısında noktalama kurallarını etkili bir şekilde kullanır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema2-tde4-4",
+      "theme": "2. Tema: Anlam Arayışı",
+      "code": "TDE4.4",
+      "title": "Beğeni ve eleştirilerini dile getirdiği yazısına yönelik yazma sürecini değerlendirebilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.4.1",
+          "title": "Kendini değerlendirir.",
+          "indicators": [
+            "Yazma sürecindeki davranış, duygu ve düşüncelerini değerlendirir.",
+            "Yazısını içerik yönünden değerlendirir.",
+            "Yazısını dil ve anlatım yönünden değerlendirir.",
+            "Yazısını paydaşların görüşlerine göre değerlendirir."
+          ]
+        },
+        {
+          "code": "TDE4.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Genel geri bildirimlere bağlı olarak bundan sonra yazacağı metin ile ilgili kendisine yeni hedefler belirler.",
+            "Özgün yazar kimliğini oluşturur.",
+            "Yazısını sınıf/okul panolarında ya da okulun resmî çevrim içi ortamlarında paylaşır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde1-1",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE1.1",
+      "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde dinleme/izlemeyi yönetebilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Metni dinlemeye/izlemeye başlamadan önce dinleme/izleme amacını belirler.",
+            "Dinleme/izleme yapmadan önce metnin içerik ve türüne yönelik tahminlerde bulunur.",
+            "Dinleyeceği/izleyeceği metin için uygun dinleme/izleme yöntem ve stratejisi seçer."
+          ]
+        },
+        {
+          "code": "TDE1.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Dinleme/izleme kurallarını uygulayarak dinlemeyi/izlemeyi sürdürür."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde1-2",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE1.2",
+      "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde anlam oluşturabilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Dinleme/izleme metnindeki bilgiler ile ön bilgileri arasında bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE1.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Dinlediği/izlediği metnin başlık ve görsellerinden hareketle metnin yazılış amacını tahmin eder.",
+            "Dinlediği/izlediği metindeki söz varlığının anlamını bağlamdan hareketle belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.3",
+          "title": "Çıkarım yapar.",
+          "indicators": [
+            "Dinlediği/izlediği metinde açıkça sunulan bilgileri belirler.",
+            "Dinlediği/izlediği metinlerden hareketle çıkarımlar yapar.",
+            "Dinlediği/izlediği metinde açıkça ifade edilen neden-sonuç, koşul, varsayım bilgilerini belirler.",
+            "Dinlediği/izlediği metnin konu ve/veya temasını belirler.",
+            "Dinlediği/izlediği metnin yardımcı düşüncelerini belirler.",
+            "Dinlediği/izlediği metinde ana düşünceyi/duyguyu belirler.",
+            "Dinlediği/izlediği metnin yazar (şair/senarist/yönetmen) tarafından yazılma amacını belirler.",
+            "Dinlediği/izlediği metinde yer alan bilgilerin sunuluş şeklini inceler.",
+            "Dinlediği/izlediği metindeki karakterlerin davranışlarından duygu ve düşüncelerine yönelik çıkarımlar yapar.",
+            "Dinlediği/izlediği metin ile yazar (senarist/yönetmen/şair) arasındaki ilişkiyi belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.4",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Metni dinleme/izleme sürecinden önce metne ilişkin tahminleri ile dinledikten/izledikten sonraki tespitlerini karşılaştırır.",
+            "Dinlediği/izlediği metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre karşılaştırır."
+          ]
+        },
+        {
+          "code": "TDE1.2.5",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Dinlediği/izlediği metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre sınıflandırır.",
+            "Dinlediği/izlediği metinde gerçek ve kurgu arasındaki farkı belirler.",
+            "Dinlediği/izlediği metindeki öznel ve nesnel ifadeleri ayırt eder.",
+            "Dinlediği/izlediği metindeki bilgilerin güvenilir olup olmadığını belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Dinlediği/izlediği metni özetler.",
+            "Dinlediği/izlediği metinlere yönelik geri bildirimler sunar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde1-3",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE1.3",
+      "title": "“Anlamın Yapı Taşları” temasında ele alınan metinleri çözümleyebilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.3.1",
+          "title": "Parçaları belirler.",
+          "indicators": [
+            "Dinlediği/izlediği metindeki karakterlerin özelliklerini, amaçlarını ve niyetlerini inceler.",
+            "Dinlediği/izlediği metindeki yapı unsurlarını belirler.",
+            "Dinlediği/izlediği metindeki dil ve anlatım özelliklerini belirler.",
+            "Dinlediği/izlediği metindeki dil işlevlerini belirler."
+          ]
+        },
+        {
+          "code": "TDE1.3.2",
+          "title": "Parçalar arasındaki ilişkileri belirler.",
+          "indicators": [
+            "Dinlediği/izlediği metni oluşturan şekil ve anlama dair birimler arasındaki ilişkileri belirler.",
+            "Dinlediği/izlediği metindeki yapı unsurları arasındaki ilişkileri belirler.",
+            "Yazarın (senarist/yönetmen/şair) üslup seçiminin nedenleri ve sonuçlarını açıklar.",
+            "Dinlediği/izlediği metinlerin yazıldığı dönemin özelliklerini açıklar.",
+            "Dinlediği/izlediği metnin yazarının (şair/senarist/yönetmen) özelliklerini açıklar.",
+            "Dinlediği/izlediği metnin içeriğinin, yapı unsurlarının, dil ve anlatım özelliklerinin metnin yazıldığı dönemle ve toplumla ilişkisini kurar."
+          ]
+        },
+        {
+          "code": "TDE1.3.3",
+          "title": "Parçalar arasındaki etkileşimleri belirler.",
+          "indicators": [
+            "Dinlediği/izlediği metni oluşturan şekil ve anlama dair birimlerin arasındaki etkileşimleri değerlendirir.",
+            "Dinlediği/izlediği metnin yapı unsurlarının metne olan katkısını değerlendirir.",
+            "Dinlediği/izlediği metnin yapı unsurları ile metnin içeriği arasındaki ilişkiden hareketle metnin yapı unsurlarının işlenişini değerlendirir.",
+            "Dinlediği/izlediği metnin dil ve anlatım özellikleri ile metnin içeriği arasındaki ilişkiden hareketle metinde kullanılan dil ve anlatım özelliklerini değerlendir.",
+            "Dinlediği/izlediği metin içindeki tutarsızlıkları ya da çatışmaları tespit ederek bunların metne olan etkisini değerlendirir.",
+            "Dinlediği/izlediği metni millî, manevi ve evrensel değerlerin aktarımı bağlamında değerlendirir.",
+            "Dinlediği/izlediği metnin içeriğinin, yapı unsurlarının, dil ve anlatım özelliklerinin metnin yazarıyla ilişkisini kurar.",
+            "Dinlediği/izlediği metnin diğer disiplinlerle olan ilişkisini değerlendirir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde2-1",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE2.1",
+      "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde okumayı yönetebilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.1.1",
+          "title": "İnceler ve görüş oluşturur.",
+          "indicators": [
+            "Metni okumaya başlamadan önce okuma amacını belirler.",
+            "Okumadan önce metnin içerik ve türüne yönelik tahminlerde bulunur."
+          ]
+        },
+        {
+          "code": "TDE2.1.2",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Okuyacağı metin için uygun okuma yöntem ve stratejisi seçer.",
+            "Seçtiği okuma stratejisi ile okumayı sürdürür."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde2-2",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE2.2",
+      "title": "“Anlamın Yapı Taşları” temasında ele alınan metinlerde anlam oluşturabilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Okuma metnindeki bilgiler ile ön bilgileri arasında bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE2.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Okuyacağı metnin başlık ve görsellerinden hareketle metnin yazılış amacını tahmin eder.",
+            "Metindeki söz varlığının anlamını bağlamdan hareketle belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.3",
+          "title": "Çıkarım yapar.",
+          "indicators": [
+            "Metinde açıkça sunulan bilgileri belirler.",
+            "Metinlerden hareketle çıkarımlar yapar.",
+            "Metinde açıkça ifade edilen neden-sonuç, koşul, varsayım bilgilerini belirler.",
+            "Metnin konu ve/veya temasını belirler.",
+            "Metnin yardımcı düşüncelerini belirler.",
+            "Metnin ana düşüncesini/duygusunu belirler.",
+            "Yazarın metni yazma amacını belirler.",
+            "Metinde yer alan bilgilerin sunuluş şeklini inceler.",
+            "Metinde geçen söz sanatlarını belirler.",
+            "Metindeki karakterlerin davranışlarından duygu ve düşüncelerine yönelik çıkarımlar yapar.",
+            "Metin ile yazar arasındaki ilişkiyi belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.4",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Metin öncesi tahminleri ile okuma içeriğini karşılaştırır.",
+            "Okuduğu metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre karşılaştırır."
+          ]
+        },
+        {
+          "code": "TDE2.2.5",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Okuduğu metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre sınıflandırır.",
+            "Metindeki gerçek ve kurgu arasındaki farkı belirler.",
+            "Metindeki öznel ve nesnel ifadeleri ayırt eder.",
+            "Metindeki bilgilerin güvenilir olup olmadığını belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Metni özetler.",
+            "Okuduğu metinlere yönelik geri bildirimler sunar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde2-3",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE2.3",
+      "title": "“Anlamın Yapı Taşları” temasında ele alınan metinleri çözümleyebilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.3.1",
+          "title": "Parçaları belirler.",
+          "indicators": [
+            "Metindeki karakterlerin özelliklerini, amaçlarını ve niyetlerini inceler.",
+            "Metindeki yapı unsurlarını belirler.",
+            "Metindeki dil ve anlatım özelliklerini belirler.",
+            "Metindeki dil işlevlerini belirler."
+          ]
+        },
+        {
+          "code": "TDE2.3.2",
+          "title": "Parçalar arasındaki ilişkileri belirler.",
+          "indicators": [
+            "Okuduğu metni oluşturan şekil ve anlama dair birimler arasındaki ilişkileri belirler.",
+            "Metindeki yapı unsurları arasındaki ilişkileri belirler.",
+            "Yazarın üslup seçiminin nedenleri ve sonuçlarını açıklar.",
+            "Metinlerin yazıldığı dönemin özelliklerini açıklar.",
+            "Metnin yazarının özelliklerini açıklar.",
+            "Metnin içeriğinin, yapı unsurlarının, dil ve anlatım özelliklerinin metnin yazıldığı dönemle ve toplumla ilişkisini kurar."
+          ]
+        },
+        {
+          "code": "TDE2.3.3",
+          "title": "Parçalar arasındaki etkileşimleri belirler.",
+          "indicators": [
+            "Okuduğu metni oluşturan şekil ve anlama dair birimlerin arasındaki etkileşimleri değerlendirir.",
+            "Metnin yapı unsurlarının metne olan katkısını değerlendirir.",
+            "Metnin yapı unsurları ile metnin içeriği arasındaki ilişkiden hareketle metnin yapı unsurlarının işlenişini değerlendirir.",
+            "Metnin dil ve anlatım özellikleri ile metnin içeriği arasındaki ilişkiden hareketle metinde kullanılan dil ve anlatım özelliklerini değerlendirir.",
+            "Metin içindeki tutarsızlıkları ya da çatışmaları tespit ederek bunların metne olan etkisini değerlendirir.",
+            "Metni millî, manevi ve evrensel değerlerin aktarımı bağlamında değerlendirir.",
+            "Metnin içeriğinin, yapı unsurlarının, dil ve anlatım özelliklerinin metnin yazarıyla ilişkisini kurar.",
+            "Metnin diğer disiplinlerle olan ilişkisini değerlendirir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde3-1",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE3.1",
+      "title": "Edebî metinlerde yapısal inceliklere odaklanan akıcı bir konuşma sürecini yönetebilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Konuşmasının amacına (ikna etme, bilgilendirme) karar verir.",
+            "Konuşmasının özelliklerini (hazırlıklı/hazırlıksız, süre, hedef kitle) belirler.",
+            "Konuşmanın türünü, yöntem ve stratejisini belirler."
+          ]
+        },
+        {
+          "code": "TDE3.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Konuşmasında engelleri ortadan kaldırır.",
+            "Konuşma amacına uygun olarak seçtiği stratejiyi yapılandırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde3-2",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE3.2",
+      "title": "Benzetme, karşılaştırma yaparak yapısal özellikleri ortaya koyduğu bir konuşma içeriği oluşturabilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Konuşmasında belirlediği amaca yönelik ön bilgileriyle bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE3.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Hedef kitlenin özelliklerine yönelik tahminlerde bulunarak konuşmasının giriş, gelişme ve sonuç bölümlerini tasarlar."
+          ]
+        },
+        {
+          "code": "TDE3.2.3",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Konuşmasının amacına uygun ana düşünceyi belirlerken karşılaştırma içeren iletiler oluşturur."
+          ]
+        },
+        {
+          "code": "TDE3.2.4",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Dilin kullanım alanına (özel, mesleki, kamusal alan ve eğitim alanı) göre konuşmasının içeriğini belirler."
+          ]
+        },
+        {
+          "code": "TDE3.2.5",
+          "title": "Yeniden ifade eder.",
+          "indicators": [
+            "Konuşmasının türüne göre bilgi toplar (Hazırlıklı konuşmada bilgi toplar, hazırlıksız konuşmada not alır.).",
+            "Söz varlığını kullanarak konuşmasının içeriğini düzenler."
+          ]
+        },
+        {
+          "code": "TDE3.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Konuşmasını planlarken dil işlevlerini kullanır."
+          ]
+        },
+        {
+          "code": "TDE3.2.7",
+          "title": "Sesle anlam oluşturur.",
+          "indicators": [
+            "Konuşmasında beden dilini doğru bir şekilde kullanacağını göz önünde bulundurur.",
+            "Konuşmasını diksiyon ve telaffuzu etkin bir şekilde kullanacak şekilde planlar."
+          ]
+        },
+        {
+          "code": "TDE3.2.8",
+          "title": "Görsel ögeleri kullanır.",
+          "indicators": [
+            "Konuşma içeriğini desteklemek için kullanacağı görsel ve işitsel ögelere karar verir."
+          ]
+        },
+        {
+          "code": "TDE3.2.9",
+          "title": "Sunar.",
+          "indicators": [
+            "Yapacağı konuşmanın plan taslağını sunar.",
+            "Aldığı geri bildirimler ile plan taslağına son şeklini verir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde3-3",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE3.3",
+      "title": "Benzetme, karşılaştırma yaparak yapısal özellikleri ortaya koyduğu bir konuşmada kural uygulayabilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.3.1",
+          "title": "Plan hazırlar.",
+          "indicators": [
+            "Konuşmasına planına uygun bir şekilde başlar.",
+            "Konuşmasını dikkat çekici bir girişle başlatır."
+          ]
+        },
+        {
+          "code": "TDE3.3.2",
+          "title": "Düşünceyi geliştirme yollarını kullanır.",
+          "indicators": [
+            "Konuşmasını desteklemek amacıyla düşünceyi geliştirme yollarını kullanır.",
+            "Duygu, düşünce ve hayallerini kendine özgü bir üslupla ifade eder."
+          ]
+        },
+        {
+          "code": "TDE3.3.3",
+          "title": "Uygun söz varlığı kullanır.",
+          "indicators": [
+            "Söz varlığını bağlama uygun şekilde kullanır.",
+            "Ana düşünce ve destekleyici bilgilerle konuşmasını sürdürür.",
+            "Konuşmasını hedef kitleye uygun bir söz varlığı ve üslupla sürdürür."
+          ]
+        },
+        {
+          "code": "TDE3.3.4",
+          "title": "İletileri açık ve örtük biçimde ifade eder.",
+          "indicators": [
+            "Vermek istediği iletileri açık veya örtük bir şekilde ifade eder.",
+            "Duygu, düşünce ve hayallerini tutarlı bir şekilde ifade eder.",
+            "Konuşmayı başlatma, sürdürme ve bitirme ifadelerini etkili kullanır.",
+            "Millî ve manevi değerlere ve kültürel unsurlara dikkat ederek konuşmasını sürdürür.",
+            "Konuşmasında toplumsal hassasiyet oluşturacak ögeler (siyaset, din, etnisite vb.) kullanmaktan kaçınır.",
+            "Konuşmasında olumlu tutum ve değerleri vurgular."
+          ]
+        },
+        {
+          "code": "TDE3.3.5",
+          "title": "Türkçe dil yapılarını uygular.",
+          "indicators": [
+            "Konuşmasında Türkçenin dil yapısını ve işlevini amacına uygun kullanır."
+          ]
+        },
+        {
+          "code": "TDE3.3.6",
+          "title": "Bağdaşıklık ögelerini kullanır.",
+          "indicators": [
+            "Konuşmasını bağdaşıklık ögelerine dikkat ederek yapar."
+          ]
+        },
+        {
+          "code": "TDE3.3.7",
+          "title": "Beden dilini ve mekânı kullanır.",
+          "indicators": [
+            "Konuşmasında beden dilini doğru bir şekilde kullanır.",
+            "Konuşmasında diksiyon ve telaffuzu etkin bir şekilde kullanır.",
+            "Konuşmasında mekânı etkin bir şekilde kullanır.",
+            "Konuşmasında zamanı verimli bir şekilde kullanır.",
+            "Konuşma sürecinde dinleyici ile etkileşim kurar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde3-4",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE3.4",
+      "title": "Edebî metinlerdeki yapısal inceliklerin konuşmaya etkisine yönelik süreci değerlendirebilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.4.1",
+          "title": "Kendini değerlendirir.",
+          "indicators": [
+            "Konuşma sürecindeki davranış, duygu ve düşüncelerini değerlendirir.",
+            "Konuşmasını içerik yönünden değerlendirir.",
+            "Konuşmasını dil ve anlatım yönünden değerlendirir.",
+            "Konuşmasını paydaşların görüşlerine göre değerlendirir."
+          ]
+        },
+        {
+          "code": "TDE3.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Genel geri bildirimlere bağlı olarak bundan sonra yapacağı konuşmalar için kendisine yeni hedefler belirler.",
+            "Özgün konuşmacı kimliğini oluşturur.",
+            "Konuşmasını dijital ortamlar için yeniden düzenleyebilir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde4-1",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE4.1",
+      "title": "Yapısını incelikle ördüğü bir yazılı anlatım sürecini yönetebilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Yazma amacına (ikna etme, bilgilendirme, resmî yazışma) karar verir.",
+            "Yazacağı metnin özelliklerini (süre, hedef kitle) belirler.",
+            "Yazacağı metnin türünü, kullanacağı yöntem ve stratejisini belirler."
+          ]
+        },
+        {
+          "code": "TDE4.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Yazma süreci ile ilgili engelleri ortadan kaldırır.",
+            "Yazma amacına uygun olarak seçtiği stratejiyi yapılandırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde4-2",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE4.2",
+      "title": "Yapısı incelikle örülmüş edebî metinlerden edindiği söz varlığını kullanarak yazısı için içerik oluşturabilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Yazma amacına yönelik ön bilgileriyle bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE4.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Hedef kitlenin özelliklerine yönelik tahminlerde bulunarak yazacağı metnin türünü ve içeriğini belirler.",
+            "Metnin türüne göre kullanacağı yapı unsurlarını belirler."
+          ]
+        },
+        {
+          "code": "TDE4.2.3",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Yazma amacı ve yazacağı metnin özelliklerine göre ana düşünceye ve vermek istediği iletiye karar verir.",
+            "Planını oluştururken karşılaştırma içeren iletiler oluşturur."
+          ]
+        },
+        {
+          "code": "TDE4.2.4",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Yazılı anlatımın kullanım alanına (özel, mesleki, eğitim ve kamusal) göre içeriğini belirler."
+          ]
+        },
+        {
+          "code": "TDE4.2.5",
+          "title": "Yeniden ifade eder.",
+          "indicators": [
+            "Söz varlığını kullanarak yazısının içeriğini düzenler."
+          ]
+        },
+        {
+          "code": "TDE4.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Yazma sürecini planlarken dil işlevlerinin kullanımına karar verir."
+          ]
+        },
+        {
+          "code": "TDE4.2.7",
+          "title": "Görsel ögeleri kullanır.",
+          "indicators": [
+            "Yazma içeriğini desteklemek için kullanacağı görsel ve işitsel ögelere karar verir."
+          ]
+        },
+        {
+          "code": "TDE4.2.8",
+          "title": "Sunar.",
+          "indicators": [
+            "Yazacağı metnin plan taslağını sunar.",
+            "Aldığı geri bildirimler ile plan taslağına son şeklini verir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde4-3",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE4.3",
+      "title": "Yapısını incelikle ördüğü yazısında kural uygulayabilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.3.1",
+          "title": "Plan hazırlar.",
+          "indicators": [
+            "Yazmaya planına uygun bir şekilde başlar.",
+            "Yazısını dikkat çekici bir girişle başlatır."
+          ]
+        },
+        {
+          "code": "TDE4.3.2",
+          "title": "Düşünceyi geliştirme yollarını kullanır.",
+          "indicators": [
+            "Yazısını desteklemek amacıyla anlatım biçimi ve düşünceyi geliştirme yollarından yararlanır.",
+            "Duygu, düşünce ve hayallerini kendine özgü bir üslupla ifade eder."
+          ]
+        },
+        {
+          "code": "TDE4.3.3",
+          "title": "Uygun söz varlığı kullanır.",
+          "indicators": [
+            "Söz varlığını (deyim, atasözü, mecaz ve terim) bağlama uygun şekilde kullanır.",
+            "Ana düşünce ve destekleyici bilgilerle yazma sürecine devam eder.",
+            "Yazısını hedef kitleye uygun bir söz varlığı ve üslupla sürdürür."
+          ]
+        },
+        {
+          "code": "TDE4.3.4",
+          "title": "İletileri açık ve örtük biçimde ifade eder.",
+          "indicators": [
+            "Vermek istediği iletileri açık veya örtük bir şekilde ifade eder.",
+            "Duygu, düşünce ve hayallerini tutarlı bir şekilde ifade eder.",
+            "Yazmayı başlatma, sürdürme ve bitirme ifadelerini etkili kullanır.",
+            "Millî ve manevi değerler ile kültürel unsurlara dikkat ederek yazma sürecine devam eder.",
+            "Yazısında toplumsal hassasiyet oluşturacak ögeler (siyaset, din, etnisite vb.) kullanmaktan kaçınır.",
+            "Yazısının içeriğine uygun başlık belirler.",
+            "Yazısında olumlu tutum ve değerleri vurgular."
+          ]
+        },
+        {
+          "code": "TDE4.3.5",
+          "title": "Türkçe dil yapılarını uygular.",
+          "indicators": [
+            "Yazısında Türkçe dil yapılarını, işlevine uygun kullanır.",
+            "Türkçeyi bilinçli ve özenli (yabancı kelimelerin yerine Türkçelerini kullanması) kullanır."
+          ]
+        },
+        {
+          "code": "TDE4.3.6",
+          "title": "Bağdaşıklık ögelerini kullanır.",
+          "indicators": [
+            "Yazısını bağdaşıklık ögelerine dikkat ederek yazar."
+          ]
+        },
+        {
+          "code": "TDE4.3.7",
+          "title": "Yazım kurallarını uygular.",
+          "indicators": [
+            "Yazısında yazım kurallarını etkili bir şekilde kullanır."
+          ]
+        },
+        {
+          "code": "TDE4.3.8",
+          "title": "Noktalama kurallarını uygular.",
+          "indicators": [
+            "Yazısında noktalama kurallarını etkili bir şekilde kullanır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema3-tde4-4",
+      "theme": "3. Tema: Anlamın Yapı Taşları",
+      "code": "TDE4.4",
+      "title": "Yapısını incelikle ördüğü yazısına yönelik yazma sürecini değerlendirebilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.4.1",
+          "title": "Kendini değerlendirir.",
+          "indicators": [
+            "Yazma sürecindeki davranış, duygu ve düşüncelerini değerlendirir.",
+            "Yazısını içerik yönünden değerlendirir.",
+            "Yazısını dil ve anlatım yönünden değerlendirir.",
+            "Yazısını paydaşların görüşlerine göre değerlendirir."
+          ]
+        },
+        {
+          "code": "TDE4.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Genel geri bildirimlere bağlı olarak bundan sonra yazacağı metin ile ilgili kendisine yeni hedefler belirler.",
+            "Özgün yazar kimliğini oluşturur.",
+            "Yazısını sınıf/okul panolarında ya da okulun resmî çevrim içi ortamlarında paylaşır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde1-1",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE1.1",
+      "title": "“Dilin Zenginliği” temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Metni dinlemeye/izlemeye başlamadan önce dinleme/izleme amacını belirler.",
+            "Dinleme/izleme yapmadan önce metnin içerik ve türüne yönelik tahminlerde bulunur.",
+            "Dinleyeceği/izleyeceği metin için uygun dinleme/izleme yöntem ve stratejisi seçer."
+          ]
+        },
+        {
+          "code": "TDE1.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Dinleme/izleme kurallarını uygulayarak dinlemeyi/izlemeyi sürdürür."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde1-2",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE1.2",
+      "title": "“Dilin Zenginliği” temasında ele alınan metinlerde anlam oluşturabilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Dinleme/izleme metnindeki bilgiler ile ön bilgileri arasında bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE1.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Dinlediği/izlediği metnin başlık ve görsellerinden hareketle metnin yazılış amacını tahmin eder.",
+            "Dinlediği/izlediği metindeki söz varlığının anlamını bağlamdan hareketle belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.3",
+          "title": "Çıkarım yapar.",
+          "indicators": [
+            "Dinlediği/izlediği metinde açıkça sunulan bilgileri belirler.",
+            "Dinlediği/izlediği metinlerden hareketle çıkarımlar yapar.",
+            "Dinlediği/izlediği metinde açıkça ifade edilen neden-sonuç, koşul, varsayım bilgilerini belirler.",
+            "Dinlediği/izlediği metnin konu ve/veya temasını belirler.",
+            "Dinlediği/izlediği metnin yardımcı düşüncelerini belirler.",
+            "Dinlediği/izlediği metinde ana düşünceyi/duyguyu belirler.",
+            "Dinlediği/izlediği metnin yazar (şair/senarist/yönetmen) tarafından yazılma amacını belirler.",
+            "Dinlediği/izlediği metinde yer alan bilgilerin sunuluş şeklini inceler.",
+            "Dinlediği/izlediği metindeki karakterlerin davranışlarından duygu ve düşüncelerine yönelik çıkarımlar yapar.",
+            "Dinlediği/izlediği metin ile yazar (senarist/yönetmen/şair) arasındaki ilişkiyi belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.4",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Metni dinleme/izleme sürecinden önce metne ilişkin tahminleri ile dinledikten/izledikten sonraki tespitlerini karşılaştırır.",
+            "Dinlediği/izlediği metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre karşılaştırır."
+          ]
+        },
+        {
+          "code": "TDE1.2.5",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Dinlediği/izlediği metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre sınıflandırır.",
+            "Dinlediği/izlediği metinde gerçek ve kurgu arasındaki farkı belirler.",
+            "Dinlediği/izlediği metindeki öznel ve nesnel ifadeleri ayırt eder.",
+            "Dinlediği/izlediği metindeki bilgilerin güvenilir olup olmadığını belirler."
+          ]
+        },
+        {
+          "code": "TDE1.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Dinlediği/izlediği metni özetler.",
+            "Dinlediği/izlediği metinlere yönelik geri bildirimler sunar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde1-3",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE1.3",
+      "title": "“Dilin Zenginliği” temasında ele alınan metinleri çözümleyebilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.3.1",
+          "title": "Parçaları belirler.",
+          "indicators": [
+            "Dinlediği/izlediği metindeki karakterlerin özelliklerini, amaçlarını ve niyetlerini inceler.",
+            "Dinlediği/izlediği metindeki yapı unsurlarını belirler.",
+            "Dinlediği/izlediği metindeki dil ve anlatım özelliklerini belirler.",
+            "Dinlediği/izlediği metindeki dil işlevlerini belirler."
+          ]
+        },
+        {
+          "code": "TDE1.3.2",
+          "title": "Parçalar arasındaki ilişkileri belirler.",
+          "indicators": [
+            "Dinlediği/izlediği metni oluşturan şekil ve anlama dair birimler arasındaki ilişkileri belirler.",
+            "Dinlediği/izlediği metindeki yapı unsurları arasındaki ilişkileri belirler.",
+            "Yazarın (senarist/yönetmen/şair) üslup seçiminin nedenleri ve sonuçlarını açıklar.",
+            "Dinlediği/izlediği metinlerin yazıldığı dönemin özelliklerini açıklar.",
+            "Dinlediği/izlediği metnin yazarının (şair/senarist/yönetmen) özelliklerini açıklar.",
+            "Dinlediği/izlediği metnin içeriğinin, yapı unsurlarının, dil ve anlatım özelliklerinin metnin yazıldığı dönemle ve toplumla ilişkisini kurar."
+          ]
+        },
+        {
+          "code": "TDE1.3.3",
+          "title": "Parçalar arasındaki etkileşimleri belirler.",
+          "indicators": [
+            "Dinlediği/izlediği metni oluşturan şekil ve anlama dair birimlerin arasındaki etkileşimleri değerlendirir.",
+            "Dinlediği/izlediği metnin yapı unsurlarının metne olan katkısını değerlendirir.",
+            "Dinlediği/izlediği metnin yapı unsurları ile metnin içeriği arasındaki ilişkiden hareketle metnin yapı unsurlarının işlenişini değerlendirir.",
+            "Dinlediği/izlediği metnin dil ve anlatım özellikleri ile metnin içeriği arasındaki ilişkiden hareketle metinde kullanılan dil ve anlatım özelliklerini değerlendir.",
+            "Dinlediği/izlediği metin içindeki tutarsızlıkları ya da çatışmaları tespit ederek bunların metne olan etkisini değerlendirir.",
+            "Dinlediği/izlediği metni millî, manevi ve evrensel değerlerin aktarımı bağlamında değerlendirir.",
+            "Dinlediği/izlediği metnin içeriğinin, yapı unsurlarının, dil ve anlatım özelliklerinin metnin yazarıyla ilişkisini kurar.",
+            "Dinlediği/izlediği metnin diğer disiplinlerle olan ilişkisini değerlendirir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde1-4",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE1.4",
+      "title": "“Dilin Zenginliği” temasında ele alınan metinlerde dinleme/izleme sürecini değerlendirebilme",
+      "skill": "Dinleme/İzleme",
+      "processComponents": [
+        {
+          "code": "TDE1.4.1",
+          "title": "Kendi değerlendirmesini yapar.",
+          "indicators": [
+            "Dinlediği/izlediği metin hakkında değerlendirmeler yapabilmek için çeşitli ölçütler belirler.",
+            "Dinlediği/izlediği metni kendi beğeni ölçütleri doğrultusunda değerlendirir.",
+            "Dinlediği/izlediği metindeki gerçeklik ile gerçek dünyayı karşılaştırır."
+          ]
+        },
+        {
+          "code": "TDE1.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Kendini dinlediği/izlediği metindeki karakterlerin yerine koyarak kahramanın davranışlarını anlamlandırır.",
+            "Dinlediği/izlediği metne yönelik beğeni ve eleştirilerini gerekçelendirerek açıklar.",
+            "Dinlediği/izlediği metnin konu ve ana düşüncesinin kendi dünyasıyla olan ilişkisini belirler.",
+            "Yazarın (senarist/yönetmen/şair) amacı ile kendi düşünceleri arasındaki benzerlik ve farklılıkları açıklar.",
+            "Dinlediği/izlediği metindeki olaya, duruma, soruna ya da karakterlerin davranışlarına seçenekler üretir.",
+            "Kendi belirlediği ölçütlerden hareketle dinlediği/izlediği metnin yazılış amacına ulaşma düzeyini değerlendirir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde2-1",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE2.1",
+      "title": "“Dilin Zenginliği” temasında ele alınan metinlerde okumayı yönetebilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.1.1",
+          "title": "İnceler ve görüş oluşturur.",
+          "indicators": [
+            "Metni okumaya başlamadan önce okuma amacını belirler.",
+            "Okumadan önce metnin içerik ve türüne yönelik tahminlerde bulunur."
+          ]
+        },
+        {
+          "code": "TDE2.1.2",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Okuyacağı metin için uygun okuma yöntem ve stratejisi seçer.",
+            "Seçtiği okuma stratejisi ile okumayı sürdürür."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde2-2",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE2.2",
+      "title": "“Dilin Zenginliği” temasında ele alınan metinlerde anlam oluşturabilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Okuma metnindeki bilgiler ile ön bilgileri arasında bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE2.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Okuyacağı metnin başlık ve görsellerinden hareketle metnin yazılış amacını tahmin eder.",
+            "Metindeki söz varlığının anlamını bağlamdan hareketle belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.3",
+          "title": "Çıkarım yapar.",
+          "indicators": [
+            "Metinde açıkça sunulan bilgileri belirler.",
+            "Metinlerden hareketle çıkarımlar yapar.",
+            "Metinde açıkça ifade edilen neden-sonuç, koşul, varsayım bilgilerini belirler.",
+            "Metnin konu ve/veya temasını belirler.",
+            "Metnin yardımcı düşüncelerini belirler.",
+            "Metnin ana düşüncesini/duygusunu belirler.",
+            "Yazarın metni yazma amacını belirler.",
+            "Metinde yer alan bilgilerin sunuluş şeklini inceler.",
+            "Metinde geçen söz sanatlarını belirler.",
+            "Metindeki karakterlerin davranışlarından duygu ve düşüncelerine yönelik çıkarımlar yapar.",
+            "Metin ile yazar arasındaki ilişkiyi belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.4",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Metin öncesi tahminleri ile okuma içeriğini karşılaştırır.",
+            "Okuduğu metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre karşılaştırır."
+          ]
+        },
+        {
+          "code": "TDE2.2.5",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Okuduğu metinleri belirlenen ölçütlere (içerik, tür, şekil, dönem, zihniyet, üslup, ileti) göre sınıflandırır.",
+            "Metindeki gerçek ve kurgu arasındaki farkı belirler.",
+            "Metindeki öznel ve nesnel ifadeleri ayırt eder.",
+            "Metindeki bilgilerin güvenilir olup olmadığını belirler."
+          ]
+        },
+        {
+          "code": "TDE2.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Metni özetler.",
+            "Okuduğu metinlere yönelik geri bildirimler sunar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde2-3",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE2.3",
+      "title": "“Dilin Zenginliği” temasında ele alınan metinleri çözümleyebilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.3.1",
+          "title": "Parçaları belirler.",
+          "indicators": [
+            "Metindeki karakterlerin özelliklerini, amaçlarını ve niyetlerini inceler.",
+            "Metindeki yapı unsurlarını belirler.",
+            "Metindeki dil ve anlatım özelliklerini belirler.",
+            "Metindeki dil işlevlerini belirler."
+          ]
+        },
+        {
+          "code": "TDE2.3.2",
+          "title": "Parçalar arasındaki ilişkileri belirler.",
+          "indicators": [
+            "Okuduğu metni oluşturan şekil ve anlama dair birimler arasındaki ilişkileri belirler.",
+            "Metindeki yapı unsurları arasındaki ilişkileri belirler.",
+            "Yazarın üslup seçiminin nedenleri ve sonuçlarını açıklar.",
+            "Metinlerin yazıldığı dönemin özelliklerini açıklar.",
+            "Metnin yazarının özelliklerini açıklar.",
+            "Metnin içeriğinin, yapı unsurlarının, dil ve anlatım özelliklerinin metnin yazıldığı dönemle ve toplumla ilişkisini kurar."
+          ]
+        },
+        {
+          "code": "TDE2.3.3",
+          "title": "Parçalar arasındaki etkileşimleri belirler.",
+          "indicators": [
+            "Okuduğu metni oluşturan şekil ve anlama dair birimlerin arasındaki etkileşimleri değerlendirir.",
+            "Metnin yapı unsurlarının metne olan katkısını değerlendirir.",
+            "Metnin yapı unsurları ile metnin içeriği arasındaki ilişkiden hareketle metnin yapı unsurlarının işlenişini değerlendirir.",
+            "Metnin dil ve anlatım özellikleri ile metnin içeriği arasındaki ilişkiden hareketle metinde kullanılan dil ve anlatım özelliklerini değerlendirir.",
+            "Metin içindeki tutarsızlıkları ya da çatışmaları tespit ederek bunların metne olan etkisini değerlendirir.",
+            "Metni millî, manevi ve evrensel değerlerin aktarımı bağlamında değerlendirir.",
+            "Metnin içeriğinin, yapı unsurlarının, dil ve anlatım özelliklerinin metnin yazarıyla ilişkisini kurar.",
+            "Metnin diğer disiplinlerle olan ilişkisini değerlendirir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde2-4",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE2.4",
+      "title": "“Dilin Zenginliği” temasında ele alınan metinlere yönelik okuma sürecini değerlendirebilme",
+      "skill": "Okuma",
+      "processComponents": [
+        {
+          "code": "TDE2.4.1",
+          "title": "Kendi değerlendirmesini yapar.",
+          "indicators": [
+            "Metin hakkında değerlendirmeler yapabilmek için çeşitli ölçütler belirler.",
+            "Okuduğu metni kendi beğeni ölçütleri doğrultusunda değerlendirir.",
+            "Metindeki gerçeklik ile gerçek dünya bilgisine dayalı karşılaştırmalar yapar."
+          ]
+        },
+        {
+          "code": "TDE2.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Kendini karakterlerin yerine koyarak kahramanın davranışlarını anlamlandırır.",
+            "Okuduğu metne yönelik beğeni ve eleştirilerini gerekçelendirerek açıklar.",
+            "Metnin konu ve ana düşüncesinin kendi dünyasıyla ilişkisini belirler.",
+            "Yazarın amacı ile kendi düşünceleri arasındaki benzerlik ve farklılıkları açıklar.",
+            "Metindeki olaya, duruma, soruna ya da karakterlerin davranışlarına seçenekler üretir.",
+            "Kendi belirlediği ölçütlerden hareketle metnin yazılış amacına ulaşma düzeyini değerlendirir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde3-1",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE3.1",
+      "title": "Dilin zenginliğini kullandığı akıcı bir konuşma sürecini yönetebilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Konuşmasının amacına (ikna etme, bilgilendirme) karar verir.",
+            "Konuşmasının özelliklerini (hazırlıklı/hazırlıksız, süre, hedef kitle) belirler.",
+            "Konuşmanın türünü, yöntem ve stratejisini belirler."
+          ]
+        },
+        {
+          "code": "TDE3.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Konuşmasında engelleri ortadan kaldırır.",
+            "Konuşma amacına uygun olarak seçtiği stratejiyi yapılandırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde3-2",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE3.2",
+      "title": "Konusunu dilin zenginliğinden yararlanarak oluşturduğu konuşma içeriğini oluşturabilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Konuşmasında belirlediği amaca yönelik ön bilgileriyle bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE3.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Hedef kitlenin özelliklerine yönelik tahminlerde bulunarak konuşmasının giriş, gelişme ve sonuç bölümlerini tasarlar."
+          ]
+        },
+        {
+          "code": "TDE3.2.3",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Konuşmasının amacına uygun ana düşünceyi belirlerken karşılaştırma içeren iletiler oluşturur."
+          ]
+        },
+        {
+          "code": "TDE3.2.4",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Dilin kullanım alanına (özel, mesleki, kamusal alan ve eğitim alanı) göre konuşmasının içeriğini belirler."
+          ]
+        },
+        {
+          "code": "TDE3.2.5",
+          "title": "Yeniden ifade eder.",
+          "indicators": [
+            "Konuşmasının türüne göre bilgi toplar (Hazırlıklı konuşmada bilgi toplar, hazırlıksız konuşmada not alır.).",
+            "Söz varlığını kullanarak konuşmasının içeriğini düzenler."
+          ]
+        },
+        {
+          "code": "TDE3.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Konuşmasını planlarken dil işlevlerini kullanır."
+          ]
+        },
+        {
+          "code": "TDE3.2.7",
+          "title": "Sesle anlam oluşturur.",
+          "indicators": [
+            "Konuşmasında beden dilini doğru bir şekilde kullanacağını göz önünde bulundurur.",
+            "Konuşmasını diksiyon ve telaffuzu etkin bir şekilde kullanacak şekilde planlar."
+          ]
+        },
+        {
+          "code": "TDE3.2.8",
+          "title": "Görsel ögeleri kullanır.",
+          "indicators": [
+            "Konuşma içeriğini desteklemek için kullanacağı görsel ve işitsel ögelere karar verir."
+          ]
+        },
+        {
+          "code": "TDE3.2.9",
+          "title": "Sunar.",
+          "indicators": [
+            "Yapacağı konuşmanın plan taslağını sunar.",
+            "Aldığı geri bildirimler ile plan taslağına son şeklini verir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde3-3",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE3.3",
+      "title": "Konusunu dilin zenginliğinden yararlanarak oluşturduğu konuşmasında kural uygulayabilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.3.1",
+          "title": "Plan hazırlar.",
+          "indicators": [
+            "Konuşmasına planına uygun bir şekilde başlar.",
+            "Konuşmasını dikkat çekici bir girişle başlatır."
+          ]
+        },
+        {
+          "code": "TDE3.3.2",
+          "title": "Düşünceyi geliştirme yollarını kullanır.",
+          "indicators": [
+            "Konuşmasını desteklemek amacıyla düşünceyi geliştirme yollarını kullanır.",
+            "Duygu, düşünce ve hayallerini kendine özgü bir üslupla ifade eder."
+          ]
+        },
+        {
+          "code": "TDE3.3.3",
+          "title": "Uygun söz varlığı kullanır.",
+          "indicators": [
+            "Söz varlığını bağlama uygun şekilde kullanır.",
+            "Ana düşünce ve destekleyici bilgilerle konuşmasını sürdürür.",
+            "Konuşmasını hedef kitleye uygun bir söz varlığı ve üslupla sürdürür."
+          ]
+        },
+        {
+          "code": "TDE3.3.4",
+          "title": "İletileri açık ve örtük biçimde ifade eder.",
+          "indicators": [
+            "Vermek istediği iletileri açık veya örtük bir şekilde ifade eder.",
+            "Duygu, düşünce ve hayallerini tutarlı bir şekilde ifade eder.",
+            "Konuşmayı başlatma, sürdürme ve bitirme ifadelerini etkili kullanır.",
+            "Millî ve manevi değerlere ve kültürel unsurlara dikkat ederek konuşmasını sürdürür.",
+            "Konuşmasında toplumsal hassasiyet oluşturacak ögeler (siyaset, din, etnisite vb.) kullanmaktan kaçınır.",
+            "Konuşmasında olumlu tutum ve değerleri vurgular."
+          ]
+        },
+        {
+          "code": "TDE3.3.5",
+          "title": "Türkçe dil yapılarını uygular.",
+          "indicators": [
+            "Konuşmasında Türkçenin dil yapısını ve işlevini amacına uygun kullanır."
+          ]
+        },
+        {
+          "code": "TDE3.3.6",
+          "title": "Bağdaşıklık ögelerini kullanır.",
+          "indicators": [
+            "Konuşmasını bağdaşıklık ögelerine dikkat ederek yapar."
+          ]
+        },
+        {
+          "code": "TDE3.3.7",
+          "title": "Beden dilini ve mekânı kullanır.",
+          "indicators": [
+            "Konuşmasında beden dilini doğru bir şekilde kullanır.",
+            "Konuşmasında diksiyon ve telaffuzu etkin bir şekilde kullanır.",
+            "Konuşmasında mekânı etkin bir şekilde kullanır.",
+            "Konuşmasında zamanı verimli bir şekilde kullanır.",
+            "Konuşma sürecinde dinleyici ile etkileşim kurar."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde3-4",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE3.4",
+      "title": "Kullandığı dil özelliklerinin konuşmasına etkisine yönelik süreci değerlendirebilme",
+      "skill": "Konuşma",
+      "processComponents": [
+        {
+          "code": "TDE3.4.1",
+          "title": "Kendini değerlendirir.",
+          "indicators": [
+            "Konuşma sürecindeki davranış, duygu ve düşüncelerini değerlendirir.",
+            "Konuşmasını içerik yönünden değerlendirir.",
+            "Konuşmasını dil ve anlatım yönünden değerlendirir.",
+            "Konuşmasını paydaşların görüşlerine göre değerlendirir."
+          ]
+        },
+        {
+          "code": "TDE3.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Genel geri bildirimlere bağlı olarak bundan sonra yapacağı konuşmalar için kendisine yeni hedefler belirler.",
+            "Özgün konuşmacı kimliğini oluşturur.",
+            "Konuşmasını dijital ortamlar için yeniden düzenleyebilir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde4-1",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE4.1",
+      "title": "Öz yaşam öyküsünü oluşturabilmek için bir yazılı anlatım sürecini yönetebilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.1.1",
+          "title": "Seçim yapar.",
+          "indicators": [
+            "Yazma amacına (ikna etme, bilgilendirme, resmî yazışma) karar verir.",
+            "Yazacağı metnin özelliklerini (süre, hedef kitle) belirler.",
+            "Yazacağı metnin türünü, kullanacağı yöntem ve stratejisini belirler."
+          ]
+        },
+        {
+          "code": "TDE4.1.2",
+          "title": "İlişkiyi sürdürür.",
+          "indicators": [
+            "Yazma süreci ile ilgili engelleri ortadan kaldırır.",
+            "Yazma amacına uygun olarak seçtiği stratejiyi yapılandırır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde4-2",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE4.2",
+      "title": "Öz yaşam öyküsünü aktarmak için kendi üslup özelliklerini yansıtan bir yazılı anlatım içeriği oluşturabilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.2.1",
+          "title": "Ön bilgilerle bağlantı kurar.",
+          "indicators": [
+            "Yazma amacına yönelik ön bilgileriyle bağlantı kurar."
+          ]
+        },
+        {
+          "code": "TDE4.2.2",
+          "title": "Tahmin eder.",
+          "indicators": [
+            "Hedef kitlenin özelliklerine yönelik tahminlerde bulunarak yazacağı metnin türünü ve içeriğini belirler.",
+            "Metnin türüne göre kullanacağı yapı unsurlarını belirler."
+          ]
+        },
+        {
+          "code": "TDE4.2.3",
+          "title": "Karşılaştırır.",
+          "indicators": [
+            "Yazma amacı ve yazacağı metnin özelliklerine göre ana düşünceye ve vermek istediği iletiye karar verir.",
+            "Planını oluştururken karşılaştırma içeren iletiler oluşturur."
+          ]
+        },
+        {
+          "code": "TDE4.2.4",
+          "title": "Sınıflandırır.",
+          "indicators": [
+            "Yazılı anlatımın kullanım alanına (özel, mesleki, eğitim ve kamusal) göre içeriğini belirler."
+          ]
+        },
+        {
+          "code": "TDE4.2.5",
+          "title": "Yeniden ifade eder.",
+          "indicators": [
+            "Söz varlığını kullanarak yazısının içeriğini düzenler."
+          ]
+        },
+        {
+          "code": "TDE4.2.6",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Yazma sürecini planlarken dil işlevlerinin kullanımına karar verir."
+          ]
+        },
+        {
+          "code": "TDE4.2.7",
+          "title": "Görsel ögeleri kullanır.",
+          "indicators": [
+            "Yazma içeriğini desteklemek için kullanacağı görsel ve işitsel ögelere karar verir."
+          ]
+        },
+        {
+          "code": "TDE4.2.8",
+          "title": "Sunar.",
+          "indicators": [
+            "Yazacağı metnin plan taslağını sunar.",
+            "Aldığı geri bildirimler ile plan taslağına son şeklini verir."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde4-3",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE4.3",
+      "title": "Öz yaşam öyküsünü aktarmak için kendi üslup özelliklerini yansıtan yazısında kural uygulayabilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.3.1",
+          "title": "Plan hazırlar.",
+          "indicators": [
+            "Yazmaya planına uygun bir şekilde başlar.",
+            "Yazısını dikkat çekici bir girişle başlatır."
+          ]
+        },
+        {
+          "code": "TDE4.3.2",
+          "title": "Düşünceyi geliştirme yollarını kullanır.",
+          "indicators": [
+            "Yazısını desteklemek amacıyla anlatım biçimi ve düşünceyi geliştirme yollarından yararlanır.",
+            "Duygu, düşünce ve hayallerini kendine özgü bir üslupla ifade eder."
+          ]
+        },
+        {
+          "code": "TDE4.3.3",
+          "title": "Uygun söz varlığı kullanır.",
+          "indicators": [
+            "Söz varlığını (deyim, atasözü, mecaz ve terim) bağlama uygun şekilde kullanır.",
+            "Ana düşünce ve destekleyici bilgilerle yazma sürecine devam eder.",
+            "Yazısını hedef kitleye uygun bir söz varlığı ve üslupla sürdürür."
+          ]
+        },
+        {
+          "code": "TDE4.3.4",
+          "title": "İletileri açık ve örtük biçimde ifade eder.",
+          "indicators": [
+            "Vermek istediği iletileri açık veya örtük bir şekilde ifade eder.",
+            "Duygu, düşünce ve hayallerini tutarlı bir şekilde ifade eder.",
+            "Yazmayı başlatma, sürdürme ve bitirme ifadelerini etkili kullanır.",
+            "Millî ve manevi değerler ile kültürel unsurlara dikkat ederek yazma sürecine devam eder.",
+            "Yazısında toplumsal hassasiyet oluşturacak ögeler (siyaset, din, etnisite vb.) kullanmaktan kaçınır.",
+            "Yazısının içeriğine uygun başlık belirler.",
+            "Yazısında olumlu tutum ve değerleri vurgular."
+          ]
+        },
+        {
+          "code": "TDE4.3.5",
+          "title": "Türkçe dil yapılarını uygular.",
+          "indicators": [
+            "Yazısında Türkçe dil yapılarını, işlevine uygun kullanır.",
+            "Türkçeyi bilinçli ve özenli (yabancı kelimelerin yerine Türkçelerini kullanması) kullanır."
+          ]
+        },
+        {
+          "code": "TDE4.3.6",
+          "title": "Bağdaşıklık ögelerini kullanır.",
+          "indicators": [
+            "Yazısını bağdaşıklık ögelerine dikkat ederek yazar."
+          ]
+        },
+        {
+          "code": "TDE4.3.7",
+          "title": "Yazım kurallarını uygular.",
+          "indicators": [
+            "Yazısında yazım kurallarını etkili bir şekilde kullanır."
+          ]
+        },
+        {
+          "code": "TDE4.3.8",
+          "title": "Noktalama kurallarını uygular.",
+          "indicators": [
+            "Yazısında noktalama kurallarını etkili bir şekilde kullanır."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tema4-tde4-4",
+      "theme": "4. Tema: Dilin Zenginliği",
+      "code": "TDE4.4",
+      "title": "Beğeni ve eleştirilerini dile getirdiği yazısına yönelik yazma sürecini değerlendirebilme",
+      "skill": "Yazma",
+      "processComponents": [
+        {
+          "code": "TDE4.4.1",
+          "title": "Kendini değerlendirir.",
+          "indicators": [
+            "Yazma sürecindeki davranış, duygu ve düşüncelerini değerlendirir.",
+            "Yazısını içerik yönünden değerlendirir.",
+            "Yazısını dil ve anlatım yönünden değerlendirir.",
+            "Yazısını paydaşların görüşlerine göre değerlendirir."
+          ]
+        },
+        {
+          "code": "TDE4.4.2",
+          "title": "Tepki verir.",
+          "indicators": [
+            "Genel geri bildirimlere bağlı olarak bundan sonra yazacağı metin ile ilgili kendisine yeni hedefler belirler.",
+            "Özgün yazar kimliğini oluşturur.",
+            "Yazısını sınıf/okul panolarında ya da okulun resmî çevrim içi ortamlarında paylaşır."
+          ]
+        }
+      ]
+    }
   ]
 }

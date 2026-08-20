@@ -50,6 +50,7 @@
           title: component.title,
           parentCode: outcome.code,
           parentTitle: outcome.title,
+          indicators: Array.isArray(component.indicators) ? component.indicators : [],
           processComponent: true
         }));
       });

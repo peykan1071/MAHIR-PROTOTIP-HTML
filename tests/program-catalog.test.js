@@ -22,12 +22,17 @@ const processes = catalog.filterOutcomes([
     code: "TDE2.2",
     title: "Anlam oluşturabilme",
     skill: "Okuma",
-    processComponents: [{ code: "TDE2.2.3", title: "Karşılaştırır." }]
+    processComponents: [{
+      code: "TDE2.2.3",
+      title: "Karşılaştırır.",
+      indicators: ["Okuduğu metinleri belirlenen ölçütlere göre karşılaştırır."]
+    }]
   }
 ], "written");
 assert.equal(processes.length, 1);
 assert.equal(processes[0].code, "TDE2.2.3");
 assert.equal(processes[0].parentCode, "TDE2.2");
+assert.deepEqual(processes[0].indicators, ["Okuduğu metinleri belirlenen ölçütlere göre karşılaştırır."]);
 assert.equal(processes[0].processComponent, true);
 
 console.log("program-catalog.test.js: all assertions passed");

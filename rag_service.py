@@ -241,12 +241,9 @@ app = modal.App(APP_NAME)
 
 _SHARED_SECRET_HEADER = "X-MAHIR-RAG-Key"
 
-if modal.is_local():
-    _shared_secret = modal.Secret.from_dict(
-        {"MAHIR_RAG_SHARED_SECRET": os.environ.get("MAHIR_RAG_SHARED_SECRET", "")}
-    )
-else:
-    _shared_secret = modal.Secret.from_dict({})
+_shared_secret = modal.Secret.from_dict(
+    {"MAHIR_RAG_SHARED_SECRET": os.environ.get("MAHIR_RAG_SHARED_SECRET", "")}
+)
 
 
 def _slice_pdf_pages(pdf_bytes: bytes, start_page: int, end_page: int) -> bytes:

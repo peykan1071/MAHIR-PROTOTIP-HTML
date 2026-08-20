@@ -2806,7 +2806,20 @@ const fileUploadBridge = (() => {
         option.dataset.optionIndex = String(optionIndex + 1);
         option.setAttribute("role", "option");
         option.setAttribute("aria-selected", savedIds.has(outcome.id) ? "true" : "false");
-        option.textContent = optionText;
+        const optionHeading = document.createElement("span");
+        optionHeading.className = "outcome-combobox-option-heading";
+        optionHeading.textContent = optionText;
+        option.append(optionHeading);
+        if (Array.isArray(outcome.indicators) && outcome.indicators.length) {
+          const indicatorList = document.createElement("ul");
+          indicatorList.className = "outcome-combobox-indicators";
+          outcome.indicators.forEach((indicator) => {
+            const item = document.createElement("li");
+            item.textContent = indicator;
+            indicatorList.append(item);
+          });
+          option.append(indicatorList);
+        }
         listbox.append(option);
         options.push(option);
       });
@@ -2927,6 +2940,7 @@ const fileUploadBridge = (() => {
       const outcomes = selected.map((outcome) => ({
         outcomeCode: outcome.code || "",
         outcomeDescription: outcome.title || "",
+        outcomeIndicators: Array.isArray(outcome.indicators) ? [...outcome.indicators] : [],
         outcomeTheme: outcome.theme || "",
         outcomeSkill: outcome.skill || "",
         parentOutcomeCode: outcome.parentCode || outcome.code || "",
