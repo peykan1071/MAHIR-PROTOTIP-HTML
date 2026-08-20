@@ -8,6 +8,42 @@ Proje, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması – Sena
 
 > **Temel ilke:** MAHİR önerir ve kanıt sunar; nihai değerlendirme ile onay öğretmene aittir.
 
+## Jüri için hızlı başlangıç
+
+Bu depo tek başına indirildiğinde arayüz ve yerel analiz akışı çalıştırılabilir; uzaktaki **OCR ve RAG** servisleri ise güvenlik nedeniyle depoya eklenmeyen erişim anahtarlarını gerektirir.
+
+### Windows'ta çalıştırma
+
+1. Depoyu GitHub'dan klonlayın veya ZIP olarak indirip çıkarın.
+2. Bilgisayarda **Python 3** bulunduğundan emin olun.
+3. Proje ana klasöründeki `MAHIR_BASLAT.cmd` dosyasına çift tıklayın.
+4. Tarayıcı otomatik açılmazsa `http://127.0.0.1:8000/index.html` adresine gidin.
+5. MAHİR kullanılırken açılan sunucu penceresini kapatmayın.
+
+`index.html` dosyasını doğrudan açmak, belge yükleme ve analiz servislerini başlatmaz; değerlendirme için mutlaka `MAHIR_BASLAT.cmd` kullanılmalıdır.
+
+### OCR ve RAG demo erişimi
+
+Tam demo için proje sahibinden ayrıca sağlanan `secrets.local.txt` dosyasını proje ana klasörüne yerleştirin. Dosya şu iki değişkeni içerir:
+
+```text
+MAHIR_OCR_SHARED_SECRET=<ayrıca sağlanan erişim anahtarı>
+MAHIR_RAG_SHARED_SECRET=<ayrıca sağlanan erişim anahtarı>
+```
+
+Gerçek anahtarlar kaynak kodda veya GitHub geçmişinde bulunmaz ve güvenlik nedeniyle buraya yazılmamalıdır. Anahtarlar olmadan temel arayüz açılır; ancak görsel belgelerin OCR ile okunması ve RAG destekli pedagojik raporlama kullanılamaz. Uzak GPU servisleri kullanılmadığında uykuya geçtiğinden ilk OCR/RAG isteği normalden daha uzun sürebilir.
+
+### Erişim anahtarları neden repoda yer almıyor?
+
+Bu, unutulmuş bir kurulum adımı değil; bilinçli bir **güvenlik, kişisel veri ve maliyet kontrolü** kararıdır.
+
+- Git deposuna bir kez eklenen parola, daha sonra dosyadan silinse bile önceki commitlerde ve çatallarda kalabilir.
+- Herkese açık bir anahtar, üçüncü kişilerin ücretli GPU tabanlı OCR/RAG servislerini yetkisiz kullanmasına ve beklenmeyen maliyet oluşturmasına yol açabilir.
+- Aynı anahtarın kaynak kodla dağıtılması, erişimi kimin ve ne zaman kullandığının denetlenmesini güçleştirir.
+- MAHİR'in veri minimizasyonu ve kontrollü erişim yaklaşımı gereği gerçek servis kimlik bilgileri uygulama kodundan ayrı tutulur.
+
+Bu nedenle `.gitignore`, `secrets.local.txt` dosyasının yanlışlıkla commit edilmesini engeller. Yetkili jüri değerlendirmesinde tam demo erişimi; proje sahibi tarafından ayrıca iletilen yerel yapılandırma dosyasıyla veya süresi ve kullanım kotası sınırlandırılmış bir jüri erişimiyle sağlanır. Anahtarın repoda bulunmaması, sistemin OCR/RAG yeteneğinin olmadığı anlamına gelmez; yalnızca ücretli uzak servislerin yetkisiz kullanımını önler.
+
 ## Problem ve çözüm
 
 Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır. Görsel grubu olarak yüklenen puanlama fotoğrafları (en fazla 10 adet, her biri tek öğrencilik puan tablosu), `MAHIR_OCR_REMOTE_URL` tanımlıysa uzaktaki bir OCR sunucusuna (bkz. aşağıdaki "Modal ile OCR") gönderilip öğrenci satırlarına dönüştürülür; tanımlı değilse görseller OCR yapılmadan öğretmen kontrolüne bırakılır.
