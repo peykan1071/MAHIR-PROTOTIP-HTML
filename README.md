@@ -1,203 +1,100 @@
 # MAHİR
 
-> Öğretmen kontrolünü merkeze alan, sınav verilerini öğrenme kanıtlarına dönüştüren Türkçe eğitim karar destek prototipi.
+> Öğretmen kontrolünü merkeze alan; sınav verilerini doğrulanabilir öğrenme kanıtlarına, resmî rapora ve kurum içi yazışma taslağına dönüştüren Türkçe çok ajanlı karar destek prototipi.
 
-MAHİR; öğretmenin sınav verilerini yapılandırmasına, doğrulamasına, öğrenme çıktılarıyla ilişkilendirmesine ve sonuçları standart bir **Sınav Sonuçları Analiz Raporu** olarak üretmesine yardımcı olur.
+MAHİR, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması - 1. Senaryo: Kamu Evrak ve Yazışma Süreçleri İçin Akıllı Ajan Destek Sistemi** kapsamında geliştirilmiştir.
 
-Proje, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması – Senaryo 1: Kamu Evrak ve Resmî Yazışma Süreçleri İçin Çok Ajanlı Destek** kapsamında geliştirilmektedir.
+Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in işlediği gelen evrak; sınav puan çizelgesi, sınav veri giriş belgesi veya onaylanmış sınav analiz raporudur. Prototip, genel amaçlı bütün kamu evraklarını değil, bu tanımlı eğitim evrakı akışını uçtan uca ele alır.
 
-> **Temel ilke:** MAHİR önerir ve kanıt sunar; nihai değerlendirme ile onay öğretmene aittir.
+> **Temel ilke:** MAHİR önerir, hesaplar ve kanıt sunar; nihai değerlendirme ve onay öğretmene aittir.
 
-## Jüri için hızlı başlangıç
+## Yarışma görevlerinin tamamlanma durumu
 
-Bu depo tek başına indirildiğinde arayüz ve yerel analiz akışı çalıştırılabilir; uzaktaki **OCR ve RAG** servisleri ise güvenlik nedeniyle depoya eklenmeyen erişim anahtarlarını gerektirir.
+Şartnamenin 6.4. bölümünde iki görevin birlikte tamamlanması istenmektedir. MAHİR'de her iki görev de eğitim alanına uyarlanmış demo kapsamında çalışmaktadır.
 
-### Windows'ta çalıştırma
+| Şartname görevi | MAHİR'deki karşılığı | Durum |
+|---|---|---|
+| Görev 1: Evrak Sınıflandırma ve İçerik Analizi | Sınav evrakının okunması, yapılandırılması, doğrulanması, öğretim programıyla eşleştirilmesi ve analiz edilmesi | **Tamamlandı - çalışan demo** |
+| Görev 2: Resmî Yazı Taslaklama ve Birim Yönlendirme | Öğretmen onaylı rapordan resmî üst yazı, ek listesi ve okul yönetimine yönlendirme paketi oluşturulması | **Tamamlandı - çalışan demo** |
 
-1. Depoyu GitHub'dan klonlayın veya ZIP olarak indirip çıkarın.
-2. Bilgisayarda **Python 3** bulunduğundan emin olun.
-3. Proje ana klasöründeki `MAHIR_BASLAT.cmd` dosyasına çift tıklayın.
-4. Tarayıcı otomatik açılmazsa `http://127.0.0.1:8000/index.html` adresine gidin.
-5. MAHİR kullanılırken açılan sunucu penceresini kapatmayın.
+### Görev 1: Evrak Sınıflandırma ve İçerik Analizi
 
-`index.html` dosyasını doğrudan açmak, belge yükleme ve analiz servislerini başlatmaz; değerlendirme için mutlaka `MAHIR_BASLAT.cmd` kullanılmalıdır.
+Şartnamedeki Görev 1 isterlerinin MAHİR'deki karşılıkları aşağıdadır.
 
-### OCR ve RAG demo erişimi
+| Beklenen yetenek | MAHİR'de nasıl karşılanır? |
+|---|---|
+| Evrakı OCR veya doğrudan metin olarak okuyabilme | DOCX, PDF, XLSX, CSV ve görsel dosyalar kabul edilir. Görseller yetkilendirilmiş uzak OCR servisiyle okunur. |
+| Evrak türünü belirleme | Dosya türü, sınav bileşeni ve rapor bağlamı ayrıştırılır; tanımlı olmayan dosya ve bağlamlar reddedilir. |
+| Önemli bilgi unsurlarını çıkarma | Okul, öğretmen, ders, sınıf/şube, dönem, sınav tarihi, soru puanları, öğrenci puanları ve öğrenme çıktısı eşleştirmeleri yapılandırılır. |
+| Eksik bilgileri tespit etme | Zorunlu alan, puan sınırı, toplam puan, soru sayısı, ders-sınıf-program eşleşmesi ve okunamayan hücre denetimleri öğretmen onayından önce çalışır. |
+| İlgili kural ve standartları önerme | Sorular resmî öğretim programındaki öğrenme çıktılarıyla eşleştirilir; RAG katmanı yalnız öğretmen onayından sonra resmî program bağlamını kullanır. |
+| Kısa ve öz özet oluşturma | Soru, öğrenme çıktısı, tema ve sınıf düzeyinde başarı özetleri ile kanıt bağlantıları üretilir. |
 
-Tam demo için proje sahibinden ayrıca sağlanan `secrets.local.txt` dosyasını proje ana klasörüne yerleştirin. Dosya şu iki değişkeni içerir:
+Görev 1 çıktısı, öğretmenin düzeltebildiği bir doğrulama ekranı ve ardından oluşturulan **Sınav Sonuçları Analiz Raporu**dur. Sayısal başarı oranları büyük dil modeli tarafından tahmin edilmez; doğrulanmış puanlardan uygulama koduyla hesaplanır.
 
-```text
-MAHIR_OCR_SHARED_SECRET=<ayrıca sağlanan erişim anahtarı>
-MAHIR_RAG_SHARED_SECRET=<ayrıca sağlanan erişim anahtarı>
-```
+### Görev 2: Resmî Yazı Taslaklama ve Birim Yönlendirme
 
-Gerçek anahtarlar kaynak kodda veya GitHub geçmişinde bulunmaz ve güvenlik nedeniyle buraya yazılmamalıdır. Anahtarlar olmadan temel arayüz açılır; ancak görsel belgelerin OCR ile okunması ve RAG destekli pedagojik raporlama kullanılamaz. Uzak GPU servisleri kullanılmadığında uykuya geçtiğinden ilk OCR/RAG isteği normalden daha uzun sürebilir.
+Şartnamedeki Görev 2 isterlerinin MAHİR'deki karşılıkları aşağıdadır.
 
-### Erişim anahtarları neden repoda yer almıyor?
+| Beklenen yetenek | MAHİR'de nasıl karşılanır? |
+|---|---|
+| Uygun resmî yazı taslağı oluşturma | Onaylanmış analiz raporundan okul/kurum müdürlüğüne hitap eden üst yazı taslağı hazırlanır. |
+| Resmî üsluba uygunluk | Muhatap, konu, metin, ekler, imza makamı ve sonraki işlem alanları standart bir yapıda oluşturulur. |
+| Doğru birime yönlendirme önerisi | Belge, "Bilgi ve gereği" işlem türüyle okul/kurum müdürlüğüne yönlendirilir. |
+| Süreç hakkında bilgilendirme | `Taslak -> Öğretmen kontrolü -> Demo aktarımı -> Paraf bekliyor -> Elektronik imza bekliyor` adımları kullanıcıya gösterilir. |
+| Eksik bilgi talebi | Okul/kurum adı, öğretmen, ders, sınıf/şube veya dönem eksikse resmî yazı oluşturulmaz; eksik alanlar kullanıcıya bildirilir. |
 
-Bu, unutulmuş bir kurulum adımı değil; bilinçli bir **güvenlik, kişisel veri ve maliyet kontrolü** kararıdır.
+Görev 2 çıktıları; indirilebilir Word üst yazısı, ek listesi ve JSON biçimindeki EBYS demo aktarım paketidir. **Demo gerçek EBYS sistemine belge göndermez; gerçek evrak sayısı, kayıt tarihi, paraf veya elektronik imza üretmez.** Bu alanlar yalnız yetkili kurum entegrasyonu sonrasında EBYS tarafından oluşturulabilir.
 
-- Git deposuna bir kez eklenen parola, daha sonra dosyadan silinse bile önceki commitlerde ve çatallarda kalabilir.
-- Herkese açık bir anahtar, üçüncü kişilerin ücretli GPU tabanlı OCR/RAG servislerini yetkisiz kullanmasına ve beklenmeyen maliyet oluşturmasına yol açabilir.
-- Aynı anahtarın kaynak kodla dağıtılması, erişimi kimin ve ne zaman kullandığının denetlenmesini güçleştirir.
-- MAHİR'in veri minimizasyonu ve kontrollü erişim yaklaşımı gereği gerçek servis kimlik bilgileri uygulama kodundan ayrı tutulur.
-
-Bu nedenle `.gitignore`, `secrets.local.txt` dosyasının yanlışlıkla commit edilmesini engeller. Yetkili jüri değerlendirmesinde tam demo erişimi; proje sahibi tarafından ayrıca iletilen yerel yapılandırma dosyasıyla veya süresi ve kullanım kotası sınırlandırılmış bir jüri erişimiyle sağlanır. Anahtarın repoda bulunmaması, sistemin OCR/RAG yeteneğinin olmadığı anlamına gelmez; yalnızca ücretli uzak servislerin yetkisiz kullanımını önler.
-
-## Problem ve çözüm
-
-Hazırlık ekranından sonra öğretmen, standart MAHİR Veri Giriş Şablonu'nu indirebilir; doldurduğu Word, PDF veya görüntü belgesini yükleyebilir. Dosya türü ve boyutu denetlendikten sonra belge öğretmen kontrol ekranına aktarılır. Görsel grubu olarak yüklenen puanlama fotoğrafları (en fazla 10 adet, her biri tek öğrencilik puan tablosu), `MAHIR_OCR_REMOTE_URL` tanımlıysa uzaktaki bir OCR sunucusuna (bkz. aşağıdaki "Modal ile OCR") gönderilip öğrenci satırlarına dönüştürülür; tanımlı değilse görseller OCR yapılmadan öğretmen kontrolüne bırakılır.
-
-MAHİR bu akışı tek bir öğretmen kontrollü süreçte birleştirir:
+## Uçtan uca MAHİR akışı
 
 ```mermaid
 flowchart LR
-    A["Sınav verisi"] --> B["Öğretmen doğrulaması"]
-    B --> C["Kurallı analiz"]
-    C --> D["Öğrenme kanıtları"]
-    D --> E["Rapor onayı"]
-    E --> F["Word / PDF"]
+    A["Sınav evrakı"] --> B["OCR / belge okuma"]
+    B --> C["Öğretmen doğrulaması"]
+    C --> D["Kurallı ölçme ve analiz"]
+    D --> E["Program eşleştirme ve RAG"]
+    E --> F["Öğretmen onaylı rapor"]
+    F --> G["Resmî üst yazı ve yönlendirme"]
+    G --> H["EBYS aktarım demosu"]
 ```
 
-Ardından `http://127.0.0.1:8000/index.html` adresi açılır. Bu yerel sunucunun PaddleOCR'a ya da başka bir üçüncü parti pakete ihtiyacı yoktur (düz `python3` yeterlidir) — OCR hiçbir zaman bu makinede çalışmaz.
+1. Öğretmen sınav türünü ve ders bağlamını seçer.
+2. Sınav evrakı yüklenir veya veriler elle girilir.
+3. Sistem dosyayı okur; eksik, okunamayan veya çelişkili alanları bildirir.
+4. Öğretmen verileri düzeltir ve onaylar.
+5. Başarı oranları soru ve öğrenme çıktısı puanlarından deterministik olarak hesaplanır.
+6. RAG, yalnız onaylı veriler üzerinden resmî öğretim programı bağlamını getirir.
+7. Rapor öğretmen incelemesinden sonra Word ve PDF olarak üretilir.
+8. Onaylı rapordan resmî üst yazı ve kurum içi yönlendirme paketi hazırlanır.
 
-### Modal ile OCR
+## Çok ajanlı mimari
 
-Görsel puan tablolarının OCR ile okunması, ayrı bir "OCR işçisi" (`backend/run_ocr_worker.py`) üzerinden çalışır ve bu işçinin gerçek bir GPU'ya ihtiyacı vardır. Bu işçi, kendi hesabınıza bağlı, **7/24 hazır ve kararlı bir adresi olan** bir [Modal](https://modal.com) fonksiyonu olarak çalışır (T4 GPU, saniye başına faturalandırma, boştayken sıfıra ölçeklenip ücret kesilmez - Modal her ay $30 ücretsiz kredi veriyor, bu kişisel/seyrek kullanım için genelde tüm faturayı karşılar).
+MAHİR'de görev sınırları belirlenmiş beş uzman ajan bulunur:
 
-**Tek seferlik kurulum** (kendi bilgisayarınızda - Modal'ın kendi build sistemi imajı uzakta derlediği için Docker kurmanıza gerek yoktur):
+| Ajan | Sorumluluk | Yapmadığı işlem |
+|---|---|---|
+| Belge Anlama Ajanı | Onaylı girdiyi standart eğitim belgesine dönüştürür | Pedagojik yorum yapmaz |
+| Program Eşleştirme Ajanı | Soruları resmî ders programındaki öğrenme çıktılarıyla eşleştirir | Puan hesaplamaz |
+| Ölçme ve Değerlendirme Ajanı | Soru ve öğrenme çıktısı başarı oranlarını hesaplar | LLM ile sayı üretmez |
+| Pedagojik Analiz Ajanı | Onaylı kanıtı resmî program bağlamıyla yorumlar | Ham öğrenci verisini modele göndermez |
+| Raporlama Ajanı | Kanıtları A-H yapısındaki resmî rapora dönüştürür | Sonuçları yeniden hesaplamaz |
 
-```bash
-pip install modal
-modal setup   # tarayıcıdan Modal hesabınızla giriş yapmanızı ister
-```
+Bu ayrım, bir ajanın ürettiği sonucun diğer ajan tarafından izlenebilmesini ve sayısal hesapların dil modeli yorumundan bağımsız kalmasını sağlar.
 
-**Dağıtım:**
+## Jüri için hızlı başlangıç
 
-```bash
-git clone --branch ocr-isleri <repo-url> mahir && cd mahir
-export MAHIR_OCR_SHARED_SECRET="uzun-rastgele-bir-parola"
-modal deploy modal_app.py
-```
+### Windows'ta çalıştırma
 
-(PowerShell'de `export` yerine `$env:MAHIR_OCR_SHARED_SECRET = "..."` kullanın.) İlk dağıtım, modelleri (~2 GB) indirip imaja gömdüğü için birkaç dakika sürer; komut bitince ekrana basılan **Web URL** (`https://<kullanıcı-adınız>--mahir-ocr-worker-ocr-worker.modal.run` gibi) kararlıdır - bir daha değişmez, tekrar dağıtım yapana kadar aynı kalır. Kendi bilgisayarınızda bu adresi ve az önce belirlediğiniz parolayı kullanarak yerel sunucuyu başlatın:
+1. Depoyu GitHub'dan klonlayınız veya ZIP olarak indirip klasöre çıkarınız.
+2. Bilgisayarınızda **Python 3.10 veya üzeri** bulunduğunu kontrol ediniz.
+3. Proje ana klasöründeki `MAHIR_BASLAT.cmd` dosyasına çift tıklayınız.
+4. Tarayıcı otomatik olarak açılmazsa `http://127.0.0.1:8000/index.html` adresine gidiniz.
+5. MAHİR'i kullandığınız süre boyunca açılan sunucu penceresini açık tutunuz.
 
-```bash
-set MAHIR_OCR_REMOTE_URL=https://xxxx.modal.run
-set MAHIR_OCR_SHARED_SECRET=uzun-rastgele-bir-parola
-python3 backend/run_file_receiver.py
-```
+Lütfen `index.html` dosyasını doğrudan açmayınız. Belge yükleme ve analiz servislerinin başlatılabilmesi için `MAHIR_BASLAT.cmd` dosyasını kullanınız.
 
-(PowerShell'de `set` yerine `$env:MAHIR_OCR_REMOTE_URL = "..."` kullanın.)
-
-**Not**: `MAHIR_OCR_REMOTE_URL` artık koda gömülü bir varsayılana sahip (bkz. `backend/app/file_receiver.py`), `MAHIR_RAG_REMOTE_URL` gibi. Kendi dağıtımınızı kullanıyorsanız yukarıdaki gibi ayarlayın; bu depodaki dağıtımla çalışıyorsanız ayarlamanıza gerek yok. OCR'ı bilinçli olarak kapatmak için boş string verin.
-
-**Önemli**: `MAHIR_OCR_REMOTE_URL` ve `MAHIR_OCR_SHARED_SECRET`, **aynı terminal penceresinde ve `run_file_receiver.py`'yi başlatmadan önce** ayarlanmalıdır. Bunları bir pencerede ayarlayıp sunucuyu başka bir pencerede (veya zaten açık bir pencerede, sunucuyu yeniden başlatmadan) çalıştırırsanız değişkenler sessizce yok sayılır - sunucu hata vermez, sadece OCR'sız "pass-through" moduna düşer. Bunu şu şekilde ayırt edebilirsiniz: tarayıcının Ağ (Network) sekmesinde `/mahir-upload` yanıtına bakınca `"structuredData": null` ve `"message": "N görsel alındı ve öğretmen kontrolüne hazırlandı."` görüyorsanız (OCR sonucu değil, sadece "alındı" onayı), env değişkenleri devreye girmemiş demektir - sunucuyu durdurup aynı pencerede env değişkenlerini tekrar ayarlayıp yeniden başlatın.
-
-`MAHIR_OCR_SHARED_SECRET`, servis adresi herkese açık olduğu için isteklerin `X-MAHIR-OCR-Key` başlığıyla doğrulanmasını sağlar - istemci ve işçi tarafında aynı parola tanımlı olmalı; hiçbiri tanımlı değilse (yerel geliştirme/test) doğrulama yapılmaz. `MAHIR_OCR_REMOTE_URL` tanımlı değilken görsel yüklemeleri OCR yapılmadan kabul edilir; sunucu çökmez.
-
-### Paylaşılan parola zorunludur (2026-08-16'dan itibaren)
-
-Her iki uzak servis de artık parola doğruluyor: parolasız veya yanlış parolalı istekler **401** alır. Yerel sunucuyu başlatmadan önce **aynı kabukta** iki değişkeni de tanımlayın:
-
-```bash
-export MAHIR_RAG_SHARED_SECRET=...
-export MAHIR_OCR_SHARED_SECRET=...
-python backend/run_file_receiver.py
-```
-
-Bu depoda parolalar `secrets.local.txt` dosyasında tutulur; dosya `.gitignore`'da olduğu için depoya girmez. Dosya sizde yoksa parolaları bilen biriyle paylaşılması gerekir - koddan türetilemez.
-
-**Parolayı değiştirmek** yalnız ortam değişkenini güncellemekle olmaz: değer *dağıtım anında* Modal uygulamasına gömülüyor (bkz. `rag_service.py` ve `modal_app.py` içindeki `modal.Secret.from_dict`). Yeni parola için değişkeni tanımlayıp `python -m modal deploy rag_service.py` ve `python -m modal deploy modal_app.py` komutlarını yeniden çalıştırın.
-
-Sınırlamalar: Boşta kalan servis bir süre sonra sıfıra ölçeklenir; gelen ilk istek konteyneri yeniden başlatıp pipeline'ı GPU'ya yükler (soğuk başlangıç, model dosyaları imaja gömülü olduğu için saniyeler-birkaç dakika sürebilir) - `run_ocr_worker.py` bu süreyi istek beklemeden önce tüketir. Kesin maliyet için [modal.com/pricing](https://modal.com/pricing) sayfasını kontrol edin.
-
-## Geliştirme Kuralları
-
-Bu projede geliştirme adım adım, küçük ve onaylı sürümler halinde yapılır. Her sprintte yalnızca belirlenen kapsam uygulanır; yapay zekâ, veritabanı, OCR, dosya okuma, PDF/Word üretimi ve sistem entegrasyonu ilk aşamada kapsam dışıdır.
-
-Ayrıntılı geliştirme kuralları, sürümleme sistemi, dosya düzeni ve kontrol listeleri için bkz. [DEVELOPMENT_CHARTER.md](DEVELOPMENT_CHARTER.md).
-
-- Kademe, okul türü, sınıf ve ders bağlamının adım adım seçilmesi
-- Soru sayısı, puan dağılımı ve öğrenme çıktısı eşleştirmesinin öğretmen tarafından tanımlanması
-- Word belgelerindeki tanınabilir tabloların okunarak veri onay ekranına aktarılması
-- PDF, görsel ve elektronik tablo dosyalarının kabul edilerek öğretmen doğrulama akışına alınması
-- Elle veri girişi seçeneği
-- Okunamayan veya eksik alanların analiz öncesinde düzeltilmesini zorunlu kılan doğrulamalar
-- Soru, sınıf ve öğrenme çıktısı düzeyinde deterministik başarı hesaplamaları
-- Ders–sınıf–program eşleşmesini hem arayüzde hem arka uçta denetleyen kurallar
-- Dil derslerinde yazılı, dinleme/izleme ve konuşma bileşenlerinin ayrı ele alınması
-- Öğretmen onayından sonra kilitlenen A–H yapısındaki rapor
-- Tarayıcıda Word ve PDF çıktısı üretimi
-- Açık öğrenci listesi ve ham sınav verisini dışarıda bırakan yerel çalışma yedeği
-
-## TDE 9 pilotu
-
-İlk doğrulama alanı **9. sınıf Türk Dili ve Edebiyatı** dersidir.
-
-Pilot veri paketinde:
-
-- dört temaya yayılmış **54 öğrenme çıktısı**,
-- resmî dönem ve senaryo tablolarında doğrulanan **66 süreç bileşeni**,
-- Dinleme/İzleme, Okuma, Konuşma ve Yazma alan becerileri,
-- tema bağlamını koruyan ders–sınıf kapsamlı kayıt yapısı
-
-bulunur.
-
-TDE kodları yalnız **Türk Dili ve Edebiyatı + 9. sınıf** profili seçildiğinde açılır. Başka bir derse TDE kodu gönderilmesi arka uç tarafından da reddedilir. Ayrıntılar için [TDE 9 pilot veri paketi](shared/pilot/tde9/README.md) incelenebilir.
-
-### Referans belgeyi dizine ekleme
-
-Müfredat teşhisinin dayandığı öğretim programı PDF'i şu komutla indekslenir:
-
-```bash
-python -m modal run rag_service.py \
-    --pdf-path "C:\yol\tdeogr.pdf" --program-id tde-9-tymm \
-    --start-page 65 --end-page 97 --replace
-```
-
-- **Belgenin adı komutta yazılmaz**, `rag_service.DOCUMENT_TITLES` kaydından gelir (`--document-title` ile geçersiz kılınabilir). Bu ad öğretmenin raporunda kaynak olarak görünüyor ("Kaynak: Ortaöğretim … Öğretim Programı … (2024), s. 66-67"), bu yüzden dosya adı değil belgenin resmî adıdır. Kayıtta olmayan bir program için komut hata verir - yanlış adla indekslemektense durmak doğrudur.
-- **`--replace` bayrağı, belge adı ya da parçalama değiştiyse ŞARTTIR.** Nokta kimliği içerik adreslidir ve `document_name` o kimliğin parçasıdır: yeni adla yazılan parçalar yeni kimlikler alır, eskiler üzerine yazılmaz ve dizinde aynı içerik iki kez kalır. Getirim bunu hatasızca yutar, yalnız sonuç bozulur.
-- `--start-page`/`--end-page` bu belgede 9. sınıf bölümüdür; PDF hazırlık ve 9-12. sınıfları birlikte kapsıyor.
-
-## Sistem sınırı ve doğruluk yaklaşımı
-
-MAHİR’in mevcut analiz motoru kurallı ve deterministiktir:
-
-- Başarı oranlarını LLM değil, uygulama kodu hesaplar.
-- Program kodları serbest metinden uydurulmaz; tanımlı ders–sınıf kataloğundan alınır.
-- Öğretmenin düzeltmediği eksik veya okunamayan veriyle analiz tamamlanmaz.
-- Nihai Word/PDF çıktıları öğretmen onayı verilmeden etkinleşmez.
-
-Bu yaklaşım, ileride eklenecek yapay zekâ katmanının hesaplama ve resmî kod üretme yerine, doğrulanmış kanıtları yorumlama görevinde kalmasını sağlar.
-
-## Güncel geliştirme durumu
-
-| Katman | Durum |
-|---|---|
-| Tek sayfalık öğretmen akışı | Çalışıyor |
-| TDE 9 program kataloğu | Çalışıyor |
-| DOCX tablo okuma | Çalışıyor |
-| Öğretmen veri doğrulaması | Çalışıyor |
-| Kurallı sınav ve öğrenme çıktısı analizi | Çalışıyor |
-| Word/PDF rapor üretimi | Çalışıyor |
-| Çoklu görsel OCR ve grup birleştirme | Geliştirme aşamasında |
-| Kalıcı ilişkisel veritabanı | Planlandı |
-| Ortak Metin parçalama ve RAG dizini | Planlandı |
-| Sağlayıcıdan bağımsız LLM API katmanı | Planlandı |
-| Kullanıcı hesabı, yetkilendirme ve kurumsal entegrasyon | Prototip sonrası |
-
-Bu tablo özellikle prototipte çalışan özelliklerle yol haritasını birbirinden ayırır; henüz tamamlanmayan bir bileşen çalışıyormuş gibi sunulmaz.
-
-## Yerel kurulum
-
-### Gereksinimler
-
-- Python 3.10 veya üzeri
-- Güncel bir masaüstü tarayıcı
-- Depoyu indirmek için Git
-
-### Çalıştırma
+### Komut satırıyla çalıştırma
 
 ```bash
 git clone https://github.com/peykan1071/MAHIR-PROTOTIP-HTML.git
@@ -205,19 +102,98 @@ cd MAHIR-PROTOTIP-HTML
 python backend/run_file_receiver.py
 ```
 
-Windows'ta `python` komutu tanınmıyorsa:
+Windows'ta `python` komutu tanınmıyorsa aşağıdaki komutu kullanınız:
 
 ```powershell
 py backend/run_file_receiver.py
 ```
 
-Ardından tarayıcıda şu adres açılır:
+## OCR ve RAG demo erişimi
+
+Depo tek başına indirildiğinde arayüz, belge doğrulama ve yerel analiz akışı çalıştırılabilir. Yetkilendirilmiş uzak **OCR ve RAG** servisleri için proje sahibi tarafından ayrıca sağlanan `secrets.local.txt` dosyasını proje ana klasörüne yerleştiriniz:
 
 ```text
-http://127.0.0.1:8000/index.html
+MAHIR_OCR_SHARED_SECRET=<ayrıca sağlanan erişim anahtarı>
+MAHIR_RAG_SHARED_SECRET=<ayrıca sağlanan erişim anahtarı>
 ```
 
-Sunucuyu durdurmak için terminalde `Ctrl+C` kullanılabilir.
+Erişim anahtarı olmadan ücretli uzak servisler kullanılamaz. Uzak GPU servisleri kullanılmadığında sıfıra ölçeklenir; bu nedenle ilk OCR veya RAG isteği normalden daha uzun sürebilir.
+
+### Erişim anahtarları neden repoda bulunmuyor?
+
+Bu durum bir kurulum eksikliği değil; bilinçli bir güvenlik ve maliyet kontrolü kararıdır.
+
+- Git deposuna eklenen bir erişim anahtarı, daha sonra silinse bile eski commitlerde ve çatallarda kalabilir.
+- Herkese açık anahtarlar, ücretli GPU servislerinin yetkisiz kullanılmasına neden olabilir.
+- Gerçek servis kimlik bilgilerinin koddan ayrı tutulması, kontrollü erişim ve veri minimizasyonu yaklaşımının gereğidir.
+- `.gitignore`, `secrets.local.txt` dosyasının yanlışlıkla Git geçmişine eklenmesini engeller.
+
+Yetkili jüri değerlendirmesinde tam erişim, ayrıca iletilen yerel yapılandırma dosyasıyla veya süre ve kota sınırı bulunan jüri erişimiyle sağlanır.
+
+## 9. sınıf Türk Dili ve Edebiyatı pilotu
+
+MAHİR'in ilk doğrulama alanı **9. sınıf Türk Dili ve Edebiyatı** dersidir. Pilot veri paketi:
+
+- dört temayı kapsayan **54 öğrenme çıktısı**,
+- resmî dönem ve senaryo tablolarıyla doğrulanan **66 süreç bileşeni**,
+- Dinleme/İzleme, Okuma, Konuşma ve Yazma alan becerileri,
+- tema, ders, sınıf ve sınav türü bağlamını koruyan kayıt yapısı
+
+içerir.
+
+TDE kodları yalnızca **Türk Dili ve Edebiyatı + 9. sınıf** profili seçildiğinde kullanıma açılır. Başka bir ders veya sınıf bağlamında TDE kodu gönderilmesi arka uç tarafından reddedilir. Ayrıntılı bilgi için [TDE 9 pilot veri paketini](shared/pilot/tde9/README.md) inceleyebilirsiniz.
+
+## Doğruluk ve halüsinasyon kontrolü
+
+- Belge gelmeden soru, puan veya öğrenme çıktısı üretilmez.
+- Program kodları serbest metinden uydurulmaz; tanımlı ders-sınıf kataloğundan alınır.
+- Öğrenci toplamları soru puanlarından hesaplanır; LLM'e hesap yaptırılmaz.
+- Her soru puanı tanımlı azami puanla sınırlandırılır.
+- Eksik veya okunamayan veri öğretmen tarafından düzeltilmeden analiz tamamlanmaz.
+- RAG yalnız öğretmen onayından sonraki pedagojik raporlama aşamasında kullanılır.
+- Kaynak bağlam bulunamazsa sistem içerik uydurmak yerine bu durumu açıkça bildirir.
+- Word ve PDF çıktıları öğretmen onayı verilmeden etkinleşmez.
+
+## Veri güvenliği ve etik sınırlar
+
+- Depoda gerçek öğrenci adı, T.C. kimlik numarası veya okul numarası bulunmaz.
+- Pilot verilerde `ÖĞR-001` benzeri anonim kimlikler kullanılır.
+- Ham öğrenci listesi ve kimlik belirleyici kurumsal alanlar LLM/RAG istemlerine gönderilmez.
+- Öğrenci eşleştirmesi yalnızca oturumluk takma referanslarla yapılır.
+- Gerçek kamu verisi yerine sentetik, anonim veya kullanımı açık örnek veriler kullanılır.
+- Üretim ortamına geçişten önce kurumsal kimlik doğrulama, yetkilendirme, kayıt politikası ve KVKK kontrolleri ayrıca tamamlanmalıdır.
+
+## Çalışan özellikler ve prototip sınırları
+
+| Bileşen | Güncel durum |
+|---|---|
+| Tek sayfalık öğretmen akışı | Çalışıyor |
+| TDE 9 program kataloğu ve ayrıntılı süreç bileşenleri | Çalışıyor |
+| DOCX, PDF, XLSX ve CSV belge okuma | Çalışıyor |
+| Çoklu görsel OCR ve grup birleştirme | Çalışıyor - uzak GPU servisiyle |
+| Öğretmen veri doğrulaması | Çalışıyor |
+| Kurallı sınav ve öğrenme çıktısı analizi | Çalışıyor |
+| Program kaynaklı RAG yorumlama | Çalışıyor - uzak GPU servisiyle |
+| Word ve PDF rapor üretimi | Çalışıyor |
+| Resmî üst yazı ve yönlendirme paketi | Çalışıyor - demo kapsamında |
+| Gerçek EBYS aktarımı ve elektronik imza | Simüle ediliyor; yetkili kurum entegrasyonu gerektirir |
+| Kalıcı ilişkisel veritabanı | Sonraki geliştirme aşaması |
+| Kurumsal kullanıcı hesabı ve yetkilendirme | Prototip sonrası |
+
+## Jüri için 15 dakikalık önerilen gösterim
+
+Şartnameye göre final süresi **10 dakika sunum + 5 dakika soru-cevap** biçimindedir.
+
+1. **1 dakika:** Problem, kullanıcı ve öğretmen onayı ilkesi
+2. **2 dakika:** Sınav evrakının yüklenmesi ve OCR/belge okuma
+3. **2 dakika:** Eksik-çelişkili veri doğrulaması
+4. **2 dakika:** Soru, öğrenme çıktısı ve tema bazlı kurallı analiz
+5. **1 dakika:** RAG destekli, kaynaklı pedagojik değerlendirme
+6. **1 dakika:** Word/PDF raporu ve kanıt görünümü
+7. **1 dakika:** Resmî üst yazı, birim yönlendirme ve EBYS demosu
+8. **5 dakika:** Jüri soruları
+
+İnternet kesintisi veya uzak GPU soğuk başlangıcı olasılığına karşı önceden hazırlanmış anonim veri, örnek rapor ve kayıtlı demo görüntüsü yedek olarak bulundurulmalıdır. Jüri talep ettiğinde canlı çalıştırma yapılabilmelidir.
 
 ## Testler
 
@@ -227,7 +203,7 @@ Python doğrulamalarını çalıştırmak için:
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-Node.js kuruluysa tarayıcıdan bağımsız JavaScript kontrolleri de çalıştırılabilir:
+Node.js kuruluysa JavaScript kontrolleri de çalıştırılabilir:
 
 ```bash
 node tests/program-catalog.test.js
@@ -235,66 +211,55 @@ node tests/workspace-backup.test.js
 node tests/data-entry-flow.test.js
 node tests/score-corrections.test.js
 node tests/report-evidence.test.js
+node tests/ebys-demo.test.js
 ```
 
 ## Proje yapısı
 
 ```text
 MAHIR-PROTOTIP-HTML/
-├── index.html                 # Ekranların semantik yapısı
-├── styles.css                 # Arayüz ve rapor görünümü
-├── script.js                  # Kullanıcı akışı ve ön yüz bağlantıları
-├── assets/js/                 # Program kataloğu, yedekleme ve çıktı üreticileri
-├── backend/app/               # Belge okuma, doğrulama ve analiz motorları
-├── backend/app/agents/        # Beş uzman ajan, orkestratör ve CED omurgası
-├── shared/pilot/tde9/         # TDE 9 pilot program verileri
-├── shared/templates/          # Veri giriş ve rapor şablonları
-├── tests/                     # Python ve JavaScript kontrolleri
-└── docs/                      # Mimari ve geliştirme belgeleri
+|-- index.html                 # Ekranların anlamsal yapısı
+|-- styles.css                # Arayüz ve rapor görünümü
+|-- script.js                 # Kullanıcı akışı ve ön yüz bağlantıları
+|-- MAHIR_BASLAT.cmd          # Windows hızlı başlatıcı
+|-- assets/js/                # Program kataloğu, yedekleme ve çıktı üreticileri
+|-- backend/app/              # Belge okuma, doğrulama ve analiz motorları
+|-- backend/app/agents/       # Beş uzman ajan ve orkestratör
+|-- shared/pilot/tde9/        # TDE 9 pilot program verileri
+|-- shared/templates/         # Veri giriş ve rapor şablonları
+|-- tests/                    # Python ve JavaScript kontrolleri
+`-- docs/                     # Mimari ve geliştirme belgeleri
 ```
 
-## Veri güvenliği
+## Teknik belgeler ve kaynaklar
 
-- Depoya gerçek öğrenci adı, T.C. kimlik numarası veya okul numarası eklenmemelidir.
-- Pilot verilerinde `P001`, `P002` gibi takma kimlikler kullanılmalıdır.
-- Mevcut sürüm yerel prototiptir; üretim ortamına yönelik kimlik doğrulama, yetkilendirme, kayıt politikası ve KVKK uyumluluk kontrolleri ayrıca tamamlanmalıdır.
-- Gelecekte haricî bir LLM API’si kullanıldığında doğrudan kişisel veriler modele gönderilmeyecektir.
-- Okul/kurum adı, öğretmen adı, il, ilçe, okul numarası ve diğer kimlik belirleyici kurumsal alanlar LLM/RAG istemlerine gönderilmez. Genel değerlendirmede öğrenci eşleştirmesi yalnız oturumluk takma referanslarla yapılır.
-
-## Resmî yazı ve EBYS demo sınırı
-
-MAHİR, onaylanan analiz raporundan okul/kurum müdürlüğüne hitap eden bir üst yazı taslağı, konu, belge türü, ek listesi ve yönlendirme paketi oluşturabilir. Bu akış yarışmanın ikinci görevi olan resmî yazı taslaklama ve birim yönlendirmeyi gösterir.
-
-**EBYS entegrasyonu demo ortamında simüle edilmektedir. Demo işlemi gerçek EBYS sistemine belge göndermez.** Uygulama gerçek bir EBYS evrak sayısı, kayıt tarihi, paraf veya elektronik imza üretmez. Bunlar yalnız yetkili kurum entegrasyonu sonrasında EBYS tarafından oluşturulabilir. Demo akışı `Taslak → Öğretmen kontrolü → Demo aktarımı → Paraf bekliyor → Elektronik imza bekliyor` durumlarını görünür kılar ve indirilebilir bir demo aktarım paketi üretir.
-
-Resmî Word/PDF raporunda teknik ajan çalışma izi bulunmaz. Teknik süreler ve model çağrıları yalnız demo/denetim ekranında tutulur; resmî rapor öğretmen ve okul/kurum yetkilisi için imza alanlarıyla sona erer.
-
-## Kaynak ilkesi
-
-Program verileri, **Türkiye Yüzyılı Maarif Modeli** kapsamındaki resmî ders programları, Ortak Metin ve konu-soru dağılım tabloları esas alınarak yapılandırılır. Resmî belgede bulunmayan ders, sınıf, sınav veya süreç bileşeni için veri üretilmez.
-
+- [Belge Anlama Ajanı](docs/architecture/document-understanding-agent.md)
+- [Program Eşleştirme Ajanı](docs/architecture/program-mapping-agent.md)
+- [Ölçme ve Değerlendirme Ajanı](docs/architecture/measurement-evaluation-agent.md)
+- [Pedagojik Analiz Ajanı](docs/architecture/pedagogical-analysis-agent.md)
+- [Raporlama Ajanı](docs/architecture/reporting-agent.md)
+- [Standart Eğitim Belgesi](docs/architecture/canonical-education-document.md)
 - [Türkiye Yüzyılı Maarif Modeli](https://tymm.meb.gov.tr/)
-- [TDE 9 pilot veri paketi ve kaynak kullanım ilkeleri](shared/pilot/tde9/README.md)
-- [Proje geliştirme ilkeleri](DEVELOPMENT_CHARTER.md)
+- [TDE 9 pilot veri paketi](shared/pilot/tde9/README.md)
+- [Geliştirme ilkeleri](DEVELOPMENT_CHARTER.md)
 - [Değişiklik günlüğü](CHANGELOG.md)
 
-## Yol haritası
+## Sonraki geliştirme adımları
 
-1. Çoklu görsel yükleme, OCR doğrulama ve grup birleştirme
-2. Yapısal veriler için ilişkisel veritabanı
-3. Ortak Metin’in anlam temelli parçalara ayrılması ve vektör dizini
-4. Kaynak gösteren RAG katmanı
-5. Sağlayıcıdan bağımsız LLM bağlantısı
-6. Anonim pilot verilerle uçtan uca doğrulama
-7. Kurumsal güvenlik ve entegrasyon hazırlıkları
+1. OCR ve RAG akışlarının farklı anonim belge örnekleriyle genişletilmiş doğrulaması
+2. Süreli ve kullanım kotası sınırlandırılmış jüri demo erişimi
+3. Kalıcı ilişkisel veritabanı
+4. Kurumsal kimlik doğrulama ve yetkilendirme
+5. Yetkili kurumlarla gerçek EBYS entegrasyonu
+6. Üretim ortamı için KVKK, denetim kaydı ve saklama politikaları
 
 ## Ekip
 
-- **Zülal Ülker Daştan** — Takım kaptanı, Türk Dili ve Edebiyatı
-- **Lokman Daştan** — Din Kültürü ve Ahlak Bilgisi
-- **Gonca Ergül** — Fen Bilimleri
-- **Hakan Ergül** — Matematik
+- **Zülal Ülker Daştan** - Takım kaptanı, Türk Dili ve Edebiyatı
+- **Lokman Daştan** - Din Kültürü ve Ahlak Bilgisi
+- **Gonca Ergül** - Fen Bilimleri
+- **Hakan Ergül** - Matematik
 
 ---
 
-**MAHİR**, öğretmenin mesleki kararını devralmak için değil; kanıtı görünür, analizi izlenebilir ve raporlamayı yönetilebilir kılmak için geliştirilmektedir.
+**MAHİR, öğretmenin mesleki kararını devralmak için değil; kanıtı görünür, analizi izlenebilir ve resmî raporlama sürecini yönetilebilir kılmak için geliştirilmiştir.**
