@@ -8,6 +8,30 @@ Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in i�
 
 > **Temel ilke:** MAHİR önerir, hesaplar ve kanıt sunar; nihai değerlendirme ve onay öğretmene aittir.
 
+## Problem, kullanıcı ve potansiyel etki
+
+Öğretmenler yalnızca sınav puanı vermekle kalmaz; sınav verilerini kontrol eder, soru ve öğrenme çıktısı düzeyinde yorumlar, sınıfın güçlü ve gelişime açık yönlerini belirler, raporlar ve gerektiğinde kurum içi yazışmaya dönüştürür. Bu işlemlerin farklı belgeler ve araçlar üzerinde elle yürütülmesi zaman kaybına, tekrar eden veri girişine ve izlenebilirlik sorunlarına yol açabilir.
+
+MAHİR; belge okuma, veri doğrulama, kurallı hesaplama, program eşleştirme, kaynaklı pedagojik değerlendirme ve resmî raporlama adımlarını öğretmen kontrolündeki tek bir akışta birleştirmek üzere geliştirilmiştir. Amaç yeni bir karar mercii oluşturmak değil, öğretmenin mevcut işini daha düzenli, izlenebilir ve yeniden kullanılabilir hâle getirmektir.
+
+### Türkiye ölçeği
+
+Millî Eğitim Bakanlığının **2024-2025 Örgün Eğitim İstatistikleri** verilerine göre Türkiye'deki örgün eğitim kurumlarında toplam **1.187.409 öğretmen** görev yapmaktadır. Bu öğretmenlerin **1.009.671'i (%85,0) resmî**, **177.738'i (%15,0) özel** okullardadır.
+
+| İstatistiksel kavram | MAHİR bağlamındaki karşılığı |
+|---|---|
+| Hedef evren (potansiyel kullanıcı evreni) | Türkiye'deki örgün eğitim kurumlarında görev yapan 1.187.409 öğretmen |
+| Mevcut pilot kapsamı | 9. sınıf Türk Dili ve Edebiyatı sınav analizi ve raporlama akışı |
+| Pilot veri seti | Gerçek kişileri temsil etmeyen sentetik ve anonim sınav verileri |
+| Analiz birimleri | Soru, anonim öğrenci, öğrenme çıktısı, tema, sınıf ve rapor |
+| İstatistiksel çıkarım sınırı | Temsilî öğretmen örneklemiyle etki araştırması yapılmadığı için evrene yönelik süre tasarrufu veya başarı etkisi tahmin edilmez |
+| Genellenebilirlik sınırı | İşlevsel pilot sonuçları bütün ders, sınıf ve kurum türlerine doğrudan genellenemez |
+| Genişleme potansiyeli | Ders ve sınıfa özgü doğrulanmış program katalogları eklenerek yeni alanlara uyarlanabilir |
+
+Buradaki **1.187.409** sayısı MAHİR'in mevcut kullanıcı sayısı veya pilot örneklemi değildir; çözümün ele aldığı problemin ulusal ölçekteki hedef evrenini gösterir. Prototipin çalışan ve doğrulanmış ilk uygulama alanı TDE 9 pilotudur. Pilot, sistemin işlevlerini doğrular; öğretmen başına zaman tasarrufu veya ülke genelindeki etki hakkında henüz istatistiksel bir tahmin üretmez.
+
+Kaynak: [Millî Eğitim Bakanlığı, 2024-2025 Örgün Eğitim İstatistikleri](https://sgb.meb.gov.tr/www/quot2024-2025-orgun-egitim-istatistikleri-yayimlandiquot/icerik/771)
+
 ## Yarışma görevlerinin tamamlanma durumu
 
 Şartnamenin 6.4. bölümünde iki görevin birlikte tamamlanması istenmektedir. MAHİR'de her iki görev de eğitim alanına uyarlanmış demo kapsamında çalışmaktadır.
@@ -83,6 +107,18 @@ MAHİR'de görev sınırları belirlenmiş beş uzman ajan bulunur:
 Bu ayrım, bir ajanın ürettiği sonucun diğer ajan tarafından izlenebilmesini ve sayısal hesapların dil modeli yorumundan bağımsız kalmasını sağlar.
 
 ## Jüri için hızlı başlangıç
+
+### Sunumu dinlemeden hızlı inceleme
+
+Depoyu yalnızca belgeler üzerinden değerlendirmek isteyen jüri üyeleri aşağıdaki kanıt zincirini izleyebilir:
+
+1. [Örnek sınav girdisi](shared/sample-exam.csv)
+2. [Yapılandırılmış standart eğitim belgesi örneği](shared/ced-example.json)
+3. [Örnek analiz raporu](shared/report-example.txt)
+4. [TDE 9 pilot veri paketi ve kapsam açıklaması](shared/pilot/tde9/README.md)
+5. [Otomatik testler](tests/)
+
+Bu dosyalar örnek girdiden yapılandırılmış veriye, analiz çıktısına ve doğrulama kontrollerine uzanan akışın repo üzerinden izlenebilmesini sağlar. Örnek dosyalar sentetiktir; gerçek öğrenci kimliği içermez.
 
 ### Windows'ta çalıştırma
 
@@ -180,20 +216,18 @@ TDE kodları yalnızca **Türk Dili ve Edebiyatı + 9. sınıf** profili seçild
 | Kalıcı ilişkisel veritabanı | Sonraki geliştirme aşaması |
 | Kurumsal kullanıcı hesabı ve yetkilendirme | Prototip sonrası |
 
-## Jüri için 15 dakikalık önerilen gösterim
+## Jüri için 5 dakikalık gösterim planı
 
-Şartnameye göre final süresi **10 dakika sunum + 5 dakika soru-cevap** biçimindedir.
+Final süresi **4 dakika sunum + 1 dakika soru-cevap** biçimindedir. Bu nedenle sunumda bütün ekranları tek tek anlatmak yerine problemin, çalışan çözüm akışının ve üretilen kanıtın gösterilmesi hedeflenir.
 
-1. **1 dakika:** Problem, kullanıcı ve öğretmen onayı ilkesi
-2. **2 dakika:** Sınav evrakının yüklenmesi ve OCR/belge okuma
-3. **2 dakika:** Eksik-çelişkili veri doğrulaması
-4. **2 dakika:** Soru, öğrenme çıktısı ve tema bazlı kurallı analiz
-5. **1 dakika:** RAG destekli, kaynaklı pedagojik değerlendirme
-6. **1 dakika:** Word/PDF raporu ve kanıt görünümü
-7. **1 dakika:** Resmî üst yazı, birim yönlendirme ve EBYS demosu
-8. **5 dakika:** Jüri soruları
+1. **0.00–0.35 | Problem ve yaklaşım:** Öğretmenin sınav verisini analiz etme yükü, kanıta dayalı değerlendirme ihtiyacı ve öğretmen onayı ilkesi açıklanır.
+2. **0.35–1.25 | Belgeyi anlama ve doğrulama:** Örnek sınav belgesi yüklenir; belge okuma/OCR sonucu ile eksik veya çelişkili alanların öğretmene nasıl gösterildiği sunulur.
+3. **1.25–2.25 | Kurallı sınav analizi:** Soru, puan, tema ve öğrenme çıktısı eşleştirmeleri ile öğrenci ve sınıf düzeyindeki hesaplamalar gösterilir.
+4. **2.25–3.10 | Kaynaklı pedagojik değerlendirme:** Öğretmen onayından sonra çalışan RAG desteği, kullanılan program kaynağı ve kanıt bağlantısı üzerinden açıklanır.
+5. **3.10–4.00 | Çıktı ve kurumsal kullanım:** Word/PDF raporu, kanıt görünümü, resmî üst yazı ve EBYS demo akışı birlikte gösterilir; MAHİR'in öğretmenin yerine karar vermediği vurgulanır.
+6. **4.00–5.00 | Jüri soruları:** Teknik mimari, veri güvenliği, pedagojik dayanak veya yaygınlaştırma hakkında gelen sorular yanıtlanır.
 
-İnternet kesintisi veya uzak GPU soğuk başlangıcı olasılığına karşı önceden hazırlanmış anonim veri, örnek rapor ve kayıtlı demo görüntüsü yedek olarak bulundurulmalıdır. Jüri talep ettiğinde canlı çalıştırma yapılabilmelidir.
+Sunum süresinin kısa olması nedeniyle canlı gösterim önceden anonim örnek veriyle hazırlanmalıdır. İnternet kesintisi veya uzak GPU soğuk başlangıcı olasılığına karşı aynı akışın kayıtlı demo görüntüsü ile örnek Word/PDF raporu yedek olarak bulundurulmalıdır.
 
 ## Testler
 
@@ -255,11 +289,30 @@ MAHIR-PROTOTIP-HTML/
 
 ## Ekip
 
-- **Zülal Ülker Daştan** - Takım kaptanı, Türk Dili ve Edebiyatı
-- **Lokman Daştan** - Din Kültürü ve Ahlak Bilgisi
-- **Gonca Ergül** - Fen Bilimleri
-- **Hakan Ergül** - Matematik
+### Zülal Ülker Daştan — Takım Kaptanı ve Kurucu Lider
+
+Türk Dili ve Edebiyatı öğretmenidir. Alanında tezsiz yüksek lisans eğitimine; eğitim teknolojileri, ölçme ve değerlendirme, yapay zekâ ve proje koordinasyonu deneyimine sahiptir.
+
+**MAHİR'deki sorumluluğu:** Proje vizyonunu ve ürün stratejisini oluşturur; kullanıcı deneyimi, yapay zekâ senaryoları, içerik yaklaşımı, ekip koordinasyonu, sürüm takibi ve yaygınlaştırma çalışmalarını yönetir.
+
+### Lokman Daştan — Araştırma Lideri
+
+Din Kültürü ve Ahlak Bilgisi öğretmenidir. İlahiyat alanında yüksek lisans eğitimine; eğitim araştırmaları, pedagojik değerlendirme, etik, veri gizliliği ve raporlama deneyimine sahiptir.
+
+**MAHİR'deki sorumluluğu:** Pedagojik uygunluğu, etik ve gizlilik ilkelerini, öğretmen doğrulama adımlarını ve üretilen raporların eğitim dili bakımından tutarlılığını denetler.
+
+### Gonca Ergül — Bilimsel İçerik Lideri
+
+Fen Bilimleri öğretmenidir. Bilimsel içerik, STEM uygulamaları, rubrik geliştirme, beceri temelli ölçme ve dijital eğitim araçları alanlarında deneyim sahibidir.
+
+**MAHİR'deki sorumluluğu:** Bilimsel içerik doğrulamasını, program ve öğrenme çıktısıyla uyumlu değerlendirme tasarımını, rubrik çalışmalarını ve öğretmen geri bildirimlerinin ürüne aktarılmasını yönetir.
+
+### Hakan Ergül — Teknik Lider
+
+Matematik öğretmenidir. Alanında yüksek lisans eğitimine; Python programlama, veri analizi, algoritma geliştirme ve web tabanlı sistemler konularında deneyime sahiptir.
+
+**MAHİR'deki sorumluluğu:** Sistem mimarisi, veri analizi ve algoritmaları geliştirir; bileşenlerin entegrasyonu ile test, güvenlik, performans ve teknik sürdürülebilirlik çalışmalarını yönetir.
 
 ---
 
-**MAHİR, öğretmenin mesleki kararını devralmak için değil; kanıtı görünür, analizi izlenebilir ve resmî raporlama sürecini yönetilebilir kılmak için geliştirilmiştir.**
+**MAHİR öğretmenin yerine karar vermez. Öğrenme kanıtlarını görünür, sınav analizini izlenebilir hâle getirir. Resmî raporlama ve kurum içi yazışma süreçlerinde öğretmene yardımcı olur.**
