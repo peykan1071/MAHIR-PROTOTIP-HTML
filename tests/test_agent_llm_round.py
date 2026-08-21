@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import rag_service
 from backend.app.agents import prompts
+from backend.app.agents.pipeline import _sanitize_anomaly_finding
 from backend.app.approved_data_analyzer import (
     analyze_approved_data,
     analyze_approved_data_traced,
@@ -287,6 +288,29 @@ class DiagnosisSourceTests(unittest.TestCase):
 
 
 class AnomalyAgentTests(unittest.TestCase):
+    def test_only_existing_question_numbers_are_accepted(self):
+        answer = "\n".join((
+            "- Soru 2: diğer sorulardan ayrışıyor.",
+            "- Soru 99: puanlama hatası olabilir.",
+            "Genel olarak sınav sorunludur.",
+        ))
+        self.assertEqual(
+            _sanitize_anomaly_finding(answer, {1, 2, 3}),
+            "- Soru 2: diğer sorulardan ayrışıyor.",
+        )
+
+    def test_at_most_three_valid_anomaly_lines_are_kept(self):
+        answer = "\n".join(f"- Soru {number}: gözlem." for number in range(1, 6))
+        cleaned = _sanitize_anomaly_finding(answer, {1, 2, 3, 4, 5})
+        self.assertEqual(cleaned.count("- Soru"), 3)
+        self.assertNotIn("Soru 4", cleaned)
+
+    def test_free_text_anomaly_claim_is_rejected(self):
+        self.assertEqual(
+            _sanitize_anomaly_finding("Bu sınavda ciddi bir sorun vardır.", {1, 2, 3}),
+            "",
+        )
+
     def test_no_llm_prompt_carries_institutional_identity(self):
         payload = _tde_payload()
         payload["exam"].update({

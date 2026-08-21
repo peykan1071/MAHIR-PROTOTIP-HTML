@@ -419,7 +419,9 @@ def _build_rag_question(outcome: dict[str, Any]) -> str:
         f"{' - '.join(parts)} öğrenme çıktısında öğrenciler {percent_text} "
         f"başarı oranı gösterdi. "
         f"Bu oran için şiddet etiketi: {severity}. "
-        "BAĞLAM'daki öğretim programı metninin bu kazanım için öngördüğü "
-        "somut içerik ve bileşenleri adıyla anarak, bu başarı oranının hangi "
-        "bileşende tıkandığını teşhis et."
+        "BAĞLAM'daki öğretim programı metninden bu çıktıyla doğrudan ilgili "
+        "iki somut terimi adıyla anarak yanıtla. Oranın yalnız performans düzeyini "
+        "gösterdiğini kabul et; eksikliğin nedenini, öğrenci sayısını veya "
+        "öğrencinin bilgisini tahmin etme. Yalnız ölçülen çıktı kapsamındaki "
+        "performans sınırlılığını ve sarmal riski betimle."
     )

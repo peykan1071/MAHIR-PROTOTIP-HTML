@@ -14,6 +14,7 @@ hiçbiri LLM tarafından üretilmez veya değiştirilmez; her çağrı ilgili aj
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from typing import Any
@@ -242,9 +243,18 @@ class MeasurementAgent:
         # Tüm ajanların prompt'ları tek istekte gidiyor (bkz. orchestrator
         # `_flush_llm_queue`) - bu ajanın LLM alması analize ek bir HTTP turu
         # eklemiyor.
-        prompt = build_anomaly_prompt(
-            [row for rows in evidence_questions.values() for row in rows]
-        )
+        # Anomali istemi öğrenme çıktısı kanıtlarından kurulmaz: aynı soru
+        # birden fazla çıktıya bağlıysa o listede yinelenir ve model bunu
+        # sahte bir "aynı oran" örüntüsü sanabilir. Her fiziksel soru burada
+        # tam bir kez bulunur.
+        anomaly_rows = [
+            {
+                **row,
+                "correctedCellCount": corrected_cells.get(index, 0),
+            }
+            for index, row in enumerate(question_results)
+        ]
+        prompt = build_anomaly_prompt(anomaly_rows)
         if prompt:
             # Sahiplik AÇIK yazılıyor: orkestratör LLM kaydını bu alana bakarak
             # doğru ajanın izine düşürüyor. Prompt ADINDAN çıkarmak kırılgan
@@ -280,7 +290,10 @@ class MeasurementAgent:
             context.scratch["anomalies"] = ""
             return AgentResult(outputs={"anomalyFindings": 0})
 
-        finding = str(result.get("answer") or "").strip()
+        finding = _sanitize_anomaly_finding(
+            str(result.get("answer") or ""),
+            {int(item["number"]) for item in context.scratch.get("questionResults", [])},
+        )
         if finding.startswith(_NO_ANOMALY_TEXT):
             finding = ""
         context.scratch["anomalies"] = finding
@@ -411,18 +424,34 @@ class PedagogicalAnalysisAgent:
             # beslendiğinde bile cevabı sık sık bu cümleyle başlatıp ardından
             # gerçek teşhisle devam ediyor (gerçek dizin karşısında ölçüldü).
             if answer.startswith(_RAG_NO_ANSWER_TEXT):
-                answer = answer[len(_RAG_NO_ANSWER_TEXT):].strip()
+                # Model kaynak yetersizliğini bildirdiyse devamına eklediği
+                # metin güvenilir kabul edilemez. Ret cümlesini kırpıp kalan
+                # olası halüsinasyonu rapora taşımak yerine yanıtın tamamı
+                # elenir.
+                answer = ""
             if not answer:
                 _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti", code)
                 continue
             stripped += int(result.get("strippedSentences") or 0)
-            if not _answer_matches_outcome_scope(answer, outcome):
-                _logger.info("RAG atlandı: cikti=%s sebep=baglam-sapmasi", code)
+            raw_sources = result.get("sources") or []
+            # Güncel RAG uç noktası kaynak parçalarının kısa alıntılarını da
+            # döndürür. Bu durumda model nihai raporu yazmaz; yalnız kaynakta
+            # birebir doğrulanabilen iki kanıt terimi seçer ve paragrafı MAHİR
+            # belirlenimci olarak kurar. Eski/aletsiz uçların alıntısız kaynak
+            # biçimi geriye uyumluluk için mevcut sözleşmeyle denetlenir.
+            if any(str(source.get("excerpt") or "").strip() for source in raw_sources if isinstance(source, dict)):
+                answer = _compose_grounded_pedagogical_answer(answer, outcome, raw_sources)
+            if not answer or not _answer_matches_outcome_scope(answer, outcome):
+                _logger.info("RAG atlandı: cikti=%s sebep=yanit-sozlesmesi", code)
                 outcome["ragContext"] = _RAG_SCOPE_REJECTED_TEXT
                 outcome["ragSources"] = []
                 continue
+            merged_sources = _merge_rag_sources(raw_sources)
+            if not merged_sources:
+                _logger.info("RAG atlandı: cikti=%s sebep=gecersiz-kaynak", code)
+                continue
             outcome["ragContext"] = answer
-            outcome["ragSources"] = _merge_rag_sources(result.get("sources"))
+            outcome["ragSources"] = merged_sources
             grounded += 1
             _logger.info(
                 "RAG dolduruldu: cikti=%s sebep=basarili kaynak=%d",
@@ -539,6 +568,90 @@ def _merge_rag_sources(sources: Any) -> list[dict[str, Any]]:
     ]
 
 
+def _sanitize_anomaly_finding(answer: str, valid_question_numbers: set[int]) -> str:
+    """Yalnız mevcut sorulara bağlı, en çok üç anomali maddesini kabul et.
+
+    Anomali LLM'i sayısal sonuç üretmez; yine de model var olmayan bir soru
+    numarası veya serbest bir genel hüküm yazabilir. Rapor yalnız biçimi doğru
+    ve sınavda gerçekten bulunan soru numarasına bağlı gözlemleri taşır.
+    """
+
+    cleaned = answer.strip()
+    if cleaned.startswith(_NO_ANOMALY_TEXT):
+        return ""
+
+    accepted: list[str] = []
+    for raw_line in cleaned.splitlines():
+        line = raw_line.strip()
+        match = re.fullmatch(r"-\s*Soru\s+(\d+)\s*:\s*(.+)", line, re.IGNORECASE)
+        if not match:
+            continue
+        if int(match.group(1)) not in valid_question_numbers:
+            continue
+        accepted.append(f"- Soru {int(match.group(1))}: {match.group(2).strip()}")
+        if len(accepted) == 3:
+            break
+    return "\n".join(accepted)
+
+
+def _compose_grounded_pedagogical_answer(
+    answer: str,
+    outcome: dict[str, Any],
+    sources: list[dict[str, Any]],
+) -> str:
+    """LLM'nin seçtiği iki kaynak teriminden güvenli rapor paragrafı kurar.
+
+    Terimler kaynak alıntılarında birebir bulunmuyorsa hiçbir metin üretilmez.
+    Başarı oranı ve şiddet modelden değil, ölçme motorunun sonucundan alınır.
+    """
+
+    candidate = answer.strip()
+    if candidate.startswith("```"):
+        candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.IGNORECASE)
+    try:
+        # Küçük modeller, "yalnız JSON" talimatına rağmen geçerli nesnenin
+        # arkasına açıklama ekleyebiliyor. İlk JSON nesnesi güvenle ayrıştırılır;
+        # devamındaki serbest metin rapora hiçbir koşulda taşınmaz.
+        payload, _unused_tail = json.JSONDecoder().raw_decode(candidate)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return ""
+    terms = payload.get("evidenceTerms") if isinstance(payload, dict) else None
+    if not isinstance(terms, list) or len(terms) != 2:
+        return ""
+    terms = [" ".join(str(term).split()).strip(" .,:;\"'") for term in terms]
+    if any(not term or len(term) > 90 for term in terms) or terms[0].casefold() == terms[1].casefold():
+        return ""
+
+    evidence = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
+    normalized_evidence = _normalize_evidence_text(evidence)
+    if any(_normalize_evidence_text(term) not in normalized_evidence for term in terms):
+        return ""
+
+    rate = float(outcome.get("successRate") or 0.0)
+    percent = round(rate * 100)
+    theme = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", str(outcome.get("outcomeTheme") or ""), flags=re.IGNORECASE).strip()
+    if not theme:
+        return ""
+    first = (
+        f'"{theme}" temasında {terms[0]} ve {terms[1]} kapsamındaki '
+        f"sınıf başarı oranı %{percent} olarak hesaplanmıştır."
+    )
+    if rate < 0.70:
+        severity = "Kritik" if rate < 0.50 else "Orta"
+        return (
+            f"{first} Eksikliğin şiddeti: {severity}. "
+            "Bu performans, seçilen öğrenme çıktısının sonraki süreçleri açısından sarmal risk taşır."
+        )
+    return f"{first} Bu sonuç, seçilen öğrenme çıktısında güçlü bir performans alanını gösterir."
+
+
+def _normalize_evidence_text(value: str) -> str:
+    """PDF satır sonu ve hece tirelerini kaynak-terim karşılaştırması için düzelt."""
+
+    value = re.sub(r"\s*-\s*", "", value.casefold())
+    return " ".join(value.split())
+
+
 def _enqueue_diagnosis_prompts(
     context: AgentContext, outcome_results: list[dict[str, Any]], program: Any
 ) -> dict[str, dict[str, Any]]:
@@ -609,6 +722,19 @@ def _enqueue_diagnosis_prompts(
                     else ""
                 )
                 + f"SORU: {question}\n\nYalnızca bu sınav türü, seçilmiş öğrenme çıktısı ve yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla."
+                + (
+                    "\n\nYANIT SÖZLEŞMESİ: Paragraf yazma. Yalnız geçerli JSON döndür: "
+                    "{\"evidenceTerms\":[\"BAĞLAMDA AYNEN GEÇEN TERİM 1\",\"BAĞLAMDA AYNEN GEÇEN TERİM 2\"]}. "
+                    "Her terim BAĞLAM içinde kesintisiz ve birebir geçen kısa bir ifade olmalı; sözcük türetme, "
+                    "ek değiştirme, özetleme veya iki ayrı parçayı birleştirme. "
+                    "Kod, oran, şiddet, neden, yorum, risk, etkinlik, çözüm veya öneri ekleme. Markdown kullanma."
+                    if is_weak else
+                    "\n\nYANIT SÖZLEŞMESİ: Paragraf yazma. Yalnız geçerli JSON döndür: "
+                    "{\"evidenceTerms\":[\"BAĞLAMDA AYNEN GEÇEN TERİM 1\",\"BAĞLAMDA AYNEN GEÇEN TERİM 2\"]}. "
+                    "Her terim BAĞLAM içinde kesintisiz ve birebir geçen kısa bir ifade olmalı; sözcük türetme, "
+                    "ek değiştirme, özetleme veya iki ayrı parçayı birleştirme. "
+                    "Kod, oran, neden, yorum, etkinlik, çözüm veya öneri ekleme. Markdown kullanma."
+                )
             ),
             "retrieval": {
                 "programId": program.id,
@@ -627,7 +753,35 @@ def _enqueue_diagnosis_prompts(
 
 
 def _answer_matches_outcome_scope(answer: str, outcome: dict[str, Any]) -> bool:
-    """Başka kazanım kodu veya sınav becerisine sapan LLM yanıtını reddet."""
+    """Pedagojik LLM yanıtının güvenli yayın sözleşmesine uyduğunu doğrula.
+
+    Model metni burada düzeltilmez. Uzunluk, öneri/etkinlik dili, başarı
+    oranından kanıtlanamayacak nedensellik veya kapsam sapması varsa yanıtın
+    tamamı elenir. Böylece akıcı görünen fakat kanıtı aşan bir metin rapora
+    taşınmaz.
+    """
+
+    normalized = " ".join(answer.casefold().split())
+    word_count = len(re.findall(r"\b[\wÇĞİÖŞÜçğıöşü]+(?:['’][\wÇĞİÖŞÜçğıöşü]+)?\b", answer))
+    is_weak = float(outcome.get("successRate") or 0.0) < 0.70
+    if word_count > (70 if is_weak else 60):
+        return False
+
+    # Toplu başarı oranı performans düzeyini gösterir; hatanın nedenini,
+    # öğrenci niyetini veya öğrenci sayısını kanıtlamaz.
+    unsupported_claims = (
+        "temel neden", "temel sebep", "nedeni", "sebebi", "kaynaklan",
+        "öğrencilerin say", "öğrenci say", "yetersiz bilgi",
+    )
+    # MAHİR tanı koyabilir fakat öğretmene etkinlik/telafi işi yazamaz.
+    action_language = (
+        "etkinlik", "aktivite", "alıştırma", "uygulama çalış",
+        "telafi", "önerilir", "tavsiye", "yapılmalı", "verilmeli",
+        "geliştirilmeli", "desteklenmeli", "gerekmektedir", "gereklidir",
+        "ihtiyaç duyul",
+    )
+    if any(term in normalized for term in unsupported_claims + action_language):
+        return False
 
     allowed_codes = {
         str(value).upper() for value in (outcome.get("outcomeCode"), outcome.get("parentOutcomeCode")) if value
@@ -636,7 +790,6 @@ def _answer_matches_outcome_scope(answer: str, outcome: dict[str, Any]) -> bool:
     if mentioned_codes - allowed_codes:
         return False
     component = str(outcome.get("componentType") or "").lower()
-    normalized = answer.casefold()
     forbidden = {
         "listening": (
             "okuma beceri", "okuma strateji", "yazma beceri", "konuşma beceri",

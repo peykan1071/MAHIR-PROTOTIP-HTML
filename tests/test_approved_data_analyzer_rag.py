@@ -10,7 +10,10 @@ from backend.app.approved_data_analyzer import (
     _strip_recommendation_sentences,
     analyze_approved_data,
 )
-from backend.app.agents.pipeline import _answer_matches_outcome_scope
+from backend.app.agents.pipeline import (
+    _answer_matches_outcome_scope,
+    _compose_grounded_pedagogical_answer,
+)
 
 _FAKE_REMOTE_URL = "https://fake.example/web_query"
 
@@ -90,6 +93,50 @@ def _llm_patch(**kwargs):
 
 
 class RagContextAttachmentTests(unittest.TestCase):
+    def test_structured_evidence_builds_deterministic_diagnosis(self):
+        outcome = {
+            "outcomeCode": "TDE2.2",
+            "outcomeTheme": "2. Tema: Anlam Arayışı",
+            "successRate": 0.20,
+        }
+        answer = '{"evidenceTerms":["ana duygu","ana düşünce"]}'
+        sources = [{"excerpt": "Metinde konu, ana duygu ve ana düşünce bir bütünün parçalarıdır."}]
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertIn('"Anlam Arayışı"', result)
+        self.assertIn("%20 olarak hesaplanmıştır", result)
+        self.assertIn("Eksikliğin şiddeti: Kritik.", result)
+        self.assertNotIn("etkinlik", result)
+
+    def test_unverified_evidence_term_is_rejected(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu ve ana düşünce belirlenir."}]
+        self.assertEqual(
+            _compose_grounded_pedagogical_answer(
+                '{"evidenceTerms":["ana duygu","edebiyat atölyesi"]}', outcome, sources
+            ),
+            "",
+        )
+
+    def test_non_json_model_paragraph_is_rejected_when_structured_evidence_is_expected(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        self.assertEqual(
+            _compose_grounded_pedagogical_answer(
+                "Öğrenciler için bir etkinlik önerilir.", outcome, [{"excerpt": "ana duygu"}]
+            ),
+            "",
+        )
+
+    def test_valid_json_is_used_and_trailing_model_prose_is_ignored(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.40}
+        sources = [{"excerpt": "Okuma stratejisi ile metinleri inceleme birlikte ele alınır."}]
+        answer = (
+            '{"evidenceTerms":["Okuma stratejisi","metinleri inceleme"]}\n\n'
+            "Bu bölüm modelin kaynak dışına çıkabilen serbest açıklamasıdır."
+        )
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertIn("Okuma stratejisi ve metinleri inceleme", result)
+        self.assertNotIn("serbest açıklama", result)
+
     def test_ragcontext_field_always_present_even_without_remote_url(self):
         # MAHIR_RAG_REMOTE_URL artık koda gömülü bir varsayılana sahip (bkz.
         # approved_data_analyzer.py) - "yapılandırılmamış" durumu burada
@@ -135,6 +182,31 @@ class RagContextAttachmentTests(unittest.TestCase):
         }
         self.assertFalse(_answer_matches_outcome_scope("TDE2.2.3 okuma becerileri eksiktir.", outcome))
         self.assertTrue(_answer_matches_outcome_scope("TDE3.3 konuşma becerisi güçlüdür.", outcome))
+
+    def test_overlong_pedagogical_answer_is_rejected(self):
+        outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
+        answer = " ".join(["kanıt"] * 71)
+        self.assertFalse(_answer_matches_outcome_scope(answer, outcome))
+
+    def test_causal_overclaim_and_student_count_are_rejected(self):
+        outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
+        self.assertFalse(_answer_matches_outcome_scope("Düşüklüğün temel nedeni yetersiz bilgidir.", outcome))
+        self.assertFalse(_answer_matches_outcome_scope("Zorluk çeken öğrencilerin sayısı yüksektir.", outcome))
+
+    def test_activity_or_remediation_language_is_rejected(self):
+        outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
+        self.assertFalse(_answer_matches_outcome_scope("Bu çıktı için etkinlik önerilir.", outcome))
+        self.assertFalse(_answer_matches_outcome_scope("Telafi çalışması yapılmalıdır.", outcome))
+
+    def test_concise_evidence_bounded_diagnosis_is_accepted(self):
+        outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
+        self.assertTrue(
+            _answer_matches_outcome_scope(
+                "Açık ve örtük iletiyi belirleme performansı yüzde 30 düzeyindedir. "
+                "Eksikliğin şiddeti: Kritik. Bu sınırlılık sonraki anlam oluşturma süreçleri için risk taşır.",
+                outcome,
+            )
+        )
 
     def test_listening_rejects_interview_and_reading_drift(self):
         outcome = {
@@ -233,12 +305,10 @@ class RagContextAttachmentTests(unittest.TestCase):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
-    def test_answer_prefixed_with_no_answer_phrase_is_stripped_not_discarded(self):
-        # Gerçek dizine karşı doğrulandı: model doğru bağlamla beslendiğinde bile
-        # cevabı neredeyse her zaman "Bu bilgi belgede bulunmuyor." ile başlatıp
-        # ardından gerçek bir teşhisle devam ediyor - kaynaklar dolu geldiği
-        # sürece bu, gerçek bir "bulunamadı" değil, atılmaması gereken geçerli
-        # bir cevap.
+    def test_answer_prefixed_with_no_answer_phrase_is_discarded(self):
+        # Model önce kaynak yetersizliğini bildirip ardından metin ekliyorsa iki
+        # ifade birbiriyle çelişir. Devamı doğru görünse bile kanıtlı kabul
+        # edilmez; olası halüsinasyonun rapora taşınması engellenir.
         canned = (
             True,
             "Yanıt üretildi.",
@@ -250,7 +320,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=_llm_reply((canned[2]["answer"], canned[2]["sources"]))):
                 result = analyze_approved_data(_weak_tde_payload())
-        self.assertEqual(result["outcomes"][0]["ragContext"], "TDE1.2 dinleme becerisini kapsar.")
+        self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
     def test_answer_only_the_no_answer_phrase_with_sources_still_leaves_ragcontext_empty(self):
         # Kırpmadan sonra hiçbir şey kalmıyorsa (model gerçekten hiçbir şey
