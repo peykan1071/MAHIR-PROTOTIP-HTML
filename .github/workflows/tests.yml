@@ -1,0 +1,67 @@
+name: MAHİR Otomatik Testleri
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mahir-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python ve JavaScript doğrulaması
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Depoyu al
+        uses: actions/checkout@v4
+
+      - name: Python 3.12 hazırla
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Python bağımlılıklarını kur
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Python testlerini çalıştır
+        shell: bash
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests -p 'test_*.py' 2>&1 | tee python-tests.log
+          {
+            echo "## MAHİR otomatik test özeti"
+            echo
+            grep -E 'Ran [0-9]+ tests?' python-tests.log | tail -1 || true
+            grep -E '^OK$' python-tests.log | tail -1 || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Node.js 22 hazırla
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: JavaScript testlerini çalıştır
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test tests/*.test.js 2>&1 | tee javascript-tests.log
+          {
+            echo
+            echo "### JavaScript testleri"
+            grep -E '^# (tests|pass|fail) ' javascript-tests.log || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ana tarayıcı betiğini doğrula
+        run: node --check script.js
