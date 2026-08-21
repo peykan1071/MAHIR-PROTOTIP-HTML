@@ -872,9 +872,10 @@ class RAGInference:
 
         # Genel ajan biçimi: çağıran kendi system/user prompt'unu gönderir.
         # `queries`den farkı GETİRİM YOK - Qdrant'a hiç dokunulmaz, Volume
-        # reload edilmez, gömme yapılmaz. MAHİR'in beş uzman ajanı
-        # (backend/app/agents/) bunu kullanır: her birinin kendi prompt'u var
-        # ama hepsi aynı sıcak konteyneri ve aynı vLLM partisini paylaşır.
+        # reload edilmez, gömme yapılmaz. Beş analiz ajanından yalnız LLM
+        # desteği kullananlar (bugünkü akışta Ölçme-Değerlendirme ve Pedagojik
+        # Analiz) prompt'larını buraya yollar; aynı sıcak konteyner ve tek
+        # vLLM partisi paylaşılır. Diğer üç ajan kurallı çalışır.
         raw_agents = (body or {}).get("agents")
         if isinstance(raw_agents, list) and raw_agents:
             # Doğrulama ile üretim ayrı: geçersiz istek çağıranın hatası (400),
@@ -967,11 +968,10 @@ class RAGInference:
 
         Bu birleştirme Faz 3'ün asıl amacı: eskiden getirimli sorgular
         `queries`, getirimsizler `agents` biçiminden gidiyordu ve iki ayrı
-        HTTP turu + iki ayrı vLLM partisi demekti. Her yeni LLM'li ajan
-        analize ~3 sn ekliyordu. Artık kaç ajan LLM kullanırsa kullansın tur
-        sayısı BİR - "ek GPU maliyeti yok" iddiası ancak böyle beş ajanda da
-        geçerli kalıyor (ölçüldü: 10 prompt, tek prompt'un 2,6 katı sürede
-        16 katı metin üretiyor).
+        HTTP turu + iki ayrı vLLM partisi demekti. Artık o analiz turunda kaç
+        LLM destekli görev bulunursa bulunsun istemci tek toplu istek yollar.
+        Bu teknik bir istek birleştirme davranışıdır; sıfır maliyet veya sabit
+        süre iddiası değildir.
 
         Hiçbir öğe `retrieval` taşımıyorsa Qdrant'a HİÇ dokunulmaz - Volume
         reload ve gömme atlanır.

@@ -5,9 +5,11 @@ Her ajan `docs/architecture/` altındaki kendi şartnamesine sadık kalır ve
 Ölçme yorum yapmaz, Pedagojik Analiz hesap yapmaz, Raporlama yeniden
 hesaplamaz.
 
-Faz 1'de hepsi deterministik: mevcut, test edilmiş mantık sarmalanıyor -
-yeniden yazılmıyor. LLM rolleri sonraki fazda bu iskeletin üzerine eklenecek
-ve her çağrı `AgentTrace.llm_calls`'a düşecek.
+Belge Anlama, Program Eşleştirme ve Raporlama deterministik çalışır. Ölçme
+Ajanı yalnız sayı üretmeyen anomali açıklamasını, Pedagojik Analiz Ajanı ise
+kaynaklı program yorumunu ortak LLM kuyruğuna ekleyebilir. Nicel sonuçların
+hiçbiri LLM tarafından üretilmez veya değiştirilmez; her çağrı ilgili ajanın
+`AgentTrace.llm_calls` kaydına düşer.
 """
 
 from __future__ import annotations

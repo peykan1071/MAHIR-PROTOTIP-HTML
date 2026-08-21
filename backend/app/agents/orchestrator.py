@@ -249,9 +249,8 @@ def _record_llm_calls(context: AgentContext, results: list[dict[str, Any]]) -> N
 def _flush_llm_queue(context: AgentContext) -> None:
     """Kuyruğa yazılmış TÜM ajan prompt'larını tek istekte gönderir.
 
-    Faz 3'ün asıl kazancı burada: kaç ajan LLM kullanırsa kullansın tur sayısı
-    BİR. Ajan başına ayrı HTTP turu atsaydık her yeni LLM'li ajan analize ~3 sn
-    eklerdi (ölçüldü) ve "ek GPU maliyeti yok" iddiası beş ajanda çökerdi.
+    Mevcut iki LLM destekli rolün istemleri burada tek ağ isteğinde
+    birleştirilir. Böylece her rol için ayrı uzak servis turu oluşturulmaz.
 
     Kuyruk boşsa hiç istek atılmaz - kayıtlı olmayan derslerde ve LLM'in
     yapılandırılmadığı ortamlarda bugünkü davranış aynen korunur.

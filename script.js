@@ -124,6 +124,13 @@
     }
   });
 
+  /*
+   * Tarihsel tarayıcı sözleşmesi: Aşağıdaki `*Agent` adları eski arayüz
+   * adaptörleriyle geriye dönük uyumluluk için korunur. Bunlar README'de
+   * tanımlanan altı uzman ajana ek bağımsız ajanlar veya LLM rolleri değildir.
+   * Güncel uzman ajan sayısı ve işlem izi, yükleme öncesindeki OCR kalite
+   * bileşeni ile `/mahir-analyze` yanıtındaki beş sunucu ajanından oluşur.
+   */
   class BaseAgent {
     constructor({ name, state, logger, events }) {
       this.name = name;
@@ -507,8 +514,10 @@
     strengths: ["Metin çıkarımı güçlüdür."],
     developmentAreas: ["Kanıt kullanımı geliştirilebilir."],
     misconceptions: [],
-    teachingSuggestions: ["Kısa kanıt temelli yazma etkinliği uygulanabilir."],
-    monitoringPlan: ["Bir sonraki değerlendirmede aynı öğrenme çıktısı izlenir."]
+    // Alan adı eski tarayıcı sözleşmesiyle uyumluluk için korunur; içerik
+    // yöntem/etkinlik önerisi değil, yalnız kanıta dayalı izleme odağıdır.
+    teachingSuggestions: ["İzleme odağı: kanıt kullanımı."],
+    monitoringPlan: ["Aynı öğrenme çıktısına ilişkin sonraki kanıtlar izlenir."]
   });
   const makeEvidenceOutput = () => ({ evidenceItems: [evidenceItemDefault()], unsupportedClaims: [], confidenceSummary: { average: 0.85 } });
   const makeValidationOutput = () => ({ valid: true, issues: [], blockingIssues: [], warnings: [], approvalRequired: true });
@@ -520,8 +529,8 @@
     learningOutcomeEvaluation: [],
     strengths: ["Metin çıkarımı güçlüdür."],
     developmentAreas: ["Kanıt kullanımı geliştirilebilir."],
-    teachingSuggestions: ["Kısa kanıt temelli yazma etkinliği uygulanabilir."],
-    monitoringPlan: ["Bir sonraki değerlendirmede aynı öğrenme çıktısı izlenir."],
+    teachingSuggestions: ["İzleme odağı: kanıt kullanımı."],
+    monitoringPlan: ["Aynı öğrenme çıktısına ilişkin sonraki kanıtlar izlenir."],
     sourceReferences: [{ id: "src-1", title: "Örnek öğretim programı" }],
     teacherReviewStatus: "pending"
   });
@@ -598,7 +607,7 @@
       customValidate(payload) { const errors = []; ["teacherContext", "measurementOutput", "curriculumOutput"].forEach((path) => assertObject(payload, path, errors)); return { errors, warnings: [] }; }
     }),
     PedagogyOutput: createContract({
-      name: "PedagogyOutput", description: "Güçlü alanlar, gelişim alanları ve öğretim önerileri.",
+      name: "PedagogyOutput", description: "Güçlü alanlar, gelişim alanları ve yöntem önermeyen izleme odakları.",
       required: ["strengths", "developmentAreas", "misconceptions", "teachingSuggestions", "monitoringPlan"], defaultFactory: makePedagogyOutput,
       customValidate(payload) { const errors = []; ["strengths", "developmentAreas", "misconceptions", "teachingSuggestions", "monitoringPlan"].forEach((path) => assertArray(payload, path, errors)); return { errors, warnings: [] }; }
     }),

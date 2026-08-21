@@ -6,9 +6,9 @@ Belge Anlama -> Program Eşleştirme -> Ölçme-Değerlendirme -> Pedagojik Anal
 Document'i (`backend/app/models.py`) devreder; orkestratör her devir
 sınırında belgeyi doğrular ve iz (trace) biriktirir.
 
-Bu paket kasıtlı olarak yalnız stdlib + mevcut `backend/app` modüllerini
-kullanır; ağır/uzak bağımlılıklar (OCR, LLM) ajanların içinde, çağrı anında
-import edilir - `ocr_engine.py`nin düzeniyle aynı.
+Bu paket öğretmen onayından sonra çalışan beş analiz ajanını içerir. Yükleme
+öncesindeki Belge Okuma ve OCR Kalite Ajanı `backend/app/ocr_quality_agent.py`
+altında ayrı çalışır. Uzak LLM bağımlılığı yalnız ihtiyaç anında çağrılır.
 """
 
 from .base import Agent, AgentContext, AgentIssue, AgentResult, AgentTrace, trace_of

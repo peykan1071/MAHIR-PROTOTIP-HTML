@@ -1,8 +1,10 @@
-"""Program Mapping Engine for the MAHIR backend skeleton.
+"""Eski örnek CSV/CED akışı için deterministik eşleştirme yardımcıları.
 
-This module maps questions in a generated CED document to sample learning
-outcomes by deterministic keyword matching. It does not use AI, OCR, API, or a
-database.
+Bu modül, geliştirmenin ilk aşamasındaki örnek veri ve komut satırı gösterimi
+için anahtar sözcük eşleştirmesini korur. Üretim analiz hattının Program
+Eşleştirme Ajanı bunu kullanarak öğretmen adına çıktı seçmez; öğretmenin
+seçtiği kodları kayıtlı ders-sınıf-program bağlamında doğrular. Bu ayrım,
+örnek motorun yeteneğinin güncel prototip yeteneği gibi sunulmasını önler.
 """
 
 from __future__ import annotations

@@ -2,7 +2,7 @@
 
 Bu belge, MAHİR projesinin geliştirme kurallarını, sürüm yönetimini, dosya düzenini ve çalışma disiplinini tanımlar. Amaç, prototipin küçük, anlaşılır, öğretmen kontrollü ve sürdürülebilir adımlarla ilerlemesini sağlamaktır.
 
-> **Güncel kapsam notu (03.08.2026):** Aşağıdaki bağlayıcı ilkeler, prototipin ilk iskeletini anlatan eski kapsam maddelerinden önce gelir. Eski belgede kapsam dışı sayılan dosya okuma ile Word/PDF çıktı özellikleri sonraki sürümlerde kullanıcı onayıyla geliştirilmiştir.
+> **Güncel kapsam notu (21.08.2026):** “Bağlayıcı Prototip Sınırı” bugünkü ürün davranışını tanımlar. Aşağıdaki “İlk geliştirme aşaması” ve “İlk aşamada yapılmayacaklar” bölümleri tarihsel proje kaydıdır; güncel yetenek listesi değildir. Dosya okuma, OCR, yapay zekâ/RAG desteği ve Word/PDF çıktıları sonraki onaylı sürümlerde eklenmiştir. Güncel durum için README esas alınır.
 
 ## Bağlayıcı Prototip Sınırı
 
@@ -26,7 +26,7 @@ MAHİR, Türkçe çalışan ve öğretmen kontrolünü merkeze alan bir eğitim 
 
 Prototip, öğretmenin sınav bilgilerini, soru bazlı verileri ve öğrenme çıktılarıyla ilgili değerlendirmelerini yapılandırılmış rapor taslaklarına dönüştürme fikrini görselleştirmek için hazırlanır. Bu aşamada üretilen tüm içerikler örnek taslak kabul edilir; son düzenleme ve onay öğretmene aittir.
 
-## 2. Teknik Kapsam
+## 2. Tarihsel İlk Geliştirme Aşaması
 
 İlk geliştirme aşamasında proje yalın web teknolojileriyle yürütülür:
 
@@ -39,7 +39,7 @@ Prototip, öğretmenin sınav bilgilerini, soru bazlı verileri ve öğrenme ç�
 
 Bu teknik kapsam, prototipin hızlı anlaşılmasını, kolay incelenmesini ve öğretmen ihtiyaçlarına göre adım adım şekillendirilmesini amaçlar.
 
-## 3. İlk Aşamada Yapılmayacaklar
+## 3. Tarihsel İlk Aşamada Kapsam Dışı Bırakılanlar
 
 Aşağıdaki işler ilk prototip aşamasında yapılmayacaktır:
 
@@ -176,7 +176,7 @@ Her sprint sonunda aşağıdaki kontroller yapılır:
 
 Kontrol sonucu kısa ve net şekilde kullanıcıya bildirilir.
 
-## 10. Yasaklı İşlemler
+## 10. Geliştirme Yetkisi Sınırları
 
 Aşağıdaki işlemler kullanıcı açıkça istemedikçe yapılmaz:
 
@@ -184,8 +184,8 @@ Aşağıdaki işlemler kullanıcı açıkça istemedikçe yapılmaz:
 - Kullanıcı onayı olmadan sonraki sürüme geçmek
 - Kapsam dışı dosya oluşturmak
 - Kapsam dışı özellik eklemek
-- Gerçek yapay zekâ, API veya veritabanı entegrasyonu yapmak
-- Dosya yükleme, OCR, PDF veya Word üretimi eklemek
+- Kullanıcı onayı olmadan yeni yapay zekâ, API veya veritabanı entegrasyonu yapmak
+- Kullanıcı onayı olmadan yeni dosya işleme, OCR veya çıktı kapsamı eklemek
 - Çok sayfalı yapı kurmak
 - Harici framework veya paket sistemi eklemek
 - Mevcut kullanıcı değişikliklerini geri almak

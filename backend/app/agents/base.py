@@ -123,13 +123,12 @@ class AgentContext:
     # program profili). CED'i tarayıcıya özgü alanlarla kirletmemek için ayrı.
     scratch: dict[str, Any] = field(default_factory=dict)
     # LLM kuyruğu: ajanlar doğrudan çağırmak yerine prompt'larını buraya yazar,
-    # orkestratör hepsini TEK istekte gönderir. Ajan başına ayrı HTTP turu
-    # atsaydık her yeni LLM'li ajan analize ~3 sn eklerdi ve "ek GPU maliyeti
-    # yok" iddiası beş ajanda çökerdi.
+    # orkestratör hepsini TEK istekte gönderir. Böylece mevcut iki LLM destekli
+    # rolün istemleri ayrı ağ turları oluşturmadan birlikte işlenir.
     llm_queue: list[dict[str, Any]] = field(default_factory=list)
     llm_results: dict[str, dict[str, Any]] = field(default_factory=dict)
     # LLM turunun kendisinin kaydı. Ajan izlerinden AYRI tutuluyor çünkü tur
-    # ortak: dokuz prompt tek istekte çözülüyor ve süreyi ajanlara bölmek
+    # ortak: birden fazla prompt tek istekte çözülüyor ve süreyi ajanlara bölmek
     # uydurma olurdu. Ayrı satır olarak göstermek hem dürüst hem de tek istekli
     # mimarinin kanıtı - bölüştürülseydi o kanıt kaybolurdu.
     llm_round: dict[str, Any] = field(default_factory=dict)

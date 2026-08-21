@@ -1,5 +1,7 @@
 ﻿# MAHİR Roadmap
 
+> **Tarihsel yol haritası:** Aşağıdaki Sprint 1 başlıkları projenin başlangıç aşamasını kaydeder. Güncel tamamlanma durumu, çalışan yetenekler ve sınırlılıklar için `README.md` esas alınır.
+
 Bu belge, MAHİR projesinin geliştirme yönünü ve sprint bazlı ilerleme başlıklarını izlemek için hazırlanmıştır.
 
 ## Proje Odağı

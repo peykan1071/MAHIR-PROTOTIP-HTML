@@ -1,8 +1,9 @@
 """Tests for the shared LLM layer the agents talk to.
 
 Driven against a real local HTTP server rather than a mock, because the two
-things most worth proving are wire-level: that every agent's prompt goes out in
-ONE request (that is the whole cost argument for having five LLM agents), and
+things most worth proving are wire-level: that every queued agent prompt goes
+out in ONE request (the current product uses two LLM-assisted roles, while the
+batch transport is tested with larger prompt groups), and
 that the charter filter is applied to every answer on the way back.
 """
 

@@ -2,6 +2,8 @@
 
 Feature 09 - Sprint 1
 
+> **Tarihsel tasarım kaydı:** Bu belge Sprint 1'deki ilk arayüz kararlarını gösterir; güncel ürün yeteneklerinin veya kullanıcı metinlerinin eksiksiz listesi değildir. Çalışan prototip ve jüriye sunulan güncel kapsam için `README.md` esas alınır.
+
 Bu belge, MAHİR ilk prototipi için 6 ekranlık wireframe taslağını ve her ekranın davranış tanımını içerir. Belge metin tabanlıdır; kod, görsel, renk, ikon, logo, hero ya da bayrak yerleşimi içermez.
 
 ## 1. Karşılama Ekranı
@@ -289,11 +291,11 @@ Bu belge, MAHİR ilk prototipi için 6 ekranlık wireframe taslağını ve her e
 |                                                                    |
 | [ ] Veriler doğrulanıyor.                                         |
 | [ ] Soru ve puan ilişkileri yapılandırılıyor.                      |
-| [ ] Öğrenme çıktıları eşleştiriliyor.                              |
+| [ ] Öğretmenin seçtiği öğrenme çıktıları doğrulanıyor.             |
 | [ ] Sayısal analiz hazırlanıyor.                                   |
 | [ ] Kanıt kontrolü yapılıyor.                                      |
 | [ ] Pedagojik değerlendirme oluşturuluyor.                         |
-| [ ] Öğretim önerileri hazırlanıyor.                                |
+| [ ] Gelişim ve izleme odakları hazırlanıyor.                       |
 |                                                                    |
 +--------------------------------------------------------------------+
 ```
@@ -314,7 +316,7 @@ Bu belge, MAHİR ilk prototipi için 6 ekranlık wireframe taslağını ve her e
 
 4. Sistemin yaptığı işlem
 
-   MAHİR, verilerin doğrulanması, soru-puan ilişkisinin yapılandırılması, öğrenme çıktılarının eşleştirilmesi, sayısal analiz, kanıt kontrolü, pedagojik değerlendirme ve öğretim önerileri adımlarını öğretmene anlaşılır şekilde gösterir.
+   MAHİR, verilerin doğrulanması, öğretmenin belirlediği soru-puan-öğrenme çıktısı ilişkisinin program bağlamında kontrolü, sayısal analiz, kanıt kontrolü ve kaynaklı pedagojik değerlendirme adımlarını öğretmene anlaşılır şekilde gösterir.
 
 5. Zorunlu alanlar
 
@@ -359,7 +361,7 @@ Bu belge, MAHİR ilk prototipi için 6 ekranlık wireframe taslağını ve her e
 | | Öğrenme Çıktıları Değerlendirmesi                            |   |
 | | Güçlü Öğrenme Alanları                                       |   |
 | | Gelişimi Desteklenecek Alanlar                               |   |
-| | Öğretim Önerileri                                            |   |
+| | Gelişim ve İzleme Odakları                                  |   |
 | | İzleme ve Gelişim Planı                                      |   |
 | | Kaynak Dayanakları                                           |   |
 | +--------------------------------------------------------------+   |
@@ -383,7 +385,7 @@ Bu belge, MAHİR ilk prototipi için 6 ekranlık wireframe taslağını ve her e
 
 4. Sistemin yaptığı işlem
 
-   MAHİR, genel değerlendirme, analiz çizelgesi, öğrenme çıktıları değerlendirmesi, güçlü öğrenme alanları, gelişimi desteklenecek alanlar, öğretim önerileri, izleme ve gelişim planı ile kaynak dayanakları bölümlerini düzenli bir rapor taslağı halinde sunar.
+   MAHİR, genel değerlendirme, analiz çizelgesi, öğrenme çıktıları değerlendirmesi, güçlü öğrenme alanları, gelişimi desteklenecek alanlar, izleme odağı ve kaynak dayanakları bölümlerini düzenli bir rapor taslağı hâlinde sunar.
 
 5. Zorunlu alanlar
 
@@ -393,8 +395,8 @@ Bu belge, MAHİR ilk prototipi için 6 ekranlık wireframe taslağını ve her e
    - Öğrenme Çıktıları Değerlendirmesi
    - Güçlü Öğrenme Alanları
    - Gelişimi Desteklenecek Alanlar
-   - Öğretim Önerileri
-   - İzleme ve Gelişim Planı
+   - Gelişim ve İzleme Odakları
+   - Kanıta Dayalı İzleme Kaydı
    - Kaynak Dayanakları
 
 6. İsteğe bağlı alanlar

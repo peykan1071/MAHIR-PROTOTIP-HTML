@@ -14,7 +14,7 @@ Son yerel doğrulamada **215 Python testi**, JavaScript test paketi ve ana taray
 
 Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in işlediği gelen evrak; sınav puan çizelgesi, sınav veri giriş belgesi veya onaylanmış sınav analiz raporudur. Prototip, genel amaçlı bütün kamu evraklarını değil, bu tanımlı eğitim evrakı akışını uçtan uca ele alır.
 
-> **Temel ilke:** MAHİR önerir, hesaplar ve kanıt sunar; nihai değerlendirme ve onay öğretmene aittir.
+> **Temel ilke:** MAHİR doğrular, hesaplar, kaynaklı taslak üretir ve kanıt sunar; nihai değerlendirme ve onay öğretmene aittir.
 
 ## Problem, kullanıcı ve potansiyel etki
 
@@ -46,7 +46,7 @@ Kaynak: [Millî Eğitim Bakanlığı, 2024-2025 Örgün Eğitim İstatistikleri]
 
 | Şartname görevi | MAHİR'deki karşılığı | Durum |
 |---|---|---|
-| Görev 1: Evrak Sınıflandırma ve İçerik Analizi | Sınav evrakının okunması, yapılandırılması, doğrulanması, öğretim programıyla eşleştirilmesi ve analiz edilmesi | **Tamamlandı - çalışan demo** |
+| Görev 1: Evrak Sınıflandırma ve İçerik Analizi | Sınav evrakının okunması, yapılandırılması ve doğrulanması; öğretmenin seçtiği öğrenme çıktılarının program bağlamında kontrol edilmesi ve puanların analiz edilmesi | **Tamamlandı - çalışan demo** |
 | Görev 2: Resmî Yazı Taslaklama ve Birim Yönlendirme | Öğretmen onaylı rapordan resmî üst yazı, ek listesi ve okul yönetimine yönlendirme paketi oluşturulması | **Tamamlandı - çalışan demo** |
 
 ### Görev 1: Evrak Sınıflandırma ve İçerik Analizi
@@ -59,7 +59,7 @@ Kaynak: [Millî Eğitim Bakanlığı, 2024-2025 Örgün Eğitim İstatistikleri]
 | Evrak türünü belirleme | Dosya türü, sınav bileşeni ve rapor bağlamı ayrıştırılır; tanımlı olmayan dosya ve bağlamlar reddedilir. |
 | Önemli bilgi unsurlarını çıkarma | Okul, öğretmen, ders, sınıf/şube, dönem, sınav tarihi, soru puanları, öğrenci puanları ve öğrenme çıktısı eşleştirmeleri yapılandırılır. |
 | Eksik bilgileri tespit etme | Zorunlu alan, puan sınırı, toplam puan, soru sayısı, ders-sınıf-program eşleşmesi ve okunamayan hücre denetimleri öğretmen onayından önce çalışır. |
-| İlgili kural ve standartları önerme | Sorular resmî öğretim programındaki öğrenme çıktılarıyla eşleştirilir; RAG katmanı yalnız öğretmen onayından sonra resmî program bağlamını kullanır. |
+| İlgili kural ve standartları önerme | Öğretmenin soru için seçtiği öğrenme çıktısı kayıtlı resmî program kataloğuyla doğrulanır; RAG katmanı yalnız öğretmen onayından sonra resmî program bağlamını kullanır. |
 | Kısa ve öz özet oluşturma | Soru, öğrenme çıktısı, tema ve sınıf düzeyinde başarı özetleri ile kanıt bağlantıları üretilir. |
 
 Görev 1 çıktısı, öğretmenin düzeltebildiği bir doğrulama ekranı ve ardından oluşturulan **Sınav Sonuçları Analiz Raporu**dur. Sayısal başarı oranları büyük dil modeli tarafından tahmin edilmez; doğrulanmış puanlardan uygulama koduyla hesaplanır.
@@ -102,18 +102,18 @@ flowchart LR
 
 ## Çok ajanlı mimari
 
-MAHİR'de görev sınırları belirlenmiş altı uzman ajan bulunur. Bunlardan Belge Okuma ve OCR Kalite Ajanı dosya yükleme aşamasında; diğer beş ajan öğretmen onayından sonraki analiz aşamasında çalışır:
+MAHİR'de görev sınırları belirlenmiş altı uzman ajan bulunur. Buradaki **ajan**, bağımsız bir sunucu veya ayrı bir yapay zekâ modeli değil; tanımlı girdisi, çıktısı, yetki sınırı, hata politikası ve işlem izi bulunan uzman görev bileşenidir. Belge Okuma ve OCR Kalite Ajanı dosya yükleme aşamasında; diğer beş ajan öğretmen onayından sonraki analiz aşamasında çalışır:
 
 | Ajan | Sorumluluk | Yapmadığı işlem |
 |---|---|---|
 | Belge Okuma ve OCR Kalite Ajanı | Belge türünü, OCR gereksinimini ve okuma kalitesini denetler | OCR sonucunu öğretmen onayı olmadan doğru kabul etmez |
 | Belge Anlama Ajanı | Onaylı girdiyi standart eğitim belgesine dönüştürür | Pedagojik yorum yapmaz |
-| Program Eşleştirme Ajanı | Soruları resmî ders programındaki öğrenme çıktılarıyla eşleştirir | Puan hesaplamaz |
-| Ölçme ve Değerlendirme Ajanı | Soru ve öğrenme çıktısı başarı oranlarını hesaplar | LLM ile sayı üretmez |
+| Program Eşleştirme Ajanı | Öğretmenin soru için seçtiği öğrenme çıktısını kayıtlı resmî program bağlamında doğrular | Otomatik öğrenme çıktısı üretmez veya puan hesaplamaz |
+| Ölçme ve Değerlendirme Ajanı | Onaylanmış soru puanlarından soru ve öğrenme çıktısı başarı oranlarını hesaplar | Cevap metni puanlamaz ve LLM ile sayı üretmez |
 | Pedagojik Analiz Ajanı | Onaylı kanıtı resmî program bağlamıyla yorumlar | Ham öğrenci verisini modele göndermez |
 | Raporlama Ajanı | Kanıtları A-H yapısındaki resmî rapora dönüştürür | Sonuçları yeniden hesaplamaz |
 
-Bu ayrım, bir ajanın ürettiği sonucun diğer ajan tarafından izlenebilmesini ve sayısal hesapların dil modeli yorumundan bağımsız kalmasını sağlar.
+Bu ayrım, bir ajanın ürettiği sonucun diğer ajan tarafından izlenebilmesini ve sayısal hesapların dil modeli yorumundan bağımsız kalmasını sağlar. İlk ajanın kalite sonucu yükleme kaydındaki `documentQuality` alanında; analiz aşamasındaki diğer beş ajanın çalışma sırası, süresi, bulguları ve LLM kullanımı ortak ajan izinde tutulur.
 
 ## Jüri için hızlı başlangıç
 

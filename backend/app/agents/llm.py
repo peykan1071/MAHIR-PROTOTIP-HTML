@@ -3,9 +3,10 @@
 Bir turda kaç ajan LLM'e ihtiyaç duyarsa duysun, hepsinin prompt'u TEK istekte
 ve TEK vLLM partisinde gider. Sebep ölçüldü: vLLM'de N dizinin birlikte
 çözülmesi neredeyse tek dizi kadar sürüyor (darboğaz GPU'nun bellek bant
-genişliği, hesap gücü değil). Yani beş ajanı LLM'e bağlamak, bir ajanı
-bağlamakla neredeyse aynı maliyet - "ek GPU maliyeti istemiyorum" kısıtı
-altında çok ajanlı olmanın yolu bu.
+genişliği, hesap gücü değil). Mevcut prototipte Ölçme ve Pedagojik Analiz
+ajanlarının istemleri bu ortak turda birleştirilir. Katman daha fazla uzman
+rolü aynı turda taşıyabilecek biçimde kurulmuştur; bu, bütün ajanların LLM
+kullandığı anlamına gelmez.
 
 Bu modül `rag_client` ile aynı sözleşmeyi taşır: **asla istisna fırlatmaz**.
 LLM arızası isteğe bağlı bir ajanı düşürür, öğretmenin analizini değil

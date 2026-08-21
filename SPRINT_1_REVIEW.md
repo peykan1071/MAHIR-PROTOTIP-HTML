@@ -1,5 +1,7 @@
 ﻿# MAHİR Sprint 1 Review
 
+> **Tarihsel kayıt:** Bu belge yalnız Sprint 1 sonunda ulaşılan durumu kaydeder; MAHİR'in bugünkü yetenek listesini açıklamaz. Sonraki sürümlerde OCR, dosya okuma, kurallı analiz, yapay zekâ/RAG desteği ve Word/PDF çıktıları eklenmiştir. Güncel ve jüriye sunulan kapsam için `README.md` esas alınır.
+
 Bu belge, MAHİR projesinde Sprint 1 boyunca yürütülen ürün geliştirme sürecinin resmî kapanış raporudur. Rapor; Development Charter, wireframe kararları, UI Contract, Visual Identity ve tamamlanan Feature kayıtları doğrultusunda hazırlanmıştır.
 
 ## 1. Sprint 1 Amacı

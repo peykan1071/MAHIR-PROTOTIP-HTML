@@ -1,72 +1,38 @@
-﻿\# Program Mapping Agent
+# Program Eşleştirme Ajanı
 
+## Amaç
 
+Program Eşleştirme Ajanı, öğretmenin her soru için seçtiği öğrenme çıktısını ders, sınıf ve kayıtlı resmî program kataloğu bağlamında doğrulayan deterministik görev bileşenidir.
 
-\## Amaç
+Prototip, soru metninden öğrenme çıktısını kendiliğinden tahmin edip kesinleştirmez. Pedagojik eşleştirme öğretmenin sorumluluğundadır; ajan bu seçimin kayıtlı programla tutarlı olup olmadığını denetler ve analizde kullanılacak ilişkiyi standartlaştırır.
 
+## Sorumluluklar
 
+- CED nesnesini ve sınav bağlamını alır.
+- Ders ve sınıf için kayıtlı program profilini bulur.
+- Seçilmiş öğrenme çıktısı kodlarının program bağlamıyla uyumunu doğrular.
+- Birden fazla çıktı seçilmişse soru puanına katkı ağırlıklarını korur.
+- Öğrenme çıktısı seçilmemiş soruları açıkça işaretler.
+- Doğrulanmış eşleştirmeyi sonraki analiz adımına aktarır.
 
-Program Eşleştirme Ajanı, Belge Anlama Ajanı tarafından üretilen Canonical Education Document (CED) nesnesindeki her soruyu Türkiye Yüzyılı Maarif Modeli öğretim programı ile eşleştiren uzman ajandır.
+## Yetki sınırı
 
+- Soru içeriğinden otomatik öğrenme çıktısı üretmez.
+- Öğretmen adına pedagojik eşleştirme kararı vermez.
+- Puan veya başarı oranı hesaplamaz.
+- Pedagojik yorum ve raporlama yapmaz.
+- Kayıtlı olmayan bir program için varsayımsal müfredat içeriği oluşturmaz.
 
+## Girdi ve çıktı
 
-Bu ajan yalnızca resmî öğretim programlarını kullanır. Analiz, puanlama veya raporlama yapmaz. Çıktı olarak öğrenme çıktılarıyla zenginleştirilmiş CED nesnesi üretir.
+**Girdi:** CED nesnesi, ders, sınıf düzeyi ve öğretmenin soru bazında seçtiği öğrenme çıktıları.
 
+**Çıktı:** Doğrulanmış program kimliği, öğrenme çıktısı ilişkileri, eşleştirilmemiş soru bulguları ve işlem izi.
 
+## İş akışı
 
-\## Sorumluluklar
-
-
-
-\- CED nesnesini alır.
-
-\- Dersi ve sınıf düzeyini belirler.
-
-\- Resmî öğretim programını yükler.
-
-\- Her soruyu uygun öğrenme çıktısıyla eşleştirir.
-
-\- Eşleştirme sonucunu CED nesnesine ekler.
-
-\- Güncellenmiş CED nesnesini sonraki ajana aktarır.
-
-
-
-\## Girdiler ve Çıktılar
-
-
-
-\### Girdiler
-
-
-
-\- Canonical Education Document (CED)
-
-\- Türkiye Yüzyılı Maarif Modeli öğretim programı
-
-
-
-\### Çıktılar
-
-
-
-\- Öğrenme çıktılarıyla zenginleştirilmiş CED
-
-
-
-\## İş Akışı
-
-
-
-1\. CED nesnesini alır.
-
-2\. Ders ve sınıf düzeyini belirler.
-
-3\. İlgili resmî öğretim programını seçer.
-
-4\. Her soru için uygun öğrenme çıktısını belirler.
-
-5\. Eşleştirme sonuçlarını CED nesnesine ekler.
-
-6\. Güncellenmiş CED nesnesini Ölçme ve Değerlendirme Ajanına aktarır.
-
+1. CED nesnesini ve sınav bağlamını alır.
+2. İlgili kayıtlı program profilini çözümler.
+3. Öğretmenin seçtiği çıktı kodlarını bağlam içinde doğrular.
+4. Eksik veya uyumsuz eşleştirmeleri bildirir.
+5. Doğrulanmış ilişkileri Ölçme ve Değerlendirme Ajanına aktarır.
