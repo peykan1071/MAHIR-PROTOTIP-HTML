@@ -4128,9 +4128,10 @@ const fileUploadBridge = (() => {
                 ...(data.students || []).map((student) => ({ ...student, sourceFile: student.sourceFile || sourceFile }))
               ],
               warnings: [...(merged.warnings || []), ...(data.warnings || [])],
+              documentQuality: data.documentQuality || payload.documentQuality || merged.documentQuality || null,
               summary: { ...(merged.summary || {}), ...(data.summary || {}) }
             };
-          }, { exam: {}, students: [], warnings: [], summary: {} });
+          }, { exam: {}, students: [], warnings: [], documentQuality: null, summary: {} });
           const message = payloads.map((payload) => payload.message).filter(Boolean).join(" ") || `${selectedFiles.length} belge başarıyla işlendi.`;
           window.clearInterval(progressTimer);
           renderValidationData(mergedData.students.length || Object.keys(mergedData.exam).length ? mergedData : {

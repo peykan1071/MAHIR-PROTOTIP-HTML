@@ -26,6 +26,7 @@ from .general_report_merger import merge_component_reports
 from .pdf_parser import parse_score_pdf
 from .spreadsheet_parser import parse_score_xlsx
 from .approved_data_analyzer import analyze_approved_data_traced
+from .ocr_quality_agent import assess_result, inspect_upload, warning_messages
 from .timing import stage
 
 
@@ -200,6 +201,7 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
             # Yerel toplam: isteğin alınmasından yanıtın hazır olmasına kadar.
             # `remote_ocr_client` kendi satırını ayrıca basıyor; aradaki fark
             # yerel ayrıştırma, uzak satırdaki büyük süre ise soğuk başlangıç.
+            ocr_decision = inspect_upload(uploaded_files, results)
             with stage(
                 "ocr-yerel",
                 dosya=len(uploaded_files),
@@ -208,6 +210,17 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 flow_ok, flow_message, structured_data = run_existing_backend_flow(
                     uploaded_files, results
                 )
+                document_quality = assess_result(
+                    ocr_decision,
+                    structured_data,
+                    flow_ok=flow_ok,
+                    expected_file_count=len(uploaded_files),
+                )
+                if isinstance(structured_data, dict):
+                    structured_data["documentQuality"] = document_quality
+                    structured_data.setdefault("warnings", []).extend(
+                        warning_messages(document_quality)
+                    )
                 measured["ogrenci"] = len((structured_data or {}).get("students") or [])
                 measured["sonuc"] = "tamam" if flow_ok else "basarisiz"
 
@@ -221,6 +234,7 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                         "fileCount": len(uploaded_files),
                         "message": flow_message,
                         "structuredData": structured_data,
+                        "documentQuality": document_quality,
                     },
                 )
                 return
@@ -233,6 +247,7 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                     "fileName": results[0].file_name,
                     "extension": results[0].extension,
                     "message": flow_message,
+                    "documentQuality": document_quality,
                 },
             )
             return

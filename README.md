@@ -94,10 +94,11 @@ flowchart LR
 
 ## Çok ajanlı mimari
 
-MAHİR'de görev sınırları belirlenmiş beş uzman ajan bulunur:
+MAHİR'de görev sınırları belirlenmiş altı uzman ajan bulunur. Bunlardan Belge Okuma ve OCR Kalite Ajanı dosya yükleme aşamasında; diğer beş ajan öğretmen onayından sonraki analiz aşamasında çalışır:
 
 | Ajan | Sorumluluk | Yapmadığı işlem |
 |---|---|---|
+| Belge Okuma ve OCR Kalite Ajanı | Belge türünü, OCR gereksinimini ve okuma kalitesini denetler | OCR sonucunu öğretmen onayı olmadan doğru kabul etmez |
 | Belge Anlama Ajanı | Onaylı girdiyi standart eğitim belgesine dönüştürür | Pedagojik yorum yapmaz |
 | Program Eşleştirme Ajanı | Soruları resmî ders programındaki öğrenme çıktılarıyla eşleştirir | Puan hesaplamaz |
 | Ölçme ve Değerlendirme Ajanı | Soru ve öğrenme çıktısı başarı oranlarını hesaplar | LLM ile sayı üretmez |
@@ -258,7 +259,8 @@ MAHIR-PROTOTIP-HTML/
 |-- MAHIR_BASLAT.cmd          # Windows hızlı başlatıcı
 |-- assets/js/                # Program kataloğu, yedekleme ve çıktı üreticileri
 |-- backend/app/              # Belge okuma, doğrulama ve analiz motorları
-|-- backend/app/agents/       # Beş uzman ajan ve orkestratör
+|-- backend/app/agents/       # Öğretmen onayı sonrası beş analiz ajanı ve orkestratör
+|-- backend/app/ocr_quality_agent.py # Yükleme aşamasındaki OCR kalite ajanı
 |-- shared/pilot/tde9/        # TDE 9 pilot program verileri
 |-- shared/templates/         # Veri giriş ve rapor şablonları
 |-- tests/                    # Python ve JavaScript kontrolleri
@@ -268,6 +270,7 @@ MAHIR-PROTOTIP-HTML/
 ## Teknik belgeler ve kaynaklar
 
 - [Belge Anlama Ajanı](docs/architecture/document-understanding-agent.md)
+- [Belge Okuma ve OCR Kalite Ajanı](docs/architecture/ocr-quality-agent.md)
 - [Program Eşleştirme Ajanı](docs/architecture/program-mapping-agent.md)
 - [Ölçme ve Değerlendirme Ajanı](docs/architecture/measurement-evaluation-agent.md)
 - [Pedagojik Analiz Ajanı](docs/architecture/pedagogical-analysis-agent.md)
