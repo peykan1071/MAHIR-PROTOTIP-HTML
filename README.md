@@ -6,21 +6,53 @@
 
 MAHİR, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması - 1. Senaryo: Kamu Evrak ve Yazışma Süreçleri İçin Akıllı Ajan Destek Sistemi** kapsamında geliştirilmiştir.
 
+![MAHİR karşılama ekranı](assets/readme/01-karsilama.png)
+
+> **Temel ilke:** MAHİR doğrular, hesaplar, kaynaklı taslak üretir ve kanıt sunar; nihai pedagojik değerlendirme, düzeltme ve onay öğretmene aittir.
+
 ## Otomatik test güvencesi
 
-GitHub, `main` dalına gönderilen her değişiklikte ve her çekme isteğinde Python ve JavaScript testlerini yeniden çalıştırır. README'nin üstündeki rozet son çalıştırmanın güncel durumunu gösterir; rozete tıklayan jüri üyesi çalıştırma tarihini, test günlüklerini ve test sayılarını doğrudan GitHub üzerinden inceleyebilir.
+GitHub, `main` dalına gönderilen her değişiklikte ve her çekme isteğinde Python ve JavaScript testlerini yeniden çalıştırır. README'nin üstündeki rozet son çalıştırmanın güncel durumunu gösterir; rozete tıklayan okuyucu çalıştırma tarihini, test günlüklerini ve test sayılarını doğrudan GitHub üzerinden inceleyebilir.
 
-Son yerel doğrulamada **215 Python testi**, JavaScript test paketi ve ana tarayıcı betiğinin sözdizimi kontrolü başarıyla tamamlanmıştır. Bu sonuç, otomatik olarak tanımlanan yazılım davranışlarının doğrulandığını gösterir; gerçek kullanıcı etki araştırması veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
+Son yerel doğrulamada **226 Python testi**, **10 JavaScript testi** ve ana tarayıcı betiğinin sözdizimi kontrolü başarıyla tamamlanmıştır. Bu sonuç, otomatik olarak tanımlanan yazılım davranışlarının doğrulandığını gösterir; gerçek kullanıcı etki araştırması veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
 
 Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in işlediği gelen evrak; sınav puan çizelgesi, sınav veri giriş belgesi veya onaylanmış sınav analiz raporudur. Prototip, genel amaçlı bütün kamu evraklarını değil, bu tanımlı eğitim evrakı akışını uçtan uca ele alır.
-
-> **Temel ilke:** MAHİR doğrular, hesaplar, kaynaklı taslak üretir ve kanıt sunar; nihai değerlendirme ve onay öğretmene aittir.
 
 ## Problem, kullanıcı ve potansiyel etki
 
 Öğretmenler yalnızca sınav puanı vermekle kalmaz; sınav verilerini kontrol eder, soru ve öğrenme çıktısı düzeyinde yorumlar, sınıfın güçlü ve gelişime açık yönlerini belirler, raporlar ve gerektiğinde kurum içi yazışmaya dönüştürür. Bu işlemlerin farklı belgeler ve araçlar üzerinde elle yürütülmesi zaman kaybına, tekrar eden veri girişine ve izlenebilirlik sorunlarına yol açabilir.
 
 MAHİR; belge okuma, veri doğrulama, kurallı hesaplama, program eşleştirme, kaynaklı pedagojik değerlendirme ve resmî raporlama adımlarını öğretmen kontrolündeki tek bir akışta birleştirmek üzere geliştirilmiştir. Amaç yeni bir karar mercii oluşturmak değil, öğretmenin mevcut işini daha düzenli, izlenebilir ve yeniden kullanılabilir hâle getirmektir.
+
+### Öğretmen olmayan okuyucu için temel kavramlar
+
+| Kavram | Bu projede ne anlama gelir? |
+|---|---|
+| Sınav evrakı | Bir öğrencinin cevaplandırdığı tek sınav belgesidir. 35 öğrencilik bir sınıfın bir sınavı 35 sınav evrakı üretir. |
+| Sınıf-sınav analizi | Bir şubenin tek sınavındaki sonuçların topluca değerlendirilmesidir. 35 sınav evrakı çoğunlukla bir analiz olayına karşılık gelir. |
+| Öğrenme çıktısı | Öğrencinin öğretim süreci sonunda edinmesi beklenen bilgi, beceri veya yeterliktir. |
+| Öğrenme kanıtı | Bir öğrenme çıktısına ne ölçüde ulaşıldığını gösteren sınav, performans, gözlem veya portfolyo verisidir. |
+| Üst yazı | Analiz raporunun okul yönetimine veya başka bir resmî makama sunulmasında kullanılan resmî yazı taslağıdır. |
+| EBYS | MEB'e bağlı okul ve kurumlarda resmî belgelerin oluşturulması, paraflanması, elektronik imzalanması, gönderilmesi ve arşivlenmesi için kullanılan Elektronik Belge Yönetim Sistemidir. MEBBİS ortak ekranı erişim yollarından biridir. |
+
+## Türkiye Yüzyılı Maarif Modeli ile aynı dili konuşan analiz
+
+Türkiye Yüzyılı Maarif Modeli yalnızca ders içeriklerini yenileyen bir program değişikliği değildir. Model; eğitimin amaçlarını, öğrenme sürecini ve ölçme-değerlendirmeyi açıklamak için kendine özgü bir kavram sistemi kullanır. Önceki uygulamalarda yaygın olan kazanım ve konu merkezli anlatımın yanında; **öğrenme çıktıları, süreç bileşenleri, alan becerileri, kavramsal beceriler, eğilimler, programlar arası bileşenler ve öğrenme kanıtları** gibi kavramlar öne çıkar.
+
+Bu değişim yalnızca eski terimlerin yenileriyle değiştirilmesi değildir. Değerlendirme; öğrencinin sadece kaç puan aldığından, hangi öğrenme çıktısında nasıl bir kanıt ortaya koyduğuna ve öğretmenin sonraki öğrenme sürecini hangi bulgularla planlayabileceğine doğru genişler. MAHİR bu nedenle eski bir sınav analiz tablosuna yeni program adları eklenerek kurulmamıştır; veri, hesaplama, kanıt ve rapor zincirini Maarif Modeli'nin kavramsal yapısı içinde kurar.
+
+| Geleneksel sınav analizi | MAHİR'in Maarif Modeli uyumlu yaklaşımı |
+|---|---|
+| Sınıf ortalaması ve genel başarı oranı | Soru, öğrenme çıktısı ve öğrenme kanıtı düzeyinde inceleme |
+| Konu veya kazanım başlığına dayalı genel sonuç | Öğretmenin seçtiği öğrenme çıktısını resmî program kataloğuyla doğrulama |
+| Sayısal sonuçların listelenmesi | Sayısal bulgunun program bağlamı ve kanıt dayanağıyla açıklanması |
+| Sonucun kaynağının sınırlı görünürlüğü | Sorudan öğrenme çıktısına uzanan izlenebilir kanıt zinciri |
+| Genel veya kaynaksız öneri | Doğrulanmış program kaynaklarıyla sınırlandırılmış açıklama |
+| Otomatik sistem hükmü izlenimi | Öğretmen doğrulaması, öğretmen onayı ve öğretmen kararı |
+
+> **Ayırt edici tasarım özelliği:** MAHİR yalnızca puanları hesaplamaz; öğretmenin onayladığı sınav verisini Türkiye Yüzyılı Maarif Modeli'nin öğrenme çıktıları ve öğrenme kanıtları yaklaşımı içinde anlamlandırır.
+
+> **Bilimsel sınır:** Mevcut prototip öğrencinin açık uçlu cevabını kendiliğinden puanlamaz ve soru metninden kesin bir öğrenme çıktısı keşfettiğini iddia etmez. Soru puanları ile öğrenme çıktısı ilişkileri öğretmen tarafından girilir veya doğrulanır; MAHİR onaylı veri üzerinden hesaplama, kanıtlandırma, program bağlamlandırması ve raporlama yapar.
 
 ### Türkiye ölçeği
 
@@ -39,6 +71,108 @@ Millî Eğitim Bakanlığının **2024-2025 Örgün Eğitim İstatistikleri** ve
 Buradaki **1.187.409** sayısı MAHİR'in mevcut kullanıcı sayısı veya pilot örneklemi değildir; çözümün ele aldığı problemin ulusal ölçekteki hedef evrenini gösterir. Prototipin çalışan ve doğrulanmış ilk uygulama alanı TDE 9 pilotudur. Pilot, sistemin işlevlerini doğrular; öğretmen başına zaman tasarrufu veya ülke genelindeki etki hakkında henüz istatistiksel bir tahmin üretmez.
 
 Kaynak: [Millî Eğitim Bakanlığı, 2024-2025 Örgün Eğitim İstatistikleri](https://sgb.meb.gov.tr/www/quot2024-2025-orgun-egitim-istatistikleri-yayimlandiquot/icerik/771)
+
+![MAHİR'in bugünden geleceğe kapsam yolu](assets/readme/09-kapsam-yolu.png)
+
+### Mevcut prototip, pilot evren ve gelecek vizyonu
+
+| Kapsam düzeyi | Ne ifade ediyor? | Ölçek | Kanıt durumu |
+|---|---|---|---|
+| Gözlenen uygulama | 35 öğrencilik geçmiş sınav verisinin analiz raporu ve üst yazı taslağına dönüştürülmesi | Yaklaşık 2,5 dakika | Tek cihazda proje gözlemi |
+| Mevcut prototip | 9. sınıf Türk Dili ve Edebiyatı yazılı sınav analizi | Çalışan prototip | Sentetik ve anonim verilerle test |
+| Potansiyel pilot evren | Aynı ders ve sınıf düzeyindeki teorik yıllık hacim | 3.937.560 sınav evrakı; 156.964 sınıf-sınav analizi | MEB 2024/25 verisi ve yılda dört yazılı varsayımı |
+| Genişleme vizyonu | Farklı dersler, kademeler, gelişim, risk ve idarî raporlama | Tek kesin sayı yok | Tamamlanmış özellik değildir |
+
+![Mevcut prototipin savunulabilir kapsam modeli](assets/readme/10-prototip-kapsami.png)
+
+Yaklaşık **2,5 dakikalık** gözlem, kontrollü, tekrarlı ve temsilî bir deney değildir. Bu nedenle Türkiye geneline yönelik zaman tasarrufu, doğruluk artışı veya eğitimsel etki çıkarımı yapılmaz.
+
+### Gösterim senaryosunun resmî dayanağı
+
+README'de görselleriyle sunulan uygulama, **9. sınıf Türk Dili ve Edebiyatı dersi 2025-2026 eğitim öğretim yılı ikinci dönem ikinci yazılı sınavı** bağlamında hazırlanmıştır. Soru yapısı, puan dağılımı ve öğrenme çıktısı ilişkileri; Millî Eğitim Bakanlığı tarafından yayımlanan ilgili konu-soru dağılım tablosu, sınav senaryosu ve resmî öğretim programı doğrultusunda ekip tarafından MAHİR'in veri yapısına uyarlanmıştır.
+
+Bu senaryo, resmî program dilinin ve ölçme bağlamının MAHİR'de nasıl yapılandırıldığını göstermek için kullanılır. Soru-öğrenme çıktısı ilişkileri öğretmen tarafından seçilir veya doğrulanır; sistem bu ilişkileri kendiliğinden kesin bir pedagojik eşleştirme olarak üretmez.
+
+> **Sentetik sınıf ile resmî dayanağın ayrımı:** Gösterimdeki 35 öğrenci referansı ve soru puanları gerçek bir sınıftan alınmamıştır. Veri seti; belge okuma, öğretmen doğrulaması, öğrenme kanıtı hesaplama, program bağlamlandırması, raporlama ve üst yazı oluşturma akışını göstermek amacıyla üretilmiş sentetik ve anonim bir sınav simülasyonudur.
+
+> **Temsil ve etki sınırı:** Bu örnek, MAHİR'in resmî sınav bağlamına nasıl uyarlanabildiğini gösterir; gerçek bir sınıfın başarısını, Türkiye genelindeki öğrencileri, ölçülmüş zaman tasarrufunu veya sistemin eğitimsel etkisini temsil etmez.
+
+## Ulusal ölçek modeli ve genişleme vizyonu
+
+MEB 2024/25 örgün eğitim istatistikleri, aynı ayrıntıda tamamlanmış 2025/26 resmî veri bulunmadığı için en yakın tam referans dönem olarak kullanılmıştır. Bu sayılar **2025/26 gerçekleşmeleri değildir**.
+
+| Gösterge | Resmî sayı | MAHİR açısından doğru yorum |
+|---|---:|---|
+| Örgün eğitim öğretmeni | 1.187.409 | Mevcut kullanıcı değil; uzun vadeli hedef evren |
+| Resmî okul öğretmeni | 1.009.671 (%85,0) | Hedef evrenin resmî kurum bölümü |
+| Özel okul öğretmeni | 177.738 (%15,0) | Hedef evrenin özel kurum bölümü |
+| İlkokul öğrencisi | 5.704.483 | Sınav evrakına değil, gelişim izleme vizyonuna dâhil |
+| Ortaokul öğrencisi | 5.085.890 | Okul türüne göre ayrıştırılması gereken sınav alanı |
+| Ortaöğretim öğrencisi | 4.374.035 | Okul türüne göre ayrıştırılması gereken sınav alanı |
+
+<p align="center">
+  <img src="assets/readme/11-ogrenci-evreni.png" alt="İlkokul, ortaokul ve ortaöğretim öğrenci evreni" width="820">
+</p>
+
+<p align="center">
+  <img src="assets/readme/12-resmi-ozel-dagilimi.png" alt="Resmî ve özel okul öğrenci dağılımı" width="720">
+</p>
+
+### Sınav evrakı modelinin sınırı
+
+İlk açık varsayımlı çalışmada ortaokul için yıllık 24, lise için yıllık 48 sınav evrakı katsayısı kullanılarak **332.015.040 potansiyel sınav evrakı** hesaplanmıştır. Bu sayı gerçekleşmiş resmî ulusal evrak sayısı veya üretilmiş rapor sayısı değildir.
+
+<p align="center"><img src="assets/readme/13-sinav-evraki-modeli.png" alt="Açık varsayımlı sınav evrakı modeli" width="760"></p>
+
+Daha doğru bir model; okul türünü, sınıf düzeyini, sınava tabi ortak/seçmeli/alan/meslek derslerini ve sınav sıklığını ayrı ayrı hesaba katmalıdır. İmam hatip ortaokulları, Anadolu imam hatip liseleri, mesleki ve teknik liseler ile diğer okul türleri tek katsayıyla temsil edilmemelidir. İlkokul ve okul öncesi, yazılı sınav evrakı hesabına katılmaz.
+
+### Sınav dışı raporlama vizyonu
+
+Mevcut prototip sınav analiziyle sınırlıdır. Aşağıdaki alanlar tamamlanmış özellikler değil; uzman doğrulaması, yeni veri sözleşmeleri ve ayrı etik/yetki kontrolleri gerektiren gelecek vizyonudur.
+
+| Alan | Belge ve veri örnekleri | Gelecekte değerlendirilebilecek MAHİR desteği |
+|---|---|---|
+| Performans ve proje | Görev, proje, sunum, rubrik, kontrol listesi, öz/akran değerlendirme | Puan ve gözlemleri ölçüt bazında birleştiren öğretmen kontrollü değerlendirme |
+| Portfolyo | Ürün dosyası, süreç kaydı, geri bildirim ve gelişim kanıtı | Dönem içindeki gelişimi kanıt zinciriyle özetleme |
+| Akademik izleme | Devamsızlık, ders başarısı, tekrar eden eksiklik ve destek kaydı | Kesin hüküm vermeyen izleme göstergeleri ve öğretmen/yöneticiye açıklanabilir uyarı |
+| Kurul ve zümre | Sınav analizleri, kararlar, izleme sonuçları | Toplu eğilimleri ve izlenecek kararları rapor taslağına dönüştürme |
+| Okul öncesi ve ilkokul | Gözlem, gelişim dosyası, beceri kontrol listesi, veli bilgilendirmesi | Sınav puanı yerine gelişim kanıtlarını öğretmen onayıyla yapılandırma |
+| İdarî süreçler | Risk izleme, stratejik plan göstergeleri, faaliyet ve dönem raporları | Farklı veri kaynaklarını kanıtlı kurumsal rapor taslağında birleştirme |
+
+### Rehberlik ve psikolojik danışma sınırı
+
+Gelecekteki rehberlik desteği; bireyi tanıma, görüşme/izleme, yönlendirme, etkinlik ve e-Rehberlik kayıtları gibi kurumsal süreçleri kapsayabilir. Ancak MAHİR:
+
+- psikolojik tanı koymaz,
+- klinik risk veya kesin öğrenci profili üretmez,
+- rehber öğretmenin mesleki kararının yerine geçmez,
+- mahrem verileri genel amaçlı LLM/RAG katmanına göndermez,
+- yalnız yetkili rol, açık amaç, veri minimizasyonu ve insan onayı bulunan süreçlerde kullanılabilir.
+
+## Kullanıcı araştırmaları ve bilimsel kanıt planı
+
+### Beş öğretmenle deneyimleme çalışması
+
+Beş farklı okulda görev yapan Türk Dili ve Edebiyatı öğretmenlerinden, daha önce hazırlamaları istenen geçmiş sınav verilerini kullanarak MAHİR'i proje ekibinin bilgisayarında deneyimlemeleri istenmiştir. Oturumda uygulama tarayıcıda hazır açılır; araştırmacılar öğretmene “şunu seçin, buraya tıklayın” biçiminde yönlendirme yapmaz. Amaç, MAHİR'in kendi arayüz yönlendirmesinin yeterliliğini ve öğretmenin gerçek kullanım deneyimini gözlemlemektir.
+
+Planlanan kayıtlar:
+
+- görevin yapıldığı okul türü ile il/ilçe bilgisi,
+- başlangıç ve bitiş zamanı,
+- tamamlanma veya bırakma durumu,
+- hata, tereddüt ve yardım isteme anları,
+- üretilen raporun öğretmen tarafından kontrolü,
+- kullanım sonrasındaki yapılandırılmış öğretmen değerlendirmesi.
+
+Gözlem kaydı, kullanıcı değerlendirme formundan ayrı tutulur ve mümkün olduğunda iki bağımsız gözlemci tarafından doldurulur. Böylece öğretmenin öznel deneyimi ile gözlenen kullanım davranışı birbirine karıştırılmaz.
+
+### Genel öğretmen ve yönetici ihtiyaç araştırması
+
+İkinci araştırma yalnız sınav analiz raporuna değil; MAHİR'in uzun vadeli öğretmen, yönetici, EBYS, kurul/zümre, akademik izleme ve diğer raporlama vizyonuna yönelik ihtiyaç algısını incelemeyi amaçlar. Türkiye'nin farklı illerinde ve çeşitli branşlarda görev yapan 150'yi aşkın öğretmen ve yöneticiden alınan ilk geri bildirimler olumludur; ancak form henüz tamamlanmadığı ve örneklem temsilî olmadığı için bu sayı Türkiye geneline yönelik ihtiyaç oranı olarak sunulmaz.
+
+Araştırmalar tamamlandığında örneklem özellikleri, soru metinleri, yanıt dağılımları ve analiz yöntemi README'de ayrıca yayımlanacaktır.
+
+> **Bilimsel dürüstlük:** Olumlu geri bildirim, ölçülmüş eğitimsel etki değildir. Temsilî örneklem, karşılaştırma grubu ve tekrarlı ölçüm bulunmadığı sürece zaman tasarrufu, başarı artışı, ülke geneli memnuniyet veya genellenebilir etki iddiası kurulmaz.
 
 ## Yarışma görevlerinin tamamlanma durumu
 
@@ -100,6 +234,48 @@ flowchart LR
 7. Rapor öğretmen incelemesinden sonra Word ve PDF olarak üretilir.
 8. Onaylı rapordan resmî üst yazı ve kurum içi yönlendirme paketi hazırlanır.
 
+### Akışın ekran kanıtları
+
+#### 1. Eğitim bağlamı
+
+Öğretmen; kademe, okul türü, sınıf düzeyi, ders türü ve dersi birbirine bağlı seçim alanlarıyla belirler. Bu bağlam, raporun doğru program kataloğuyla kurulmasını sağlar.
+
+<p align="center"><img src="assets/readme/02-hazirlik-baglami.png" alt="MAHİR hazırlık ve eğitim bağlamı ekranı" width="820"></p>
+
+#### 2. Dört veri giriş yolu
+
+MAHİR şablonu, öğretmenin kendi Word/PDF/Excel tablosu, soru bazlı puan çizelgesi görselleri veya elle veri girişi kullanılabilir. Her yol aynı öğretmen onay ekranına bağlanır.
+
+<p align="center"><img src="assets/readme/03-veri-giris-yollari.png" alt="MAHİR veri giriş yolları" width="820"></p>
+
+#### 3. OCR veri kabul kapısı
+
+Görsel OCR yolu yalnız soru numarası, azami puan ve öğrencinin aldığı puanı gösteren soru bazlı puan çizelgeleri içindir. Fotoğraf kalitesi, açı, ışık ve el yazısı sonucu etkileyebileceğinden OCR çıktısı otomatik olarak doğru kabul edilmez.
+
+<p align="center"><img src="assets/readme/04-ocr-puan-cizelgesi.png" alt="OCR puan çizelgesi yükleme ekranı" width="820"></p>
+
+#### 4. Veri minimizasyonu ve açık öğretmen onayı
+
+Ad-soyad ve T.C. kimlik numarası analiz için kullanılmaz. Öğrenciler <code>ÖĞR-001</code> benzeri anonim referanslarla ayrıştırılır. Okunan puanlar ve toplamlar öğretmenin düzenleme ve kontrolüne sunulur; açık onay verilmeden analiz başlamaz.
+
+<p align="center"><img src="assets/readme/05-ogretmen-veri-kontrolu.png" alt="Öğretmen veri kontrol ekranı" width="820"></p>
+
+#### 5. İzlenebilir analiz ve raporlama
+
+Analiz ekranı, belge anlama, program eşleştirme, ölçme-değerlendirme, pedagojik analiz ve raporlama aşamalarını ayrı ayrı gösterir. Ekrandaki süre yalnız ilgili çalıştırmanın analiz aşamasıdır; veri hazırlama, öğretmen kontrolü ve rapor incelemesini kapsayan uçtan uca süre değildir.
+
+<p align="center"><img src="assets/readme/06-analiz-sureci.png" alt="MAHİR analiz süreci" width="820"></p>
+
+Soru bazındaki puanlar, azami puanlar ve öğretmenin seçtiği öğrenme çıktıları birlikte gösterilerek kanıtın hangi veriden üretildiği izlenebilir tutulur.
+
+<p align="center"><img src="assets/readme/07-soru-bazinda-kanit.png" alt="Soru bazında öğrenme kanıtları" width="820"></p>
+
+#### 6. Rapor, üst yazı ve EBYS demo sınırı
+
+Öğretmen onaylı rapordan resmî üst yazı ve ek listesi hazırlanabilir. Prototip MEBBİS'e veya gerçek MEB EBYS'ye bağlı değildir; evrak sayısı, kayıt tarihi, paraf veya elektronik imza üretmez.
+
+<p align="center"><img src="assets/readme/08-ebys-demo.png" alt="Üst yazı ve EBYS demo ekranı" width="820"></p>
+
 ## Çok ajanlı mimari
 
 MAHİR'de görev sınırları belirlenmiş altı uzman ajan bulunur. Buradaki **ajan**, bağımsız bir sunucu veya ayrı bir yapay zekâ modeli değil; tanımlı girdisi, çıktısı, yetki sınırı, hata politikası ve işlem izi bulunan uzman görev bileşenidir. Belge Okuma ve OCR Kalite Ajanı dosya yükleme aşamasında; diğer beş ajan öğretmen onayından sonraki analiz aşamasında çalışır:
@@ -115,17 +291,61 @@ MAHİR'de görev sınırları belirlenmiş altı uzman ajan bulunur. Buradaki **
 
 Bu ayrım, bir ajanın ürettiği sonucun diğer ajan tarafından izlenebilmesini ve sayısal hesapların dil modeli yorumundan bağımsız kalmasını sağlar. İlk ajanın kalite sonucu yükleme kaydındaki `documentQuality` alanında; analiz aşamasındaki diğer beş ajanın çalışma sırası, süresi, bulguları ve LLM kullanımı ortak ajan izinde tutulur.
 
-## Jüri için hızlı başlangıç
+### İki aşamalı çalışma düzeni
 
-### Sunumu dinlemeden hızlı inceleme
+| Aşama | Bileşenler | Öğretmen kontrolü |
+|---|---|---|
+| Veri kabul kapısı | Belge Okuma ve OCR Kalite Ajanı | OCR sonucu, eksik ve belirsiz alanlar öğretmene sunulur; onay verilmeden analiz başlamaz. |
+| Onay sonrası analiz hattı | Belge Anlama -> Program Eşleştirme -> Ölçme ve Değerlendirme -> Pedagojik Analiz -> Raporlama | Rapor ve kurumsal belge taslakları öğretmen incelemesi ve onayı olmadan nihai kabul edilmez. |
 
-Depoyu yalnızca belgeler üzerinden değerlendirmek isteyen jüri üyeleri aşağıdaki kanıt zincirini izleyebilir:
+### Standart Eğitim Belgesi - CED
 
-1. [Örnek sınav girdisi](shared/sample-exam.csv)
-2. [Yapılandırılmış standart eğitim belgesi örneği](shared/ced-example.json)
-3. [Örnek analiz raporu](shared/report-example.txt)
-4. [TDE 9 pilot veri paketi ve kapsam açıklaması](shared/pilot/tde9/README.md)
-5. [Otomatik testler](tests/)
+**Canonical Education Document (CED)**; öğretmen tarafından onaylanan sınav bağlamını, soru yapısını, anonim öğrenci puanlarını ve öğrenme çıktısı ilişkilerini ajanlar arasında taşıyan standart eğitim belgesi modelidir. CED bir yapay zekâ kararı değildir; ajanların aynı veri sözleşmesi üzerinden çalışmasını ve bir aşamadaki bulgunun sonraki aşamada izlenebilmesini sağlar.
+
+| CED'nin taşıdığı bilgiler | CED'nin yapmadıkları |
+|---|---|
+| Ders, sınıf, okul türü, dönem, sınav türü ve sınav sırası | OCR işlemi yapmaz |
+| Soru numarası, azami puan ve öğretmen onaylı soru puanları | Öğrenme çıktısını kendiliğinden seçmez |
+| Öğretmenin seçtiği öğrenme çıktıları ve katkı ilişkileri | Pedagojik karar veya resmî onay üretmez |
+| Anonim öğrenci referansları, doğrulama bulguları ve işlem izi | Ham kimlik verisini LLM/RAG katmanına taşımaz |
+
+### Deterministik işlemler ile LLM/RAG ayrımı
+
+| Ajan | LLM/RAG kullanımı | Bilimsel ve teknik sınır |
+|---|---|---|
+| Belge Okuma ve OCR Kalite | Yok | OCR kalite bulguları öğretmen doğrulamasının yerini tutmaz. |
+| Belge Anlama | Yok | Yalnız onaylanmış veriyi CED yapısına dönüştürür. |
+| Program Eşleştirme | Yok | Öğretmenin seçimini katalogla doğrular; otomatik pedagojik seçim yapmaz. |
+| Ölçme ve Değerlendirme | Yalnız açıklayıcı anomali kontrolü | LLM hiçbir puanı, oranı veya toplamı değiştiremez. |
+| Pedagojik Analiz | Doğrulanmış program kaynağıyla RAG | Kaynak yoksa veya yanıt kapsam dışına çıkarsa açıklama rapora alınmaz. |
+| Raporlama | Yok | Önceki ajanların doğrulanmış sonuçlarını düzenler; yeniden hesaplama yapmaz. |
+
+Pedagojik Analiz Ajanı isteğe bağlıdır. RAG/LLM erişimi başarısız olursa sayısal analiz ve kanıt temelli rapor yorumsuz biçimde devam edebilir. Başarısız ajanlar ve atlanan alanlar işlem izinde saklanır; eksik kanıt tamamlanmış gibi gösterilmez.
+
+LLM kullanan görevlerin istemleri ortak kuyruğa yazılıp tek toplu istek içinde gönderilebilir. Bu, ayrı ağ turlarını azaltan teknik bir optimizasyondur; sıfır GPU maliyeti, sabit süre veya ajan sayısından bağımsız performans iddiası değildir.
+
+### RAG kaynak ve kapsam korumaları
+
+- RAG yalnız öğretmenin onayladığı anonimleştirilmiş veri üzerinde çalışır.
+- Arama; kayıtlı program, sınıf, tema ve seçilmiş öğrenme çıktısı bağlamıyla sınırlandırılır.
+- Tema çözülemezse daha geniş ve riskli bir aramaya düşülmez.
+- Kaynak bulunmayan model yanıtı rapora taşınmaz.
+- Başka öğrenme çıktısı koduna veya yanlış beceri alanına sapan yanıt reddedilir.
+- Kullanılan kaynaklar belge adı ve orijinal PDF sayfa numaralarıyla işlem izine eklenir.
+- RAG başarısızlığı deterministik sayısal analizi durdurmaz.
+
+## Projeyi inceleme rehberi
+
+### Sunumu izlemeden depo üzerinden inceleme
+
+Projeyi yalnızca depo ve belgeler üzerinden değerlendiren okuyucu aşağıdaki kanıt zincirini izleyebilir:
+
+1. [Örnek sınav girdisi](shared/sample-exam.csv): Sisteme hangi verilerin sağlandığını gösterir.
+2. [Yapılandırılmış standart eğitim belgesi örneği](shared/ced-example.json): Onaylı verinin ajanlar arasında hangi ortak sözleşmeyle taşındığını gösterir.
+3. [TDE 9 pilot veri paketi ve kapsam açıklaması](shared/pilot/tde9/README.md): Öğretmenin seçtiği öğrenme çıktısının program bağlamında nasıl doğrulandığını gösterir.
+4. [Ajan mimari belgeleri](docs/architecture/): Altı bileşenin görev, yetki, hata ve LLM sınırlarını gösterir.
+5. [Örnek analiz raporu](shared/report-example.txt): Sayısal sonuçların ve kanıtların nasıl sunulduğunu gösterir.
+6. [Otomatik testler](tests/): İş akışının, güvenlik sınırlarının ve öğretmen kontrol noktalarının nasıl doğrulandığını gösterir.
 
 Bu dosyalar örnek girdiden yapılandırılmış veriye, analiz çıktısına ve doğrulama kontrollerine uzanan akışın repo üzerinden izlenebilmesini sağlar. Örnek dosyalar sentetiktir; gerçek öğrenci kimliği içermez.
 
@@ -173,7 +393,7 @@ Bu durum bir kurulum eksikliği değil; bilinçli bir güvenlik ve maliyet kontr
 - Gerçek servis kimlik bilgilerinin koddan ayrı tutulması, kontrollü erişim ve veri minimizasyonu yaklaşımının gereğidir.
 - `.gitignore`, `secrets.local.txt` dosyasının yanlışlıkla Git geçmişine eklenmesini engeller.
 
-Yetkili jüri değerlendirmesinde tam erişim, ayrıca iletilen yerel yapılandırma dosyasıyla veya süre ve kota sınırı bulunan jüri erişimiyle sağlanır.
+Yetkili değerlendirmede tam erişim, ayrıca iletilen yerel yapılandırma dosyasıyla veya süre ve kota sınırı bulunan değerlendirme erişimiyle sağlanır.
 
 ## 9. sınıf Türk Dili ve Edebiyatı pilotu
 
@@ -225,19 +445,6 @@ TDE kodları yalnızca **Türk Dili ve Edebiyatı + 9. sınıf** profili seçild
 | Kalıcı ilişkisel veritabanı | Sonraki geliştirme aşaması |
 | Kurumsal kullanıcı hesabı ve yetkilendirme | Prototip sonrası |
 
-## Jüri için 5 dakikalık gösterim planı
-
-Final süresi **4 dakika sunum + 1 dakika soru-cevap** biçimindedir. Bu nedenle sunumda bütün ekranları tek tek anlatmak yerine problemin, çalışan çözüm akışının ve üretilen kanıtın gösterilmesi hedeflenir.
-
-1. **0.00–0.35 | Problem ve yaklaşım:** Öğretmenin sınav verisini analiz etme yükü, kanıta dayalı değerlendirme ihtiyacı ve öğretmen onayı ilkesi açıklanır.
-2. **0.35–1.25 | Belgeyi anlama ve doğrulama:** Örnek sınav belgesi yüklenir; belge okuma/OCR sonucu ile eksik veya çelişkili alanların öğretmene nasıl gösterildiği sunulur.
-3. **1.25–2.25 | Kurallı sınav analizi:** Soru, puan, tema ve öğrenme çıktısı eşleştirmeleri ile öğrenci ve sınıf düzeyindeki hesaplamalar gösterilir.
-4. **2.25–3.10 | Kaynaklı pedagojik değerlendirme:** Öğretmen onayından sonra çalışan RAG desteği, kullanılan program kaynağı ve kanıt bağlantısı üzerinden açıklanır.
-5. **3.10–4.00 | Çıktı ve kurumsal kullanım:** Word/PDF raporu, kanıt görünümü, resmî üst yazı ve EBYS demo akışı birlikte gösterilir; MAHİR'in öğretmenin yerine karar vermediği vurgulanır.
-6. **4.00–5.00 | Jüri soruları:** Teknik mimari, veri güvenliği, pedagojik dayanak veya yaygınlaştırma hakkında gelen sorular yanıtlanır.
-
-Sunum süresinin kısa olması nedeniyle canlı gösterim önceden anonim örnek veriyle hazırlanmalıdır. İnternet kesintisi veya uzak GPU soğuk başlangıcı olasılığına karşı aynı akışın kayıtlı demo görüntüsü ile örnek Word/PDF raporu yedek olarak bulundurulmalıdır.
-
 ## Testler
 
 Python doğrulamalarını çalıştırmak için:
@@ -246,16 +453,14 @@ Python doğrulamalarını çalıştırmak için:
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-Node.js kuruluysa JavaScript kontrolleri de çalıştırılabilir:
+Node.js kuruluysa repodaki 10 JavaScript test dosyasının tamamı ve ana tarayıcı betiğinin sözdizimi kontrolü çalıştırılabilir:
 
 ```bash
-node tests/program-catalog.test.js
-node tests/workspace-backup.test.js
-node tests/data-entry-flow.test.js
-node tests/score-corrections.test.js
-node tests/report-evidence.test.js
-node tests/ebys-demo.test.js
+node --test tests/*.test.js
+node --check script.js
 ```
+
+JavaScript test **dosyası** sayısı, test vakası sayısı değildir. CI başarısı kodla tanımlanan davranışları doğrular; gerçek kullanıcı etkisini veya bütün belge türlerinde kusursuzluğu kanıtlamaz.
 
 ## Proje yapısı
 
@@ -292,7 +497,7 @@ MAHIR-PROTOTIP-HTML/
 ## Sonraki geliştirme adımları
 
 1. OCR ve RAG akışlarının farklı anonim belge örnekleriyle genişletilmiş doğrulaması
-2. Süreli ve kullanım kotası sınırlandırılmış jüri demo erişimi
+2. Süreli ve kullanım kotası sınırlandırılmış değerlendirme erişimi
 3. Kalıcı ilişkisel veritabanı
 4. Kurumsal kimlik doğrulama ve yetkilendirme
 5. Yetkili kurumlarla gerçek EBYS entegrasyonu
