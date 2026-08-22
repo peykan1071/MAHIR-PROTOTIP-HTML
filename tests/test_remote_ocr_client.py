@@ -1,17 +1,21 @@
-"""Tests for the single connection-level retry in `run_remote_image_group_ocr`.
+"""Tests for the connection-level retry-with-backoff in `run_remote_image_group_ocr`.
 
 A live WinError 10053 ("bağlantı ana makinedeki yazılım tarafından iptal
 edildi") showed the worker itself was healthy - the request never reached it.
-That class of error deserves one silent retry so a transient local network
-blip never surfaces to the teacher. HTTP-level errors (401, 500, ...) are a
-real answer from the server and must NOT be retried.
+A first fix added one retry, but a second live occurrence failed on BOTH the
+original attempt and that retry (the process had already restarted onto the
+fixed code), showing this local network path can drop more than one attempt
+in a row. `_post_to_worker_with_retry` now backs off across
+`_CONNECTION_RETRY_DELAYS_SECONDS` (2s, 5s) for up to 3 total attempts.
+HTTP-level errors (401, 500, ...) are a real answer from the server and must
+NOT be retried.
 """
 
 import io
 import json
 import unittest
 import urllib.error
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from backend.app import remote_ocr_client
 from backend.app.file_receiver import UploadedFile
@@ -42,7 +46,7 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.mock_sleep = patcher.start()
 
-    def test_connection_error_then_success_is_retried_once_and_hidden(self):
+    def test_connection_error_then_success_on_second_attempt_is_hidden(self):
         ok_response = _response({"ok": True, "message": "tamam", "structuredData": {"a": 1}})
         with patch(
             "backend.app.remote_ocr_client.urllib.request.urlopen",
@@ -54,20 +58,33 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
         self.assertEqual(message, "tamam")
         self.assertEqual(data, {"a": 1})
         self.assertEqual(mock_urlopen.call_count, 2)
-        self.mock_sleep.assert_called_once()
+        self.mock_sleep.assert_called_once_with(2)
 
-    def test_connection_error_twice_reports_unreachable_after_one_retry(self):
+    def test_connection_error_twice_then_success_on_third_attempt_is_hidden(self):
+        ok_response = _response({"ok": True, "message": "tamam", "structuredData": {"a": 1}})
         with patch(
             "backend.app.remote_ocr_client.urllib.request.urlopen",
-            side_effect=[OSError("kopma-1"), OSError("kopma-2")],
+            side_effect=[OSError("kopma-1"), OSError("kopma-2"), ok_response],
+        ) as mock_urlopen:
+            ok, _message, _data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
+
+        self.assertTrue(ok)
+        self.assertEqual(mock_urlopen.call_count, 3)
+        self.assertEqual(self.mock_sleep.call_args_list, [call(2), call(5)])
+
+    def test_connection_error_on_all_three_attempts_reports_unreachable(self):
+        with patch(
+            "backend.app.remote_ocr_client.urllib.request.urlopen",
+            side_effect=[OSError("kopma-1"), OSError("kopma-2"), OSError("kopma-3")],
         ) as mock_urlopen:
             ok, message, data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
 
         self.assertFalse(ok)
         self.assertIn("Uzak OCR sunucusuna ulaşılamadı", message)
-        self.assertIn("kopma-2", message)
+        self.assertIn("kopma-3", message)
         self.assertIsNone(data)
-        self.assertEqual(mock_urlopen.call_count, 2)
+        self.assertEqual(mock_urlopen.call_count, 3)
+        self.assertEqual(self.mock_sleep.call_args_list, [call(2), call(5)])
 
     def test_http_error_is_not_retried(self):
         http_error = urllib.error.HTTPError(
