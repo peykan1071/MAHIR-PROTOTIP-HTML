@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
+# Yerel backend log dosyaları (run_file_receiver.py::_configure_logging) -
+# öğretmen/öğrenci verisi taşımaz (yalnızca kod/sebep/sayı) ama yine de
+# yerel makineye özgü çalışma zamanı çıktısı, depoya girmemeli.
+backend/logs/
+
 # Yerel paylaşılan parolalar - uzak servislerin (OCR/RAG) X-MAHIR-*-Key
 # doğrulaması bu değerlerle çalışır ve ASLA depoya girmemelidir.
 secrets.local.txt

@@ -5,17 +5,32 @@ import unittest
 from typing import ClassVar
 from unittest.mock import patch
 
+from backend.app.agents.pipeline import (
+    _REASON_ACTION_LANGUAGE,
+    _REASON_CAUSAL_OVERCLAIM,
+    _REASON_CODE_LEAK,
+    _REASON_CROSS_SKILL_LEAK,
+    _REASON_DUPLICATE_TERMS,
+    _REASON_EVIDENCE_COUNT,
+    _REASON_EVIDENCE_ITEM_SHAPE,
+    _REASON_RATIONALE_STRIPPED,
+    _REASON_STATUS_NOT_SUCCESS,
+    _REASON_TERM_SHAPE,
+    _REASON_TERM_UNGROUNDED,
+    _REASON_THEME_MISSING,
+    _REASON_TOO_LONG,
+    _answer_matches_outcome_scope,
+    _compose_grounded_pedagogical_answer,
+    _grounding_retry_hint_for,
+    _term_is_grounded,
+)
 from backend.app.approved_data_analyzer import (
     _build_rag_question,
     _build_rag_retrieval_query,
     _normalize_theme_for_rag,
     _strip_recommendation_sentences,
     analyze_approved_data,
-)
-from backend.app.agents.pipeline import (
-    _answer_matches_outcome_scope,
-    _compose_grounded_pedagogical_answer,
-    _term_is_grounded,
+    analyze_approved_data_traced,
 )
 
 _FAKE_REMOTE_URL = "https://fake.example/web_query"
@@ -181,8 +196,29 @@ class RagContextAttachmentTests(unittest.TestCase):
         three = _evidence_json(
             ["ana duygu", "ana düşünce", "konu"], ["a.", "b.", "c."]
         )
-        self.assertEqual(_compose_grounded_pedagogical_answer(empty, outcome, sources), "")
-        self.assertEqual(_compose_grounded_pedagogical_answer(three, outcome, sources), "")
+        empty_reasons: list[str] = []
+        three_reasons: list[str] = []
+        self.assertEqual(_compose_grounded_pedagogical_answer(empty, outcome, sources, empty_reasons), "")
+        self.assertEqual(_compose_grounded_pedagogical_answer(three, outcome, sources, three_reasons), "")
+        self.assertEqual(empty_reasons, [_REASON_EVIDENCE_COUNT])
+        self.assertEqual(three_reasons, [_REASON_EVIDENCE_COUNT])
+
+    def test_evidence_item_not_a_dict_is_rejected(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu belirlenir."}]
+        answer = json.dumps({"status": "success", "evidence": ["ana duygu"]})
+        reasons: list[str] = []
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
+        self.assertEqual(reasons, [_REASON_EVIDENCE_ITEM_SHAPE])
+
+    def test_empty_or_overlong_term_is_rejected(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu belirlenir."}]
+        overlong_term = "a" * 91
+        answer = _evidence_json([overlong_term], ["Bu bileşen net kurulamamaktadır."])
+        reasons: list[str] = []
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
+        self.assertEqual(reasons, [_REASON_TERM_SHAPE])
 
     def test_unverified_evidence_term_is_rejected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
@@ -190,14 +226,36 @@ class RagContextAttachmentTests(unittest.TestCase):
         answer = _evidence_json(
             ["ana duygu", "edebiyat atölyesi"], ["Ana duygu eksik.", "Edebiyat atölyesi eksik."]
         )
-        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources), "")
+        reasons: list[str] = []
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
+        self.assertEqual(reasons, [_REASON_TERM_UNGROUNDED])
+
+    def test_duplicate_terms_are_rejected(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu belirlenir."}]
+        answer = _evidence_json(
+            ["ana duygu", "Ana Duygu"], ["Ana duygu net kurulamıyor.", "Yine net kurulamıyor."]
+        )
+        reasons: list[str] = []
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
+        self.assertEqual(reasons, [_REASON_DUPLICATE_TERMS])
+
+    def test_missing_theme_is_rejected(self):
+        outcome = {"outcomeTheme": "", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu belirlenir."}]
+        answer = _evidence_json(["ana duygu"], ["Ana duygu net kurulamıyor."])
+        reasons: list[str] = []
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
+        self.assertEqual(reasons, [_REASON_THEME_MISSING])
 
     def test_status_not_found_is_rejected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
         answer = json.dumps({"status": "not_found"})
+        reasons: list[str] = []
         self.assertEqual(
-            _compose_grounded_pedagogical_answer(answer, outcome, [{"excerpt": "ana duygu"}]), ""
+            _compose_grounded_pedagogical_answer(answer, outcome, [{"excerpt": "ana duygu"}], reasons), ""
         )
+        self.assertEqual(reasons, [_REASON_STATUS_NOT_SUCCESS])
 
     def test_recommendation_language_in_rationale_is_stripped_and_then_rejected(self):
         # gapRationale tamamen öneri cümlesiyse strip_recommendation_sentences
@@ -209,16 +267,20 @@ class RagContextAttachmentTests(unittest.TestCase):
             ["ana duygu", "ana düşünce"],
             ["Bu eksiklik giderilmelidir ve telafi programı önerilir.", "Ana düşünce eksik."],
         )
-        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources), "")
+        reasons: list[str] = []
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
+        self.assertEqual(reasons, [_REASON_RATIONALE_STRIPPED])
 
     def test_non_json_model_paragraph_is_rejected_when_structured_evidence_is_expected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        reasons: list[str] = []
         self.assertEqual(
             _compose_grounded_pedagogical_answer(
-                "Öğrenciler için bir etkinlik önerilir.", outcome, [{"excerpt": "ana duygu"}]
+                "Öğrenciler için bir etkinlik önerilir.", outcome, [{"excerpt": "ana duygu"}], reasons
             ),
             "",
         )
+        self.assertEqual(reasons, [_REASON_STATUS_NOT_SUCCESS])
 
     def test_valid_json_is_used_and_trailing_model_prose_is_ignored(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.40}
@@ -277,23 +339,35 @@ class RagContextAttachmentTests(unittest.TestCase):
             "outcomeCode": "TDE3.3", "componentType": "speaking",
             "outcomeDescription": "konuşmada kural uygulayabilme",
         }
-        self.assertFalse(_answer_matches_outcome_scope("TDE2.2.3 okuma becerileri eksiktir.", outcome))
+        reasons: list[str] = []
+        self.assertFalse(_answer_matches_outcome_scope("TDE2.2.3 okuma becerileri eksiktir.", outcome, reasons))
+        self.assertEqual(reasons, [_REASON_CODE_LEAK])
         self.assertTrue(_answer_matches_outcome_scope("TDE3.3 konuşma becerisi güçlüdür.", outcome))
 
     def test_overlong_pedagogical_answer_is_rejected(self):
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
         answer = " ".join(["kanıt"] * 71)
-        self.assertFalse(_answer_matches_outcome_scope(answer, outcome))
+        reasons: list[str] = []
+        self.assertFalse(_answer_matches_outcome_scope(answer, outcome, reasons))
+        self.assertEqual(reasons, [_REASON_TOO_LONG])
 
     def test_causal_overclaim_and_student_count_are_rejected(self):
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
-        self.assertFalse(_answer_matches_outcome_scope("Düşüklüğün temel nedeni yetersiz bilgidir.", outcome))
-        self.assertFalse(_answer_matches_outcome_scope("Zorluk çeken öğrencilerin sayısı yüksektir.", outcome))
+        reasons_1: list[str] = []
+        reasons_2: list[str] = []
+        self.assertFalse(_answer_matches_outcome_scope("Düşüklüğün temel nedeni yetersiz bilgidir.", outcome, reasons_1))
+        self.assertFalse(_answer_matches_outcome_scope("Zorluk çeken öğrencilerin sayısı yüksektir.", outcome, reasons_2))
+        self.assertEqual(reasons_1, [_REASON_CAUSAL_OVERCLAIM])
+        self.assertEqual(reasons_2, [_REASON_CAUSAL_OVERCLAIM])
 
     def test_activity_or_remediation_language_is_rejected(self):
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
-        self.assertFalse(_answer_matches_outcome_scope("Bu çıktı için etkinlik önerilir.", outcome))
-        self.assertFalse(_answer_matches_outcome_scope("Telafi çalışması yapılmalıdır.", outcome))
+        reasons_1: list[str] = []
+        reasons_2: list[str] = []
+        self.assertFalse(_answer_matches_outcome_scope("Bu çıktı için etkinlik önerilir.", outcome, reasons_1))
+        self.assertFalse(_answer_matches_outcome_scope("Telafi çalışması yapılmalıdır.", outcome, reasons_2))
+        self.assertEqual(reasons_1, [_REASON_ACTION_LANGUAGE])
+        self.assertEqual(reasons_2, [_REASON_ACTION_LANGUAGE])
 
     def test_concise_evidence_bounded_diagnosis_is_accepted(self):
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
@@ -310,10 +384,14 @@ class RagContextAttachmentTests(unittest.TestCase):
             "outcomeCode": "TDE1.2", "componentType": "listening",
             "outcomeDescription": "dinlediği/izlediği metinde anlam oluşturabilme",
         }
-        self.assertFalse(_answer_matches_outcome_scope("Öğrenciler mülakatta konuşur ve iletiyi belirler.", outcome))
+        reasons_1: list[str] = []
+        reasons_2: list[str] = []
+        self.assertFalse(_answer_matches_outcome_scope("Öğrenciler mülakatta konuşur ve iletiyi belirler.", outcome, reasons_1))
         self.assertTrue(_answer_matches_outcome_scope("Öğrenciler mülakat metnini dinleyerek iletiyi belirler.", outcome))
-        self.assertFalse(_answer_matches_outcome_scope("Okuma stratejileri uygulanmalıdır.", outcome))
+        self.assertFalse(_answer_matches_outcome_scope("Okuma stratejileri uygulanmalıdır.", outcome, reasons_2))
         self.assertTrue(_answer_matches_outcome_scope("Dinlediği metindeki açık ve örtük iletiyi belirler.", outcome))
+        self.assertEqual(reasons_1, [_REASON_CROSS_SKILL_LEAK])
+        self.assertEqual(reasons_2, [_REASON_CROSS_SKILL_LEAK])
 
     def test_rejected_listening_drift_is_reported_without_the_unsafe_context(self):
         payload = _weak_tde_payload()
@@ -528,6 +606,33 @@ class DiagnosisGroundingRetryTests(unittest.TestCase):
         # yanlış kullanmasıydı, hangi BAĞLAM'ın getirildiği değil.
         self.assertEqual(retry_items[0]["retrieval"], _diagnosis_prompts(mock_query)[0]["retrieval"])
 
+    def test_rationale_stripped_first_attempt_gets_rationale_specific_retry_hint(self):
+        # 2026-08-23: retry ipucu artık sebebe göre seçiliyor - terim zaten
+        # BAĞLAM'da geçerliyken yalnızca gerekçe (zorunluluk kipi yüzünden)
+        # charter filtresince boşaltılırsa, "BİREBİR terim seç" ipucu
+        # alakasız olurdu; bu senaryoda gerekçeye özgü ipucu gitmeli.
+        bad_rationale = _evidence_json(
+            ["Sözün İnceliği", "anlam oluşturma"],
+            ["Bu bileşen geliştirilmelidir.", "Bu bileşen de geliştirilmelidir."],
+        )
+        good = _evidence_json(
+            ["Sözün İnceliği", "anlam oluşturma"],
+            ["Bu bileşen net biçimde kurulamamaktadır.", "Bu bileşen sınırlı düzeyde kalmaktadır."],
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(bad_rationale, self._SOURCES)], [(good, self._SOURCES)]),
+            ) as mock_query:
+                result = analyze_approved_data(_weak_tde_payload())
+
+        self.assertEqual(mock_query.call_count, 2)
+        context = result["outcomes"][0]["ragContext"]
+        self.assertNotIn("doğrulanmış bir kaynak bağlamı oluşturulamadı", context)
+        retry_items = mock_query.call_args_list[1][0][0]
+        self.assertIn("GÖZLEMSEL", retry_items[0]["user"])
+        self.assertNotIn("BİREBİR", retry_items[0]["user"])
+
     def test_ungrounded_after_retry_is_rejected_and_tried_only_twice(self):
         bad = _evidence_json(
             ["dinleme becerisi", "kelime dağarcığı"], ["İlk deneme 1.", "İlk deneme 2."]
@@ -544,6 +649,29 @@ class DiagnosisGroundingRetryTests(unittest.TestCase):
         self.assertIn("doğrulanmış bir kaynak bağlamı oluşturulamadı", context)
         self.assertEqual(result["outcomes"][0]["ragSources"], [])
 
+    def test_final_rejection_is_counted_and_logged_with_both_reasons(self):
+        # 2026-08-23 Track A: `_RAG_SCOPE_REJECTED_TEXT`in GERÇEKTE hangi
+        # sebeple tetiklendiği artık hem `AgentResult.outputs["ragRejectReasons"]`e
+        # sayılıyor hem loglanıyor (ilk deneme VE retry'ın sebebi birlikte -
+        # sebep DEĞİŞTİYSE bu da tek başına bir sinyal).
+        bad = _evidence_json(
+            ["dinleme becerisi", "kelime dağarcığı"], ["İlk deneme 1.", "İlk deneme 2."]
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(bad, self._SOURCES)]),
+            ):
+                with self.assertLogs("backend.app.agents.pipeline", level="INFO") as logs:
+                    _analysis, trace = analyze_approved_data_traced(_weak_tde_payload())
+
+        pedagogical = next(entry for entry in trace["agents"] if entry["agent"] == "pedagojik-analiz")
+        self.assertEqual(pedagogical["outputs"]["ragRejectReasons"], {_REASON_TERM_UNGROUNDED: 1})
+        give_up_lines = [line for line in logs.output if "yeniden-deneme-de-basarisiz" in line]
+        self.assertEqual(len(give_up_lines), 1)
+        self.assertIn(f"ilk_ayrinti={_REASON_TERM_UNGROUNDED}", give_up_lines[0])
+        self.assertIn(f"son_ayrinti={_REASON_TERM_UNGROUNDED}", give_up_lines[0])
+
     def test_first_attempt_success_never_triggers_a_retry_call(self):
         good = _evidence_json(
             ["Sözün İnceliği", "anlam oluşturma"], ["Birinci deneme 1.", "Birinci deneme 2."]
@@ -556,6 +684,35 @@ class DiagnosisGroundingRetryTests(unittest.TestCase):
                 analyze_approved_data(_weak_tde_payload())
 
         mock_query.assert_called_once()
+
+
+class GroundingRetryHintSelectionTests(unittest.TestCase):
+    """`_grounding_retry_hint_for`: sebep koduna göre doğru ipucu seçiliyor mu.
+
+    2026-08-23: önceden retry TEK sabit ipucu kullanıyordu (yalnızca
+    terim-ayarı sorunundan bahsediyordu) - gerçek sebep başkaysa (ör.
+    gerekçe charter filtresiyle boşaldıysa) o ipucu alakasızdı.
+    """
+
+    def test_term_ungrounded_gets_the_default_grounding_hint(self):
+        hint = _grounding_retry_hint_for(_REASON_TERM_UNGROUNDED)
+        self.assertIn("BİREBİR", hint)
+
+    def test_rationale_stripped_gets_the_rationale_hint(self):
+        hint = _grounding_retry_hint_for(_REASON_RATIONALE_STRIPPED)
+        self.assertIn("GÖZLEMSEL", hint)
+        self.assertNotIn("BİREBİR", hint)
+
+    def test_scope_violation_reasons_get_the_scope_hint(self):
+        for reason in (_REASON_TOO_LONG, _REASON_CAUSAL_OVERCLAIM, _REASON_ACTION_LANGUAGE, _REASON_CODE_LEAK, _REASON_CROSS_SKILL_LEAK):
+            with self.subTest(reason=reason):
+                hint = _grounding_retry_hint_for(reason)
+                self.assertIn("kapsamında kal", hint)
+
+    def test_unmapped_or_missing_reason_falls_back_to_the_default_hint(self):
+        for reason in (_REASON_EVIDENCE_COUNT, _REASON_EVIDENCE_ITEM_SHAPE, _REASON_DUPLICATE_TERMS, None, "bilinmeyen-yeni-sebep"):
+            with self.subTest(reason=reason):
+                self.assertIn("BİREBİR", _grounding_retry_hint_for(reason))
 
 
 class TermGroundingTests(unittest.TestCase):
