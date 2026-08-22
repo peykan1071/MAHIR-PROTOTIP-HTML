@@ -55,40 +55,47 @@ _NO_ANOMALY_TEXT = "Belirgin bir tutarsızlık görülmedi"
 _DIAGNOSIS_TOP_K = 8
 
 # `_compose_grounded_pedagogical_answer`in cümle kalıp havuzları. Model
-# BAĞLAM'dan doğrulanmış BİR ya da İKİ terim seçiyor, cümlenin TAMAMINI
+# yalnızca BAĞLAM'dan doğrulanmış İKİ terim seçiyor, cümlenin TAMAMINI
 # MAHİR kuruyor (kanıt garantisi bundan geliyor) - ama tek bir sabit kalıp
 # her satırı birebir aynı iskelete sokup raporu robotik/tek düze gösteriyordu.
-# Her varyant aynı zorunlu parçaları taşımak ZORUNDA (tırnaklı tema adı,
-# terim(ler), "%<oran> olarak hesaplanmıştır" - `RagContextAttachmentTests`
-# bunu doğruluyor); yalnız cümlenin çevresi değişiyor. `{terms}` tek bir
-# terimde "X", ikide "X ve Y" olarak önceden birleştirilip veriliyor - ayrı
-# `{term1}`/`{term2}` yer tutucuları TEK terimli durumda boş kalırdı.
-# Seçim `_pick_template` ile GİRDİYE göre belirlenimci (aynı kazanım aynı
-# yeniden üretimde hep aynı kalıbı alır - test edilebilirlik/kararlılık
-# için) ama farklı kazanımlar farklı kalıp alır, bu yüzden bir raporun
-# tamamı tek tip görünmez.
-#
-# 2026-08-22 (4. sürüm): TAM OLARAK İKİ zorunluluğu kaldırıldı - dar
-# kapsamlı bazı kazanımlarda BAĞLAM'da gerçekten TEK güçlü/somut aday
-# bulunuyor, model ikinciyi uydurmak yerine tamamen `not_found` diyip
-# öğretmene hiçbir yorum göstermiyordu. Artık BİR terim de kabul ediliyor;
-# doğrulama kuralı (`_term_is_grounded`) ve kanıt garantisi DEĞİŞMEDİ.
+# Her varyant aynı zorunlu parçaları taşımak ZORUNDA (tırnaklı tema adı, her
+# iki terim, "%<oran> olarak hesaplanmıştır" - `RagContextAttachmentTests`
+# bunu doğruluyor); yalnız cümlenin çevresi değişiyor. Seçim `_pick_template`
+# ile GİRDİYE göre belirlenimci (aynı kazanım aynı yeniden üretimde hep aynı
+# kalıbı alır - test edilebilirlik/kararlılık için) ama farklı kazanımlar
+# farklı kalıp alır, bu yüzden bir raporun tamamı tek tip görünmez.
 _OPENING_TEMPLATES = (
     (
-        '"{theme}" temasında {terms} kapsamındaki sınıf başarı oranı '
+        '"{theme}" temasında {term1} ve {term2} kapsamındaki sınıf başarı oranı '
         "%{percent} olarak hesaplanmıştır."
     ),
     (
-        '"{theme}" temasındaki {terms} bileşeninde sınıf başarı '
+        '"{theme}" temasındaki {term1} ve {term2} bileşenlerinde sınıf başarı '
         "oranı %{percent} olarak hesaplanmıştır."
     ),
     (
-        'Sınıfın "{theme}" temasında {terms} kapsamındaki başarı oranı '
+        'Sınıfın "{theme}" temasında {term1} ve {term2} kapsamındaki başarı oranı '
         "%{percent} olarak hesaplanmıştır."
     ),
     (
-        '"{theme}" temasında ölçülen {terms} performansına göre sınıf '
+        '"{theme}" temasında ölçülen {term1} ve {term2} performansına göre sınıf '
         "başarı oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        '"{theme}" temasına ait {term1} ve {term2} göstergelerinde sınıf başarı '
+        "oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        'Elde edilen verilere göre "{theme}" temasında {term1} ve {term2} '
+        "açısından sınıf başarı oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        '"{theme}" temasında {term1} ve {term2} unsurları temel alınarak sınıf '
+        "başarı oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        'Değerlendirme sonuçlarına göre "{theme}" temasında {term1} ve {term2} '
+        "bakımından sınıf başarı oranı %{percent} olarak hesaplanmıştır."
     ),
 )
 _WEAK_CLOSING_TEMPLATES = (
@@ -104,11 +111,26 @@ _WEAK_CLOSING_TEMPLATES = (
         "Eksikliğin şiddeti: {severity}. Bu eksiklik, sonraki öğrenme "
         "süreçlerine sarmal biçimde yansıyabilir."
     ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu düzey, ilerleyen kazanımların "
+        "sağlıklı biçimde oluşması açısından risk taşımaktadır."
+    ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu tablo, sonraki öğrenme "
+        "basamaklarına sarmal biçimde etki edebilir."
+    ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu sonuç, ileriki kazanımların "
+        "temelini oluşturan bir alanda risk işaret etmektedir."
+    ),
 )
 _STRONG_CLOSING_TEMPLATES = (
     "Bu sonuç, seçilen öğrenme çıktısında güçlü bir performans alanını gösterir.",
     "Bu veriler, seçilen öğrenme çıktısında sağlam bir kazanım düzeyine işaret eder.",
     "Sınıf, seçilen öğrenme çıktısında bu alanda belirgin bir başarı sergilemektedir.",
+    "Elde edilen veriler, seçilen öğrenme çıktısında yüksek bir yeterlik düzeyine karşılık gelmektedir.",
+    "Bu bulgular, seçilen öğrenme çıktısında sınıfın büyük ölçüde başarılı olduğunu göstermektedir.",
+    "Seçilen öğrenme çıktısına ilişkin veriler, güçlü bir performans düzeyini yansıtmaktadır.",
 )
 
 
@@ -820,12 +842,6 @@ def _compose_grounded_pedagogical_answer(
     karşılığı yoksa (Türkçe çekim eki farklılıklarına toleranslı - bkz.
     `_term_is_grounded`) hiçbir metin üretilmez.
 
-    2026-08-22 (4. sürüm): `evidence` artık TAM OLARAK İKİ değil, BİR ya da
-    İKİ öğe taşıyabilir - dar kapsamlı kazanımlarda BAĞLAM'da gerçekten TEK
-    güçlü aday bulunabiliyor, ikisini zorunlu tutmak modeli ya ikinciyi
-    uydurmaya ya da tamamen `not_found` deyip pes etmeye itiyordu (canlıda
-    gözlenen "bazı kazanımlara hiç yorum yapılamıyor" durumunun bir nedeni).
-
     Yeni şemanın model promptunda AÇIKÇA yazılı bir öneri/etkinlik yasağı
     YOK (yalnız "kod UYDURMA" ve "başarı oranını terim olarak alma"
     uyarıları var) - bu yüzden `gapRationale`/`strengthRationale` metni
@@ -845,7 +861,7 @@ def _compose_grounded_pedagogical_answer(
     if not payload or payload.get("status") != "success":
         return ""
     evidence_items = payload.get("evidence")
-    if not isinstance(evidence_items, list) or not 1 <= len(evidence_items) <= 2:
+    if not isinstance(evidence_items, list) or len(evidence_items) != 2:
         return ""
 
     rate = float(outcome.get("successRate") or 0.0)
@@ -863,7 +879,7 @@ def _compose_grounded_pedagogical_answer(
             return ""
         parsed_evidence.append((term, rationale))
     terms = [term for term, _ in parsed_evidence]
-    if len(terms) == 2 and terms[0].casefold() == terms[1].casefold():
+    if terms[0].casefold() == terms[1].casefold():
         return ""
 
     evidence_text = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
@@ -874,18 +890,17 @@ def _compose_grounded_pedagogical_answer(
     if not theme:
         return ""
     percent = round(rate * 100)
-    terms_phrase = " ve ".join(terms)
-    opening = _pick_template(_OPENING_TEMPLATES, theme, *terms).format(
-        theme=theme, terms=terms_phrase, percent=percent
+    opening = _pick_template(_OPENING_TEMPLATES, theme, terms[0], terms[1]).format(
+        theme=theme, term1=terms[0], term2=terms[1], percent=percent
     )
     rationale_text = " ".join(rationale for _, rationale in parsed_evidence)
     if is_weak:
         severity = "Kritik" if rate < 0.50 else "Orta"
-        closing = _pick_template(_WEAK_CLOSING_TEMPLATES, theme, *terms, severity).format(
+        closing = _pick_template(_WEAK_CLOSING_TEMPLATES, theme, terms[0], terms[1], severity).format(
             severity=severity
         )
         return f"{opening} {rationale_text} {closing}"
-    closing = _pick_template(_STRONG_CLOSING_TEMPLATES, theme, *terms)
+    closing = _pick_template(_STRONG_CLOSING_TEMPLATES, theme, terms[0], terms[1])
     return f"{opening} {rationale_text} {closing}"
 
 
