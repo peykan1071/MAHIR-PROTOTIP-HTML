@@ -8,7 +8,7 @@ Dağıtım: `modal deploy rag_service.py` (repo kökünden).
 Neden iki ayrı Image (indexing_image / inference_image): PDF ayrıştırma
 (Docling) ve LLM sunumu (vLLM) çok farklı ve ağır bağımlılık ağaçlarına
 sahiptir (ikisi de kendi `torch` sürümünü ister). Aynı image içinde
-dördünü (docling + qdrant-client + sentence-transformers + vllm) birlikte
+dördünü (docling + qdrant-client + FlagEmbedding + vllm) birlikte
 çözümlemeye zorlamak gereksiz bir çakışma riski yaratır. `index_pdf`
 yalnızca `indexing_image`'i, `RAGInference` yalnızca `inference_image`'i
 kullanır; ikisi de aynı iki Volume'u ("rag-storage", "rag-hf-cache")
@@ -35,6 +35,7 @@ import re
 import tempfile
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import modal
@@ -43,8 +44,8 @@ if TYPE_CHECKING:
     # Yalnızca tip belirtimi için - `from __future__ import annotations` sayesinde
     # bu importlar çalışma zamanında hiç değerlendirilmez, bu yüzden bu dosya
     # (Modal dışında) hiçbir ağır bağımlılık kurulu olmadan da import edilebilir.
+    from FlagEmbedding import BGEM3FlagModel
     from qdrant_client import QdrantClient
-    from sentence_transformers import SentenceTransformer
     from vllm import LLM
 
 try:
@@ -66,7 +67,14 @@ LLM_MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
 
 QDRANT_MOUNT_DIR = "/data"
 QDRANT_STORAGE_PATH = "/data/qdrant_db"
-QDRANT_COLLECTION_NAME = "mahir_rag_chunks"
+# 2026-08-22: hibrit (dense+sparse) aramaya geçişte YENİ bir koleksiyon adı
+# kullanılıyor - eski "mahir_rag_chunks" tek (adsız) dense vektörle
+# oluşturulmuştu, Qdrant var olan bir koleksiyona sparse vektör alanı SONRADAN
+# ekleyemiyor (şema değişikliği reindex gerektirir). Yeni ad, geri dönüşü
+# anlık kılıyor: hibrit arama canlıda regresyona uğrarsa bu sabiti eski adına
+# çevirip yeniden deploy etmek yeterli, eski (dokunulmamış) koleksiyon hâlâ
+# yerinde duruyor.
+QDRANT_COLLECTION_NAME = "mahir_rag_chunks_v2_hybrid"
 
 HF_CACHE_DIR = "/root/.cache/huggingface"
 
@@ -135,6 +143,15 @@ _NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
 # gözettiği için eşiği gevşetmek "kalabalık bağlam" riskini geri
 # getirmiyor; yalnızca ham havuza az sayıda ek (daha zayıf ama yine de
 # konuyla ilgili) aday katıyor.
+#
+# 2026-08-22 HİBRİT ARAMAYA GEÇİŞ NOTU: bu değer, saf dense kosinüs
+# skorlarına (0-1 aralığı) göre kalibre edildi. `_retrieve_hits` artık
+# Qdrant'ın RRF (Reciprocal Rank Fusion) skorunu döndürüyor - rank tabanlı,
+# tamamen farklı bir dağılım (tipik olarak çok daha küçük değerler). Bu
+# oranın RRF skalasında da anlamlı kesim yaptığı VARSAYILMAMALI; hibrit
+# indeks canlıya alındıktan sonra bu depodaki önceki turlarla (0,78->0,60->
+# 0,68->0,60->0,50) AYNI yöntemle - gerçek sorgularla skor dağılımı
+# ölçülerek - yeniden kalibre edilmeli.
 _RELATIVE_SCORE_FLOOR = 0.50
 
 # MEB müfredat PDF'lerindeki hiyerarşi başlıkları - tdeogr.pdf üzerinde tüm
@@ -201,7 +218,16 @@ indexing_image = (
     # Docling'in PDF/görüntü işleme alt katmanının (OpenCV tabanlı) ihtiyaç
     # duyduğu sistem kütüphaneleri - debian_slim imajında varsayılan olarak yok.
     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
-    .pip_install("qdrant-client", "sentence-transformers", "pypdf")
+    # `sentence-transformers` yerine `FlagEmbedding` (2026-08-22, hibrit
+    # dense+sparse arama): bge-m3'ün sparse ("lexical_weights") çıktısını
+    # yalnız bu paket tek `encode()` çağrısında dense'le BİRLİKTE veriyor -
+    # `sentence-transformers` yalnız dense üretiyordu. `FlagEmbedding` zaten
+    # `sentence_transformers`'ı transitive bağımlılık olarak getiriyor,
+    # ayrıca eklemeye gerek yok.
+    # qdrant-client>=1.10: hibrit arama Query API'sinin (Prefetch/FusionQuery)
+    # tanıtıldığı sürüm - önceden hiç pinlenmiyordu, bu özellik artık ona
+    # dayandığı için pin gerekli (bkz. requirements.txt'teki aynı pin notu).
+    .pip_install("qdrant-client>=1.10,<2", "FlagEmbedding", "pypdf")
     .pip_install("docling")
     .env({"HF_HOME": HF_CACHE_DIR})
 )
@@ -210,9 +236,13 @@ indexing_image = (
 inference_image = (
     modal.Image.debian_slim(python_version="3.12")
     # vLLM en kırılgan/sürüme duyarlı paket - kendi torch çözümünü önce
-    # oturtması için ayrı ve ilk pip_install katmanında kalıyor.
+    # oturtması için ayrı ve ilk pip_install katmanında kalıyor. FlagEmbedding
+    # `torch>=1.6.0`/`transformers<6.0,>=4.44.2` gibi gevşek alt sınırlar
+    # istiyor (bkz. PyPI metadata) - vLLM'in kendi çözdüğü sürümleri normalde
+    # ezmemesi beklenir, ama imaj kurulumu (`modal deploy`) ilk kez bu
+    # değişiklikle çalıştırıldığında build log'u kontrol edilmeli.
     .pip_install("vllm")
-    .pip_install("qdrant-client", "sentence-transformers")
+    .pip_install("qdrant-client>=1.10,<2", "FlagEmbedding")
     .env({
         "HF_HOME": HF_CACHE_DIR,
         # debian_slim imajında nvcc/CUDA toolkit yok. vLLM'in varsayılan
@@ -524,26 +554,84 @@ def _mmr_select(hits: list, k: int, lambda_param: float = _MMR_LAMBDA) -> list:
     return selected
 
 
-def _retrieve_hits(qdrant, query_vector, top_k: int, query_filter) -> list:
-    """`_retrieve_for` ve `_run_batch_query`nin ortak tek-öğe getirim adımı.
+def _sparse_vector_from_weights(weights: dict) -> "SparseVector":  # noqa: F821 - bkz. altta yerel import
+    """bge-m3'ün `lexical_weights` çıktısını (`{token_id_str: weight}`)
+    Qdrant'ın `SparseVector`ına çevirir.
 
-    İkisi de bugüne kadar bu bloğu (geniş aday havuzu çek -> zayıfları at ->
-    MMR ile çeşitlendir) ayrı ayrı taşıyordu - saf bir taşıma, davranış
-    değişikliği yok. Hibrit (dense+sparse) arama eklendiğinde tek değişecek
-    yer burası olacak, iki çağıran yerine.
+    Anahtarların STRING token id olduğu `FlagEmbedding`in kaynağından
+    doğrulandı (`M3Embedder._process_token_weights`: `idx = str(idx)`) -
+    Qdrant `indices` için int istiyor, bu yüzden geri çevriliyor.
     """
 
+    from qdrant_client.models import SparseVector
+
+    return SparseVector(indices=[int(key) for key in weights], values=list(weights.values()))
+
+
+def _dense_vector_of(hit) -> list[float]:
+    """Named-vector (dense+sparse) bir Qdrant isabetinden düz dense listesini
+    çıkarır. `with_vectors=True` named-vector koleksiyonlarda `.vector`ı
+    `{"dense": [...], "sparse": SparseVector(...)}` sözlüğü olarak döndürüyor
+    (yerel/embedded modda elle doğrulandı) - `_mmr_select`in kosinüs
+    benzerliği düz bir liste bekliyor, sözlüğü değil.
+    """
+
+    vector = hit.vector
+    return vector["dense"] if isinstance(vector, dict) else vector
+
+
+def _retrieve_hits(
+    qdrant, dense_vector, sparse_weights: dict, top_k: int, query_filter
+) -> list:
+    """`_retrieve_for` ve `_run_batch_query`nin ortak tek-öğe getirim adımı.
+
+    2026-08-22: hibrit (dense+sparse) arama - `dense_vector` (bge-m3 dense
+    gömme) ve `sparse_weights` (`lexical_weights`, bkz.
+    `_sparse_vector_from_weights`) birlikte, Qdrant'ın Reciprocal Rank
+    Fusion'ıyla (RRF) tek bir sıralı listeye birleştiriliyor. Amaç: teşhis
+    modelinin BAĞLAM'dan BİREBİR terim seçmesi gerekiyor (bkz.
+    `backend/app/agents/pipeline.py::_term_is_grounded`) - salt anlamsal
+    (dense) benzerlik, doğru terimi taşıyan ama farklı kelimelerle yazılmış
+    bir parçayı öne çıkarabiliyordu; sparse/lexical eşleşme, terimin
+    GEÇTİĞİ parçayı da güçlendiriyor.
+
+    `Prefetch`in filtre alanının adı `filter=` (dıştaki `query_points`
+    çağrısının `query_filter=`i DEĞİL) - yerel/embedded Qdrant'ta elle
+    doğrulandı (spike script, 2026-08-22).
+    """
+
+    from qdrant_client.models import Fusion, FusionQuery, Prefetch
+
+    pool_size = max(top_k * _MMR_CANDIDATE_MULTIPLIER, _MMR_MIN_CANDIDATE_POOL)
     hits = qdrant.query_points(
         collection_name=QDRANT_COLLECTION_NAME,
-        query=query_vector,
-        query_filter=query_filter,
-        limit=max(top_k * _MMR_CANDIDATE_MULTIPLIER, _MMR_MIN_CANDIDATE_POOL),
+        prefetch=[
+            Prefetch(query=dense_vector, using="dense", limit=pool_size, filter=query_filter),
+            Prefetch(
+                query=_sparse_vector_from_weights(sparse_weights),
+                using="sparse",
+                limit=pool_size,
+                filter=query_filter,
+            ),
+        ],
+        query=FusionQuery(fusion=Fusion.RRF),
+        limit=pool_size,
         with_payload=True,
         with_vectors=True,
     ).points
     if not hits:
         return []
-    return _mmr_select(_drop_weak_hits(hits), top_k)
+    # `_drop_weak_hits`/`_mmr_select` `.score`/`.vector`e (düz liste) göre
+    # çalışıyor - RRF skoru `.score`da zaten düz bir sayı, yalnız `.vector`
+    # (named-vector sözlüğü) sarmalanmalı. `_drop_weak_hits`in oran eşiği
+    # RRF skalasına göre henüz YENİDEN KALİBRE EDİLMEDİ (bkz. modül başındaki
+    # `_RELATIVE_SCORE_FLOOR` notu) - bu, hibrit indeksleme sonrası canlı
+    # ölçümle yapılacak ayrı bir adım.
+    wrapped = [
+        SimpleNamespace(score=hit.score, vector=_dense_vector_of(hit), payload=hit.payload)
+        for hit in hits
+    ]
+    return _mmr_select(_drop_weak_hits(wrapped), top_k)
 
 
 @app.function(image=indexing_image, volumes=VOLUMES, timeout=60)
@@ -817,17 +905,28 @@ def index_pdf(
 
     contextualized_texts = [record[1] for record in chunk_records]
 
-    from sentence_transformers import SentenceTransformer
+    # Hibrit arama (2026-08-22): dense VE sparse ("lexical_weights") tek
+    # `encode` çağrısında birlikte üretiliyor - bkz. `_retrieve_hits`
+    # docstring'i. `sentence_transformers.SentenceTransformer` yalnız dense
+    # veriyordu, bu yüzden `FlagEmbedding.BGEM3FlagModel`e geçildi.
+    from FlagEmbedding import BGEM3FlagModel
 
     try:
-        embedder = SentenceTransformer(EMBEDDING_MODEL_NAME)
-        vectors = embedder.encode(contextualized_texts, normalize_embeddings=True).tolist()
+        embedder = BGEM3FlagModel(EMBEDDING_MODEL_NAME, normalize_embeddings=True)
+        embedded = embedder.encode(contextualized_texts, return_dense=True, return_sparse=True)
+        dense_vectors = embedded["dense_vecs"].tolist()
+        sparse_weights = embedded["lexical_weights"]
     except Exception as error:  # noqa: BLE001 - gömme de üçüncü parti bir ML çağrısı; tek
         # bir belge işi tüm fonksiyonu çökertmemeli.
         return False, f"Metin parçaları gömülemedi: {error}", None
 
     from qdrant_client import QdrantClient
-    from qdrant_client.models import Distance, PointStruct, VectorParams
+    from qdrant_client.models import (
+        Distance,
+        PointStruct,
+        SparseVectorParams,
+        VectorParams,
+    )
 
     try:
         client = QdrantClient(path=QDRANT_STORAGE_PATH)
@@ -839,13 +938,17 @@ def index_pdf(
         if not client.collection_exists(QDRANT_COLLECTION_NAME):
             client.create_collection(
                 QDRANT_COLLECTION_NAME,
-                vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
+                vectors_config={"dense": VectorParams(size=len(dense_vectors[0]), distance=Distance.COSINE)},
+                sparse_vectors_config={"sparse": SparseVectorParams()},
             )
 
         points = [
             PointStruct(
                 id=_deterministic_point_id(program_id, document_name, index, chunk.text),
-                vector=vector,
+                vector={
+                    "dense": dense_vector,
+                    "sparse": _sparse_vector_from_weights(sparse_vector_weights),
+                },
                 payload={
                     "text": chunk.text,
                     "contextualized_text": contextualized_text,
@@ -859,9 +962,11 @@ def index_pdf(
                     "chunk_index": index,
                 },
             )
-            for index, ((chunk, contextualized_text, grade_label, theme_name, pages), vector) in enumerate(
-                zip(chunk_records, vectors)
-            )
+            for index, (
+                (chunk, contextualized_text, grade_label, theme_name, pages),
+                dense_vector,
+                sparse_vector_weights,
+            ) in enumerate(zip(chunk_records, dense_vectors, sparse_weights))
         ]
         client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=points)
 
@@ -910,7 +1015,7 @@ class RAGInference:
     # modal.com/docs/guide/parametrized-functions) - bu yüzden örnek
     # değişkenleri __init__ yerine bare sınıf-seviyeli tip belirtimiyle
     # tanımlanıp değerleri `load()` içinde (@modal.enter()) atanıyor.
-    _embedder: SentenceTransformer | None
+    _embedder: BGEM3FlagModel | None
     _qdrant: QdrantClient | None
     _llm: LLM | None
 
@@ -918,8 +1023,8 @@ class RAGInference:
     def load(self) -> None:
         """Konteyner ısınırken bir kez çalışır: modelleri ve Qdrant'ı belleğe yükler."""
 
+        from FlagEmbedding import BGEM3FlagModel
         from qdrant_client import QdrantClient
-        from sentence_transformers import SentenceTransformer
         from vllm import LLM
 
         # Başka bir konteynerin (index_pdf) bu ısınmadan sonra commit ettiği
@@ -929,8 +1034,14 @@ class RAGInference:
         # Sorgu anında tek bir kısa soru cümlesi gömülüyor - GPU'yu (zaten
         # Qwen2.5-7B'nin KV cache'iyle dolu olan A10G, 24 GB VRAM) vLLM'e
         # bırakmak için gömme modelini kasıtlı olarak CPU'da çalıştırıyoruz.
-        # (index_pdf'te toplu gömme GPU'da kalır - orada vLLM hiç yok.)
-        self._embedder = SentenceTransformer(EMBEDDING_MODEL_NAME, device="cpu")
+        # (index_pdf'te toplu gömme GPU'da kalır - orada vLLM hiç yok.) `devices`
+        # (çoğul) `BGEM3FlagModel`in kurucu parametresi - `SentenceTransformer`in
+        # `device` (tekil) parametresiyle KARIŞTIRILMAMALI (FlagEmbedding
+        # kaynağından doğrulandı, 2026-08-22). `use_fp16=False`: fp16 CPU'da
+        # ya desteklenmiyor ya da yavaş - GPU'ya özgü bir hızlandırma.
+        self._embedder = BGEM3FlagModel(
+            EMBEDDING_MODEL_NAME, normalize_embeddings=True, use_fp16=False, devices="cpu"
+        )
 
         self._llm = LLM(
             model=LLM_MODEL_NAME,
@@ -1234,7 +1345,13 @@ class RAGInference:
                 str((items[index].get("retrieval") or {}).get("query") or items[index].get("user") or "")
                 for index in retrieval_indexes
             ]
-            query_vectors = self._embedder.encode(query_texts, normalize_embeddings=True)
+            # Hibrit arama: dense VE sparse (`lexical_weights`) tek `encode`
+            # çağrısında birlikte üretiliyor (bkz. `_retrieve_hits`
+            # docstring'i). `normalize_embeddings` burada değil, `load()`daki
+            # `BGEM3FlagModel` kurucusunda ayarlanıyor.
+            embedded = self._embedder.encode(query_texts, return_dense=True, return_sparse=True)
+            dense_vectors = embedded["dense_vecs"]
+            sparse_weights = embedded["lexical_weights"]
         except Exception as error:  # noqa: BLE001 - gömme üçüncü parti bir ML çağrısı.
             return False, f"Getirim sorgusu gömülemedi: {error}", {}, {}
 
@@ -1262,7 +1379,8 @@ class RAGInference:
             try:
                 hits = _retrieve_hits(
                     self._qdrant,
-                    query_vectors[position].tolist(),
+                    dense_vectors[position].tolist(),
+                    sparse_weights[position],
                     requested_top_k,
                     Filter(must=conditions) if conditions else None,
                 )
@@ -1335,7 +1453,9 @@ class RAGInference:
                 str(item.get("retrievalQuery") or "").strip() or question
                 for item, question in zip(items, questions)
             ]
-            query_vectors = self._embedder.encode(embedded_texts, normalize_embeddings=True)
+            embedded = self._embedder.encode(embedded_texts, return_dense=True, return_sparse=True)
+            dense_vectors = embedded["dense_vecs"]
+            sparse_weights = embedded["lexical_weights"]
         except Exception as error:  # noqa: BLE001 - gömme üçüncü parti bir ML çağrısı; tek bir
             # sorgu tüm servis konteynerini çökertmemeli.
             return False, f"Soru gömülemedi: {error}", None
@@ -1383,7 +1503,13 @@ class RAGInference:
             query_filter = Filter(must=filter_conditions) if filter_conditions else None
 
             try:
-                hits = _retrieve_hits(self._qdrant, query_vectors[index].tolist(), top_k, query_filter)
+                hits = _retrieve_hits(
+                    self._qdrant,
+                    dense_vectors[index].tolist(),
+                    sparse_weights[index],
+                    top_k,
+                    query_filter,
+                )
             except Exception as error:  # noqa: BLE001 - yerel Qdrant okuması; bozuk/erişilemeyen
                 # bir depo tüm servisi çökertmemeli.
                 return False, f"Belge dizininden okunamadı: {error}", None
