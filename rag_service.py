@@ -96,10 +96,37 @@ _NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
 # gösteren altı sorgunun ortak aralığı 0,771-0,793 çıktı; 0,78 hepsinde tam
 # kopuş noktasından kesiyor. Mutlak bir eşik bunu yapamaz: bge-m3'ün skorları
 # belgeye/sorguya göre kayıyor (aynı dizinde 0,60 ile 0,94 arası gözlendi) ve
-# önerilen 0,40 gibi bir sayı burada hiçbir şeyi elemezdi. Oranın asıl değeri
-# uyarlanabilir olması - kuyruğu düz olan iki sorguda (Sözün İnceliği) 8
-# isabetin 8'ini de koruyor.
-_RELATIVE_SCORE_FLOOR = 0.78
+# önerilen 0,40 gibi bir sayı burada hiçbir şeyi elemezdi.
+#
+# 2026-08-22 0,78 -> 0,60 DÜŞÜRÜLDÜ: bu ilk ölçüm yalnız "isabet var mı" (top_k
+# tüm parçaları mı kapsıyor) sorusunu optimize etmişti, "hangi TÜR parça"
+# sorusunu değil. Canlı incelemede görüldü ki bir kazanımın "kazanım
+# tanımlama" tablosu (SORU'daki kazanım metnine neredeyse birebir aynı metin,
+# bu yüzden hep 0,85-0,92 skorlanıyor) tek başına 8 slotu doldurup aynı
+# temanın çok daha zengin "Öğrenme-Öğretme Uygulamaları" içeriğini (konu
+# olarak alakalı ama kelime olarak farklı, bu yüzden ~0,65-0,75 skorlanıyor -
+# 0,78 eşiğinin altında) sistematik olarak dışarıda bırakıyordu; sonuç,
+# `agents/pipeline.py`nin evidenceTerms seçimi için elinde hiç iyi aday
+# kalmaması ve modelin SORU'nun kendi cümlesine kaçmasıydı. 0,60 bu tarz
+# konu-alakalı-ama-kelime-farklı içeriği de içeri alıyor; asıl alakasız kuyruk
+# (0,60'ın altı, ölçümde 0,60-0,68 civarı görülmüştü) yine elenmeye devam
+# ediyor.
+#
+# 2026-08-22 0,60 -> 0,68 (top_k=12 ile) -> 0,60'A GERİ. Ara durak (0,68):
+# top_k'yi büyütüp eşiği yükseltmek bir sorguyu düzeltirken (Sözün İnceliği)
+# başka birini bozuyordu (Anlamın Yapı Taşları, 5/5 -> 0/5) - kök sorun bir
+# SAYI ayarıyla çözülemeyen yapısal bir tekrar sorunuydu (aynı kazanımın
+# birbirine çok benzeyen "tanımlama" satırları top_k ne olursa olsun slotları
+# dolduruyordu). Asıl çözüm `_mmr_select` (Maximal Marginal Relevance) -
+# `_retrieve_for`/`_run_batch_query` artık ÇOK daha geniş bir ham havuz
+# (bkz. `_MMR_CANDIDATE_MULTIPLIER`/`_MMR_MIN_CANDIDATE_POOL`) çekip bu
+# eşikten geçirdikten SONRA MMR ile hem alakalı hem çeşitli bir alt küme
+# seçiyor - tekrar sorunu artık MMR'nin işi, bu eşiğin tek görevi ham
+# havuzdaki gerçekten alakasız kuyruğu elemek. Bu yüzden eşik tekrar
+# gevşek varsayılana (0,60) dönebildi; MMR geniş havuzdan seçim yaptığı
+# için tek başına top_k büyütmenin yarattığı "kalabalık bağlam" riski de
+# yok - MMR seçilenler arasında zaten çeşitliliği zorluyor.
+_RELATIVE_SCORE_FLOOR = 0.60
 
 # MEB müfredat PDF'lerindeki hiyerarşi başlıkları - tdeogr.pdf üzerinde tüm
 # 5 sınıf düzeyi ve 20 sınıf×tema kombinasyonu için elle doğrulandı. Satırın
@@ -126,76 +153,50 @@ TEMA_HEADING_PATTERN = re.compile(r"^\s*\d+\.\s*TEMA\s*:\s*(.+?)\s*$", re.MULTIL
 # tekrarlıyor; yalnızca getirimin bilebileceği şeyi - o temanın müfredat metnini
 # - kullanmıyordu. Prompt'un yeni ekseni bu yüzden demirleme: teşhis, BAĞLAM'dan
 # somut bir öğe adlandırmak zorunda.
+# 2026-08-22: prompts.DIAGNOSIS_SYSTEM_PROMPT ile birebir aynı tutulmalı
+# (bkz. o dosyadaki değişiklik notu) - görev artık paragraf yazmak değil,
+# `agents/pipeline.py`nin `{"evidenceTerms":[...]}` sözleşmesine uyacak
+# şekilde BAĞLAM'dan İKİ terim seçmek.
 SYSTEM_PROMPT = (
     "Sen; Öğrenme Analitiği, Veri Odaklı Ölçme-Değerlendirme ve Program "
     "Geliştirme alanlarında uzmanlaşmış kıdemli bir Eğitim Analistisin. "
-    "Görevin: sana BAĞLAM olarak verilen resmî öğretim programı metni ile "
-    "kazanıma ait başarı oranını çapraz analiz ederek, bu kazanıma özgü "
-    "öğrenme eksikliğini ve risk düzeyini kanıta dayalı ve eleştirel bir "
-    "gözle teşhis etmektir.\n\n"
+    "Görevin bir teşhis PARAGRAFI YAZMAK DEĞİL: sana BAĞLAM olarak verilen "
+    "resmî öğretim programı metninden, SORU'da belirtilen kazanıma özgü "
+    "öğrenme eksikliğini kanıtlayan TAM OLARAK İKİ somut terim seçmektir; "
+    "paragrafın kendisini ayrı bir sistem zaten kuracak.\n\n"
     "TEMEL İLKELER:\n"
-    "1) Teşhisini yalnızca BAĞLAM'a, SORU'da verilen kazanım metnine ve "
-    "başarı oranına dayandır; sınav sorusunun tam metnini veya ders kitabını "
-    "görmediğini unutma, soru içeriği hakkında spekülasyon yapma. BAĞLAM sana "
-    "zaten ders, sınıf düzeyi ve tema filtresinden geçirilerek verilir - yani "
-    "önüne gelen metin HER ZAMAN sorulan kazanımın ait olduğu temaya aittir. "
-    "Yalnızca BAĞLAM bu kazanıma dair hiçbir bilgi içermiyorsa, YANITININ "
-    'TAMAMI OLARAK yalnızca şu cümleyi yaz ve başka HİÇBİR ŞEY ekleme: "Bu '
-    'bilgi belgede bulunmuyor." Bu cümleyi yazdıysan, ardından teşhis '
-    "eklemeye devam ETME; teşhis yazacaksan da bu cümleyi hiç kullanma.\n"
-    "2) BAĞLAM'a DEMİRLE - bu, teşhisi değerli kılan tek şeydir. İlk cümlene "
-    "SORU'da geçen tema adını tırnak içinde YAZARAK başla. O adı SORU'dan "
-    "birebir kopyala; başka hiçbir tema adı yazma, hatırladığın bir tema "
-    "adı varsayma. Ayrıca yanıtın, BAĞLAM'dan alınmış EN AZ İKİ "
-    "somut öğeyi daha adıyla anmak ZORUNDA: müfredatın bu kazanım için "
-    "saydığı süreç bileşeni, beceri, kavram ya da metin türü. Müfredatın "
-    "kullandığı terimleri KENDİ sözcüklerinle değiştirme, olduğu gibi kullan. "
-    "Hangi derse ait olduğu belli olmayan, her kazanım için yazılabilecek "
-    "genel bir teşhis (ör. \"okuma becerileri eksik\", \"stratejileri "
-    "uygulamakta zorlanıyor\") BAŞARISIZ sayılır. Kazanım KODU yazacaksan "
-    "yalnızca BAĞLAM'da ya da SORU'da geçen kodu yaz - kod UYDURMA, "
-    "hatırladığın bir kod varsayma; emin değilsen kodu hiç yazma ve bileşeni "
-    "adıyla an.\n"
-    "3) Eleştirel ve gerçekçi ol: yüzeysel teselliler (\"geçerli bir puan\", "
-    '"gelişime açık" gibi yuvarlak ifadeler) yasak. Düşük başarı oranını '
-    "doğrudan öğrenme kaybı veya kazanımın kavranamadığı şeklinde net "
-    "teşhis et. Belirsizlik dolgusu da yasak: \"belirli\", \"genellikle\", "
-    "\"bazı\", \"birtakım\", \"söz konusu\" gibi sözcükleri kullanma; her "
-    "cümle somut bir iddia taşısın. \"olabilir\" gibi olasılık kipini "
-    "yalnızca sarmal risk cümlesinde ve en çok bir kez kullan.\n"
-    "4) Eksikliğin ŞİDDET etiketi sana SORU'nun içinde hazır verilir "
-    "(\"Bu oran için şiddet etiketi: ...\"). O etiketi kendin yeniden "
-    "hesaplama, yumuşatma veya sertleştirme; yanıtının içinde şu kalıbı "
-    "AYNEN, bir kez kullan: \"Eksikliğin şiddeti: <etiket>.\" Sana \"Orta\" "
-    "verildiyse hiçbir yerde \"kritik\" kelimesini KULLANMA; \"Kritik\" "
-    "verildiyse hiçbir yerde \"orta\" deme. \"Hafif\" kelimesini hiçbir "
-    "durumda kullanma - bu prompt yalnızca başarı oranı %70'in altındaki "
-    "kazanımlar için çalıştırılır, bu aralıkta hiçbir durum hafif sayılmaz. "
-    "Bu kazanım sonraki/ileri düzey kazanımların temelini oluşturduğundan, "
-    "eksikliğin sonraki öğrenmelere sarmal (kümülatif) bir risk oluşturup "
-    "oluşturmadığını da teşhisine kısaca ekle - yalnızca bu riski TEŞHİS ET, "
-    "nasıl giderileceğini önerme (madde 5).\n"
-    "5) Yalnızca teşhis koy, ÇÖZÜM ÖNERME - bu kural istisnasızdır ve "
-    "yanıtının SON cümlesi dâhil her cümlesi için geçerlidir. Etkinlik, "
-    "kaynak, ders, öğretim yöntemi, çalışma veya telafi programı önerme. "
-    "Şu ifadeleri hiç kullanma: \"önerilir\", \"tavsiye edilir\", "
-    "\"gerekmektedir\", \"gerekir\", \"gereklidir\", \"ihtiyaç duyulmaktadır\", "
-    "\"yapılmalıdır\", \"verilmelidir\", "
-    "\"geliştirilmelidir\", \"desteklenmelidir\". Ayrıca \"etkinlik\", "
-    "\"alıştırma\", \"uygulama çalışması\", \"destek\" gibi YAPILACAK İŞ "
-    "adlarını hiç anma - ne önererek ne de betimleyerek. Sarmal risk "
-    "cümlesinde de ne yapılacağını değil, hangi KAZANIMIN veya BECERİNİN "
-    "etkileneceğini yaz. Ne YAPILMASI gerektiğini "
-    "değil, yalnızca NE OLDUĞUNU yaz: durumu, eksikliği ve risk düzeyini "
-    "kanıtlarıyla belirle ve orada bitir.\n\n"
-    "BİÇİM: Türkçe, tek akıcı paragraf (madde işareti, başlık veya markdown "
-    "kullanma). UZUNLUK SINIRI: EN ÇOK 70 KELİME - bu sınır katıdır, aşma; "
-    "40 kelimenin altına da düşme. Kısa ve yoğun "
-    "yaz, dolgu cümlesiyle uzatma. Şunları bu sırayla kapsasın: (a) tema adı "
-    "ve müfredatın bu kazanım için öngördüğü somut içerik veya bileşen "
-    "(BAĞLAM'dan adıyla anılmış) ile başarı oranının karşılaştırması, "
-    "(b) \"Eksikliğin şiddeti: <etiket>.\" kalıbı ve eksikliğin hangi "
-    "bileşende yoğunlaştığı, (c) eksikliğin sonraki kazanımlara sarmal riski."
+    "1) Seçimini yalnızca BAĞLAM'a ve SORU'da verilen kazanım metnine "
+    "dayandır; sınav sorusunun tam metnini veya ders kitabını görmediğini "
+    "unutma, soru içeriği hakkında spekülasyon yapma. BAĞLAM sana zaten "
+    "ders, sınıf düzeyi ve tema filtresinden geçirilerek verilir - önündeki "
+    "metin HER ZAMAN sorulan kazanımın ait olduğu temaya aittir. BAĞLAM bu "
+    "kazanıma dair hiçbir somut öğe içermiyorsa YANITININ TAMAMI olarak "
+    "yalnızca şu cümleyi yaz ve başka HİÇBİR ŞEY ekleme: "
+    '"Bu bilgi belgede bulunmuyor."\n'
+    "2) BAĞLAM'a DEMİRLE - bu, seçimini değerli kılan tek şeydir. Seçtiğin "
+    "İKİ terim, müfredatın bu kazanım için saydığı somut bir süreç bileşeni, "
+    "beceri, kavram ya da metin türü olmak ZORUNDA; BAĞLAM'da KESİNTİSİZ ve "
+    "BİREBİR geçen bir ifade olmalı - sözcük türetme, ek değiştirme, "
+    "özetleme veya iki ayrı parçayı birleştirme YAPMA, müfredatın kullandığı "
+    "terimi olduğu gibi al. SORU bölümündeki başarı oranı "
+    '(ör. "%30"), şiddet etiketi veya "sarmal risk" gibi ifadeler ASLA '
+    "terim olarak seçilemez - onlar müfredat metni DEĞİL, sana verilen görev "
+    "bilgisidir; yalnızca BAĞLAM başlığı altındaki müfredat metninden seç. "
+    "Hangi derse ait olduğu belli olmayan, her "
+    'kazanım için seçilebilecek genel bir terim (ör. "okuma becerileri", '
+    '"stratejiler") BAŞARISIZ sayılır.\n'
+    "3) Kod UYDURMA: bir öğrenme çıktısı kodu içeren bir terim seçeceksen "
+    "yalnızca BAĞLAM'da ya da SORU'da birebir geçen kodu kullan; emin "
+    "değilsen kod içeren bir terim seçme, bileşeni adıyla an.\n"
+    "4) Seçtiğin terimlerin KENDİSİ bir öneri, etkinlik, yöntem veya telafi "
+    "CÜMLESİ olmasın - bir kavramı veya süreç bileşenini ADLANDIRAN kısa bir "
+    'ifade seç, "yapılmalıdır/önerilir/gerekmektedir" gibi bir eylem '
+    "YAPILACAK İŞ bildiren tam cümle seçme; ne önererek ne de betimleyerek "
+    "bir etkinlik adı taşıma.\n\n"
+    "YANIT: Yalnızca geçerli JSON döndür: "
+    '{"evidenceTerms":["BAĞLAMDA BİREBİR GEÇEN TERİM 1",'
+    '"BAĞLAMDA BİREBİR GEÇEN TERİM 2"]}. '
+    "Başka hiçbir metin, açıklama veya markdown ekleme."
 )
 
 rag_storage_volume = modal.Volume.from_name("rag-storage", create_if_missing=True)
@@ -467,6 +468,74 @@ def _drop_weak_hits(hits: list, floor_ratio: float = _RELATIVE_SCORE_FLOOR) -> l
     return [hit for hit in hits if hit.score >= cutoff] or hits[:1]
 
 
+# MMR (Maximal Marginal Relevance) çeşitlilik parametresi - 1,0 saf alaka
+# (skor sıralamasıyla aynı, çeşitlilik yok), 0,0 saf çeşitlilik (skoru yok
+# sayar). Klasik literatür aralığı 0,5-0,7; 0,6 alakayı öne alan ama tekrarı
+# belirgin biçimde cezalandıran bir orta nokta.
+_MMR_LAMBDA = 0.6
+
+# MMR'nin seçeceği ham aday havuzu, çağıranın istediği nihai `k`'nin katı
+# olarak alınır - MMR'nin gerçekten çeşitlilik arasından seçim
+# yapabilmesi için skor sıralamasındaki ilk `k`'den daha geniş bir havuza
+# ihtiyacı var (bkz. `_mmr_select`).
+_MMR_CANDIDATE_MULTIPLIER = 3
+_MMR_MIN_CANDIDATE_POOL = 24
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    """İki vektörün kosinüs benzerliği. Embedder çıktıları zaten normalize
+    (`normalize_embeddings=True`) - bu yüzden yalnız iç çarpım yeterli, ayrıca
+    normlama gerekmiyor."""
+
+    return sum(x * y for x, y in zip(a, b))
+
+
+def _mmr_select(hits: list, k: int, lambda_param: float = _MMR_LAMBDA) -> list:
+    """Skor sıralı `hits`ten, hem sorguya alakalı HEM DE birbirinden farklı
+    en fazla `k` isabeti Maximal Marginal Relevance ile seçer.
+
+    Neden gerekli: aynı kazanımın "kazanım tanımlama" satırları (ör. altı
+    farklı beceri/alt-madde başlığı altında hep aynı "'X' temasında ele
+    alınan metinlerde Y" kalıbıyla yazılmış kısa tanımlar) sorguya (kazanım
+    kimliği + açıklaması) hepsi neredeyse aynı ölçüde yakın olduğundan, düz
+    "en yüksek skorlu top_k" seçimi bu tekrarlı ailenin TAMAMINI alıp aynı
+    temanın konu olarak alakalı ama kelime olarak farklı ("Öğrenme-Öğretme
+    Uygulamaları" gibi) içeriğine hiç yer bırakmıyordu. `top_k`/`floor_ratio`
+    ayarlarıyla (bkz. bu iki sabitin 2026-08-22 tarihli notları) düzeltilmeye
+    çalışıldı ama bu yalnız bir SAYI ayarıyla çözülemeyen yapısal bir tekrar
+    sorunuydu: bir sorgu için işe yarayan `top_k` diğerinde gürültü
+    yaratıyordu (ölçüldü: bir senaryo 5/5 -> 0/5). MMR, "zaten seçtiklerime
+    çok benzeyen bir sonraki en iyi aday" yerine "alakalı KALAN ama farklı"
+    adayı tercih ederek ikisini birlikte çözüyor.
+
+    Her adımda seçilecek aday, `lambda_param * sorguya_alaka - (1 -
+    lambda_param) * en_yakın_seçili_isabete_benzerlik` skorunu maksimize
+    eder. `hit.score` zaten sorgu vektörüne kosinüs benzerliği (Qdrant'ın
+    COSINE mesafe ayarı) - yeniden hesaplamaya gerek yok. Aday-seçili
+    benzerliği için `hit.vector` gerekiyor - çağıran taraf Qdrant sorgusunu
+    `with_vectors=True` ile yapmalı.
+    """
+
+    if len(hits) <= k:
+        return hits
+
+    selected = [hits[0]]
+    remaining = list(hits[1:])
+    while remaining and len(selected) < k:
+        best_index = 0
+        best_mmr = None
+        for index, candidate in enumerate(remaining):
+            redundancy = max(
+                _cosine_similarity(candidate.vector, chosen.vector) for chosen in selected
+            )
+            mmr = lambda_param * candidate.score - (1 - lambda_param) * redundancy
+            if best_mmr is None or mmr > best_mmr:
+                best_mmr = mmr
+                best_index = index
+        selected.append(remaining.pop(best_index))
+    return selected
+
+
 @app.function(image=indexing_image, volumes=VOLUMES, timeout=60)
 def clear_index(program_id: str | None = None) -> tuple[bool, str]:
     """Belge dizinini temizler - `program_id` verilirse yalnızca o programa ait
@@ -500,6 +569,71 @@ def clear_index(program_id: str | None = None) -> tuple[bool, str]:
         return True, message
     finally:
         client.close()
+
+
+@app.function(image=indexing_image, volumes=VOLUMES, timeout=60)
+def list_chunks(program_id: str | None = None) -> int:
+    """Docling + HybridChunker'ın `index_pdf` içinde ürettiği parçaları (chunk)
+    inceleme amaçlı stdout'a döker - `program_id` verilirse yalnızca o
+    programa ait parçaları, yoksa tüm koleksiyonu. GPU gerektirmez, gömme/LLM
+    çağırmaz; yalnızca Qdrant'ta zaten depolanmış payload'ı okur.
+
+    `modal run rag_service.py::list_chunks --program-id tde-9-tymm` ile
+    çalıştırılır (çıktıyı bir dosyaya yönlendirmek için sonuna
+    `> chunks.txt` eklenebilir). Dönüş değeri yalnızca parça sayısıdır -
+    metin gövdeleri `modal run`'ın kendi return-value çıktısında değil,
+    aşağıdaki print'lerde görünür.
+    """
+
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+    try:
+        client = QdrantClient(path=QDRANT_STORAGE_PATH)
+    except Exception as error:  # noqa: BLE001 - "storage folder already accessed" gibi kilit hataları da dahil.
+        print(f"Belge dizinine erişilemedi (eşzamanlı kullanım olabilir): {error}")
+        return 0
+
+    try:
+        if not client.collection_exists(QDRANT_COLLECTION_NAME):
+            print("Koleksiyon henüz yok - hiç belge indekslenmemiş.")
+            return 0
+
+        scroll_filter = (
+            Filter(must=[FieldCondition(key="program_id", match=MatchValue(value=program_id))])
+            if program_id
+            else None
+        )
+        chunks: list[dict[str, object]] = []
+        offset = None
+        while True:
+            records, offset = client.scroll(
+                collection_name=QDRANT_COLLECTION_NAME,
+                scroll_filter=scroll_filter,
+                limit=100,
+                offset=offset,
+                with_payload=True,
+            )
+            chunks.extend(record.payload or {} for record in records)
+            if offset is None:
+                break
+    finally:
+        client.close()
+
+    chunks.sort(key=lambda payload: (str(payload.get("document_name")), payload.get("chunk_index") or 0))
+
+    for payload in chunks:
+        print(
+            f"--- [{payload.get('chunk_index')}] {payload.get('document_name')} | "
+            f"program={payload.get('program_id')} sınıf={payload.get('grade')} "
+            f"tema={payload.get('theme')} sayfa={payload.get('pages')} "
+            f"başlıklar={payload.get('headings')} ---"
+        )
+        print(payload.get("text"))
+        print()
+
+    print(f"Toplam {len(chunks)} parça.")
+    return len(chunks)
 
 
 @app.function(
@@ -1024,6 +1158,18 @@ class RAGInference:
                 max(int(_number_or(item.get("maxTokens"), MAX_AGENT_OUTPUT_TOKENS)) for item in items),
             )
             try:
+                # 2026-08-22: 0,3 DENENDİ, 0,1'E GERİ ALINDI. Gerekçe: görev
+                # serbest paragraf yazmak değil, BAĞLAM'dan doğrulanmış İKİ
+                # terim SEÇMEK (`_compose_grounded_pedagogical_answer` katı bir
+                # JSON + birebir-alıntı sözleşmesi bekliyor). 0,3 ile gerçek
+                # sorgularla ölçüldü: önceden 5/5 güvenilir çalışan bir örnek
+                # (Anlamın Yapı Taşları/TDE1.2) 0/5'e düştü - model terimleri
+                # hafifçe değiştiriyor (ör. "kontrol listesi" yerine "bağlamanın
+                # kontrol listesi" gibi kaynakta birebir geçmeyen bir ifade
+                # uyduruyor) veya aynı terimi iki kez seçiyor. Bu görev şekli
+                # için (katı biçim/alıntı uyumu önemli, "yaratıcılık" değil)
+                # düşük sıcaklık doğru seçenekti - metin çeşitliliği artık
+                # `pipeline.py`deki kalıp havuzlarından geliyor, modelden değil.
                 outputs = self._llm.chat(
                     conversations, SamplingParams(temperature=0.1, max_tokens=max_tokens)
                 )
@@ -1102,20 +1248,26 @@ class RAGInference:
                     )
                 )
 
+            requested_top_k = int(_number_or(spec.get("topK"), DEFAULT_TOP_K))
             try:
+                # MMR'nin çeşitlilik arasından seçim yapabilmesi için istenen
+                # `topK`den daha geniş bir ham havuz çekiliyor (bkz.
+                # `_mmr_select`); `with_vectors=True` MMR'nin aday-seçili
+                # benzerliğini hesaplayabilmesi için gerekli.
                 hits = self._qdrant.query_points(
                     collection_name=QDRANT_COLLECTION_NAME,
                     query=query_vectors[position].tolist(),
                     query_filter=Filter(must=conditions) if conditions else None,
-                    limit=int(_number_or(spec.get("topK"), DEFAULT_TOP_K)),
+                    limit=max(requested_top_k * _MMR_CANDIDATE_MULTIPLIER, _MMR_MIN_CANDIDATE_POOL),
                     with_payload=True,
+                    with_vectors=True,
                 ).points
             except Exception as error:  # noqa: BLE001 - yerel Qdrant okuması.
                 return False, f"Belge dizininden okunamadı: {error}", {}, {}
 
             if not hits:
                 continue
-            hits = _drop_weak_hits(hits)
+            hits = _mmr_select(_drop_weak_hits(hits), requested_top_k)
             contexts[index] = "\n\n---\n\n".join(
                 str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
                 for hit in hits
@@ -1228,12 +1380,14 @@ class RAGInference:
             query_filter = Filter(must=filter_conditions) if filter_conditions else None
 
             try:
+                # bkz. _retrieve_for'daki aynı desen - MMR için geniş havuz + vektörler.
                 hits = self._qdrant.query_points(
                     collection_name=QDRANT_COLLECTION_NAME,
                     query=query_vectors[index].tolist(),
                     query_filter=query_filter,
-                    limit=top_k,
+                    limit=max(top_k * _MMR_CANDIDATE_MULTIPLIER, _MMR_MIN_CANDIDATE_POOL),
                     with_payload=True,
+                    with_vectors=True,
                 ).points
             except Exception as error:  # noqa: BLE001 - yerel Qdrant okuması; bozuk/erişilemeyen
                 # bir depo tüm servisi çökertmemeli.
@@ -1243,10 +1397,10 @@ class RAGInference:
                 results[index] = _no_answer()
                 continue
 
-            # Zayıf kuyruğu at - bkz. `_drop_weak_hits` / `_RELATIVE_SCORE_FLOOR`.
-            # `sources` da kırpılmış listeden üretilir: rapordaki kaynak listesi
-            # modelin gerçekten gördüğü bağlamla aynı kalmalı.
-            hits = _drop_weak_hits(hits)
+            # Zayıf kuyruğu at, sonra MMR ile çeşitlendir - bkz. `_drop_weak_hits`
+            # / `_mmr_select`. `sources` da bu son listeden üretilir: rapordaki
+            # kaynak listesi modelin gerçekten gördüğü bağlamla aynı kalmalı.
+            hits = _mmr_select(_drop_weak_hits(hits), top_k)
 
             context_blocks = [
                 str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
@@ -1270,6 +1424,7 @@ class RAGInference:
 
                 # Konuşma LİSTESİ veriliyor - vLLM partiyi kendi sıralayıp
                 # birlikte çözüyor ve çıktıları giriş sırasıyla döndürüyor.
+                # bkz. _run_agent_prompts'taki 2026-08-22 notu (0,3 denenip 0,1'e geri alındı).
                 outputs = self._llm.chat(conversations, SamplingParams(temperature=0.1, max_tokens=1024))
             except Exception as error:  # noqa: BLE001 - vLLM üretimi üçüncü parti bir ML çağrısı;
                 # bir sorgunun başarısız olması servis konteynerini çökertmemeli.

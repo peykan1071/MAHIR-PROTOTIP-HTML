@@ -13,6 +13,7 @@ from backend.app.approved_data_analyzer import (
 from backend.app.agents.pipeline import (
     _answer_matches_outcome_scope,
     _compose_grounded_pedagogical_answer,
+    _term_is_grounded,
 )
 
 _FAKE_REMOTE_URL = "https://fake.example/web_query"
@@ -394,6 +395,67 @@ def _two_weak_outcomes_payload():
     }
 
 
+class TermGroundingTests(unittest.TestCase):
+    """`_term_is_grounded`in Türkçe çekim eki toleransı - kalibrasyon verisi
+    gerçek sorgulardan (2026-08-22).
+
+    Önceki birebir alt-dize kontrolü, model doğru BAĞLAM ifadesini seçse
+    bile ek farkı yüzünden (ör. "görsellerden"/"görsellerinden") reddediyordu.
+    Bu testler hem gerçek-ama-farklı-ekli ifadelerin artık kabul edildiğini
+    HEM DE gerçek uydurmaların (SORU'nun kendi cümlesi, modelin kendi
+    "BAĞLAM" etiketini içeriğe sızdırması) hâlâ reddedildiğini kilitliyor -
+    ikisi birbirine çok yakın karakter-benzerliği skorlarına sahip
+    olabildiğinden (`difflib` ile ölçüldü: "ön bilgileri ile bağlantı
+    kurar" 0,71 - "bağlamanın kontrol listesi" 0,77) salt bir eşik/skor
+    yaklaşımı yerine sözcük sözcük eşleştirme kullanılıyor.
+    """
+
+    _SOZUN_INCELIGI_EVIDENCE = (
+        "TDE1.1. 'Sözün İnceliği' temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebil-me "
+        "TDE1.2. 'Sözün İnceliği' temasında ele alınan metinlerde anlam oluşturabilme "
+        "'Sözün İnceliği' temasında ele alınan dinlediği/izlediği metnin başlık ve "
+        "görsellerinden hareketle metnin yazılış amacını tahmin eder. "
+        "'Sözün İnceliği' temasında ele alınan dinleme/izleme metnindeki bilgiler ile "
+        "ön bilgileri arasında bağlantı kurar. "
+        "Öğrenciler, dinleme/izleme öncesinde hazırlanan kontrol listesini gözden geçirir."
+    )
+    _ANLAM_YAPI_EVIDENCE = "TDE1.3. 'Anlamın Yapı Taşları' temasında ele alınan metinleri çözümleyebilme"
+
+    def test_case_ending_difference_is_tolerated(self):
+        self.assertTrue(_term_is_grounded("görsellerden hareketle", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_clitic_split_versus_merged_is_tolerated(self):
+        # Kaynak "bilgilerle" (bitişik "-le"), model "bilgileri ile" (ayrı) yazdı.
+        self.assertTrue(
+            _term_is_grounded("ön bilgileri ile bağlantı kurar", self._SOZUN_INCELIGI_EVIDENCE)
+        )
+
+    def test_success_rate_leaking_from_the_question_is_rejected(self):
+        self.assertFalse(_term_is_grounded("%30 başarı oranı", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_sarmal_risk_leaking_from_the_question_is_rejected(self):
+        self.assertFalse(_term_is_grounded("sarmal risk", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_baglam_label_leaking_into_the_term_is_rejected(self):
+        # "bağlamanın" ("BAĞLAM" etiketinin kendisi + iyelik eki) karakter
+        # düzeyinde gerçek "bağlantı" sözcüğüne şaşırtıcı derecede yakın
+        # (difflib: 0,78) - salt bir benzerlik eşiği bunu kaçırırdı.
+        self.assertFalse(_term_is_grounded("bağlamanın kontrol listesi", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_unrelated_invented_word_is_rejected(self):
+        self.assertFalse(_term_is_grounded("kısaltma", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_vowel_drop_suffix_case_is_a_known_gap(self):
+        # "metni" (ünlü düşmesiyle çekimlenmiş) ile kaynaktaki "metinleri"
+        # arasındaki ortak önek çok kısa kalıyor (yalnız "met") - bu, kabul
+        # edilen bir kalan sınır: nadir bir ünlü düşmesi durumu, eşik
+        # gevşetilirse gerçek uydurmaları (yukarısı) da içeri alırdı.
+        self.assertFalse(_term_is_grounded("metni çözümleyebilme", self._ANLAM_YAPI_EVIDENCE))
+
+    def test_empty_term_is_rejected(self):
+        self.assertFalse(_term_is_grounded("   ", self._SOZUN_INCELIGI_EVIDENCE))
+
+
 class RagBatchingTests(unittest.TestCase):
     # Zayıf çıktılar tek istekte, tek vLLM partisinde yanıtlanıyor: ölçüldü,
     # sıcak konteynerde tek sorgunun 7-8,6 sn'si üretim ve bu ~29 token/s tek
@@ -596,10 +658,19 @@ class NoBloomTests(unittest.TestCase):
                 self.assertNotIn("bilişsel düzey", question)
                 self.assertNotIn("Bloom", question)
 
-    def test_question_still_carries_the_severity_label(self):
-        # Şiddet mekanizması ölçümde 8/8 doğruydu - Bloom'la birlikte gitmemeli.
-        self.assertIn("şiddet etiketi: Kritik", self._question(rate=0.4))
-        self.assertIn("şiddet etiketi: Orta", self._question(rate=0.6))
+    def test_question_no_longer_carries_success_rate_or_severity(self):
+        # 2026-08-22: model artık paragraf yazmıyor, yalnız BAĞLAM'dan iki
+        # terim seçiyor; oranı/şiddeti MAHİR kendi hesaplıyor
+        # (_compose_grounded_pedagogical_answer). Canlı ölçümde bu sayılar
+        # sorudayken model tekrar tekrar "%40 başarı oranı"/"Kritik" gibi
+        # SORU'nun kendi cümlesini "evidenceTerms" diye seçip BAĞLAM'daki
+        # gerçek müfredat metnini hiç kullanmadı - kaldırılması bu tuzağı
+        # ortadan kaldırıyor (bkz. _build_rag_question docstring'i).
+        for rate in (0.2, 0.4, 0.6):
+            with self.subTest(rate=rate):
+                question = self._question(rate=rate)
+                self.assertNotIn("şiddet etiketi", question)
+                self.assertNotIn("%", question)
 
     def test_question_asks_for_curriculum_grounding(self):
         # Eski kapanış emri modelin yanıtı bilişsel kıyasa harcamasına yol
@@ -627,28 +698,36 @@ class NoBloomTests(unittest.TestCase):
         self.assertNotIn("BAĞLAM", retrieval_query)
 
 
-class RagQuestionSeverityTests(unittest.TestCase):
-    # Şiddet etiketi eşiğe dayalı belirlenimci bir karar; modele bırakıldığında
-    # %55'lik vakaların yarısına "Kritik" dediği canlı ölçümle görüldü.
-    def _question_for(self, success_rate):
-        return _build_rag_question({
-            "outcomeTheme": "1. Tema: Sözün İnceliği",
-            "outcomeCode": "TDE1.2",
-            "outcomeSkill": "Okuma",
-            "outcomeDescription": "metinlerde anlam oluşturabilme",
-            "successRate": success_rate,
-        })
+class RagContextSeverityTests(unittest.TestCase):
+    """Şiddet etiketinin eşiğe dayalı, belirlenimci hesabı.
+
+    2026-08-22 öncesi bu hesap `_build_rag_question`da yapılıp SORU içinde
+    modele veriliyordu (modele bırakıldığında %55'lik vakaların yarısına
+    "Kritik" dediği canlı ölçümle görülmüştü). Artık model paragrafın
+    kendisini yazmıyor - yalnız BAĞLAM'dan iki terim seçiyor - ve modele
+    verilen bu sayı, kendi cümlesini ("%40 başarı oranı" gibi)
+    "evidenceTerms" olarak seçmesine yol açan bir tuzağa dönüştü. Hesap bu
+    yüzden tamamen MAHİR'in tarafına (`_compose_grounded_pedagogical_answer`)
+    taşındı; eşik davranışı burada, o fonksiyona karşı test ediliyor.
+    """
+
+    def _answer_for(self, success_rate):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": success_rate}
+        sources = [{"excerpt": "ana duygu ve ana düşünce"}]
+        return _compose_grounded_pedagogical_answer(
+            '{"evidenceTerms":["ana duygu","ana düşünce"]}', outcome, sources
+        )
 
     def test_below_fifty_percent_is_critical(self):
-        self.assertIn("şiddet etiketi: Kritik", self._question_for(0.35))
+        self.assertIn("Eksikliğin şiddeti: Kritik.", self._answer_for(0.35))
 
     def test_fifty_to_sixtynine_percent_is_moderate(self):
-        self.assertIn("şiddet etiketi: Orta", self._question_for(0.55))
+        self.assertIn("Eksikliğin şiddeti: Orta.", self._answer_for(0.55))
 
     def test_exactly_fifty_percent_is_moderate(self):
         # Sınır değer, mahir-report-export-common.js'teki "< 0.50 => Öncelikli"
         # kuralıyla aynı yönde kırılmalı.
-        self.assertIn("şiddet etiketi: Orta", self._question_for(0.50))
+        self.assertIn("Eksikliğin şiddeti: Orta.", self._answer_for(0.50))
 
     def test_severity_label_is_absent_from_retrieval_query(self):
         retrieval_query = _build_rag_retrieval_query({

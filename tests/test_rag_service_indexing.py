@@ -109,11 +109,26 @@ class DeterministicPointIdTests(unittest.TestCase):
 
 
 class DropWeakHitsTests(unittest.TestCase):
-    def test_cuts_at_the_break_in_measured_distribution(self):
-        # Gerçek ölçüm (Anlam Arayışı / TDE2.1, tema filtresi açık, top_k=8):
-        # 4 isabetten sonra 0,7471 -> 0,6634 kopuşu var.
+    def test_default_floor_keeps_the_topically_relevant_tail(self):
+        # 2026-08-22: 0,78 -> 0,60 -> 0,68 -> 0,60 (bkz. _RELATIVE_SCORE_
+        # FLOOR'un 2026-08-22 notları). Ne 0,78 (fazla agresif) ne 0,68
+        # (hâlâ bazı senaryolarda yetersiz) doğru dengeydi - kök sorun bir
+        # SAYI ayarıyla çözülemeyen yapısal bir tekrar sorunuydu, gerçek
+        # çözüm `_mmr_select`. Bu eşiğin işi artık yalnız gerçekten alakasız
+        # kuyruğu elemek; asıl çeşitlilik/tekrar dengesini `_mmr_select`
+        # kuruyor. 0,60 bu gerçek ölçüm verisinde (Anlam Arayışı/TDE2.1)
+        # kuyruğun tamamını tutuyor - MMR aşaması bunlardan hangisinin
+        # nihai listeye gireceğine ayrıca karar verir.
         hits = _hits(0.9424, 0.8601, 0.7609, 0.7471, 0.6634, 0.6578, 0.6266, 0.6144)
         kept = rag_service._drop_weak_hits(hits)
+        self.assertEqual(len(kept), 8)
+
+    def test_old_0_78_ratio_still_cuts_at_the_measured_break(self):
+        # Tarihi ölçüm (bkz. eski yorum) hâlâ geçerli bir davranış - yalnız
+        # artık modül varsayılanı değil, `floor_ratio` ile açıkça istenmesi
+        # gerekiyor.
+        hits = _hits(0.9424, 0.8601, 0.7609, 0.7471, 0.6634, 0.6578, 0.6266, 0.6144)
+        kept = rag_service._drop_weak_hits(hits, floor_ratio=0.78)
         self.assertEqual([hit.score for hit in kept], [0.9424, 0.8601, 0.7609, 0.7471])
 
     def test_keeps_everything_when_the_tail_is_flat(self):
@@ -137,10 +152,75 @@ class DropWeakHitsTests(unittest.TestCase):
         self.assertEqual(len(rag_service._drop_weak_hits(hits)), 1)
 
     def test_non_positive_top_score_is_left_alone(self):
-        # Kosinüs negatif olabilir; orada `top * 0.78` eşiği yükseltir, yani
-        # oranla kırpmak anlamını yitirir - liste olduğu gibi geçmeli.
+        # Kosinüs negatif olabilir; orada `top * floor_ratio` eşiği YÜKSELTİR
+        # (negatifin negatifle çarpımı pozitife döner), yani oranla kırpmak
+        # anlamını yitirir - liste olduğu gibi geçmeli.
         hits = _hits(-0.10, -0.40, -0.90)
         self.assertEqual(len(rag_service._drop_weak_hits(hits)), 3)
+
+
+def _mmr_hits(*score_vector_pairs):
+    """(skor, vektör) çiftlerinden Qdrant isabetine benzer nesneler üretir."""
+
+    return [SimpleNamespace(score=score, vector=vector) for score, vector in score_vector_pairs]
+
+
+class CosineSimilarityTests(unittest.TestCase):
+    def test_identical_vectors_are_one(self):
+        self.assertAlmostEqual(rag_service._cosine_similarity([0.6, 0.8], [0.6, 0.8]), 1.0)
+
+    def test_orthogonal_vectors_are_zero(self):
+        self.assertAlmostEqual(rag_service._cosine_similarity([1.0, 0.0], [0.0, 1.0]), 0.0)
+
+
+class MmrSelectTests(unittest.TestCase):
+    """2026-08-22: aynı kazanımın birbirine çok benzeyen "tanımlama"
+    satırları düz "en yüksek skorlu top_k" seçiminde tüm slotları doldurup
+    temanın asıl zengin, konu-alakalı-ama-kelime-farklı içeriğine hiç yer
+    bırakmıyordu (gerçek sorgularla ölçüldü: bir senaryo 5/5 -> 0/5). Bu
+    testler, MMR'nin gerçekten "alakalı ama zaten seçilenlerden farklı"
+    adayı tercih ettiğini - salt skor sıralamasından farklı bir sonuç
+    ürettiğini - doğruluyor.
+    """
+
+    def test_returns_everything_when_pool_is_not_larger_than_k(self):
+        hits = _mmr_hits((0.9, [1.0, 0.0]), (0.8, [0.0, 1.0]))
+        self.assertEqual(rag_service._mmr_select(hits, 5), hits)
+
+    def test_prefers_diverse_candidate_over_a_near_duplicate(self):
+        # top her zaman ilk seçilir (en yüksek skor). near_duplicate top'a
+        # neredeyse özdeş yönde (redundancy ~0,99); diverse daha düşük
+        # skorlu ama top'tan tamamen farklı bir yönde (redundancy 0).
+        # Varsayılan lambda (0,6) ile diverse kazanmalı - salt skor
+        # sıralaması (near_duplicate 0,85 > diverse 0,70) tersini seçerdi.
+        top = SimpleNamespace(score=0.95, vector=[1.0, 0.0])
+        near_duplicate = SimpleNamespace(score=0.85, vector=[0.99, 0.01])
+        diverse = SimpleNamespace(score=0.70, vector=[0.0, 1.0])
+        selected = rag_service._mmr_select([top, near_duplicate, diverse], 2)
+        self.assertEqual(selected, [top, diverse])
+
+    def test_lambda_one_falls_back_to_pure_relevance_ranking(self):
+        # lambda=1,0 çeşitlilik terimini tamamen sıfırlar - saf skor
+        # sıralamasıyla aynı sonucu vermeli (near_duplicate > diverse).
+        top = SimpleNamespace(score=0.95, vector=[1.0, 0.0])
+        near_duplicate = SimpleNamespace(score=0.85, vector=[0.99, 0.01])
+        diverse = SimpleNamespace(score=0.70, vector=[0.0, 1.0])
+        selected = rag_service._mmr_select([top, near_duplicate, diverse], 2, lambda_param=1.0)
+        self.assertEqual(selected, [top, near_duplicate])
+
+    def test_family_of_near_duplicates_yields_only_one_representative(self):
+        # Altı "kazanım tanımlama" benzeri isabet (hepsi birbirine çok
+        # yakın), artı bir tane gerçekten farklı ("uygulama" benzeri)
+        # isabet. k=3 istendiğinde MMR ailenin tamamını değil, en
+        # yükseğini + çeşitliliği seçmeli.
+        family = [
+            SimpleNamespace(score=0.90 - 0.01 * i, vector=[0.99 - 0.001 * i, 0.02 * i])
+            for i in range(6)
+        ]
+        rich = SimpleNamespace(score=0.68, vector=[0.1, 0.99])
+        selected = rag_service._mmr_select([*family, rich], 3)
+        self.assertIn(rich, selected)
+        self.assertEqual(len(selected), 3)
 
 
 if __name__ == "__main__":

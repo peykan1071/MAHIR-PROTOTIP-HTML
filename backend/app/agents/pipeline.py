@@ -14,6 +14,8 @@ hiçbiri LLM tarafından üretilmez veya değiştirilmez; her çağrı ilgili aj
 
 from __future__ import annotations
 
+import difflib
+import hashlib
 import json
 import logging
 import re
@@ -36,9 +38,78 @@ from .prompts import DIAGNOSIS_SYSTEM_PROMPT, STRENGTH_SYSTEM_PROMPT, build_anom
 # gürültüden başka bir şey olmaz.
 _NO_ANOMALY_TEXT = "Belirgin bir tutarsızlık görülmedi"
 
-# Getirimde çekilecek parça sayısı - backend/app/rag_client.py ile aynı
-# gerekçe: parçalar 512 token ve getirim zaten tek temaya kısıtlı.
+# Getirimde MODELE gönderilecek NİHAİ parça sayısı - bu, `rag_service.py`nin
+# Qdrant'tan çektiği HAM aday sayısı DEĞİL (bkz. orada `_MMR_CANDIDATE_
+# MULTIPLIER`/`_MMR_MIN_CANDIDATE_POOL`, o çok daha geniş bir havuz çekip
+# `_mmr_select` ile bu sayıya iner). 2026-08-22 önce 8 -> 16 -> 12 arası
+# gidip geldi (bkz. git geçmişi): aynı kazanımın birbirine çok benzeyen
+# "kazanım tanımlama" satırları düz "en yüksek skorlu top_k" seçiminde tek
+# başına tüm slotları doldurup temanın asıl zengin içeriğini dışarıda
+# bırakıyordu, ama `top_k`yi büyütmek BAŞKA bir sorguda kalabalık/tekrarlı
+# bağlamın modelin dikkatini dağıtmasına yol açtı (ölçüldü: 5/5 -> 0/5).
+# Kök sorun bir SAYI ayarıyla çözülemeyen yapısal bir tekrar sorunuydu; asıl
+# çözüm `rag_service.py`ye eklenen MMR (Maximal Marginal Relevance)
+# yeniden-sıralaması - o artık alaka VE çeşitliliği birlikte gözetiyor, bu
+# yüzden nihai sayı tekrar makul/küçük bir değere (8) çekilebildi.
 _DIAGNOSIS_TOP_K = 8
+
+# `_compose_grounded_pedagogical_answer`in cümle kalıp havuzları. Model
+# yalnızca BAĞLAM'dan doğrulanmış İKİ terim seçiyor, cümlenin TAMAMINI
+# MAHİR kuruyor (kanıt garantisi bundan geliyor) - ama tek bir sabit kalıp
+# her satırı birebir aynı iskelete sokup raporu robotik/tek düze gösteriyordu.
+# Her varyant aynı zorunlu parçaları taşımak ZORUNDA (tırnaklı tema adı, her
+# iki terim, "%<oran> olarak hesaplanmıştır" - `RagContextAttachmentTests`
+# bunu doğruluyor); yalnız cümlenin çevresi değişiyor. Seçim `_pick_template`
+# ile GİRDİYE göre belirlenimci (aynı kazanım aynı yeniden üretimde hep aynı
+# kalıbı alır - test edilebilirlik/kararlılık için) ama farklı kazanımlar
+# farklı kalıp alır, bu yüzden bir raporun tamamı tek tip görünmez.
+_OPENING_TEMPLATES = (
+    (
+        '"{theme}" temasında {term1} ve {term2} kapsamındaki sınıf başarı oranı '
+        "%{percent} olarak hesaplanmıştır."
+    ),
+    (
+        '"{theme}" temasındaki {term1} ve {term2} bileşenlerinde sınıf başarı '
+        "oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        'Sınıfın "{theme}" temasında {term1} ve {term2} kapsamındaki başarı oranı '
+        "%{percent} olarak hesaplanmıştır."
+    ),
+    (
+        '"{theme}" temasında ölçülen {term1} ve {term2} performansına göre sınıf '
+        "başarı oranı %{percent} olarak hesaplanmıştır."
+    ),
+)
+_WEAK_CLOSING_TEMPLATES = (
+    (
+        "Eksikliğin şiddeti: {severity}. Bu performans, seçilen öğrenme "
+        "çıktısının sonraki süreçleri açısından sarmal risk taşır."
+    ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu durum, ileri düzey kazanımlar için "
+        "sarmal bir risk oluşturmaktadır."
+    ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu eksiklik, sonraki öğrenme "
+        "süreçlerine sarmal biçimde yansıyabilir."
+    ),
+)
+_STRONG_CLOSING_TEMPLATES = (
+    "Bu sonuç, seçilen öğrenme çıktısında güçlü bir performans alanını gösterir.",
+    "Bu veriler, seçilen öğrenme çıktısında sağlam bir kazanım düzeyine işaret eder.",
+    "Sınıf, seçilen öğrenme çıktısında bu alanda belirgin bir başarı sergilemektedir.",
+)
+
+
+def _pick_template(templates: tuple[str, ...], *seed_parts: str) -> str:
+    """`seed_parts`e göre belirlenimci bir kalıp seçer (rastgele değil - aynı
+    girdi her zaman aynı kalıbı almalı, aksi hâlde bir raporu iki kez
+    üretmek farklı metin verirdi)."""
+
+    digest = hashlib.md5("|".join(seed_parts).encode("utf-8")).hexdigest()
+    return templates[int(digest, 16) % len(templates)]
+
 
 # LLM/RAG bir kaynak bulsa bile yanıt seçilen sınav becerisine saparsa metni
 # rapora taşımayız. Hücreyi sessizce boş bırakmak yerine öğretmene nedenini
@@ -601,8 +672,9 @@ def _compose_grounded_pedagogical_answer(
 ) -> str:
     """LLM'nin seçtiği iki kaynak teriminden güvenli rapor paragrafı kurar.
 
-    Terimler kaynak alıntılarında birebir bulunmuyorsa hiçbir metin üretilmez.
-    Başarı oranı ve şiddet modelden değil, ölçme motorunun sonucundan alınır.
+    Terimlerin BAĞLAM'da (Türkçe çekim eki farklılıklarına toleranslı - bkz.
+    `_term_is_grounded`) karşılığı yoksa hiçbir metin üretilmez. Başarı oranı
+    ve şiddet modelden değil, ölçme motorunun sonucundan alınır.
     """
 
     candidate = answer.strip()
@@ -623,8 +695,7 @@ def _compose_grounded_pedagogical_answer(
         return ""
 
     evidence = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
-    normalized_evidence = _normalize_evidence_text(evidence)
-    if any(_normalize_evidence_text(term) not in normalized_evidence for term in terms):
+    if any(not _term_is_grounded(term, evidence) for term in terms):
         return ""
 
     rate = float(outcome.get("successRate") or 0.0)
@@ -632,17 +703,17 @@ def _compose_grounded_pedagogical_answer(
     theme = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", str(outcome.get("outcomeTheme") or ""), flags=re.IGNORECASE).strip()
     if not theme:
         return ""
-    first = (
-        f'"{theme}" temasında {terms[0]} ve {terms[1]} kapsamındaki '
-        f"sınıf başarı oranı %{percent} olarak hesaplanmıştır."
+    opening = _pick_template(_OPENING_TEMPLATES, theme, terms[0], terms[1]).format(
+        theme=theme, term1=terms[0], term2=terms[1], percent=percent
     )
     if rate < 0.70:
         severity = "Kritik" if rate < 0.50 else "Orta"
-        return (
-            f"{first} Eksikliğin şiddeti: {severity}. "
-            "Bu performans, seçilen öğrenme çıktısının sonraki süreçleri açısından sarmal risk taşır."
+        closing = _pick_template(_WEAK_CLOSING_TEMPLATES, theme, terms[0], terms[1], severity).format(
+            severity=severity
         )
-    return f"{first} Bu sonuç, seçilen öğrenme çıktısında güçlü bir performans alanını gösterir."
+        return f"{opening} {closing}"
+    closing = _pick_template(_STRONG_CLOSING_TEMPLATES, theme, terms[0], terms[1])
+    return f"{opening} {closing}"
 
 
 def _normalize_evidence_text(value: str) -> str:
@@ -650,6 +721,47 @@ def _normalize_evidence_text(value: str) -> str:
 
     value = re.sub(r"\s*-\s*", "", value.casefold())
     return " ".join(value.split())
+
+
+# 2026-08-22: bir terim BAĞLAM'da geçiyor mu kontrolü, önceden birebir
+# alt-dize (`in` operatörü) ile yapılıyordu. Bu ÇOK katıydı: model doğru,
+# BAĞLAM'daki gerçek bir ifadeyi seçse bile Türkçe'nin çekim ekleri
+# ("görsellerden"/"görsellerinden", "ön bilgileri ile"/"ön bilgilerle",
+# "metni"/"metinleri") yüzünden karakter karakter eşleşmiyordu - gerçek
+# sorgularla ölçüldü, bu halüsinasyon değil, yalnızca yazım farkıydı.
+# Bunun yerine terim SÖZCÜK SÖZCÜK BAĞLAM'daki en yakın sözcükle
+# karşılaştırılır (`difflib.SequenceMatcher`, eşik aşağıda). 3 karakter ve
+# altı sözcükler ("ile", "ve", "bir"...) işlevsel kabul edilip her zaman
+# geçer. Eşik (0,80) dört gerçek uydurma örneğiyle (model SORU'nun kendi
+# cümlesini veya kendi "BAĞLAM" etiketini içeriğe sızdırdığında - ör.
+# "sarmal risk", "%30 başarı oranı", "bağlamanın kontrol listesi",
+# "kısaltma") kalibre edildi; bkz. `tests/test_agent_llm_round.py`daki
+# kalibrasyon testleri - dördü de bu eşikte doğru reddediliyor.
+_TERM_WORD_SIMILARITY_THRESHOLD = 0.80
+_WORD_PATTERN = re.compile(r"[\wçğıöşüÇĞİÖŞÜ]+")
+
+
+def _word_is_grounded(word: str, evidence_words: list[str]) -> bool:
+    """Tek bir sözcüğün BAĞLAM'da (çekim eki farklı olsa bile) karşılığı var mı."""
+
+    if len(word) <= 3:
+        return True
+    return any(
+        difflib.SequenceMatcher(None, word, evidence_word).ratio() >= _TERM_WORD_SIMILARITY_THRESHOLD
+        for evidence_word in evidence_words
+    )
+
+
+def _term_is_grounded(term: str, evidence: str) -> bool:
+    """`term`in BAĞLAM'da (`evidence`) - Türkçe çekim eki farklılıklarına
+    tolerans tanıyarak - gerçekten geçtiğini doğrular. Bkz. yukarıdaki
+    modül notu."""
+
+    evidence_words = _WORD_PATTERN.findall(_normalize_evidence_text(evidence))
+    term_words = _WORD_PATTERN.findall(_normalize_evidence_text(term))
+    if not term_words:
+        return False
+    return all(_word_is_grounded(word, evidence_words) for word in term_words)
 
 
 def _enqueue_diagnosis_prompts(
@@ -687,10 +799,14 @@ def _enqueue_diagnosis_prompts(
     for outcome in outcome_results:
         code = str(outcome.get("outcomeCode") or "?")
         is_weak = float(outcome.get("successRate") or 0.0) < _RAG_WEAK_THRESHOLD
+        # Başarı oranı KASITLI OLARAK burada yok (bkz. _build_rag_question'ın
+        # 2026-08-22 notu) - model artık paragraf yazmıyor, yalnız BAĞLAM'dan
+        # iki terim seçiyor; oranı sorguya gömmek modelin SORU'nun kendi
+        # cümlesini (ör. "%90") "evidenceTerms" diye seçmesine yol açıyordu.
         question = _build_rag_question(outcome) if is_weak else (
             f"{' - '.join(str(part) for part in (outcome.get('outcomeTheme'), outcome.get('outcomeCode'), outcome.get('outcomeDescription'), outcome.get('outcomeSkill')) if part)} "
-            f"öğrenme çıktısında başarı oranı %{round(float(outcome.get('successRate') or 0.0) * 100)}. "
-            "BAĞLAM'daki somut süreç bileşenlerine dayanarak güçlü alanı ve başarının sürdürülme odağını açıkla."
+            "öğrenme çıktısı için BAĞLAM'daki somut süreç bileşenlerine dayanarak güçlü "
+            "performansı kanıtlayan iki somut terimi adıyla anarak seç."
         )
         if not question:
             _logger.info("RAG atlandı: cikti=%s sebep=soru-bos", code)
