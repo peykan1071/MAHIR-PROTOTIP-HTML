@@ -119,7 +119,31 @@ _RAG_SCOPE_REJECTED_TEXT = (
     "Seçilen sınav türü ve öğrenme çıktısıyla uyumlu, doğrulanmış bir kaynak bağlamı oluşturulamadı."
 )
 
+# `PedagogicalAnalysisAgent._evaluate_diagnosis_result`in "retry" durumu için:
+# ilk denemede doğrulanamayan (BAĞLAM'da birebir geçmeyen terim ya da kapsam
+# dışı yanıt) çıktılar bu ek talimatla AYNI getirime bir kez daha sorulur.
+_GROUNDING_RETRY_HINT = (
+    "\n\nNOT: Önceki denemende seçtiğin en az bir terim BAĞLAM'da BİREBİR "
+    "geçmiyordu (eş anlamlı ya da çekim eki değiştirilmiş bir ifade "
+    "kullanmıştın) veya yanıtın seçilen öğrenme çıktısının kapsamı dışına "
+    "çıkmıştı. Bu kez YALNIZCA BAĞLAM'da harfi harfine geçen kelime veya "
+    "kelime öbeklerini seç; hiçbir kelimeyi değiştirme."
+)
+
 _logger = logging.getLogger(__name__)
+
+
+def _build_grounding_retry_prompt(original: dict[str, Any]) -> dict[str, Any]:
+    """Doğrulama başarısız olduğunda AYNI getirimle (aynı BAĞLAM) tek seferlik
+    yeniden deneme prompt'u kurar - `system`/`retrieval` aynı kalır, yalnız
+    `user`e düzeltici bir not eklenir. Aynı `retrieval` kasıtlı: getirim
+    zaten deterministik, sorun modelin BAĞLAM'ı yanlış kullanmasıydı, hangi
+    BAĞLAM'ın getirildiği değil.
+    """
+
+    retry = dict(original)
+    retry["user"] = str(original.get("user") or "") + _GROUNDING_RETRY_HINT
+    return retry
 
 
 class DocumentUnderstandingAgent:
@@ -460,6 +484,73 @@ class PedagogicalAnalysisAgent:
             }
         )
 
+    def _evaluate_diagnosis_result(
+        self, code: str, result: dict[str, Any] | None, outcome: dict[str, Any]
+    ) -> tuple[str, int]:
+        """Tek bir teşhis denemesini değerlendirir; başarılıysa `outcome`u yazar.
+
+        Döner: `(durum, kırpılan_cümle_sayısı)`. `durum` üçünden biri:
+        - `"grounded"`: rapora yazıldı.
+        - `"retry"`: model bir cevap ÜRETTİ ama doğrulanamadı (BAĞLAM'da
+          birebir geçmeyen terim, kapsam dışı yanıt vb.) - yeniden denemeye
+          değer, çünkü üretim stokastik ve aynı soru ikinci seferde farklı
+          (ve doğrulanabilir) bir terim seçebilir.
+        - `"skip"`: kaynak/cevap hiç yok ya da model dürüstçe "bu kazanıma
+          BAĞLAM'da içerik yok" dedi - yeniden denemek sonucu değiştirmez.
+        """
+
+        from ..approved_data_analyzer import _RAG_NO_ANSWER_TEXT
+
+        if not result:
+            _logger.info("RAG atlandı: cikti=%s sebep=sonuc-yok", code)
+            return "skip", 0
+        if not result.get("sources"):
+            # Kaynak yoksa getirim hiç isabet vermemiştir - filtrelerden
+            # (program/sınıf/tema) biri tutmamış demektir.
+            _logger.info("RAG atlandı: cikti=%s sebep=kaynak-yok", code)
+            return "skip", 0
+        answer = str(result.get("answer") or "").strip()
+        # startswith + kırpma, tam eşleşme değil: model doğru bağlamla
+        # beslendiğinde bile cevabı sık sık bu cümleyle başlatıp ardından
+        # gerçek teşhisle devam ediyor (gerçek dizin karşısında ölçüldü).
+        # `_is_not_found_response`, 2026-08-22 (2. sürüm) şemasının
+        # `{"status":"not_found"}` biçimini AYNI şekilde ele alır - ikisi
+        # de "BAĞLAM'da içerik yok" demenin dürüst bir yolu, sözleşme
+        # ihlali değil; ikisi de görünür ret mesajı OLMADAN sessizce
+        # atlanmalı (aksi hâlde meşru "bu konuda içerik yok" durumları
+        # öğretmene sanki model hata yapmış gibi görünürdü).
+        if answer.startswith(_RAG_NO_ANSWER_TEXT) or _is_not_found_response(answer):
+            # Model kaynak yetersizliğini bildirdiyse devamına eklediği
+            # metin güvenilir kabul edilemez. Ret cümlesini kırpıp kalan
+            # olası halüsinasyonu rapora taşımak yerine yanıtın tamamı
+            # elenir.
+            answer = ""
+        if not answer:
+            _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti", code)
+            return "skip", 0
+        stripped = int(result.get("strippedSentences") or 0)
+        raw_sources = result.get("sources") or []
+        # Güncel RAG uç noktası kaynak parçalarının kısa alıntılarını da
+        # döndürür. Bu durumda model nihai raporu yazmaz; yalnız kaynakta
+        # birebir doğrulanabilen iki kanıt terimi seçer ve paragrafı MAHİR
+        # belirlenimci olarak kurar. Eski/aletsiz uçların alıntısız kaynak
+        # biçimi geriye uyumluluk için mevcut sözleşmeyle denetlenir.
+        if any(str(source.get("excerpt") or "").strip() for source in raw_sources if isinstance(source, dict)):
+            answer = _compose_grounded_pedagogical_answer(answer, outcome, raw_sources)
+        if not answer or not _answer_matches_outcome_scope(answer, outcome):
+            _logger.info("RAG doğrulanamadı: cikti=%s sebep=yanit-sozlesmesi", code)
+            return "retry", stripped
+        merged_sources = _merge_rag_sources(raw_sources)
+        if not merged_sources:
+            _logger.info("RAG atlandı: cikti=%s sebep=gecersiz-kaynak", code)
+            return "skip", stripped
+        outcome["ragContext"] = answer
+        outcome["ragSources"] = merged_sources
+        _logger.info(
+            "RAG dolduruldu: cikti=%s sebep=basarili kaynak=%d", code, len(outcome["ragSources"])
+        )
+        return "grounded", stripped
+
     def apply_llm(self, context: AgentContext) -> AgentResult:
         """Teşhis yanıtlarını `ragContext`e, dayandığı kaynakları `ragSources`a yazar.
 
@@ -474,68 +565,72 @@ class PedagogicalAnalysisAgent:
         geldiğini söylüyordu; bu da bir teşhisin hangi BELGE SAYFASINDAN
         geldiğini söylüyor. Veri zaten uçtan geliyordu (`sources`) ve yalnız
         "boş mu" diye bakılıp atılıyordu.
+
+        2026-08-22 (3. sürüm): canlı ölçümde ilk üretimde ~%40 doğrulanamama
+        oranı görüldü (dominant sebep: model BAĞLAM'daki terimi birebir
+        değil, eş anlamlısıyla seçiyor). Üretim stokastik olduğundan aynı
+        soruyu bir kez daha sormak makul bir düzeltme - bu yüzden `"retry"`
+        durumundaki çıktılar TEK bir ek tur için toplanıp aynı getirimle
+        (aynı BAĞLAM) yeniden sorulur. Toleransı gevşetmek yerine bu yol
+        seçildi çünkü doğrulama kuralının kendisine DOKUNMUYOR - charter
+        garantisini zayıflatmadan modele ikinci bir şans veriyor.
         """
 
-        from ..approved_data_analyzer import _RAG_NO_ANSWER_TEXT
+        targets = context.scratch.get("diagnosisTargets", {})
+        prompts_by_name = {
+            str(item.get("name")): item
+            for item in context.llm_queue
+            if item.get("agent") == self.name
+        }
 
         grounded = 0
         stripped = 0
-        for name, outcome in context.scratch.get("diagnosisTargets", {}).items():
+        pending: dict[str, dict[str, Any]] = {}
+        for name, outcome in targets.items():
             code = str(outcome.get("outcomeCode") or "?")
-            result = context.llm_result(name)
-            if not result:
-                _logger.info("RAG atlandı: cikti=%s sebep=sonuc-yok", code)
-                continue
-            if not result.get("sources"):
-                # Kaynak yoksa getirim hiç isabet vermemiştir - filtrelerden
-                # (program/sınıf/tema) biri tutmamış demektir.
-                _logger.info("RAG atlandı: cikti=%s sebep=kaynak-yok", code)
-                continue
-            answer = str(result.get("answer") or "").strip()
-            # startswith + kırpma, tam eşleşme değil: model doğru bağlamla
-            # beslendiğinde bile cevabı sık sık bu cümleyle başlatıp ardından
-            # gerçek teşhisle devam ediyor (gerçek dizin karşısında ölçüldü).
-            # `_is_not_found_response`, 2026-08-22 (2. sürüm) şemasının
-            # `{"status":"not_found"}` biçimini AYNI şekilde ele alır - ikisi
-            # de "BAĞLAM'da içerik yok" demenin dürüst bir yolu, sözleşme
-            # ihlali değil; ikisi de görünür ret mesajı OLMADAN sessizce
-            # atlanmalı (aksi hâlde meşru "bu konuda içerik yok" durumları
-            # öğretmene sanki model hata yapmış gibi görünürdü).
-            if answer.startswith(_RAG_NO_ANSWER_TEXT) or _is_not_found_response(answer):
-                # Model kaynak yetersizliğini bildirdiyse devamına eklediği
-                # metin güvenilir kabul edilemez. Ret cümlesini kırpıp kalan
-                # olası halüsinasyonu rapora taşımak yerine yanıtın tamamı
-                # elenir.
-                answer = ""
-            if not answer:
-                _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti", code)
-                continue
-            stripped += int(result.get("strippedSentences") or 0)
-            raw_sources = result.get("sources") or []
-            # Güncel RAG uç noktası kaynak parçalarının kısa alıntılarını da
-            # döndürür. Bu durumda model nihai raporu yazmaz; yalnız kaynakta
-            # birebir doğrulanabilen iki kanıt terimi seçer ve paragrafı MAHİR
-            # belirlenimci olarak kurar. Eski/aletsiz uçların alıntısız kaynak
-            # biçimi geriye uyumluluk için mevcut sözleşmeyle denetlenir.
-            if any(str(source.get("excerpt") or "").strip() for source in raw_sources if isinstance(source, dict)):
-                answer = _compose_grounded_pedagogical_answer(answer, outcome, raw_sources)
-            if not answer or not _answer_matches_outcome_scope(answer, outcome):
-                _logger.info("RAG atlandı: cikti=%s sebep=yanit-sozlesmesi", code)
+            status, delta = self._evaluate_diagnosis_result(code, context.llm_result(name), outcome)
+            stripped += delta
+            if status == "grounded":
+                grounded += 1
+            elif status == "retry" and name in prompts_by_name:
+                pending[name] = outcome
+
+        if pending:
+            retry_items = [_build_grounding_retry_prompt(prompts_by_name[name]) for name in pending]
+            from ..approved_data_analyzer import MAHIR_RAG_REMOTE_URL
+
+            retry_results: list[dict[str, Any]] | None = None
+            if MAHIR_RAG_REMOTE_URL:
+                from .llm import run_agent_prompts
+
+                ok, message, retry_results = run_agent_prompts(retry_items, MAHIR_RAG_REMOTE_URL)
+                if not ok:
+                    _logger.warning("RAG yeniden deneme turu başarısız: %s", message)
+                    retry_results = None
+
+            retry_by_name = {str(item.get("name")): item for item in (retry_results or [])}
+            trace = context.trace_for(self.name)
+            if retry_results:
+                from .llm import trace_entry
+
+                for result in retry_results:
+                    if trace is not None:
+                        trace.llm_calls.append(trace_entry(result))
+
+            for name, outcome in pending.items():
+                code = str(outcome.get("outcomeCode") or "?")
+                status, delta = self._evaluate_diagnosis_result(code, retry_by_name.get(name), outcome)
+                stripped += delta
+                if status == "grounded":
+                    grounded += 1
+                    continue
+                # Yeniden deneme de doğrulanamadı (ya da hiç sonuç gelmedi) -
+                # öğretmene "bir şey bulundu ama doğrulanamadı" mesajı
+                # gösterilir; sessizce boş bırakmak, iki gerçek denemenin
+                # ikisinin de reddedildiğini gizlerdi.
+                _logger.info("RAG atlandı: cikti=%s sebep=yeniden-deneme-de-basarisiz", code)
                 outcome["ragContext"] = _RAG_SCOPE_REJECTED_TEXT
                 outcome["ragSources"] = []
-                continue
-            merged_sources = _merge_rag_sources(raw_sources)
-            if not merged_sources:
-                _logger.info("RAG atlandı: cikti=%s sebep=gecersiz-kaynak", code)
-                continue
-            outcome["ragContext"] = answer
-            outcome["ragSources"] = merged_sources
-            grounded += 1
-            _logger.info(
-                "RAG dolduruldu: cikti=%s sebep=basarili kaynak=%d",
-                code,
-                len(outcome["ragSources"]),
-            )
 
         return AgentResult(
             outputs={"curriculumGroundedCount": grounded, "llmStrippedSentences": stripped}

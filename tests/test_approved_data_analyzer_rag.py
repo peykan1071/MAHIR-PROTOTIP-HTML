@@ -2,6 +2,7 @@
 
 import json
 import unittest
+from typing import ClassVar
 from unittest.mock import patch
 
 from backend.app.approved_data_analyzer import (
@@ -49,6 +50,40 @@ def _llm_reply(*answers):
             answer, sources = answers[index] if index < len(answers) else ("", [])
             # Kaynak listesi bossa getirim isabet vermemistir; yanit da bos
             # gitmeli - `apply_llm` kaynaga bakarak `kaynak-yok` diyor.
+            if not sources:
+                answer = ""
+            results.append({
+                "name": item["name"],
+                "answer": answer,
+                "sources": sources,
+                "strippedSentences": 0,
+            })
+        return True, "Ajan yanıtları üretildi.", results
+
+    return fake
+
+
+def _llm_reply_sequence(*per_call_answers):
+    """`_llm_reply` gibi ama HER ÇAĞRIDA bir sonraki demeti kullanır - ilk
+    deneme/yeniden deneme (retry) senaryolarını test etmek için: ilk çağrı
+    `per_call_answers[0]`i, ikinci çağrı (retry) `per_call_answers[1]`i
+    kullanır. Demet biterse son öğe tekrar kullanılır."""
+
+    call_count = 0
+
+    def fake(items, remote_url):
+        nonlocal call_count
+        index = min(call_count, len(per_call_answers) - 1)
+        call_count += 1
+        answers = per_call_answers[index]
+        diagnoses = [item for item in items if str(item.get("name", "")).startswith("pedagoji/")]
+        results = []
+        for item in items:
+            if not str(item.get("name", "")).startswith("pedagoji/"):
+                results.append({"name": item["name"], "answer": "", "sources": [], "strippedSentences": 0})
+                continue
+            idx = diagnoses.index(item)
+            answer, sources = answers[idx] if idx < len(answers) else ("", [])
             if not sources:
                 answer = ""
             results.append({
@@ -427,6 +462,73 @@ def _two_weak_outcomes_payload():
         ],
         "students": [{"studentRef": "Ö-001", "scores": [30, 40]}],
     }
+
+
+class DiagnosisGroundingRetryTests(unittest.TestCase):
+    """2026-08-22 (3. sürüm): doğrulanamayan ilk deneme TEK bir ek turla
+    yeniden sorulur - canlıda ölçülen ~%40 ilk-üretim reddetme oranını
+    düşürmek için (bkz. `PedagogicalAnalysisAgent._evaluate_diagnosis_result`).
+    Toleransı gevşetmek yerine üretimi tekrarlamak seçildi: doğrulama kuralı
+    değişmiyor, modele ikinci bir şans veriliyor.
+    """
+
+    _SOURCES: ClassVar[list[dict[str, str]]] = [
+        {"documentName": "mufredat.pdf", "excerpt": "Sözün İnceliği temasında anlam oluşturma ele alınır."}
+    ]
+
+    def test_ungrounded_first_attempt_is_retried_and_succeeds(self):
+        bad = _evidence_json(
+            ["dinleme becerisi", "kelime dağarcığı"], ["İlk deneme 1.", "İlk deneme 2."]
+        )
+        good = _evidence_json(
+            ["Sözün İnceliği", "anlam oluşturma"], ["İkinci deneme 1.", "İkinci deneme 2."]
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(bad, self._SOURCES)], [(good, self._SOURCES)]),
+            ) as mock_query:
+                result = analyze_approved_data(_weak_tde_payload())
+
+        self.assertEqual(mock_query.call_count, 2)
+        context = result["outcomes"][0]["ragContext"]
+        self.assertIn("anlam oluşturma", context)
+        self.assertNotIn("doğrulanmış bir kaynak bağlamı oluşturulamadı", context)
+        retry_items = mock_query.call_args_list[1][0][0]
+        self.assertEqual(len(retry_items), 1)
+        self.assertIn("BİREBİR", retry_items[0]["user"])
+        # Getirim (aynı BAĞLAM) retry'de DEĞİŞMEMELİ - sorun modelin BAĞLAM'ı
+        # yanlış kullanmasıydı, hangi BAĞLAM'ın getirildiği değil.
+        self.assertEqual(retry_items[0]["retrieval"], _diagnosis_prompts(mock_query)[0]["retrieval"])
+
+    def test_ungrounded_after_retry_is_rejected_and_tried_only_twice(self):
+        bad = _evidence_json(
+            ["dinleme becerisi", "kelime dağarcığı"], ["İlk deneme 1.", "İlk deneme 2."]
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(bad, self._SOURCES)]),
+            ) as mock_query:
+                result = analyze_approved_data(_weak_tde_payload())
+
+        self.assertEqual(mock_query.call_count, 2)
+        context = result["outcomes"][0]["ragContext"]
+        self.assertIn("doğrulanmış bir kaynak bağlamı oluşturulamadı", context)
+        self.assertEqual(result["outcomes"][0]["ragSources"], [])
+
+    def test_first_attempt_success_never_triggers_a_retry_call(self):
+        good = _evidence_json(
+            ["Sözün İnceliği", "anlam oluşturma"], ["Birinci deneme 1.", "Birinci deneme 2."]
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(good, self._SOURCES)]),
+            ) as mock_query:
+                analyze_approved_data(_weak_tde_payload())
+
+        mock_query.assert_called_once()
 
 
 class TermGroundingTests(unittest.TestCase):
