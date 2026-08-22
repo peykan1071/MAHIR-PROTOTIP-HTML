@@ -55,46 +55,55 @@ _NO_ANOMALY_TEXT = "Belirgin bir tutarsızlık görülmedi"
 _DIAGNOSIS_TOP_K = 8
 
 # `_compose_grounded_pedagogical_answer`in cümle kalıp havuzları. Model
-# yalnızca BAĞLAM'dan doğrulanmış İKİ terim seçiyor, cümlenin TAMAMINI
+# BAĞLAM'dan doğrulanmış BİR ya da İKİ terim seçiyor, cümlenin TAMAMINI
 # MAHİR kuruyor (kanıt garantisi bundan geliyor) - ama tek bir sabit kalıp
 # her satırı birebir aynı iskelete sokup raporu robotik/tek düze gösteriyordu.
-# Her varyant aynı zorunlu parçaları taşımak ZORUNDA (tırnaklı tema adı, her
-# iki terim, "%<oran> olarak hesaplanmıştır" - `RagContextAttachmentTests`
-# bunu doğruluyor); yalnız cümlenin çevresi değişiyor. Seçim `_pick_template`
-# ile GİRDİYE göre belirlenimci (aynı kazanım aynı yeniden üretimde hep aynı
-# kalıbı alır - test edilebilirlik/kararlılık için) ama farklı kazanımlar
-# farklı kalıp alır, bu yüzden bir raporun tamamı tek tip görünmez.
+# Her varyant aynı zorunlu parçaları taşımak ZORUNDA (tırnaklı tema adı,
+# terim(ler), "%<oran> olarak hesaplanmıştır" - `RagContextAttachmentTests`
+# bunu doğruluyor); yalnız cümlenin çevresi değişiyor. `{terms}` tek bir
+# terimde "X", ikide "X ve Y" olarak önceden birleştirilip veriliyor - ayrı
+# `{term1}`/`{term2}` yer tutucuları TEK terimli durumda boş kalırdı.
+# Seçim `_pick_template` ile GİRDİYE göre belirlenimci (aynı kazanım aynı
+# yeniden üretimde hep aynı kalıbı alır - test edilebilirlik/kararlılık
+# için) ama farklı kazanımlar farklı kalıp alır, bu yüzden bir raporun
+# tamamı tek tip görünmez.
+#
+# 2026-08-22 (4. sürüm): TAM OLARAK İKİ zorunluluğu kaldırıldı - dar
+# kapsamlı bazı kazanımlarda BAĞLAM'da gerçekten TEK güçlü/somut aday
+# bulunuyor, model ikinciyi uydurmak yerine tamamen `not_found` diyip
+# öğretmene hiçbir yorum göstermiyordu. Artık BİR terim de kabul ediliyor;
+# doğrulama kuralı (`_term_is_grounded`) ve kanıt garantisi DEĞİŞMEDİ.
 _OPENING_TEMPLATES = (
     (
-        '"{theme}" temasında {term1} ve {term2} kapsamındaki sınıf başarı oranı '
+        '"{theme}" temasında {terms} kapsamındaki sınıf başarı oranı '
         "%{percent} olarak hesaplanmıştır."
     ),
     (
-        '"{theme}" temasındaki {term1} ve {term2} bileşenlerinde sınıf başarı '
+        '"{theme}" temasındaki {terms} bileşeninde sınıf başarı '
         "oranı %{percent} olarak hesaplanmıştır."
     ),
     (
-        'Sınıfın "{theme}" temasında {term1} ve {term2} kapsamındaki başarı oranı '
+        'Sınıfın "{theme}" temasında {terms} kapsamındaki başarı oranı '
         "%{percent} olarak hesaplanmıştır."
     ),
     (
-        '"{theme}" temasında ölçülen {term1} ve {term2} performansına göre sınıf '
+        '"{theme}" temasında ölçülen {terms} performansına göre sınıf '
         "başarı oranı %{percent} olarak hesaplanmıştır."
     ),
     (
-        '"{theme}" temasına ait {term1} ve {term2} göstergelerinde sınıf başarı '
+        '"{theme}" temasına ait {terms} göstergesinde sınıf başarı '
         "oranı %{percent} olarak hesaplanmıştır."
     ),
     (
-        'Elde edilen verilere göre "{theme}" temasında {term1} ve {term2} '
+        'Elde edilen verilere göre "{theme}" temasında {terms} '
         "açısından sınıf başarı oranı %{percent} olarak hesaplanmıştır."
     ),
     (
-        '"{theme}" temasında {term1} ve {term2} unsurları temel alınarak sınıf '
+        '"{theme}" temasında {terms} temel alınarak sınıf '
         "başarı oranı %{percent} olarak hesaplanmıştır."
     ),
     (
-        'Değerlendirme sonuçlarına göre "{theme}" temasında {term1} ve {term2} '
+        'Değerlendirme sonuçlarına göre "{theme}" temasında {terms} '
         "bakımından sınıf başarı oranı %{percent} olarak hesaplanmıştır."
     ),
 )
@@ -842,6 +851,12 @@ def _compose_grounded_pedagogical_answer(
     karşılığı yoksa (Türkçe çekim eki farklılıklarına toleranslı - bkz.
     `_term_is_grounded`) hiçbir metin üretilmez.
 
+    2026-08-22 (4. sürüm): `evidence` artık TAM OLARAK İKİ değil, BİR ya da
+    İKİ öğe taşıyabilir - dar kapsamlı kazanımlarda BAĞLAM'da gerçekten TEK
+    güçlü aday bulunabiliyor, ikisini zorunlu tutmak modeli ya ikinciyi
+    uydurmaya ya da tamamen `not_found` deyip pes etmeye itiyordu (canlıda
+    gözlenen "bazı kazanımlara hiç yorum yapılamıyor" durumunun bir nedeni).
+
     Yeni şemanın model promptunda AÇIKÇA yazılı bir öneri/etkinlik yasağı
     YOK (yalnız "kod UYDURMA" ve "başarı oranını terim olarak alma"
     uyarıları var) - bu yüzden `gapRationale`/`strengthRationale` metni
@@ -861,7 +876,7 @@ def _compose_grounded_pedagogical_answer(
     if not payload or payload.get("status") != "success":
         return ""
     evidence_items = payload.get("evidence")
-    if not isinstance(evidence_items, list) or len(evidence_items) != 2:
+    if not isinstance(evidence_items, list) or not 1 <= len(evidence_items) <= 2:
         return ""
 
     rate = float(outcome.get("successRate") or 0.0)
@@ -879,7 +894,7 @@ def _compose_grounded_pedagogical_answer(
             return ""
         parsed_evidence.append((term, rationale))
     terms = [term for term, _ in parsed_evidence]
-    if terms[0].casefold() == terms[1].casefold():
+    if len(terms) == 2 and terms[0].casefold() == terms[1].casefold():
         return ""
 
     evidence_text = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
@@ -890,17 +905,18 @@ def _compose_grounded_pedagogical_answer(
     if not theme:
         return ""
     percent = round(rate * 100)
-    opening = _pick_template(_OPENING_TEMPLATES, theme, terms[0], terms[1]).format(
-        theme=theme, term1=terms[0], term2=terms[1], percent=percent
+    terms_phrase = " ve ".join(terms)
+    opening = _pick_template(_OPENING_TEMPLATES, theme, *terms).format(
+        theme=theme, terms=terms_phrase, percent=percent
     )
     rationale_text = " ".join(rationale for _, rationale in parsed_evidence)
     if is_weak:
         severity = "Kritik" if rate < 0.50 else "Orta"
-        closing = _pick_template(_WEAK_CLOSING_TEMPLATES, theme, terms[0], terms[1], severity).format(
+        closing = _pick_template(_WEAK_CLOSING_TEMPLATES, theme, *terms, severity).format(
             severity=severity
         )
         return f"{opening} {rationale_text} {closing}"
-    closing = _pick_template(_STRONG_CLOSING_TEMPLATES, theme, terms[0], terms[1])
+    closing = _pick_template(_STRONG_CLOSING_TEMPLATES, theme, *terms)
     return f"{opening} {rationale_text} {closing}"
 
 
