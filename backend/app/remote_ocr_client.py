@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -24,6 +25,11 @@ _SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
 # modül öğretmenin makinesinde çalışıyor ve PaddleOCR bağımlısı `ocr_worker`i
 # import edemez (modül docstring'i).
 WARMUP_PATH = "/mahir-warmup"
+
+
+def _post_to_worker(request: urllib.request.Request) -> dict[str, object]:
+    with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
 def run_remote_image_group_ocr(
@@ -53,8 +59,24 @@ def run_remote_image_group_ocr(
     # `ocr_engine`in bugün yaptığının aynısı.
     try:
         with stage("ocr-uzak", dosya=len(uploaded_files), bayt=len(body)):
-            with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+            try:
+                payload = _post_to_worker(request)
+            except urllib.error.HTTPError:
+                # HTTPError, URLError'ın alt sınıfı - aşağıdaki geniş yakalamaya
+                # düşmeden önce burada elden geçirilmeli. Bu, sunucudan gelen
+                # geçerli bir yanıt (401, 500 vb.) - yeniden denemek sonucu
+                # değiştirmez, doğrudan dıştaki HTTPError bloğuna düşsün.
+                raise
+            except (urllib.error.URLError, TimeoutError, OSError):
+                # Bağlantı-seviyesi kopma (ör. Windows'ta WinError 10053 -
+                # "bağlantı ana makinedeki yazılım tarafından iptal edildi").
+                # İstek karşıya hiç ulaşmamış olabilir, yani sunucu tarafında
+                # bir sorun olduğunu göstermez. Anlık ağ kesintilerini
+                # öğretmene hiç göstermeden atlatmak için tek seferlik bir
+                # yeniden deneme yeterli - ikinci deneme de patlarsa aşağıdaki
+                # except bloğu değişmeden devreye girer.
+                time.sleep(2)
+                payload = _post_to_worker(request)
     except urllib.error.HTTPError as error:
         # The worker still answers with its usual {"ok", "message", ...} JSON body even on a
         # non-2xx status - surface that message instead of the generic "HTTP Error 500" text.
