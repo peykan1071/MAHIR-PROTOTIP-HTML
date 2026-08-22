@@ -145,14 +145,31 @@ _NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
 # konuyla ilgili) aday katıyor.
 #
 # 2026-08-22 HİBRİT ARAMAYA GEÇİŞ NOTU: bu değer, saf dense kosinüs
-# skorlarına (0-1 aralığı) göre kalibre edildi. `_retrieve_hits` artık
-# Qdrant'ın RRF (Reciprocal Rank Fusion) skorunu döndürüyor - rank tabanlı,
-# tamamen farklı bir dağılım (tipik olarak çok daha küçük değerler). Bu
-# oranın RRF skalasında da anlamlı kesim yaptığı VARSAYILMAMALI; hibrit
-# indeks canlıya alındıktan sonra bu depodaki önceki turlarla (0,78->0,60->
-# 0,68->0,60->0,50) AYNI yöntemle - gerçek sorgularla skor dağılımı
-# ölçülerek - yeniden kalibre edilmeli.
-_RELATIVE_SCORE_FLOOR = 0.50
+# skorlarına (0-1 aralığı) göre kalibre edilmişti - RRF'e geçince (aşağıdaki
+# turda) YENİDEN kalibre edildi.
+#
+# 2026-08-22 0,50 -> 0,30 DÜŞÜRÜLDÜ (RRF kalibrasyonu, canlı ölçüm):
+# grade-9 TDE müfredatı yeni hibrit koleksiyona indekslendikten sonra
+# floor GEÇİCİ olarak 0'a çekilip (`_drop_weak_hits` devre dışı) gerçek
+# sorularla ham RRF skor dağılımı gözlendi. İki bulgu:
+# 1) RRF skoru rank tabanlı olduğundan bir parça dense VE sparse
+#    bacaklarının ikisinde de 1. sırada çıkınca skor sert bir tepe
+#    yapıyor (gözlemde 1,00) - sonraki en iyi adaylar (aynı ölçüde
+#    alakalı, farklı temalardaki "Dinleme/İzleme" kazanımları) 0,35-0,39
+#    bandında kalıyor. 0,50 oranı bu durumda ikincil adayların TAMAMINI
+#    eleyip getirimi tek isabete düşürüyordu (canlıda doğrulandı: "Dinleme
+#    becerisi kazanımlarında hangi kavramlar geçiyor?" sorusu, chunk
+#    dökümünde 4 farklı temada ayrı ayrı var olan ilgili kazanımdan
+#    yalnızca 1'ini döndürüyordu).
+# 2) Konu dışı bir kontrol sorusunda ("Fotosentez nasıl gerçekleşir?" -
+#    bu müfredatta hiç yok) ne 0,50 ne 0,30 havuzu anlamlı şekilde
+#    daraltıyor (ikisi de en iyi isabetin görece yakınında kümelenen bir
+#    isabet grubu döndürüyor) - konu dışı sorguları elemek zaten bu
+#    eşiğin işi değil, `agents/pipeline.py`deki BİREBİR terim/bağlam
+#    doğrulaması ve üretim-yeniden-deneme mekanizması bunu üstleniyor.
+# 0,30 seçildi çünkü üç sorunun ham dağılımında da "güçlü ilk katman"
+# ile "zayıf uzun kuyruk" arasındaki en tutarlı kırılma noktası burasıydı.
+_RELATIVE_SCORE_FLOOR = 0.30
 
 # MEB müfredat PDF'lerindeki hiyerarşi başlıkları - tdeogr.pdf üzerinde tüm
 # 5 sınıf düzeyi ve 20 sınıf×tema kombinasyonu için elle doğrulandı. Satırın
