@@ -28,9 +28,14 @@ if (Test-Path -LiteralPath $secretsFile -PathType Leaf) {
     }
 }
 
-$listenerLine = netstat -ano | Select-String "127\.0\.0\.1:8000\s+.*LISTENING"
-if ($listenerLine) {
-    $existingPid = [int]([regex]::Match($listenerLine.ToString(), "\s(\d+)\s*$").Groups[1].Value)
+$listener = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue |
+    Where-Object { $_.LocalAddress -in @("127.0.0.1", "0.0.0.0", "::1", "::") } |
+    Select-Object -First 1
+if ($listener) {
+    $existingPid = [int]$listener.OwningProcess
+    if ($existingPid -le 0) {
+        throw "8000 portunun sahibi güvenli biçimde belirlenemedi. Bilgisayarı yeniden başlatıp tekrar deneyin."
+    }
     try {
         $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/index.html" -UseBasicParsing -TimeoutSec 3
         $serverHeader = [string]$response.Headers["Server"]

@@ -18,18 +18,39 @@ def parse_mahir_docx(content: bytes) -> dict[str, object]:
     exam_table = _find_exam_table(tables)
     question_table = _find_table(tables, {"soru no", "azami puan"})
     student_table = _find_student_table(tables)
+    single_student_table = _find_single_student_score_table(tables)
 
     exam = _parse_exam(exam_table or [])
     questions = _parse_questions(question_table or [])
-    students = _parse_students_flexible(student_table or [])
+    document_type = "unclassified-docx"
+    if student_table:
+        document_type = "mahir-class-score-template"
+        if not questions:
+            questions = _questions_from_student_headings(student_table)
+        students = _parse_students_flexible(student_table)
+    elif single_student_table:
+        document_type = "single-student-score-sheet"
+        if not questions:
+            questions = _parse_single_student_questions(single_student_table)
+        students = _parse_single_student_scores(exam_table or [], single_student_table)
+    else:
+        students = []
     warnings = _build_warnings(exam, questions, students)
 
+    identity_cells = []
     if student_table:
-        headings = {_normalise_label(cell) for cell in student_table[0]}
+        identity_cells.extend(student_table[0])
+    if exam_table:
+        identity_cells.extend(cell for row in exam_table for cell in row)
+    if identity_cells:
+        headings = {_normalise_label(cell) for cell in identity_cells}
         identity_columns = []
         if headings & {"tc kimlik no", "t c kimlik no", "tc kimlik numarasi", "t c kimlik numarasi", "tckn"}:
             identity_columns.append("T.C. kimlik numarası")
-        if headings & {"ad soyad", "adi soyadi", "ogrenci ad soyad", "ogrenci adi soyadi"}:
+        if headings & {
+            "ad soyad", "adi soyadi", "ogrenci ad soyad", "ogrenci adi soyadi",
+            "ogrencinin adi soyadi",
+        }:
             identity_columns.append("ad-soyad")
         if identity_columns:
             warnings.append(
@@ -37,13 +58,14 @@ def parse_mahir_docx(content: bytes) -> dict[str, object]:
                 "ve öğrenci analiz verisinden çıkarıldı."
             )
 
-    if not student_table:
+    if not student_table and not single_student_table:
         warnings.append(
             "Word belgesindeki öğrenci ve puan alanları otomatik olarak ayırt edilemedi. "
             "Bilgileri öğretmen kontrol ekranında tamamlayınız."
         )
 
     return {
+        "documentType": document_type,
         "exam": exam,
         "questions": questions,
         "students": students,
@@ -69,9 +91,13 @@ def _find_table(
 
 
 def _find_exam_table(tables: list[list[list[str]]]) -> list[list[str]] | None:
+    metadata_labels = {
+        "il", "ilce", "okul adi", "ders", "dersin adi", "sinif sube",
+        "sinav turu", "sinav tarihi", "ogrenci okul no", "ogrencinin adi soyadi",
+    }
     for table in tables:
         labels = {_normalise_label(cell) for row in table for cell in row}
-        if len(labels & {"il", "ilce", "okul adi", "ders", "sinif sube"}) >= 2:
+        if len(labels & metadata_labels) >= 2:
             return table
     return None
 
@@ -84,6 +110,20 @@ def _find_student_table(tables: list[list[list[str]]]) -> list[list[str]] | None
         has_number = any(label in {"okul no", "ogrenci no", "numara", "no"} for label in labels)
         has_score = any(re.match(r"^(?:s|soru) ?\d+\b", label) for label in labels)
         if has_number and has_score:
+            return table
+    return None
+
+
+def _find_single_student_score_table(
+    tables: list[list[list[str]]],
+) -> list[list[str]] | None:
+    """Find the Ministry-style three-row score matrix for one student."""
+
+    for table in tables:
+        if len(table) < 3:
+            continue
+        row_labels = {_normalise_label(row[0]) for row in table if row}
+        if {"sorular", "azami puan", "ogrencinin aldigi puan"}.issubset(row_labels):
             return table
     return None
 
@@ -116,17 +156,14 @@ def _read_tables(content: bytes) -> list[list[list[str]]]:
 
 
 def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
-    values: dict[str, str] = {}
-    for row in rows:
-        for index in range(0, len(row) - 1, 2):
-            values[_normalise_label(row[index])] = row[index + 1].strip()
+    values = _labeled_values(rows)
 
     exam = {
         "province": values.get("il", ""),
         "district": values.get("ilce", ""),
         "schoolName": values.get("okul adi", ""),
         "academicYear": values.get("egitim ogretim yili", ""),
-        "course": values.get("ders", ""),
+        "course": values.get("ders", "") or values.get("dersin adi", ""),
         "classSection": values.get("sinif sube", ""),
         "term": _selected_option(values.get("donem", "")),
         "examType": _selected_option(values.get("sinav turu", "")),
@@ -155,6 +192,18 @@ def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
     return exam
 
 
+def _labeled_values(rows: list[list[str]]) -> dict[str, str]:
+    """Return adjacent label/value pairs from a metadata table."""
+
+    values: dict[str, str] = {}
+    for row in rows:
+        for index in range(0, len(row) - 1, 2):
+            label = _normalise_label(row[index])
+            if label:
+                values[label] = row[index + 1].strip()
+    return values
+
+
 def _parse_questions(rows: list[list[str]]) -> list[dict[str, object]]:
     questions = []
     for row in rows[1:]:
@@ -174,6 +223,97 @@ def _parse_questions(rows: list[list[str]]) -> list[dict[str, object]]:
             }
         )
     return questions
+
+
+def _questions_from_student_headings(rows: list[list[str]]) -> list[dict[str, object]]:
+    """Create a question skeleton from Soru 1..N columns without inventing outcomes."""
+
+    if not rows:
+        return []
+    questions = []
+    for cell in rows[0]:
+        label = _normalise_label(cell)
+        match = re.match(r"^(?:s|soru) ?(\d+)\b", label)
+        if not match:
+            continue
+        questions.append(
+            {
+                "number": int(match.group(1)),
+                "outcomeCode": "",
+                "outcomeDescription": "",
+                "maxScore": None,
+                "source": "score-column-heading",
+            }
+        )
+    return questions
+
+
+def _parse_single_student_questions(rows: list[list[str]]) -> list[dict[str, object]]:
+    """Read question numbers and maximum scores from a three-row score matrix."""
+
+    if not rows:
+        return []
+    question_row = next(
+        (row for row in rows if row and _normalise_label(row[0]) == "sorular"), []
+    )
+    max_row = next(
+        (row for row in rows if row and _normalise_label(row[0]) == "azami puan"), []
+    )
+    questions = []
+    for index, cell in enumerate(question_row[1:], start=1):
+        label = _normalise_label(cell)
+        match = re.match(r"^(?:s|soru) ?(\d+)\b", label)
+        if not match:
+            continue
+        max_score = _number(max_row[index]) if index < len(max_row) else None
+        questions.append(
+            {
+                "number": int(match.group(1)),
+                "outcomeCode": "",
+                "outcomeDescription": "",
+                "maxScore": max_score,
+                "source": "single-student-score-sheet",
+            }
+        )
+    return questions
+
+
+def _parse_single_student_scores(
+    exam_rows: list[list[str]], score_rows: list[list[str]]
+) -> list[dict[str, object]]:
+    """Read one student without carrying name/surname into the analysis model."""
+
+    values = _labeled_values(exam_rows)
+    student_no = values.get("ogrenci okul no", "") or values.get("okul no", "")
+    score_row = next(
+        (
+            row
+            for row in score_rows
+            if row and _normalise_label(row[0]) == "ogrencinin aldigi puan"
+        ),
+        [],
+    )
+    if not score_row:
+        return []
+    question_count = len(_parse_single_student_questions(score_rows))
+    scores = [_number(value) for value in score_row[1 : 1 + question_count]]
+    total_score = (
+        _number(score_row[1 + question_count])
+        if len(score_row) > 1 + question_count
+        else None
+    )
+    if not (student_no or any(score is not None for score in scores) or total_score is not None):
+        return []
+    return [
+        {
+            "rowNumber": 1,
+            "studentNo": student_no.strip(),
+            "scores": scores,
+            "totalScore": total_score,
+            "calculatedTotal": round(sum(score or 0 for score in scores), 2),
+            "control": "",
+        }
+    ]
 
 
 def _parse_students(
@@ -261,11 +401,27 @@ def _build_warnings(
     if not students:
         warnings.append("Doldurulmuş öğrenci satırı bulunamadı.")
 
-    for question in questions:
-        if not question["outcomeCode"] and not question["outcomeDescription"]:
-            warnings.append(f"{question['number']}. sorunun öğrenme çıktısı boş.")
-        if question["maxScore"] is None:
-            warnings.append(f"{question['number']}. sorunun azami puanı boş.")
+    inferred_questions = [question for question in questions if question.get("source")]
+    if inferred_questions:
+        if any(
+            not question["outcomeCode"] and not question["outcomeDescription"]
+            for question in inferred_questions
+        ):
+            warnings.append(
+                "Öğrenme çıktıları puan çizelgesinde yer almıyor; sınav senaryosu veya "
+                "öğretmenin onaylı eşleştirmesi kullanılmalıdır."
+            )
+        if any(question["maxScore"] is None for question in inferred_questions):
+            warnings.append(
+                "Soru azami puanları bu çizelgede yer almıyor; öğretmen kontrol ekranında "
+                "onaylanmalıdır."
+            )
+    else:
+        for question in questions:
+            if not question["outcomeCode"] and not question["outcomeDescription"]:
+                warnings.append(f"{question['number']}. sorunun öğrenme çıktısı boş.")
+            if question["maxScore"] is None:
+                warnings.append(f"{question['number']}. sorunun azami puanı boş.")
 
     for student in students:
         if (

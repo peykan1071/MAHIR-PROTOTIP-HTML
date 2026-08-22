@@ -14,7 +14,7 @@ MAHİR, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması - 1. Se
 
 GitHub, `main` dalına gönderilen her değişiklikte ve her çekme isteğinde Python ve JavaScript testlerini yeniden çalıştırır. README'nin üstündeki rozet son çalıştırmanın güncel durumunu gösterir; rozete tıklayan okuyucu çalıştırma tarihini, test günlüklerini ve test sayılarını doğrudan GitHub üzerinden inceleyebilir.
 
-Son yerel doğrulamada **226 Python testi**, **10 JavaScript testi** ve ana tarayıcı betiğinin sözdizimi kontrolü başarıyla tamamlanmıştır. Bu sonuç, otomatik olarak tanımlanan yazılım davranışlarının doğrulandığını gösterir; gerçek kullanıcı etki araştırması veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
+Son yerel doğrulamada **230 Python testi**, **10 JavaScript testi** ve ana tarayıcı betiğinin sözdizimi kontrolü başarıyla tamamlanmıştır. Bu sonuç, otomatik olarak tanımlanan yazılım davranışlarının doğrulandığını gösterir; gerçek kullanıcı etki araştırması veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
 
 Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in işlediği gelen evrak; sınav puan çizelgesi, sınav veri giriş belgesi veya onaylanmış sınav analiz raporudur. Prototip, genel amaçlı bütün kamu evraklarını değil, bu tanımlı eğitim evrakı akışını uçtan uca ele alır.
 
@@ -23,6 +23,27 @@ Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in i�
 Öğretmenler yalnızca sınav puanı vermekle kalmaz; sınav verilerini kontrol eder, soru ve öğrenme çıktısı düzeyinde yorumlar, sınıfın güçlü ve gelişime açık yönlerini belirler, raporlar ve gerektiğinde kurum içi yazışmaya dönüştürür. Bu işlemlerin farklı belgeler ve araçlar üzerinde elle yürütülmesi zaman kaybına, tekrar eden veri girişine ve izlenebilirlik sorunlarına yol açabilir.
 
 MAHİR; belge okuma, veri doğrulama, kurallı hesaplama, program eşleştirme, kaynaklı pedagojik değerlendirme ve resmî raporlama adımlarını öğretmen kontrolündeki tek bir akışta birleştirmek üzere geliştirilmiştir. Amaç yeni bir karar mercii oluşturmak değil, öğretmenin mevcut işini daha düzenli, izlenebilir ve yeniden kullanılabilir hâle getirmektir.
+
+### MAHİR olmadan ve MAHİR ile iş akışı karşılaştırması
+
+Aşağıdaki tablo, aynı sınav analizi ve raporlama görevinin araç ve süreç düzeyindeki karşılaştırmasıdır. **Ölçülmüş bir kullanıcı etki araştırması değildir.** “MAHİR olmadan” sütunu, işlemlerin öğretmen tarafından belge, hesap tablosu ve metin düzenleyici gibi ayrı araçlarla yürütüldüğü referans iş akışını ifade eder.
+
+| Boyut | MAHİR olmadan referans iş akışı | MAHİR ile mevcut prototip | Kanıt ve sınır |
+|---|---|---|---|
+| Veri hazırlama | Sınav verileri kullanılan araca uygun biçimde öğretmen tarafından düzenlenir ve farklı belgelere aktarılabilir. | DOCX, PDF, XLSX, CSV, görsel veya elle giriş yolları ortak doğrulama ekranında birleştirilir. | Her iki yöntemde de kaynak verinin doğruluğu öğretmenin sorumluluğundadır; düşük kaliteli OCR sonucu ayrıca kontrol edilmelidir. |
+| Veri kontrolü | Eksik, hatalı veya tutarsız değerler öğretmenin kendi kontrol yöntemiyle bulunur. | Zorunlu alan, puan sınırı, toplam puan, soru sayısı ve bağlam kontrolleri analizden önce çalışır. | Otomatik kontrol, doğru girilmiş fakat pedagojik olarak yanlış olan bir veriyi her durumda tespit edemez. |
+| Sayısal hesaplama | Ortalama, başarı oranı ve dağılımlar kullanılan tablo veya formüllerle ayrı ayrı hesaplanır. | Sayısal sonuçlar öğretmen onaylı puanlardan kurallı uygulama koduyla hesaplanır. | Hesaplar LLM'e yaptırılmaz; yanlış kaynak veri yanlış sonuca yol açabilir. |
+| Öğrenme çıktısı ilişkisi | Soru ve öğrenme çıktısı ilişkisi ayrı belge veya tablolarda kurulabilir. | Öğretmenin seçtiği ilişki kayıtlı TDE 9 program kataloğuyla doğrulanır ve analiz boyunca korunur. | Sistem öğrenme çıktısını kendiliğinden kesin olarak belirlemez; seçme ve doğrulama öğretmene aittir. |
+| İzlenebilirlik | Sayısal bulgu, kaynak soru ve rapor metni arasındaki bağlantı kullanılan belgelere göre dağınık kalabilir. | Soru, puan, öğrenme çıktısı, analiz bulgusu ve rapor arasında ortak veri ve işlem izi tutulur. | İzlenebilirlik prototip oturumu kapsamındadır; kurumsal ve kalıcı denetim altyapısı henüz tamamlanmamıştır. |
+| Rapor hazırlama | Hesaplanan sonuçlar öğretmen tarafından rapor şablonuna aktarılır ve metin düzenlenir. | Doğrulanmış bulgular, düzenlenebilir Word ve PDF analiz raporuna dönüştürülür. | Üretilen rapor taslaktır; öğretmen incelemesi ve onayı olmadan nihai kabul edilmez. |
+| Üst yazı | Rapor bilgileri ayrı bir resmî yazı şablonuna aktarılır. | Onaylı rapordan üst yazı ve ek listesi taslağı hazırlanır. | Gerçek EBYS aktarımı, evrak numarası, paraf ve elektronik imza üretilmez. |
+| İşlem bütünlüğü | Veri, hesap, yorum, rapor ve yazışma birden fazla araç ve dosyada yürütülebilir. | Adımlar tek öğretmen akışı ve ortak veri sözleşmesi içinde birbirine bağlanır. | Prototip, genel amaçlı tüm kamu evraklarını veya bütün dersleri kapsamaz. |
+| Zaman | Proje ekibinin aynı kapsamdaki görev gözleminde, 35 öğrencilik sınav verisinin elle analiz edilerek rapor ve üst yazıya dönüştürülmesi en az 2 saat sürmüştür. | Tek cihazdaki proje gözleminde aynı kapsamdaki sentetik verinin rapor ve üst yazıya dönüştürülmesi yaklaşık 2,5 dakika sürmüştür. | Bu sonuç, proje ekibinin tek görev gözlemine dayanır; hedef kullanıcılarla yapılmış tekrarlı ve kontrollü bir deney değildir. Veri hazırlama ve öğretmenin nihai içerik incelemesi karşılaştırma kapsamı dışında tutulmuştur. |
+| Çıktı kalitesi | Kalite; öğretmenin kullandığı şablona, formüllere, kontrol adımlarına ve ayırdığı zamana bağlıdır. | Standart veri kontrolleri, program kataloğu, kaynak sınırları ve ortak rapor yapısı daha tutarlı çıktı üretmeyi hedefler. | Gerçek kullanıcı belgeleri uzmanlarca puanlanmadığı için kalite artışı henüz kanıtlanmış değildir. |
+| Hata riski | Tekrar eden veri aktarımı ve elle kurulan formüller hata olasılığı oluşturabilir. | Tekrarlı hesap ve aktarım adımları azaltılır; tanımlı doğrulama kontrolleri uygulanır. | Hata oranında azalma henüz karşılaştırmalı kullanıcı çalışmasıyla ölçülmemiştir. |
+| İnsan kontrolü | Analiz, yorum ve resmî belge sorumluluğu öğretmendedir. | Analiz, yorum ve resmî belge sorumluluğu yine öğretmendedir; MAHİR karar destek ve taslak üretim aracı olarak kalır. | MAHİR öğretmenin pedagojik veya idarî kararının yerine geçmez. |
+
+Bu karşılaştırma, MAHİR'in **hangi adımları birleştirdiğini ve hangi kontrolleri sağladığını** gösterir. Tek görev gözlemindeki süre farkının hedef kullanıcı koşullarında doğrulanması; hata oranı ve çıktı kalitesinin ölçülmesi için aynı anonim sınav verisinin MAHİR olmadan ve MAHİR ile işlendiği karşılaştırmalı pilot çalışma yapılacaktır.
 
 ### Öğretmen olmayan okuyucu için temel kavramlar
 
@@ -149,30 +170,26 @@ Gelecekteki rehberlik desteği; bireyi tanıma, görüşme/izleme, yönlendirme,
 - mahrem verileri genel amaçlı LLM/RAG katmanına göndermez,
 - yalnız yetkili rol, açık amaç, veri minimizasyonu ve insan onayı bulunan süreçlerde kullanılabilir.
 
-## Kullanıcı araştırmaları ve bilimsel kanıt planı
+## İhtiyacın resmî dayanağı ve kullanıcı doğrulama planı
 
-### Beş öğretmenle deneyimleme çalışması
+Millî Eğitim Bakanlığı **Yazılı ve Uygulamalı Sınavlar Yönergesi**, sınav sonuçlarının ilgili ders öğretmeni tarafından sisteme girilmesini; sınavların şube ve sınıf bazında analiz edilmesini ve belirlenen konu veya kazanım eksiklikleri için iyileştirici önlemler alınmasını öngörür. Bu yükümlülük, MAHİR'in desteklediği sınav analizi ve sonuçların raporlanması iş akışının kurumsal dayanağını oluşturur.
 
-Beş farklı okulda görev yapan Türk Dili ve Edebiyatı öğretmenlerinden, daha önce hazırlamaları istenen geçmiş sınav verilerini kullanarak MAHİR'i proje ekibinin bilgisayarında deneyimlemeleri istenmiştir. Oturumda uygulama tarayıcıda hazır açılır; araştırmacılar öğretmene “şunu seçin, buraya tıklayın” biçiminde yönlendirme yapmaz. Amaç, MAHİR'in kendi arayüz yönlendirmesinin yeterliliğini ve öğretmenin gerçek kullanım deneyimini gözlemlemektir.
+MAHİR; öğretmenin yürüttüğü bu süreci veri doğrulama, kurallı hesaplama, öğrenme çıktısı düzeyinde inceleme, rapor oluşturma ve kurum içi yazışma taslağı hazırlama adımlarıyla desteklemek amacıyla geliştirilmiştir. Projenin ihtiyaç gerekçesi, bu aşamada mevzuat ve resmî kaynak incelemesine dayanmaktadır; henüz tamamlanmış bir saha ihtiyaç araştırması veya gerçek kullanıcı etki çalışması bulunduğu iddia edilmemektedir.
 
-Planlanan kayıtlar:
+MEB tarafından öğretmen görüşlerine dayalı izleme-değerlendirme çalışmaları ve ölçme-değerlendirme süreçlerine yönelik ihtiyaç belirleme çalıştayları yürütülmektedir. Bu çalışmalar alanın geliştirilmesine yönelik kurumsal ilgiyi gösterir; ancak MAHİR'in otomatik analiz, raporlama ve üst yazı oluşturma işlevlerine duyulan ihtiyacı tek başına doğrulamaz.
 
-- görevin yapıldığı okul türü ile il/ilçe bilgisi,
-- başlangıç ve bitiş zamanı,
-- tamamlanma veya bırakma durumu,
-- hata, tereddüt ve yardım isteme anları,
-- üretilen raporun öğretmen tarafından kontrolü,
-- kullanım sonrasındaki yapılandırılmış öğretmen değerlendirmesi.
+Sonraki geliştirme aşamasında hedef kullanıcılarla iki ayrı çalışma planlanmaktadır:
 
-Gözlem kaydı, kullanıcı değerlendirme formundan ayrı tutulur ve mümkün olduğunda iki bağımsız gözlemci tarafından doldurulur. Böylece öğretmenin öznel deneyimi ile gözlenen kullanım davranışı birbirine karıştırılmaz.
+1. **İhtiyaç analizi:** Türk Dili ve Edebiyatı öğretmenlerinin mevcut sınav değerlendirme yöntemleri, süreçte harcadıkları zaman, karşılaştıkları güçlükler ve otomatik raporlamadan beklentileri incelenecektir.
+2. **Pilot kullanıcı testi:** Öğretmenlerin MAHİR'i müdahalesiz biçimde kullanması gözlemlenecek; görev tamamlama durumu, işlem süreleri, yardım ihtiyacı, teknik sorunlar ve kullanım sonrası değerlendirmeleri kaydedilecektir.
 
-### Genel öğretmen ve yönetici ihtiyaç araştırması
+Çalışmalar tamamlandığında örneklem özellikleri, soru ve görev metinleri, analiz yöntemi ve bulgular açık biçimde raporlanacaktır. Temsilî örneklem ve yeterli ölçüm bulunmadan zaman tasarrufu, memnuniyet, başarı artışı veya ülke geneline genellenebilir etki iddiasında bulunulmayacaktır.
 
-İkinci araştırma yalnız sınav analiz raporuna değil; MAHİR'in uzun vadeli öğretmen, yönetici, EBYS, kurul/zümre, akademik izleme ve diğer raporlama vizyonuna yönelik ihtiyaç algısını incelemeyi amaçlar. Türkiye'nin farklı illerinde ve çeşitli branşlarda görev yapan 150'yi aşkın öğretmen ve yöneticiden alınan ilk geri bildirimler olumludur; ancak form henüz tamamlanmadığı ve örneklem temsilî olmadığı için bu sayı Türkiye geneline yönelik ihtiyaç oranı olarak sunulmaz.
+Kaynaklar:
 
-Araştırmalar tamamlandığında örneklem özellikleri, soru metinleri, yanıt dağılımları ve analiz yöntemi README'de ayrıca yayımlanacaktır.
-
-> **Bilimsel dürüstlük:** Olumlu geri bildirim, ölçülmüş eğitimsel etki değildir. Temsilî örneklem, karşılaştırma grubu ve tekrarlı ölçüm bulunmadığı sürece zaman tasarrufu, başarı artışı, ülke geneli memnuniyet veya genellenebilir etki iddiası kurulmaz.
+- [MEB Yazılı ve Uygulamalı Sınavlar Yönergesi](https://odsgm.meb.gov.tr/meb_iys_dosyalar/2024_02/07101329_odsgm_mevzuat_kitapcigi.pdf)
+- [Öğretmen görüşlerine dayalı Türkiye Yüzyılı Maarif Modeli izleme ve değerlendirme çalışmaları](https://ttkb.meb.gov.tr/www/ogretmen-goruslerine-dayali-olarak-hazirlanan-turkiye-yuzyili-maarif-modeli-izleme-ve-degerlendirme-raporlari-tamamlandi/icerik/907/tr)
+- [Sınıf içi ölçme ve değerlendirme süreçlerine yönelik ihtiyaç belirleme çalıştayı](https://odsgm.meb.gov.tr/www/ortaokullarda-sinif-ici-olcme-ve-degerlendirme-sureclerine-yonelik-ihtiyac-belirleme-calistayi-gerceklestirildi/icerik/1579/tr)
 
 ## Yarışma görevlerinin tamamlanma durumu
 
