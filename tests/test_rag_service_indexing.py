@@ -223,5 +223,71 @@ class MmrSelectTests(unittest.TestCase):
         self.assertEqual(len(selected), 3)
 
 
+class _FakeQdrant:
+    """`_retrieve_hits`in tek çağırdığı yüzeyi taklit eder - gerçek Qdrant
+    kurmadan `query_points`e giden argümanları ve dönen `.points`i kontrol
+    etmek için."""
+
+    def __init__(self, points):
+        self._points = points
+        self.calls: list[dict] = []
+
+    def query_points(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(points=self._points)
+
+
+class RetrieveHitsTests(unittest.TestCase):
+    """`_retrieve_hits` - `_retrieve_for`/`_run_batch_query`nin ortak tek-öğe
+    getirim adımı (2026-08-22, Faz 0: davranış değişikliği olmayan taşıma).
+    """
+
+    def test_calls_query_points_with_wide_candidate_pool_and_vectors(self):
+        qdrant = _FakeQdrant(_mmr_hits((0.9, [1.0, 0.0])))
+        rag_service._retrieve_hits(qdrant, [1.0, 0.0], 5, None)
+
+        self.assertEqual(len(qdrant.calls), 1)
+        call = qdrant.calls[0]
+        self.assertEqual(call["collection_name"], rag_service.QDRANT_COLLECTION_NAME)
+        self.assertEqual(call["query"], [1.0, 0.0])
+        self.assertIsNone(call["query_filter"])
+        # MMR'nin çeşitlilik arasından seçebilmesi için istenen top_k'den
+        # daha geniş bir ham havuz istenmeli.
+        self.assertEqual(
+            call["limit"],
+            max(5 * rag_service._MMR_CANDIDATE_MULTIPLIER, rag_service._MMR_MIN_CANDIDATE_POOL),
+        )
+        self.assertTrue(call["with_payload"])
+        self.assertTrue(call["with_vectors"])
+
+    def test_filter_is_passed_through_unchanged(self):
+        qdrant = _FakeQdrant([])
+        sentinel_filter = object()
+        rag_service._retrieve_hits(qdrant, [1.0, 0.0], 5, sentinel_filter)
+        self.assertIs(qdrant.calls[0]["query_filter"], sentinel_filter)
+
+    def test_no_hits_returns_empty_list_without_touching_mmr(self):
+        qdrant = _FakeQdrant([])
+        self.assertEqual(rag_service._retrieve_hits(qdrant, [1.0, 0.0], 5, None), [])
+
+    def test_applies_drop_weak_hits_then_mmr_select(self):
+        # top + near_duplicate + diverse (bkz. MmrSelectTests) - MMR
+        # near_duplicate yerine diverse'i seçmeli; ayrıca zayıf kuyruğun
+        # (top skorun göreli eşiğinin altındaki bir isabet) elenmesi
+        # gerekir - ikisi de bu tek çağrıda gerçekleşmiş olmalı.
+        top = SimpleNamespace(score=0.95, vector=[1.0, 0.0])
+        near_duplicate = SimpleNamespace(score=0.90, vector=[0.99, 0.02])
+        diverse = SimpleNamespace(score=0.70, vector=[0.0, 1.0])
+        weak = SimpleNamespace(score=0.10, vector=[0.5, 0.5])
+        qdrant = _FakeQdrant([top, near_duplicate, diverse, weak])
+
+        selected = rag_service._retrieve_hits(qdrant, [1.0, 0.0], 2, None)
+
+        self.assertNotIn(weak, selected)
+        self.assertIn(top, selected)
+        self.assertIn(diverse, selected)
+        self.assertNotIn(near_duplicate, selected)
+
+
 if __name__ == "__main__":
     unittest.main()

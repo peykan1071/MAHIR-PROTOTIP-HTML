@@ -524,6 +524,28 @@ def _mmr_select(hits: list, k: int, lambda_param: float = _MMR_LAMBDA) -> list:
     return selected
 
 
+def _retrieve_hits(qdrant, query_vector, top_k: int, query_filter) -> list:
+    """`_retrieve_for` ve `_run_batch_query`nin ortak tek-öğe getirim adımı.
+
+    İkisi de bugüne kadar bu bloğu (geniş aday havuzu çek -> zayıfları at ->
+    MMR ile çeşitlendir) ayrı ayrı taşıyordu - saf bir taşıma, davranış
+    değişikliği yok. Hibrit (dense+sparse) arama eklendiğinde tek değişecek
+    yer burası olacak, iki çağıran yerine.
+    """
+
+    hits = qdrant.query_points(
+        collection_name=QDRANT_COLLECTION_NAME,
+        query=query_vector,
+        query_filter=query_filter,
+        limit=max(top_k * _MMR_CANDIDATE_MULTIPLIER, _MMR_MIN_CANDIDATE_POOL),
+        with_payload=True,
+        with_vectors=True,
+    ).points
+    if not hits:
+        return []
+    return _mmr_select(_drop_weak_hits(hits), top_k)
+
+
 @app.function(image=indexing_image, volumes=VOLUMES, timeout=60)
 def clear_index(program_id: str | None = None) -> tuple[bool, str]:
     """Belge dizinini temizler - `program_id` verilirse yalnızca o programa ait
@@ -1238,24 +1260,17 @@ class RAGInference:
 
             requested_top_k = int(_number_or(spec.get("topK"), DEFAULT_TOP_K))
             try:
-                # MMR'nin çeşitlilik arasından seçim yapabilmesi için istenen
-                # `topK`den daha geniş bir ham havuz çekiliyor (bkz.
-                # `_mmr_select`); `with_vectors=True` MMR'nin aday-seçili
-                # benzerliğini hesaplayabilmesi için gerekli.
-                hits = self._qdrant.query_points(
-                    collection_name=QDRANT_COLLECTION_NAME,
-                    query=query_vectors[position].tolist(),
-                    query_filter=Filter(must=conditions) if conditions else None,
-                    limit=max(requested_top_k * _MMR_CANDIDATE_MULTIPLIER, _MMR_MIN_CANDIDATE_POOL),
-                    with_payload=True,
-                    with_vectors=True,
-                ).points
+                hits = _retrieve_hits(
+                    self._qdrant,
+                    query_vectors[position].tolist(),
+                    requested_top_k,
+                    Filter(must=conditions) if conditions else None,
+                )
             except Exception as error:  # noqa: BLE001 - yerel Qdrant okuması.
                 return False, f"Belge dizininden okunamadı: {error}", {}, {}
 
             if not hits:
                 continue
-            hits = _mmr_select(_drop_weak_hits(hits), requested_top_k)
             contexts[index] = "\n\n---\n\n".join(
                 str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
                 for hit in hits
@@ -1368,15 +1383,7 @@ class RAGInference:
             query_filter = Filter(must=filter_conditions) if filter_conditions else None
 
             try:
-                # bkz. _retrieve_for'daki aynı desen - MMR için geniş havuz + vektörler.
-                hits = self._qdrant.query_points(
-                    collection_name=QDRANT_COLLECTION_NAME,
-                    query=query_vectors[index].tolist(),
-                    query_filter=query_filter,
-                    limit=max(top_k * _MMR_CANDIDATE_MULTIPLIER, _MMR_MIN_CANDIDATE_POOL),
-                    with_payload=True,
-                    with_vectors=True,
-                ).points
+                hits = _retrieve_hits(self._qdrant, query_vectors[index].tolist(), top_k, query_filter)
             except Exception as error:  # noqa: BLE001 - yerel Qdrant okuması; bozuk/erişilemeyen
                 # bir depo tüm servisi çökertmemeli.
                 return False, f"Belge dizininden okunamadı: {error}", None
@@ -1385,11 +1392,8 @@ class RAGInference:
                 results[index] = _no_answer()
                 continue
 
-            # Zayıf kuyruğu at, sonra MMR ile çeşitlendir - bkz. `_drop_weak_hits`
-            # / `_mmr_select`. `sources` da bu son listeden üretilir: rapordaki
-            # kaynak listesi modelin gerçekten gördüğü bağlamla aynı kalmalı.
-            hits = _mmr_select(_drop_weak_hits(hits), top_k)
-
+            # `sources` da bu son listeden üretilir: rapordaki kaynak listesi
+            # modelin gerçekten gördüğü bağlamla aynı kalmalı.
             context_blocks = [
                 str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
                 for hit in hits
