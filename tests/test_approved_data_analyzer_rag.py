@@ -1,5 +1,6 @@
 """Tests for RAG-sourced conceptual context attached to weak outcomes."""
 
+import json
 import unittest
 from unittest.mock import patch
 
@@ -17,6 +18,15 @@ from backend.app.agents.pipeline import (
 )
 
 _FAKE_REMOTE_URL = "https://fake.example/web_query"
+
+
+def _evidence_json(terms, rationales, key="gapRationale"):
+    """2026-08-22 (2. sürüm) yapılandırılmış kanıt şemasını üretir - testler
+    her seferinde tam JSON'u elle yazmasın diye. `key`, zayıf çıktılar için
+    `"gapRationale"`, güçlü çıktılar için `"strengthRationale"`."""
+
+    evidence = [{"exactTerm": term, key: rationale} for term, rationale in zip(terms, rationales)]
+    return json.dumps({"status": "success", "evidence": evidence})
 
 
 def _llm_reply(*answers):
@@ -100,23 +110,44 @@ class RagContextAttachmentTests(unittest.TestCase):
             "outcomeTheme": "2. Tema: Anlam Arayışı",
             "successRate": 0.20,
         }
-        answer = '{"evidenceTerms":["ana duygu","ana düşünce"]}'
+        answer = _evidence_json(
+            ["ana duygu", "ana düşünce"],
+            ["Ana duygu net kurulamıyor.", "Ana düşünce belirlenemiyor."],
+        )
         sources = [{"excerpt": "Metinde konu, ana duygu ve ana düşünce bir bütünün parçalarıdır."}]
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
         self.assertIn('"Anlam Arayışı"', result)
         self.assertIn("%20 olarak hesaplanmıştır", result)
         self.assertIn("Eksikliğin şiddeti: Kritik.", result)
+        self.assertIn("Ana duygu net kurulamıyor.", result)
         self.assertNotIn("etkinlik", result)
 
     def test_unverified_evidence_term_is_rejected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
         sources = [{"excerpt": "Metinde ana duygu ve ana düşünce belirlenir."}]
-        self.assertEqual(
-            _compose_grounded_pedagogical_answer(
-                '{"evidenceTerms":["ana duygu","edebiyat atölyesi"]}', outcome, sources
-            ),
-            "",
+        answer = _evidence_json(
+            ["ana duygu", "edebiyat atölyesi"], ["Ana duygu eksik.", "Edebiyat atölyesi eksik."]
         )
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources), "")
+
+    def test_status_not_found_is_rejected(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        answer = json.dumps({"status": "not_found"})
+        self.assertEqual(
+            _compose_grounded_pedagogical_answer(answer, outcome, [{"excerpt": "ana duygu"}]), ""
+        )
+
+    def test_recommendation_language_in_rationale_is_stripped_and_then_rejected(self):
+        # gapRationale tamamen öneri cümlesiyse strip_recommendation_sentences
+        # onu boşaltır - boş gerekçe TÜM yanıtı reddettirir (bkz.
+        # _compose_grounded_pedagogical_answer docstring'i).
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu ve ana düşünce belirlenir."}]
+        answer = _evidence_json(
+            ["ana duygu", "ana düşünce"],
+            ["Bu eksiklik giderilmelidir ve telafi programı önerilir.", "Ana düşünce eksik."],
+        )
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources), "")
 
     def test_non_json_model_paragraph_is_rejected_when_structured_evidence_is_expected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
@@ -131,8 +162,11 @@ class RagContextAttachmentTests(unittest.TestCase):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.40}
         sources = [{"excerpt": "Okuma stratejisi ile metinleri inceleme birlikte ele alınır."}]
         answer = (
-            '{"evidenceTerms":["Okuma stratejisi","metinleri inceleme"]}\n\n'
-            "Bu bölüm modelin kaynak dışına çıkabilen serbest açıklamasıdır."
+            _evidence_json(
+                ["Okuma stratejisi", "metinleri inceleme"],
+                ["Okuma stratejisi tutarsız uygulanıyor.", "Metinleri inceleme yüzeysel kalıyor."],
+            )
+            + "\n\nBu bölüm modelin kaynak dışına çıkabilen serbest açıklamasıdır."
         )
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
         self.assertIn("Okuma stratejisi ve metinleri inceleme", result)
@@ -714,9 +748,10 @@ class RagContextSeverityTests(unittest.TestCase):
     def _answer_for(self, success_rate):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": success_rate}
         sources = [{"excerpt": "ana duygu ve ana düşünce"}]
-        return _compose_grounded_pedagogical_answer(
-            '{"evidenceTerms":["ana duygu","ana düşünce"]}', outcome, sources
+        answer = _evidence_json(
+            ["ana duygu", "ana düşünce"], ["Ana duygu eksik.", "Ana düşünce eksik."]
         )
+        return _compose_grounded_pedagogical_answer(answer, outcome, sources)
 
     def test_below_fifty_percent_is_critical(self):
         self.assertIn("Eksikliğin şiddeti: Kritik.", self._answer_for(0.35))

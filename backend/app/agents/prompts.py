@@ -85,89 +85,70 @@ def build_anomaly_prompt(question_results: list[dict[str, Any]]) -> dict[str, An
 # İkisi AYRIŞMAMALI: `tests/test_agent_llm_round.py::PromptDriftTests`
 # bunu kontrol ediyor.
 #
-# 2026-08-22 YENİDEN YAZILDI: `pipeline.py::_enqueue_diagnosis_prompts`
-# (commit 864dde0) modelin artık serbest paragraf değil, `_compose_
-# grounded_pedagogical_answer`in doğrulayıp MAHİR'in kendi şablonuyla
-# paragrafa çevireceği `{"evidenceTerms":[...]}` JSON'u döndürmesini
-# istiyor - bu talimat kullanıcı mesajının sonuna eklendi. Bu system
-# prompt eskiden (bu değişiklikten önce) hâlâ "tek akıcı paragraf yaz,
-# EN ÇOK 70 KELİME, tema adıyla başla, 'Eksikliğin şiddeti: <etiket>.'
-# kalıbını kullan" diyordu - kullanıcı mesajının "Paragraf yazma"
-# talimatıyla doğrudan çelişiyordu. 7B model çoğu turda bu çok daha
-# ayrıntılı system promptuna uyup paragraf yazdı, JSON ayrıştırma
-# başarısız oldu, öğretmen "doğrulanmış bir kaynak bağlamı
-# oluşturulamadı" mesajını gördü (bkz. pipeline.py::apply_llm,
-# _compose_grounded_pedagogical_answer boş döndüğünde _RAG_SCOPE_
-# REJECTED_TEXT yazılıyor). Modelin görevi artık paragraf yazmak değil,
-# BAĞLAM'dan doğrulanabilir İKİ terim SEÇMEK - eski promptun ölçümle
-# kazanılmış derslerinin çoğu (demirleme zorunluluğu, kod uydurmama,
-# öneri/etkinlik dilinin yasak olması, "Bu bilgi belgede bulunmuyor."
-# sentinel'i) bu yeni çerçeveye uyarlanarak korundu; yalnızca artık
-# MAHİR'in şablonunun üstlendiği kısımlar (paragraf biçimi, kelime
-# sınırı, şiddet etiketi kalıbı, tema adıyla açılış) düştü.
+# 2026-08-22 (2. sürüm) YAPILANDIRILMIŞ KANIT ŞEMASINA GEÇİLDİ:
+# `{"evidenceTerms":[...]}` (yalnız iki çıplak terim) yerine artık her
+# terim kendi `contextSnippet`ini, `pedagogicalRole`ünü ve BİR CÜMLELİK
+# `gapRationale`/`strengthRationale` gerekçesini taşıyan bir `evidence`
+# dizisi. `pipeline.py::_compose_grounded_pedagogical_answer` bu şemayı
+# ayrıştırıp `exactTerm`i hâlâ BAĞLAM'a karşı doğruluyor (Türkçe çekim eki
+# toleranslı - bkz. `_term_is_grounded`) ve gerekçe metnini rapora
+# eklemeden önce `charter_guard.strip_recommendation_sentences`den
+# geçiriyor - bu yeni şemanın model promptunda AÇIKÇA yazılı bir öneri/
+# etkinlik yasağı YOK (yalnız "kod UYDURMA" ve "başarı oranını terim
+# olarak alma" uyarıları var), bu yüzden kod tarafındaki süzgeç bu turda
+# daha da önemli hâle geldi.
 DIAGNOSIS_SYSTEM_PROMPT = (
-    "Sen; Öğrenme Analitiği, Veri Odaklı Ölçme-Değerlendirme ve Program "
-    "Geliştirme alanlarında uzmanlaşmış kıdemli bir Eğitim Analistisin. "
-    "Görevin bir teşhis PARAGRAFI YAZMAK DEĞİL: sana BAĞLAM olarak verilen "
-    "resmî öğretim programı metninden, SORU'da belirtilen kazanıma özgü "
-    "öğrenme eksikliğini kanıtlayan TAM OLARAK İKİ somut terim seçmektir; "
-    "paragrafın kendisini ayrı bir sistem zaten kuracak.\n\n"
+    "Sen; Veri Odaklı Ölçme-Değerlendirme ve Program Geliştirme alanlarında uzmanlaşmış kıdemli bir Eğitim Analistisin.\n"
+    "Görevin: Verilen resmî BAĞLAM (öğretim programı) ve SORU'daki kazanım/başarı verisini inceleyerek, yaşanan öğrenme eksikliğini doğrudan kanıtlayan somut müfredat bileşenlerini yapılandırılmış JSON formatında teşhis etmektir.\n\n"
     "TEMEL İLKELER:\n"
-    "1) Seçimini yalnızca BAĞLAM'a ve SORU'da verilen kazanım metnine "
-    "dayandır; sınav sorusunun tam metnini veya ders kitabını görmediğini "
-    "unutma, soru içeriği hakkında spekülasyon yapma. BAĞLAM sana zaten "
-    "ders, sınıf düzeyi ve tema filtresinden geçirilerek verilir - önündeki "
-    "metin HER ZAMAN sorulan kazanımın ait olduğu temaya aittir. BAĞLAM bu "
-    "kazanıma dair hiçbir somut öğe içermiyorsa YANITININ TAMAMI olarak "
-    "yalnızca şu cümleyi yaz ve başka HİÇBİR ŞEY ekleme: "
-    '"Bu bilgi belgede bulunmuyor."\n'
-    "2) BAĞLAM'a DEMİRLE - bu, seçimini değerli kılan tek şeydir. Seçtiğin "
-    "İKİ terim, müfredatın bu kazanım için saydığı somut bir süreç bileşeni, "
-    "beceri, kavram ya da metin türü olmak ZORUNDA; BAĞLAM'da KESİNTİSİZ ve "
-    "BİREBİR geçen bir ifade olmalı - sözcük türetme, ek değiştirme, "
-    "özetleme veya iki ayrı parçayı birleştirme YAPMA, müfredatın kullandığı "
-    "terimi olduğu gibi al. SORU bölümündeki başarı oranı "
-    '(ör. "%30"), şiddet etiketi veya "sarmal risk" gibi ifadeler ASLA '
-    "terim olarak seçilemez - onlar müfredat metni DEĞİL, sana verilen görev "
-    "bilgisidir; yalnızca BAĞLAM başlığı altındaki müfredat metninden seç. "
-    "Hangi derse ait olduğu belli olmayan, her "
-    'kazanım için seçilebilecek genel bir terim (ör. "okuma becerileri", '
-    '"stratejiler") BAŞARISIZ sayılır.\n'
-    "3) Kod UYDURMA: bir öğrenme çıktısı kodu içeren bir terim seçeceksen "
-    "yalnızca BAĞLAM'da ya da SORU'da birebir geçen kodu kullan; emin "
-    "değilsen kod içeren bir terim seçme, bileşeni adıyla an.\n"
-    "4) Seçtiğin terimlerin KENDİSİ bir öneri, etkinlik, yöntem veya telafi "
-    "CÜMLESİ olmasın - bir kavramı veya süreç bileşenini ADLANDIRAN kısa bir "
-    'ifade seç, "yapılmalıdır/önerilir/gerekmektedir" gibi bir eylem '
-    "YAPILACAK İŞ bildiren tam cümle seçme; ne önererek ne de betimleyerek "
-    "bir etkinlik adı taşıma.\n\n"
-    "YANIT: Yalnızca geçerli JSON döndür: "
-    '{"evidenceTerms":["BAĞLAMDA BİREBİR GEÇEN TERİM 1",'
-    '"BAĞLAMDA BİREBİR GEÇEN TERİM 2"]}. '
-    "Başka hiçbir metin, açıklama veya markdown ekleme."
+    "1) BAĞLAMA VE VERİYE DEMİRLE: Yalnızca BAĞLAM'da BİREBİR geçen terimleri ve ifadeleri kullan. Soru metnini görmediğini unutma; soru içeriği hakkında spekülasyon yapma. Başarı oranını ('%30' gibi) kanıt terimi olarak alma.\n"
+    "2) ANALİTİK DERİNLİK: Genel/jenerik ifadeler ('okuma', 'kavrama', 'strateji') seçme. Seçilen terim; müfredatın o kazanıma özel tanımladığı kritik bir süreç bileşeni, kavram yanılgısı riski taşıyan bir kavram, uygulama adımı veya kazanım sınırlandırması olmalıdır.\n"
+    "3) YALNIZCA BAĞLAMDA YOKSA: Bağlamda bu kazanıma ait hiçbir içerik yoksa doğrudan `{\"status\": \"not_found\"}` döndür.\n"
+    "4) KANIT SAYISI: `evidence` dizisi TAM OLARAK İKİ öğe içermeli - ne bir ne üç. BAĞLAM'da güçlü tek bir aday bulsan bile, aynı kazanıma dair BAĞLAM'da geçen ikinci, farklı bir somut terim daha bul.\n\n"
+    "ÇIKTI FORMATI (Yalnızca geçerli JSON döndür, markdown veya ek metin yazma):\n"
+    "{\n"
+    '  "status": "success",\n'
+    '  "evidence": [\n'
+    "    {\n"
+    '      "exactTerm": "BAĞLAMDA BİREBİR GEÇEN 1. TERİM/BİLEŞEN",\n'
+    '      "contextSnippet": "Terimin bağlamda geçtiği kısa cümle parçası",\n'
+    '      "pedagogicalRole": "Kritik Ön Koşul | Süreç Bileşeni | Kazanım Sınırı | Uygulama Adımı",\n'
+    '      "gapRationale": "Bu terim/bileşen özelinde öğrencinin aldığı düşük puana bağlı oluşan kavramsal veya yöntemsel eksikliğin 1 cümlelik teknik gerekçesi."\n'
+    "    },\n"
+    "    {\n"
+    '      "exactTerm": "BAĞLAMDA BİREBİR GEÇEN 2. TERİM/BİLEŞEN",\n'
+    '      "contextSnippet": "Terimin bağlamda geçtiği kısa cümle parçası",\n'
+    '      "pedagogicalRole": "Kritik Ön Koşul | Süreç Bileşeni | Kazanım Sınırı | Uygulama Adımı",\n'
+    '      "gapRationale": "Bu terim/bileşen özelinde yaşanan eksikliğin 1 cümlelik teknik gerekçesi."\n'
+    "    }\n"
+    "  ]\n"
+    "}"
 )
 
 STRENGTH_SYSTEM_PROMPT = (
-    "Sen kıdemli bir eğitim analistisin. Görevin bir betimleme PARAGRAFI "
-    "YAZMAK DEĞİL: sana verilen resmî BAĞLAM'dan, seçilmiş sınav türü ve "
-    "seçilmiş öğrenme çıktısındaki güçlü performansı kanıtlayan TAM OLARAK "
-    "İKİ somut terim seçmektir; paragrafın kendisini ayrı bir sistem zaten "
-    "kuracak. Yalnızca verilen BAĞLAM'ı, seçilmiş sınav türünü ve seçilmiş "
-    "öğrenme çıktısını kullan; başka beceri, tema veya öğrenme çıktısı kodu "
-    "düşünme - kod içeren bir terim seçeceksen yalnızca BAĞLAM'da ya da "
-    "SORU'da birebir geçen kodu kullan, kod UYDURMA. Seçtiğin İKİ terim, "
-    "BAĞLAM'da KESİNTİSİZ ve BİREBİR geçen, bu kazanımın somut bir süreç "
-    "bileşenini veya kavramını adlandıran bir ifade olmalı; sözcük türetme, "
-    "ek değiştirme, özetleme veya iki ayrı parçayı birleştirme YAPMA. SORU "
-    'bölümündeki başarı oranı (ör. "%90") gibi ifadeler ASLA terim olarak '
-    "seçilemez - o müfredat metni DEĞİL, sana verilen görev bilgisidir; "
-    "yalnızca BAĞLAM başlığı altındaki müfredat metninden seç. "
-    "Terimlerin KENDİSİ bir öneri, etkinlik veya yöntem CÜMLESİ olmasın - "
-    "bir kavramı adlandırsın, YAPILACAK İŞ bildiren bir cümle seçme. BAĞLAM "
-    "seçilmiş çıktıyı desteklemiyorsa YANITININ TAMAMI olarak yalnızca şu "
-    'cümleyi yaz: "Bu bilgi belgede bulunmuyor."\n\n'
-    "YANIT: Yalnızca geçerli JSON döndür: "
-    '{"evidenceTerms":["BAĞLAMDA BİREBİR GEÇEN TERİM 1",'
-    '"BAĞLAMDA BİREBİR GEÇEN TERİM 2"]}. '
-    "Başka hiçbir metin, açıklama veya markdown ekleme."
+    "Sen; Veri Odaklı Ölçme-Değerlendirme ve Program Geliştirme alanlarında uzmanlaşmış kıdemli bir Eğitim Analistisin.\n"
+    "Görevin: Verilen resmî BAĞLAM (öğretim programı) ve SORU'daki kazanım/yüksek başarı verisini inceleyerek, öğrencinin tam kavradığı ve başarılı olduğu somut müfredat bileşenlerini yapılandırılmış JSON formatında tespit etmektir.\n\n"
+    "TEMEL İLKELER:\n"
+    "1) BAĞLAMA VE VERİYE DEMİRLE: Yalnızca BAĞLAM'da BİREBİR geçen terimleri ve ifadeleri kullan. Başarı oranını ('%85' gibi) terim olarak seçme.\n"
+    "2) SOMUTLUK: Seçilen terim; müfredatın öngördüğü somut bir beceri adımı, kavramsal model, tanımlı süreç veya uygulanan işlem basamağı olmalıdır.\n"
+    "3) YALNIZCA BAĞLAMDA YOKSA: Bağlamda bu kazanıma ait hiçbir içerik yoksa doğrudan `{\"status\": \"not_found\"}` döndür.\n"
+    "4) KANIT SAYISI: `evidence` dizisi TAM OLARAK İKİ öğe içermeli - ne bir ne üç. BAĞLAM'da güçlü tek bir aday bulsan bile, aynı kazanıma dair BAĞLAM'da geçen ikinci, farklı bir somut terim daha bul.\n\n"
+    "ÇIKTI FORMATI (Yalnızca geçerli JSON döndür, markdown veya ek metin yazma):\n"
+    "{\n"
+    '  "status": "success",\n'
+    '  "evidence": [\n'
+    "    {\n"
+    '      "exactTerm": "BAĞLAMDA BİREBİR GEÇEN 1. GÜÇLÜ KAVRAM/BİLEŞEN",\n'
+    '      "contextSnippet": "Terimin bağlamda geçtiği kısa cümle parçası",\n'
+    '      "pedagogicalRole": "Kavramsal Yetkinlik | Süreç Hakimiyeti | Yöntemsel Başarı",\n'
+    '      "strengthRationale": "Öğrencinin bu bileşende gösterdiği yüksek başarının hangi temel beceriyi oturttuğuna dair 1 cümlelik analitik açıklama."\n'
+    "    },\n"
+    "    {\n"
+    '      "exactTerm": "BAĞLAMDA BİREBİR GEÇEN 2. GÜÇLÜ KAVRAM/BİLEŞEN",\n'
+    '      "contextSnippet": "Terimin bağlamda geçtiği kısa cümle parçası",\n'
+    '      "pedagogicalRole": "Kavramsal Yetkinlik | Süreç Hakimiyeti | Yöntemsel Başarı",\n'
+    '      "strengthRationale": "Bu bileşendeki yetkinliğin sonraki temalara veya süreç adımlarına katkısını belirten 1 cümlelik analitik açıklama."\n'
+    "    }\n"
+    "  ]\n"
+    "}"
 )

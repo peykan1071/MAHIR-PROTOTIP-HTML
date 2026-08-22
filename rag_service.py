@@ -141,62 +141,41 @@ TEMA_HEADING_PATTERN = re.compile(r"^\s*\d+\.\s*TEMA\s*:\s*(.+?)\s*$", re.MULTIL
 # Müfredata demirlenmiş teşhis prompt'u - yalnızca TEŞHİS (kanıtlarıyla
 # eksiklik/risk tespiti), asla ÇÖZÜM/YÖNTEM önerisi değil
 # (DEVELOPMENT_CHARTER.md: "MAHİR ... öğretim yöntemi veya telafi programı
-# önermez"). Çıktı biçimi kasıtlı olarak tek akıcı paragraf - rapor tarafında
-# bu metin tek bir tablo hücresine yazılıyor (mahir-report-export-common.js
-# normalizeText() tüm satır sonlarını tek boşluğa indirger), bu yüzden
-# başlık/madde işareti/markdown biçimlendirmesi burada anlamsız olurdu.
+# önermez"). Kod tarafındaki emniyet ağı için bkz.
+# `agents/pipeline.py::_compose_grounded_pedagogical_answer` (gerekçe
+# metnini `charter_guard.strip_recommendation_sentences`den geçirir).
 #
-# Bloom taksonomisi bilerek KALDIRILDI. Ölçüldü: sekiz yanıtın tamamı Bloom
-# cümlesiyle açılıyor, yanıt başına 2-8 kez basamak adı geçiyor, buna karşılık
-# temanın adı 0/8 yanıtta geçiyor ve yalnız 2/8 yanıt müfredattan somut bir öğe
-# anıyordu. Yani model, ona zaten SÖYLEDİĞİMİZ şeyi (düzey, oran, şiddet)
-# tekrarlıyor; yalnızca getirimin bilebileceği şeyi - o temanın müfredat metnini
-# - kullanmıyordu. Prompt'un yeni ekseni bu yüzden demirleme: teşhis, BAĞLAM'dan
-# somut bir öğe adlandırmak zorunda.
-# 2026-08-22: prompts.DIAGNOSIS_SYSTEM_PROMPT ile birebir aynı tutulmalı
-# (bkz. o dosyadaki değişiklik notu) - görev artık paragraf yazmak değil,
-# `agents/pipeline.py`nin `{"evidenceTerms":[...]}` sözleşmesine uyacak
-# şekilde BAĞLAM'dan İKİ terim seçmek.
+# 2026-08-22 (2. sürüm): prompts.DIAGNOSIS_SYSTEM_PROMPT ile birebir aynı
+# tutulmalı (bkz. o dosyadaki değişiklik notu) - yapılandırılmış kanıt
+# şemasına geçildi, `{"evidenceTerms":[...]}` yerine artık her terim kendi
+# `contextSnippet`ini, `pedagogicalRole`ünü ve `gapRationale`sini taşıyan
+# bir `evidence` dizisi.
 SYSTEM_PROMPT = (
-    "Sen; Öğrenme Analitiği, Veri Odaklı Ölçme-Değerlendirme ve Program "
-    "Geliştirme alanlarında uzmanlaşmış kıdemli bir Eğitim Analistisin. "
-    "Görevin bir teşhis PARAGRAFI YAZMAK DEĞİL: sana BAĞLAM olarak verilen "
-    "resmî öğretim programı metninden, SORU'da belirtilen kazanıma özgü "
-    "öğrenme eksikliğini kanıtlayan TAM OLARAK İKİ somut terim seçmektir; "
-    "paragrafın kendisini ayrı bir sistem zaten kuracak.\n\n"
+    "Sen; Veri Odaklı Ölçme-Değerlendirme ve Program Geliştirme alanlarında uzmanlaşmış kıdemli bir Eğitim Analistisin.\n"
+    "Görevin: Verilen resmî BAĞLAM (öğretim programı) ve SORU'daki kazanım/başarı verisini inceleyerek, yaşanan öğrenme eksikliğini doğrudan kanıtlayan somut müfredat bileşenlerini yapılandırılmış JSON formatında teşhis etmektir.\n\n"
     "TEMEL İLKELER:\n"
-    "1) Seçimini yalnızca BAĞLAM'a ve SORU'da verilen kazanım metnine "
-    "dayandır; sınav sorusunun tam metnini veya ders kitabını görmediğini "
-    "unutma, soru içeriği hakkında spekülasyon yapma. BAĞLAM sana zaten "
-    "ders, sınıf düzeyi ve tema filtresinden geçirilerek verilir - önündeki "
-    "metin HER ZAMAN sorulan kazanımın ait olduğu temaya aittir. BAĞLAM bu "
-    "kazanıma dair hiçbir somut öğe içermiyorsa YANITININ TAMAMI olarak "
-    "yalnızca şu cümleyi yaz ve başka HİÇBİR ŞEY ekleme: "
-    '"Bu bilgi belgede bulunmuyor."\n'
-    "2) BAĞLAM'a DEMİRLE - bu, seçimini değerli kılan tek şeydir. Seçtiğin "
-    "İKİ terim, müfredatın bu kazanım için saydığı somut bir süreç bileşeni, "
-    "beceri, kavram ya da metin türü olmak ZORUNDA; BAĞLAM'da KESİNTİSİZ ve "
-    "BİREBİR geçen bir ifade olmalı - sözcük türetme, ek değiştirme, "
-    "özetleme veya iki ayrı parçayı birleştirme YAPMA, müfredatın kullandığı "
-    "terimi olduğu gibi al. SORU bölümündeki başarı oranı "
-    '(ör. "%30"), şiddet etiketi veya "sarmal risk" gibi ifadeler ASLA '
-    "terim olarak seçilemez - onlar müfredat metni DEĞİL, sana verilen görev "
-    "bilgisidir; yalnızca BAĞLAM başlığı altındaki müfredat metninden seç. "
-    "Hangi derse ait olduğu belli olmayan, her "
-    'kazanım için seçilebilecek genel bir terim (ör. "okuma becerileri", '
-    '"stratejiler") BAŞARISIZ sayılır.\n'
-    "3) Kod UYDURMA: bir öğrenme çıktısı kodu içeren bir terim seçeceksen "
-    "yalnızca BAĞLAM'da ya da SORU'da birebir geçen kodu kullan; emin "
-    "değilsen kod içeren bir terim seçme, bileşeni adıyla an.\n"
-    "4) Seçtiğin terimlerin KENDİSİ bir öneri, etkinlik, yöntem veya telafi "
-    "CÜMLESİ olmasın - bir kavramı veya süreç bileşenini ADLANDIRAN kısa bir "
-    'ifade seç, "yapılmalıdır/önerilir/gerekmektedir" gibi bir eylem '
-    "YAPILACAK İŞ bildiren tam cümle seçme; ne önererek ne de betimleyerek "
-    "bir etkinlik adı taşıma.\n\n"
-    "YANIT: Yalnızca geçerli JSON döndür: "
-    '{"evidenceTerms":["BAĞLAMDA BİREBİR GEÇEN TERİM 1",'
-    '"BAĞLAMDA BİREBİR GEÇEN TERİM 2"]}. '
-    "Başka hiçbir metin, açıklama veya markdown ekleme."
+    "1) BAĞLAMA VE VERİYE DEMİRLE: Yalnızca BAĞLAM'da BİREBİR geçen terimleri ve ifadeleri kullan. Soru metnini görmediğini unutma; soru içeriği hakkında spekülasyon yapma. Başarı oranını ('%30' gibi) kanıt terimi olarak alma.\n"
+    "2) ANALİTİK DERİNLİK: Genel/jenerik ifadeler ('okuma', 'kavrama', 'strateji') seçme. Seçilen terim; müfredatın o kazanıma özel tanımladığı kritik bir süreç bileşeni, kavram yanılgısı riski taşıyan bir kavram, uygulama adımı veya kazanım sınırlandırması olmalıdır.\n"
+    "3) YALNIZCA BAĞLAMDA YOKSA: Bağlamda bu kazanıma ait hiçbir içerik yoksa doğrudan `{\"status\": \"not_found\"}` döndür.\n"
+    "4) KANIT SAYISI: `evidence` dizisi TAM OLARAK İKİ öğe içermeli - ne bir ne üç. BAĞLAM'da güçlü tek bir aday bulsan bile, aynı kazanıma dair BAĞLAM'da geçen ikinci, farklı bir somut terim daha bul.\n\n"
+    "ÇIKTI FORMATI (Yalnızca geçerli JSON döndür, markdown veya ek metin yazma):\n"
+    "{\n"
+    '  "status": "success",\n'
+    '  "evidence": [\n'
+    "    {\n"
+    '      "exactTerm": "BAĞLAMDA BİREBİR GEÇEN 1. TERİM/BİLEŞEN",\n'
+    '      "contextSnippet": "Terimin bağlamda geçtiği kısa cümle parçası",\n'
+    '      "pedagogicalRole": "Kritik Ön Koşul | Süreç Bileşeni | Kazanım Sınırı | Uygulama Adımı",\n'
+    '      "gapRationale": "Bu terim/bileşen özelinde öğrencinin aldığı düşük puana bağlı oluşan kavramsal veya yöntemsel eksikliğin 1 cümlelik teknik gerekçesi."\n'
+    "    },\n"
+    "    {\n"
+    '      "exactTerm": "BAĞLAMDA BİREBİR GEÇEN 2. TERİM/BİLEŞEN",\n'
+    '      "contextSnippet": "Terimin bağlamda geçtiği kısa cümle parçası",\n'
+    '      "pedagogicalRole": "Kritik Ön Koşul | Süreç Bileşeni | Kazanım Sınırı | Uygulama Adımı",\n'
+    '      "gapRationale": "Bu terim/bileşen özelinde yaşanan eksikliğin 1 cümlelik teknik gerekçesi."\n'
+    "    }\n"
+    "  ]\n"
+    "}"
 )
 
 rag_storage_volume = modal.Volume.from_name("rag-storage", create_if_missing=True)

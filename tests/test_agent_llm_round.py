@@ -391,72 +391,99 @@ class DiagnosisPromptContractTests(unittest.TestCase):
     kazanılmış kararların bir sonraki düzenlemede sessizce geri alınmasını
     engelliyor.
 
-    2026-08-22: Görev "teşhis paragrafı yaz"tan "BAĞLAM'dan İKİ doğrulanabilir
-    terim seç"e geçti (`pipeline.py::_enqueue_diagnosis_prompts`in
-    `{"evidenceTerms":[...]}` sözleşmesi - kök neden: eski prompt hâlâ
-    "paragraf yaz" diyordu, kullanıcı mesajı "paragraf yazma, JSON döndür"
-    diyordu; model çoğu turda eski/daha ayrıntılı system prompt'a uyup
-    paragraf yazınca JSON ayrıştırma başarısız oluyor, öğretmen "doğrulanmış
-    bir kaynak bağlamı oluşturulamadı" görüyordu). Paragraf biçimine özgü
-    eski testler (kelime sınırı, tema adıyla açılış, şiddet kalıbı, dolgu
-    sözcük listesi) MAHİR'in kendi şablonuna taşındığı için burada kaldırıldı;
-    hâlâ geçerli olan demirleme/uydurmama/öneri-yasağı dersleri yeni göreve
-    uyarlanmış hâliyle korundu.
+    2026-08-22 (2. sürüm): Görev "BAĞLAM'dan İKİ çıplak terim seç"ten "her
+    terim için `exactTerm`+`pedagogicalRole`+`gapRationale`/
+    `strengthRationale` taşıyan yapılandırılmış bir kanıt listesi döndür"e
+    geçti (kullanıcının paylaştığı prompt taslağı, `agents/prompts.py`ye
+    birebir uygulandı). ÖNEMLİ bir gözlem: bu yeni promptun metninde artık
+    ÖNCEKİ sürümdeki gibi açıkça yazılı bir "öneri/etkinlik cümlesi
+    olmasın", "kod UYDURMA" maddesi YOK - yalnızca "başarı oranını terim
+    olarak alma" ve dolaylı "spekülasyon yapma" uyarıları var. Bu KASITLI
+    bir gevşetme değil; kullanıcının prompt taslağı böyle geldi ve olduğu
+    gibi uygulandı. Charter güvencesi bu yüzden artık PROMPT METNİNDE değil
+    KOD TARAFINDA duruyor: `_compose_grounded_pedagogical_answer` her
+    gerekçeyi `charter_guard.strip_recommendation_sentences`den geçirir,
+    ardından `_answer_matches_outcome_scope` kod uydurma/beceri kayması gibi
+    kalan riskleri denetler. `test_prompt_no_longer_states_an_explicit_
+    recommendation_ban` bu boşluğu bilerek belgeliyor.
     """
 
-    PROMPT = prompts.DIAGNOSIS_SYSTEM_PROMPT
+    DIAGNOSIS_PROMPT = prompts.DIAGNOSIS_SYSTEM_PROMPT
+    STRENGTH_PROMPT = prompts.STRENGTH_SYSTEM_PROMPT
 
     def test_bloom_taxonomy_is_gone(self):
         # Kaldırma gerekçesi ölçüldü: 8/8 yanıt Bloom cümlesiyle açılıyordu,
-        # tema adı 0/8 yanıtta geçiyordu. İki kısa terim seçiminde bu diline
-        # zaten yer yok ama gerileme koruması olarak kalsın.
+        # tema adı 0/8 yanıtta geçiyordu. Yapılandırılmış kanıt seçiminde bu
+        # dile zaten yer yok ama gerileme koruması olarak kalsın.
         for term in ("Bloom", "bilişsel düzey", "basamak", "Hatırlama", "Yaratma"):
             with self.subTest(term=term):
-                self.assertNotIn(term, self.PROMPT)
-
-    def test_grounding_is_required_not_suggested(self):
-        # Teşhisi değerli kılan tek şey: yalnız getirimin bilebileceği içeriği
-        # kullanması. İstek "yapabilirsin" değil, ZORUNLULUK olmalı.
-        self.assertIn("DEMİRLE", self.PROMPT)
-        self.assertIn("ZORUNDA", self.PROMPT)
-        self.assertIn("BAŞARISIZ sayılır", self.PROMPT)
+                self.assertNotIn(term, self.DIAGNOSIS_PROMPT)
 
     def test_prompt_gives_no_theme_name_as_an_example(self):
-        # BU BİR HATA KAYDIDIR. Açılış kuralı önce örnekle yazılmıştı
-        # (ör. "'Sözün İnceliği' temasında..."); model örneği KOPYALADI ve
-        # 4. Tema kazanımlarına "'Sözün İnceliği' temasında" diye başladı -
-        # yani öğretmene BAŞKA bir temanın teşhisini doğruymuş gibi gösterdi.
-        # Bu risk artık yapısal olarak da kapalı (tema adını model değil
-        # MAHİR'in şablonu yazıyor) ama prompt'ta yine de kopyalanabilir somut
-        # bir tema adı bulunmamalı.
+        # BU BİR HATA KAYDIDIR (önceki sürümden). Açılış kuralı önce
+        # örnekle yazılmıştı; model örneği KOPYALADI ve başka bir temanın
+        # teşhisini doğruymuş gibi gösterdi. Bu risk artık yapısal olarak
+        # da kapalı (tema adını model değil MAHİR'in şablonu yazıyor) ama
+        # prompt'ta yine de kopyalanabilir somut bir tema adı bulunmamalı.
         for theme in ("Sözün İnceliği", "Anlam Arayışı", "Anlamın Yapı Taşları", "Dilin Zenginliği"):
             with self.subTest(theme=theme):
-                self.assertNotIn(theme, self.PROMPT)
+                self.assertNotIn(theme, self.DIAGNOSIS_PROMPT)
 
-    def test_inventing_outcome_codes_is_forbidden(self):
-        # Ölçümde model sarmal risk cümlesinde var olmayan kodlar üretti
-        # (ör. teşhis ettiği kazanımı "gelecekteki kazanım" diye andı).
-        self.assertIn("Kod UYDURMA", self.PROMPT)
+    def test_grounding_to_context_is_required(self):
+        self.assertIn("BAĞLAMA VE VERİYE DEMİRLE", self.DIAGNOSIS_PROMPT)
+        self.assertIn("BİREBİR geçen terimleri", self.DIAGNOSIS_PROMPT)
+        self.assertIn("Soru metnini görmediğini unutma", self.DIAGNOSIS_PROMPT)
 
-    def test_activity_names_are_banned_not_just_recommendations(self):
-        # Charter süzgeci "gerekli olan"ı bilerek koruyor (teşhis dili), ama
-        # ölçümde model "gerekli olan ... analiz ETKİNLİKLERİNE" yazdı: öneri
-        # kipi olmadan etkinlik ADLANDIRMAK da charter ihlali. Artık seçilen
-        # TERİMİN kendisi için geçerli.
-        self.assertIn("YAPILACAK İŞ", self.PROMPT)
-        self.assertIn("ne önererek ne de betimleyerek", self.PROMPT)
+    def test_success_rate_leaking_as_a_term_is_banned(self):
+        # Bu oturumun ayrı bir kök nedeni: SORU'daki başarı oranı modelin
+        # "kanıt terimi" olarak seçtiği bir tuzaktı (bkz. approved_data_
+        # analyzer.py::_build_rag_question'ın 2026-08-22 notu).
+        self.assertIn("Başarı oranını", self.DIAGNOSIS_PROMPT)
+        self.assertIn("kanıt terimi olarak alma", self.DIAGNOSIS_PROMPT)
+        self.assertIn("Başarı oranını", self.STRENGTH_PROMPT)
+        self.assertIn("terim olarak seçme", self.STRENGTH_PROMPT)
 
-    def test_measured_mechanisms_survived(self):
-        self.assertIn("Bu bilgi belgede bulunmuyor.", self.PROMPT)
+    def test_not_found_sentinel_is_json_not_plain_text(self):
+        # Eski sürümde "Bu bilgi belgede bulunmuyor." düz metniydi;
+        # `apply_llm` artık `_is_not_found_response` ile bu JSON durumunu
+        # ayrıca tanıyor (bkz. pipeline.py).
+        for prompt in (self.DIAGNOSIS_PROMPT, self.STRENGTH_PROMPT):
+            with self.subTest(prompt=prompt[:20]):
+                self.assertIn('"status": "not_found"', prompt)
 
-    def test_output_is_evidence_terms_json_not_a_paragraph(self):
-        # Kök nedenin kendisi: bu prompt artık PARAGRAF değil, doğrulanabilir
-        # İKİ terimlik JSON istemeli - `_compose_grounded_pedagogical_answer`
-        # yalnız bu biçimi ayrıştırabiliyor.
-        self.assertIn("PARAGRAFI YAZMAK DEĞİL", self.PROMPT)
-        self.assertIn("TAM OLARAK İKİ", self.PROMPT)
-        self.assertIn('{"evidenceTerms":', self.PROMPT)
-        self.assertIn("KESİNTİSİZ ve BİREBİR", self.PROMPT)
+    def test_output_schema_requires_structured_evidence(self):
+        # Kök nedenin kendisi: prompt artık çıplak iki terim değil, her biri
+        # `exactTerm`+`pedagogicalRole`+gerekçe taşıyan bir `evidence` listesi
+        # istemeli - `_compose_grounded_pedagogical_answer` yalnız bu biçimi
+        # ayrıştırabiliyor.
+        for prompt in (self.DIAGNOSIS_PROMPT, self.STRENGTH_PROMPT):
+            with self.subTest(prompt=prompt[:20]):
+                self.assertIn('"status": "success"', prompt)
+                self.assertIn('"evidence"', prompt)
+                self.assertIn('"exactTerm"', prompt)
+                self.assertIn('"pedagogicalRole"', prompt)
+        self.assertIn('"gapRationale"', self.DIAGNOSIS_PROMPT)
+        self.assertIn('"strengthRationale"', self.STRENGTH_PROMPT)
+
+    def test_evidence_count_is_explicitly_required_to_be_two(self):
+        # 2026-08-22 canlı ölçüm: bu madde eklenmeden ÖNCE model 8 turun
+        # 6'sında yalnızca BİR kanıt öğesi döndürdü (`evidence` dizisi
+        # şemada örnekle 2 gösteriliyordu ama KURAL olarak yazılı değildi) -
+        # `_compose_grounded_pedagogical_answer` tam 2 öğe şart koştuğundan
+        # bu, ölçülen 2/8 başarı oranına yol açtı. Bu madde o boşluğu kapatır.
+        for prompt in (self.DIAGNOSIS_PROMPT, self.STRENGTH_PROMPT):
+            with self.subTest(prompt=prompt[:20]):
+                self.assertIn("TAM OLARAK İKİ", prompt)
+
+    def test_prompt_no_longer_states_an_explicit_recommendation_ban(self):
+        # Bu bir HATA KAYDI DEĞİL - bilinçli bir gözlem (bkz. sınıf notu).
+        # Önceki sürümde burada "öneri/etkinlik CÜMLESİ olmasın", "kod
+        # UYDURMA" gibi açık charter maddeleri vardı; bu yeni promptta yok.
+        # Charter güvencesi artık kod tarafında (`_compose_grounded_
+        # pedagogical_answer`'ın `strip_recommendation_sentences` çağrısı +
+        # `_answer_matches_outcome_scope`).
+        self.assertNotIn("YAPILACAK İŞ", self.DIAGNOSIS_PROMPT)
+        self.assertNotIn("Kod UYDURMA", self.DIAGNOSIS_PROMPT)
 
 
 if __name__ == "__main__":

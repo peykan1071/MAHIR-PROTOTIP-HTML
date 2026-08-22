@@ -22,6 +22,7 @@ import re
 from typing import Any
 
 from .. import measurement_engine
+from ..charter_guard import strip_recommendation_sentences
 from ..models import CEDValidationIssue
 from ..program_catalog import validate_question_program_context
 from .base import AgentContext, AgentIssue, AgentResult
@@ -494,7 +495,13 @@ class PedagogicalAnalysisAgent:
             # startswith + kırpma, tam eşleşme değil: model doğru bağlamla
             # beslendiğinde bile cevabı sık sık bu cümleyle başlatıp ardından
             # gerçek teşhisle devam ediyor (gerçek dizin karşısında ölçüldü).
-            if answer.startswith(_RAG_NO_ANSWER_TEXT):
+            # `_is_not_found_response`, 2026-08-22 (2. sürüm) şemasının
+            # `{"status":"not_found"}` biçimini AYNI şekilde ele alır - ikisi
+            # de "BAĞLAM'da içerik yok" demenin dürüst bir yolu, sözleşme
+            # ihlali değil; ikisi de görünür ret mesajı OLMADAN sessizce
+            # atlanmalı (aksi hâlde meşru "bu konuda içerik yok" durumları
+            # öğretmene sanki model hata yapmış gibi görünürdü).
+            if answer.startswith(_RAG_NO_ANSWER_TEXT) or _is_not_found_response(answer):
                 # Model kaynak yetersizliğini bildirdiyse devamına eklediği
                 # metin güvenilir kabul edilemez. Ret cümlesini kırpıp kalan
                 # olası halüsinasyonu rapora taşımak yerine yanıtın tamamı
@@ -665,55 +672,110 @@ def _sanitize_anomaly_finding(answer: str, valid_question_numbers: set[int]) -> 
     return "\n".join(accepted)
 
 
+def _decode_json_object(text: str) -> dict[str, Any] | None:
+    """Model çıktısını JSON NESNESİ olarak ayrıştırmayı dener; olmazsa `None`.
+
+    Küçük modeller "yalnız JSON" talimatına rağmen geçerli nesnenin arkasına
+    açıklama ekleyebiliyor ya da onu ``` kod bloğuna sarabiliyor - ilk JSON
+    nesnesi güvenle ayrıştırılır, devamındaki serbest metin hiçbir çağıran
+    tarafından kullanılmaz.
+    """
+
+    candidate = text.strip()
+    if candidate.startswith("```"):
+        candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.IGNORECASE)
+    try:
+        payload, _unused_tail = json.JSONDecoder().raw_decode(candidate)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _is_not_found_response(answer: str) -> bool:
+    """Modelin `{"status": "not_found"}` yanıtını tanır (bkz. DIAGNOSIS_
+    SYSTEM_PROMPT madde 3). Bu, BAĞLAM'da kazanıma dair içerik olmadığının
+    dürüst bir bildirimi - bir sözleşme ihlali DEĞİL; `apply_llm` bunu
+    sessizce (görünür ret mesajı olmadan) atlamalı, tıpkı eski düz-metin
+    "Bu bilgi belgede bulunmuyor." sentinel'inin yaptığı gibi."""
+
+    payload = _decode_json_object(answer)
+    return bool(payload) and payload.get("status") == "not_found"
+
+
 def _compose_grounded_pedagogical_answer(
     answer: str,
     outcome: dict[str, Any],
     sources: list[dict[str, Any]],
 ) -> str:
-    """LLM'nin seçtiği iki kaynak teriminden güvenli rapor paragrafı kurar.
+    """LLM'nin döndürdüğü yapılandırılmış kanıtlardan güvenli rapor paragrafı kurar.
 
-    Terimlerin BAĞLAM'da (Türkçe çekim eki farklılıklarına toleranslı - bkz.
-    `_term_is_grounded`) karşılığı yoksa hiçbir metin üretilmez. Başarı oranı
-    ve şiddet modelden değil, ölçme motorunun sonucundan alınır.
+    2026-08-22 (2. sürüm): model artık iki çıplak terim değil, her biri
+    `exactTerm` + `pedagogicalRole` + `gapRationale`/`strengthRationale`
+    taşıyan bir `evidence` dizisi döndürüyor (bkz. `agents/prompts.py::
+    DIAGNOSIS_SYSTEM_PROMPT`in ÇIKTI FORMATI'). `exactTerm`in BAĞLAM'da
+    karşılığı yoksa (Türkçe çekim eki farklılıklarına toleranslı - bkz.
+    `_term_is_grounded`) hiçbir metin üretilmez.
+
+    Yeni şemanın model promptunda AÇIKÇA yazılı bir öneri/etkinlik yasağı
+    YOK (yalnız "kod UYDURMA" ve "başarı oranını terim olarak alma"
+    uyarıları var) - bu yüzden `gapRationale`/`strengthRationale` metni
+    rapora eklenmeden önce `charter_guard.strip_recommendation_sentences`
+    ile süzülür (DEVELOPMENT_CHARTER.md: "MAHİR ... öğretim yöntemi veya
+    telafi programı önermez"); süzgeç bir kanıt öğesinin gerekçesini
+    tamamen boşaltırsa o öğe (dolayısıyla TÜM yanıt) reddedilir - kısmen
+    öneri içeren bir gerekçeyi "temizleyip" yayınlamak yerine hücreyi boş
+    bırakmak doğrusu (bkz. `strip_recommendation_sentences` docstring'i).
+    `_answer_matches_outcome_scope` (bu fonksiyonun çağırandan sonraki
+    adımı) kod uydurma/beceri kayması gibi kalan riskleri ayrıca denetler.
+
+    Başarı oranı ve şiddet modelden değil, ölçme motorunun sonucundan alınır.
     """
 
-    candidate = answer.strip()
-    if candidate.startswith("```"):
-        candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.IGNORECASE)
-    try:
-        # Küçük modeller, "yalnız JSON" talimatına rağmen geçerli nesnenin
-        # arkasına açıklama ekleyebiliyor. İlk JSON nesnesi güvenle ayrıştırılır;
-        # devamındaki serbest metin rapora hiçbir koşulda taşınmaz.
-        payload, _unused_tail = json.JSONDecoder().raw_decode(candidate)
-    except (TypeError, ValueError, json.JSONDecodeError):
+    payload = _decode_json_object(answer)
+    if not payload or payload.get("status") != "success":
         return ""
-    terms = payload.get("evidenceTerms") if isinstance(payload, dict) else None
-    if not isinstance(terms, list) or len(terms) != 2:
-        return ""
-    terms = [" ".join(str(term).split()).strip(" .,:;\"'") for term in terms]
-    if any(not term or len(term) > 90 for term in terms) or terms[0].casefold() == terms[1].casefold():
-        return ""
-
-    evidence = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
-    if any(not _term_is_grounded(term, evidence) for term in terms):
+    evidence_items = payload.get("evidence")
+    if not isinstance(evidence_items, list) or len(evidence_items) != 2:
         return ""
 
     rate = float(outcome.get("successRate") or 0.0)
-    percent = round(rate * 100)
+    is_weak = rate < 0.70
+    rationale_key = "gapRationale" if is_weak else "strengthRationale"
+
+    parsed_evidence: list[tuple[str, str]] = []
+    for item in evidence_items:
+        if not isinstance(item, dict):
+            return ""
+        term = " ".join(str(item.get("exactTerm") or "").split()).strip(" .,:;\"'")
+        rationale, _stripped = strip_recommendation_sentences(str(item.get(rationale_key) or "").strip())
+        rationale = rationale.strip()
+        if not term or len(term) > 90 or not rationale:
+            return ""
+        parsed_evidence.append((term, rationale))
+    terms = [term for term, _ in parsed_evidence]
+    if terms[0].casefold() == terms[1].casefold():
+        return ""
+
+    evidence_text = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
+    if any(not _term_is_grounded(term, evidence_text) for term in terms):
+        return ""
+
     theme = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", str(outcome.get("outcomeTheme") or ""), flags=re.IGNORECASE).strip()
     if not theme:
         return ""
+    percent = round(rate * 100)
     opening = _pick_template(_OPENING_TEMPLATES, theme, terms[0], terms[1]).format(
         theme=theme, term1=terms[0], term2=terms[1], percent=percent
     )
-    if rate < 0.70:
+    rationale_text = " ".join(rationale for _, rationale in parsed_evidence)
+    if is_weak:
         severity = "Kritik" if rate < 0.50 else "Orta"
         closing = _pick_template(_WEAK_CLOSING_TEMPLATES, theme, terms[0], terms[1], severity).format(
             severity=severity
         )
-        return f"{opening} {closing}"
+        return f"{opening} {rationale_text} {closing}"
     closing = _pick_template(_STRONG_CLOSING_TEMPLATES, theme, terms[0], terms[1])
-    return f"{opening} {closing}"
+    return f"{opening} {rationale_text} {closing}"
 
 
 def _normalize_evidence_text(value: str) -> str:
@@ -837,20 +899,15 @@ def _enqueue_diagnosis_prompts(
                     and outcome.get("parentOutcomeCode") != outcome.get("outcomeCode")
                     else ""
                 )
+                # Eskiden burada ayrıca bir "YANIT SÖZLEŞMESİ" bloğu vardı
+                # (evidenceTerms'e özgü JSON talimatı) - 2026-08-22 (2. sürüm)
+                # yeni sistem promptu kendi ÇIKTI FORMATI'nı zaten tam
+                # taşıdığından KALDIRILDI; o eski blok bırakılsaydı yeni
+                # şemayla ("evidence"/"gapRationale") ÇELİŞİRDİ - tam olarak
+                # bu oturumun daha önce düzelttiği "sistem promptu ile
+                # kullanıcı mesajı çelişiyor" hatasının aynısını geri
+                # getirirdi.
                 + f"SORU: {question}\n\nYalnızca bu sınav türü, seçilmiş öğrenme çıktısı ve yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla."
-                + (
-                    "\n\nYANIT SÖZLEŞMESİ: Paragraf yazma. Yalnız geçerli JSON döndür: "
-                    "{\"evidenceTerms\":[\"BAĞLAMDA AYNEN GEÇEN TERİM 1\",\"BAĞLAMDA AYNEN GEÇEN TERİM 2\"]}. "
-                    "Her terim BAĞLAM içinde kesintisiz ve birebir geçen kısa bir ifade olmalı; sözcük türetme, "
-                    "ek değiştirme, özetleme veya iki ayrı parçayı birleştirme. "
-                    "Kod, oran, şiddet, neden, yorum, risk, etkinlik, çözüm veya öneri ekleme. Markdown kullanma."
-                    if is_weak else
-                    "\n\nYANIT SÖZLEŞMESİ: Paragraf yazma. Yalnız geçerli JSON döndür: "
-                    "{\"evidenceTerms\":[\"BAĞLAMDA AYNEN GEÇEN TERİM 1\",\"BAĞLAMDA AYNEN GEÇEN TERİM 2\"]}. "
-                    "Her terim BAĞLAM içinde kesintisiz ve birebir geçen kısa bir ifade olmalı; sözcük türetme, "
-                    "ek değiştirme, özetleme veya iki ayrı parçayı birleştirme. "
-                    "Kod, oran, neden, yorum, etkinlik, çözüm veya öneri ekleme. Markdown kullanma."
-                )
             ),
             "retrieval": {
                 "programId": program.id,
