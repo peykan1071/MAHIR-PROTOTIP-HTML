@@ -198,7 +198,7 @@ SYSTEM_PROMPT = (
     "Görevin: Verilen resmî BAĞLAM (öğretim programı) ve SORU'daki kazanım/başarı verisini inceleyerek, yaşanan öğrenme eksikliğini doğrudan kanıtlayan somut müfredat bileşenlerini yapılandırılmış JSON formatında teşhis etmektir.\n\n"
     "TEMEL İLKELER:\n"
     "1) BAĞLAMA VE VERİYE DEMİRLE: Yalnızca BAĞLAM'da BİREBİR geçen terimleri ve ifadeleri kullan. Soru metnini görmediğini unutma; soru içeriği hakkında spekülasyon yapma. Başarı oranını ('%30' gibi) kanıt terimi olarak alma.\n"
-    "2) ANALİTİK DERİNLİK: Genel/jenerik ifadeler ('okuma', 'kavrama', 'strateji') seçme. Seçilen terim; müfredatın o kazanıma özel tanımladığı kritik bir süreç bileşeni, kavram yanılgısı riski taşıyan bir kavram, uygulama adımı veya kazanım sınırlandırması olmalıdır.\n"
+    "2) ANALİTİK DERİNLİK: Genel/jenerik ifadeler ('okuma', 'kavrama', 'strateji') seçme. Seçilen terim; müfredatın o kazanıma özel tanımladığı kritik bir süreç bileşeni, kavram yanılgısı riski taşıyan bir kavram, uygulama adımı veya kazanım sınırlandırması olmalıdır. `gapRationale` de aynı somutlukta olmalı - bu alanın ne olduğunu tarif eden genel bir cümle DEĞİL, SEÇTİĞİN TERİME özgü gerçek eksikliği anlatan bir cümle yaz.\n"
     "3) YALNIZCA BAĞLAMDA YOKSA: Bağlamda bu kazanıma ait hiçbir içerik yoksa doğrudan `{\"status\": \"not_found\"}` döndür.\n"
     "4) KANIT SAYISI: `evidence` dizisi EN AZ BİR, EN ÇOK İKİ öğe içermeli. BAĞLAM'da bu kazanıma dair BİREBİR geçen birden fazla güçlü/somut terim varsa en iyi ikisini yaz; yalnızca TEK güçlü/somut terim bulabiliyorsan yalnızca onu yaz - ikinciyi asla uydurma veya zayıf/alakasız bir terimle doldurma.\n\n"
     "ÇIKTI FORMATI (Yalnızca geçerli JSON döndür, markdown veya ek metin yazma):\n"
@@ -209,13 +209,13 @@ SYSTEM_PROMPT = (
     '      "exactTerm": "BAĞLAMDA BİREBİR GEÇEN 1. TERİM/BİLEŞEN",\n'
     '      "contextSnippet": "Terimin bağlamda geçtiği kısa cümle parçası",\n'
     '      "pedagogicalRole": "Kritik Ön Koşul | Süreç Bileşeni | Kazanım Sınırı | Uygulama Adımı",\n'
-    '      "gapRationale": "Bu terim/bileşen özelinde öğrencinin aldığı düşük puana bağlı oluşan kavramsal veya yöntemsel eksikliğin 1 cümlelik teknik gerekçesi."\n'
+    '      "gapRationale": "SEÇİLEN TERİMİN ÖĞRENCİDE YOL AÇTIĞI SOMUT KAVRAMSAL/YÖNTEMSEL EKSİKLİĞİ ADLANDIRAN 1 CÜMLE (bu alanın tanımını TEKRARLAMA, doğrudan eksikliği anlat)"\n'
     "    },\n"
     "    {\n"
     '      "exactTerm": "BAĞLAMDA BİREBİR GEÇEN 2. TERİM/BİLEŞEN",\n'
     '      "contextSnippet": "Terimin bağlamda geçtiği kısa cümle parçası",\n'
     '      "pedagogicalRole": "Kritik Ön Koşul | Süreç Bileşeni | Kazanım Sınırı | Uygulama Adımı",\n'
-    '      "gapRationale": "Bu terim/bileşen özelinde yaşanan eksikliğin 1 cümlelik teknik gerekçesi."\n'
+    '      "gapRationale": "2. TERİMLE İLGİLİ AYNI ŞEKİLDE SOMUT EKSİKLİK CÜMLESİ (tanımı tekrarlama)"\n'
     "    }\n"
     "  ]\n"
     "}"
