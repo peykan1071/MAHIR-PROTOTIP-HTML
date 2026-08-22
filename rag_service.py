@@ -126,7 +126,16 @@ _NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
 # gevşek varsayılana (0,60) dönebildi; MMR geniş havuzdan seçim yaptığı
 # için tek başına top_k büyütmenin yarattığı "kalabalık bağlam" riski de
 # yok - MMR seçilenler arasında zaten çeşitliliği zorluyor.
-_RELATIVE_SCORE_FLOOR = 0.60
+#
+# 2026-08-22 0,60 -> 0,50 DÜŞÜRÜLDÜ: bazı kazanımlar için getirim SIFIR
+# isabetle dönüyordu (`agents/pipeline.py` tarafında sessizce "kaynak-yok"
+# olarak atlanıyor, öğretmen hiçbir yorum görmüyor) - dar/az yaygın
+# kelime dağarcığı taşıyan kazanımların embedding'i o temanın en iyi
+# isabetine göre 0,60'ın altında kalabiliyor. MMR zaten çeşitliliği
+# gözettiği için eşiği gevşetmek "kalabalık bağlam" riskini geri
+# getirmiyor; yalnızca ham havuza az sayıda ek (daha zayıf ama yine de
+# konuyla ilgili) aday katıyor.
+_RELATIVE_SCORE_FLOOR = 0.50
 
 # MEB müfredat PDF'lerindeki hiyerarşi başlıkları - tdeogr.pdf üzerinde tüm
 # 5 sınıf düzeyi ve 20 sınıf×tema kombinasyonu için elle doğrulandı. Satırın
@@ -157,7 +166,7 @@ SYSTEM_PROMPT = (
     "1) BAĞLAMA VE VERİYE DEMİRLE: Yalnızca BAĞLAM'da BİREBİR geçen terimleri ve ifadeleri kullan. Soru metnini görmediğini unutma; soru içeriği hakkında spekülasyon yapma. Başarı oranını ('%30' gibi) kanıt terimi olarak alma.\n"
     "2) ANALİTİK DERİNLİK: Genel/jenerik ifadeler ('okuma', 'kavrama', 'strateji') seçme. Seçilen terim; müfredatın o kazanıma özel tanımladığı kritik bir süreç bileşeni, kavram yanılgısı riski taşıyan bir kavram, uygulama adımı veya kazanım sınırlandırması olmalıdır.\n"
     "3) YALNIZCA BAĞLAMDA YOKSA: Bağlamda bu kazanıma ait hiçbir içerik yoksa doğrudan `{\"status\": \"not_found\"}` döndür.\n"
-    "4) KANIT SAYISI: `evidence` dizisi TAM OLARAK İKİ öğe içermeli - ne bir ne üç. BAĞLAM'da güçlü tek bir aday bulsan bile, aynı kazanıma dair BAĞLAM'da geçen ikinci, farklı bir somut terim daha bul.\n\n"
+    "4) KANIT SAYISI: `evidence` dizisi EN AZ BİR, EN ÇOK İKİ öğe içermeli. BAĞLAM'da bu kazanıma dair BİREBİR geçen birden fazla güçlü/somut terim varsa en iyi ikisini yaz; yalnızca TEK güçlü/somut terim bulabiliyorsan yalnızca onu yaz - ikinciyi asla uydurma veya zayıf/alakasız bir terimle doldurma.\n\n"
     "ÇIKTI FORMATI (Yalnızca geçerli JSON döndür, markdown veya ek metin yazma):\n"
     "{\n"
     '  "status": "success",\n'

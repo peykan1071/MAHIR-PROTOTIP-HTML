@@ -104,7 +104,7 @@ DIAGNOSIS_SYSTEM_PROMPT = (
     "1) BAĞLAMA VE VERİYE DEMİRLE: Yalnızca BAĞLAM'da BİREBİR geçen terimleri ve ifadeleri kullan. Soru metnini görmediğini unutma; soru içeriği hakkında spekülasyon yapma. Başarı oranını ('%30' gibi) kanıt terimi olarak alma.\n"
     "2) ANALİTİK DERİNLİK: Genel/jenerik ifadeler ('okuma', 'kavrama', 'strateji') seçme. Seçilen terim; müfredatın o kazanıma özel tanımladığı kritik bir süreç bileşeni, kavram yanılgısı riski taşıyan bir kavram, uygulama adımı veya kazanım sınırlandırması olmalıdır.\n"
     "3) YALNIZCA BAĞLAMDA YOKSA: Bağlamda bu kazanıma ait hiçbir içerik yoksa doğrudan `{\"status\": \"not_found\"}` döndür.\n"
-    "4) KANIT SAYISI: `evidence` dizisi TAM OLARAK İKİ öğe içermeli - ne bir ne üç. BAĞLAM'da güçlü tek bir aday bulsan bile, aynı kazanıma dair BAĞLAM'da geçen ikinci, farklı bir somut terim daha bul.\n\n"
+    "4) KANIT SAYISI: `evidence` dizisi EN AZ BİR, EN ÇOK İKİ öğe içermeli. BAĞLAM'da bu kazanıma dair BİREBİR geçen birden fazla güçlü/somut terim varsa en iyi ikisini yaz; yalnızca TEK güçlü/somut terim bulabiliyorsan yalnızca onu yaz - ikinciyi asla uydurma veya zayıf/alakasız bir terimle doldurma.\n\n"
     "ÇIKTI FORMATI (Yalnızca geçerli JSON döndür, markdown veya ek metin yazma):\n"
     "{\n"
     '  "status": "success",\n'
@@ -132,7 +132,7 @@ STRENGTH_SYSTEM_PROMPT = (
     "1) BAĞLAMA VE VERİYE DEMİRLE: Yalnızca BAĞLAM'da BİREBİR geçen terimleri ve ifadeleri kullan. Başarı oranını ('%85' gibi) terim olarak seçme.\n"
     "2) SOMUTLUK: Seçilen terim; müfredatın öngördüğü somut bir beceri adımı, kavramsal model, tanımlı süreç veya uygulanan işlem basamağı olmalıdır.\n"
     "3) YALNIZCA BAĞLAMDA YOKSA: Bağlamda bu kazanıma ait hiçbir içerik yoksa doğrudan `{\"status\": \"not_found\"}` döndür.\n"
-    "4) KANIT SAYISI: `evidence` dizisi TAM OLARAK İKİ öğe içermeli - ne bir ne üç. BAĞLAM'da güçlü tek bir aday bulsan bile, aynı kazanıma dair BAĞLAM'da geçen ikinci, farklı bir somut terim daha bul.\n\n"
+    "4) KANIT SAYISI: `evidence` dizisi EN AZ BİR, EN ÇOK İKİ öğe içermeli. BAĞLAM'da bu kazanıma dair BİREBİR geçen birden fazla güçlü/somut terim varsa en iyi ikisini yaz; yalnızca TEK güçlü/somut terim bulabiliyorsan yalnızca onu yaz - ikinciyi asla uydurma veya zayıf/alakasız bir terimle doldurma.\n\n"
     "ÇIKTI FORMATI (Yalnızca geçerli JSON döndür, markdown veya ek metin yazma):\n"
     "{\n"
     '  "status": "success",\n'

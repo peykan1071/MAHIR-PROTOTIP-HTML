@@ -465,15 +465,22 @@ class DiagnosisPromptContractTests(unittest.TestCase):
         self.assertIn('"gapRationale"', self.DIAGNOSIS_PROMPT)
         self.assertIn('"strengthRationale"', self.STRENGTH_PROMPT)
 
-    def test_evidence_count_is_explicitly_required_to_be_two(self):
-        # 2026-08-22 canlı ölçüm: bu madde eklenmeden ÖNCE model 8 turun
-        # 6'sında yalnızca BİR kanıt öğesi döndürdü (`evidence` dizisi
+    def test_evidence_count_is_bounded_at_one_to_two_not_forced_to_two(self):
+        # 2026-08-22 canlı ölçüm, 3. sürüm: madde eklenmeden ÖNCE model 8
+        # turun 6'sında yalnızca BİR kanıt öğesi döndürdü (`evidence` dizisi
         # şemada örnekle 2 gösteriliyordu ama KURAL olarak yazılı değildi) -
-        # `_compose_grounded_pedagogical_answer` tam 2 öğe şart koştuğundan
-        # bu, ölçülen 2/8 başarı oranına yol açtı. Bu madde o boşluğu kapatır.
+        # `_compose_grounded_pedagogical_answer` o zaman tam 2 öğe şart
+        # koştuğundan bu, ölçülen 2/8 başarı oranına yol açtı.
+        #
+        # 4. sürüm: "TAM OLARAK İKİ" zorunluluğu GEVŞETİLDİ - dar kapsamlı
+        # bazı kazanımlarda BAĞLAM'da gerçekten TEK güçlü aday bulunuyordu,
+        # model ikinciyi uydurmak yerine tamamen `not_found` deyip
+        # öğretmene hiçbir yorum göstermiyordu. Artık BİR veya İKİ kabul
+        # ediliyor; kural hâlâ İKİDEN FAZLASINI (üç ve üzeri) yasaklıyor.
         for prompt in (self.DIAGNOSIS_PROMPT, self.STRENGTH_PROMPT):
             with self.subTest(prompt=prompt[:20]):
-                self.assertIn("TAM OLARAK İKİ", prompt)
+                self.assertNotIn("TAM OLARAK İKİ", prompt)
+                self.assertIn("EN AZ BİR, EN ÇOK İKİ", prompt)
 
     def test_prompt_no_longer_states_an_explicit_recommendation_ban(self):
         # Bu bir HATA KAYDI DEĞİL - bilinçli bir gözlem (bkz. sınıf notu).

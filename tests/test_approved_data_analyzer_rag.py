@@ -157,6 +157,33 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertIn("Ana duygu net kurulamıyor.", result)
         self.assertNotIn("etkinlik", result)
 
+    def test_single_evidence_item_is_now_accepted(self):
+        # 2026-08-22 (4. sürüm): dar kapsamlı kazanımlarda BAĞLAM'da
+        # gerçekten TEK güçlü aday bulunabiliyor - artık ikinciyi
+        # uydurmak zorunda değil, TEK terimle de rapor kuruluyor.
+        outcome = {
+            "outcomeCode": "TDE2.2",
+            "outcomeTheme": "2. Tema: Anlam Arayışı",
+            "successRate": 0.20,
+        }
+        answer = _evidence_json(["ana duygu"], ["Ana duygu net kurulamıyor."])
+        sources = [{"excerpt": "Metinde ana duygu bir bütünün parçasıdır."}]
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertIn('"Anlam Arayışı"', result)
+        self.assertIn("ana duygu", result)
+        self.assertIn("Ana duygu net kurulamıyor.", result)
+        self.assertNotIn(" ve ", result.split("kapsamındaki")[0])
+
+    def test_zero_or_three_plus_evidence_items_are_still_rejected(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu ve ana düşünce ve konu belirlenir."}]
+        empty = json.dumps({"status": "success", "evidence": []})
+        three = _evidence_json(
+            ["ana duygu", "ana düşünce", "konu"], ["a.", "b.", "c."]
+        )
+        self.assertEqual(_compose_grounded_pedagogical_answer(empty, outcome, sources), "")
+        self.assertEqual(_compose_grounded_pedagogical_answer(three, outcome, sources), "")
+
     def test_unverified_evidence_term_is_rejected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
         sources = [{"excerpt": "Metinde ana duygu ve ana düşünce belirlenir."}]
