@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from typing import Any
-import unicodedata
 
 from .assessment_profiles import (
     GENERAL,
     REQUIRED_COMPONENTS,
     build_general_evaluation,
+    normalize_course_name,
     profile_for_course,
 )
 
@@ -20,12 +20,6 @@ REQUIRED_CONTEXT_FIELDS = {
     "classSection": "Sınıf/şube",
     "schoolName": "Okul/kurum",
 }
-
-
-def _normalize(value: object) -> str:
-    text = unicodedata.normalize("NFKC", str(value or "")).translate(str.maketrans({"I": "ı", "İ": "i"}))
-    text = text.casefold().strip()
-    return " ".join(text.split())
 
 
 def _class_average(report: dict[str, Any]) -> float:
@@ -64,18 +58,18 @@ def merge_component_reports(
 
     reference_exam = by_component[REQUIRED_COMPONENTS[0]]["exam"]
     for field, label in REQUIRED_CONTEXT_FIELDS.items():
-        reference_value = _normalize(reference_exam.get(field))
+        reference_value = normalize_course_name(reference_exam.get(field))
         if not reference_value:
             raise ValueError(f"{label} bilgisi raporlardan birinde bulunmuyor.")
         for component in REQUIRED_COMPONENTS[1:]:
-            candidate = _normalize(by_component[component]["exam"].get(field))
+            candidate = normalize_course_name(by_component[component]["exam"].get(field))
             if not candidate:
                 raise ValueError(f"{label} bilgisi raporlardan birinde bulunmuyor.")
             if candidate != reference_value:
                 raise ValueError(f"Yüklenen raporların {label.lower()} bilgileri birbiriyle uyuşmuyor.")
 
     course_name = str(reference_exam.get("courseName") or "").strip()
-    if expected_course and _normalize(course_name) != _normalize(expected_course):
+    if expected_course and normalize_course_name(course_name) != normalize_course_name(expected_course):
         raise ValueError("Yüklenen raporların dersi, hazırlık aşamasında seçilen dersle uyuşmuyor.")
     if expected_grade:
         report_grade = "".join(character for character in str(reference_exam.get("classSection") or "") if character.isdigit())

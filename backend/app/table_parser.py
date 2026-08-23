@@ -9,6 +9,15 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
+from .parsing_utils import (
+    TOTAL_MISMATCH_TOLERANCE,
+    calculate_total,
+    normalise_label,
+    parse_integer,
+    parse_number,
+    question_number,
+)
+
 
 def parse_tabular_document(
     tables: Iterable[list[list[object]]], *, source_label: str
@@ -44,7 +53,7 @@ def parse_tabular_document(
 
 
 def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[str, object] | None:
-    headings = [_normalise_label(cell) for cell in rows[0]]
+    headings = [normalise_label(cell) for cell in rows[0]]
     number_index = _find_index(headings, _is_student_number_heading)
     total_index = _find_index(headings, _is_total_heading)
     row_index = _find_index(headings, lambda label: label in {"sira", "sira no"})
@@ -52,9 +61,9 @@ def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[st
     tckn_indexes = [index for index, label in enumerate(headings) if _is_tckn_heading(label)]
     score_columns = sorted(
         (
-            (_question_number(label), index, _max_score_from_heading(rows[0][index]))
+            (question_number(label), index, _max_score_from_heading(rows[0][index]))
             for index, label in enumerate(headings)
-            if _question_number(label) is not None
+            if question_number(label) is not None
         ),
         key=lambda item: item[0],
     )
@@ -70,8 +79,8 @@ def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[st
     for source_row in rows[1:]:
         row = source_row + [""] * max(0, len(headings) - len(source_row))
         student_no = row[number_index].strip()
-        scores = [_number(row[index]) for _, index, _ in score_columns]
-        total_score = _number(row[total_index]) if total_index is not None else None
+        scores = [parse_number(row[index]) for _, index, _ in score_columns]
+        total_score = parse_number(row[total_index]) if total_index is not None else None
         if not (student_no or any(score is not None for score in scores) or total_score is not None):
             continue
         privacy_findings = []
@@ -81,11 +90,11 @@ def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[st
             privacy_findings.append("AD_SOYAD")
         students.append(
             {
-                "rowNumber": _integer(row[row_index]) if row_index is not None else len(students) + 1,
+                "rowNumber": parse_integer(row[row_index]) if row_index is not None else len(students) + 1,
                 "studentNo": student_no,
                 "scores": scores,
                 "totalScore": total_score,
-                "calculatedTotal": round(sum(score or 0 for score in scores), 2),
+                "calculatedTotal": calculate_total(scores),
                 "control": "",
                 "privacyFindings": privacy_findings,
             }
@@ -108,7 +117,7 @@ def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[st
     for student in students:
         if student["totalScore"] is not None and abs(
             float(student["totalScore"]) - float(student["calculatedTotal"])
-        ) > 0.01:
+        ) > TOTAL_MISMATCH_TOLERANCE:
             warnings.append(
                 f"{student['rowNumber']}. satırda yazılan toplam ({student['totalScore']}) ile "
                 f"hesaplanan toplam ({student['calculatedTotal']}) farklı."
@@ -133,11 +142,6 @@ def _find_index(headings: list[str], predicate) -> int | None:
     return next((index for index, label in enumerate(headings) if predicate(label)), None)
 
 
-def _normalise_label(value: object) -> str:
-    translation = str.maketrans("ÇĞİÖŞÜçğıöşü", "CGIOSUcgiosu")
-    return re.sub(r"[^a-z0-9]+", " ", str(value).translate(translation).casefold()).strip()
-
-
 def _is_student_number_heading(label: str) -> bool:
     return label in {"okul no", "okul numarasi", "ogrenci no", "ogrenci numarasi", "numara", "no"}
 
@@ -156,28 +160,7 @@ def _is_total_heading(label: str) -> bool:
     return label == "puan" or label.startswith("toplam") or label == "genel toplam"
 
 
-def _question_number(label: str) -> int | None:
-    match = re.match(r"^(?:s|soru)\s*(\d+)\b", label)
-    return int(match.group(1)) if match else None
-
-
 def _max_score_from_heading(value: object) -> float | int | None:
     text = str(value)
     match = re.search(r"(?:\(|\b)(\d+(?:[.,]\d+)?)\s*(?:p|puan)\b", text, flags=re.IGNORECASE)
-    return _number(match.group(1)) if match else None
-
-
-def _number(value: object) -> float | int | None:
-    cleaned = str(value).strip().replace(",", ".")
-    if not cleaned:
-        return None
-    match = re.search(r"-?\d+(?:\.\d+)?", cleaned)
-    if not match:
-        return None
-    number = float(match.group(0))
-    return int(number) if number.is_integer() else number
-
-
-def _integer(value: object) -> int | None:
-    number = _number(value)
-    return int(number) if number is not None else None
+    return parse_number(match.group(1)) if match else None

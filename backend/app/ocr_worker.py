@@ -25,10 +25,7 @@ from .file_receiver import (
     extract_uploaded_files,
     validate_file_name,
 )
-
-UPLOAD_PATH = "/mahir-upload"
-WARMUP_PATH = "/mahir-warmup"
-SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
+from .ocr_protocol import SHARED_SECRET_HEADER, UPLOAD_PATH, WARMUP_PATH
 
 
 class OCRWorkerHandler(BaseHTTPRequestHandler):
@@ -103,7 +100,8 @@ class OCRWorkerHandler(BaseHTTPRequestHandler):
             return
         oversized = next((f for f in uploaded_files if len(f.content) > MAX_UPLOAD_SIZE), None)
         if oversized is not None:
-            self._send_json(413, {"ok": False, "message": "Dosya 20 MB sınırını aşıyor."})
+            limit_mb = MAX_UPLOAD_SIZE // (1024 * 1024)
+            self._send_json(413, {"ok": False, "message": f"Dosya {limit_mb} MB sınırını aşıyor."})
             return
 
         ok, message, structured_data = _run_image_group_ocr(uploaded_files, checks)
@@ -144,12 +142,8 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
             ]
         for row in rows:
             privacy_findings = set(row.pop("privacyFindings", []) or [])
-            if privacy_findings:
-                labels = []
-                if "TCKN" in privacy_findings:
-                    labels.append("T.C. kimlik numarası")
-                if "AD_SOYAD" in privacy_findings:
-                    labels.append("ad-soyad")
+            labels = _translate_privacy_findings(privacy_findings)
+            if labels:
                 warnings.append(
                     f"{uploaded_file.file_name}: KVKK uyarısı — {' ve '.join(labels)} "
                     "algılandı ve öğrenci analiz verisinden çıkarıldı."
@@ -172,6 +166,17 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
             },
         },
     )
+
+
+def _translate_privacy_findings(findings: set[str]) -> list[str]:
+    """OCR sınırındaki gizlilik bulgu kodlarını öğretmene gösterilecek Türkçe etikete çevir."""
+
+    labels = []
+    if "TCKN" in findings:
+        labels.append("T.C. kimlik numarası")
+    if "AD_SOYAD" in findings:
+        labels.append("ad-soyad")
+    return labels
 
 
 def create_server(host: str = "0.0.0.0", port: int = 8000) -> ThreadingHTTPServer:
