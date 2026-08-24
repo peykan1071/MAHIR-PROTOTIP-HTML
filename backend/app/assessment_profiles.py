@@ -60,13 +60,7 @@ PROFILES = {
 }
 
 
-def normalize_course_name(course_name: object) -> str:
-    """Karşılaştırılabilir ders/alan adı normu (NFKC + Türkçe İ/I çevirisi).
-
-    `general_report_merger.py` da aynı normu (rapor alanlarının tutarlılık
-    denetiminde) kullanır - fonksiyon bu yüzden public.
-    """
-
+def _normalized_course_name(course_name: object) -> str:
     value = unicodedata.normalize("NFKC", str(course_name or "")).translate(
         str.maketrans({"I": "ı", "İ": "i"})
     )
@@ -77,19 +71,19 @@ def normalize_course_name(course_name: object) -> str:
 def profile_for_course(course_name: str) -> AssessmentProfile | None:
     """Resolve only explicitly registered language courses to a weighting profile."""
 
-    normalized = normalize_course_name(course_name)
+    normalized = _normalized_course_name(course_name)
     if not normalized:
         return None
 
     tde_names = {
-        normalize_course_name("Türk Dili ve Edebiyatı"),
-        normalize_course_name("Seçmeli Türk Dili ve Edebiyatı"),
+        _normalized_course_name("Türk Dili ve Edebiyatı"),
+        _normalized_course_name("Seçmeli Türk Dili ve Edebiyatı"),
     }
     if normalized in tde_names:
         return PROFILES["tde-70-15-15"]
 
     language_profile = PROFILES["language-50-25-25"]
-    if normalized in {normalize_course_name(name) for name in language_profile.course_names}:
+    if normalized in {_normalized_course_name(name) for name in language_profile.course_names}:
         return language_profile
     return None
 

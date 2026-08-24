@@ -415,20 +415,20 @@ class DiagnosisPromptContractTests(unittest.TestCase):
         # dile zaten yer yok ama gerileme koruması olarak kalsın.
         for term in ("Bloom", "bilişsel düzey", "basamak", "Hatırlama", "Yaratma"):
             with self.subTest(term=term):
-                self.assertNotIn(term, self.PROMPT)
+                self.assertNotIn(term, self.DIAGNOSIS_PROMPT)
 
     def test_grounding_is_required_not_suggested(self):
         # Teşhisi değerli kılan tek şey: yalnız getirimin bilebileceği içeriği
         # kullanması. İstek "yapabilirsin" değil, ZORUNLULUK olmalı.
-        self.assertIn("DEMİRLE", self.PROMPT)
-        self.assertIn("ZORUNDA", self.PROMPT)
-        self.assertIn("BAŞARISIZ sayılır", self.PROMPT)
+        self.assertIn("DEMİRLE", self.DIAGNOSIS_PROMPT)
+        self.assertIn("ZORUNDA", self.DIAGNOSIS_PROMPT)
+        self.assertIn("BAŞARISIZ sayılır", self.DIAGNOSIS_PROMPT)
 
     def test_filler_words_are_banned(self):
         # Ölçüm: "belirli" 14 kez, 8 yanıtın 4'ünde.
         for word in ("belirli", "genellikle", "bazı", "birtakım"):
             with self.subTest(word=word):
-                self.assertIn(f'"{word}"', self.PROMPT)
+                self.assertIn(f'"{word}"', self.DIAGNOSIS_PROMPT)
 
     def test_length_budget_is_stated_as_a_hard_cap(self):
         # 2026-08-24 (3. sürüm): model artık yalnız NİTEL teşhis paragrafı
@@ -436,8 +436,8 @@ class DiagnosisPromptContractTests(unittest.TestCase):
         # `test_theme_rate_and_severity_are_never_the_models_job`) - bu
         # yüzden bütçe küçüldü, ama "katı sınır" dersi (İlk sürüm "40-70
         # kelime" diyordu ve 8 yanıtın 3'ü 73-75 kelimeye çıktı) aynen geçerli.
-        self.assertIn("EN ÇOK 45 KELİME", self.PROMPT)
-        self.assertIn("15 kelimenin altına da düşme", self.PROMPT)
+        self.assertIn("EN ÇOK 45 KELİME", self.DIAGNOSIS_PROMPT)
+        self.assertIn("15 kelimenin altına da düşme", self.DIAGNOSIS_PROMPT)
 
     def test_theme_rate_and_severity_are_never_the_models_job(self):
         # 2026-08-24 (3. sürüm): 2. sürümün {TEMA}/{ORAN}/{SIDDET} yer
@@ -450,11 +450,11 @@ class DiagnosisPromptContractTests(unittest.TestCase):
         # bir daha bu değerleri hiç görmez/yazmaz, yanlış yazma riski de
         # yapılandırılmış yer tutucu takip etme riski de yapısal olarak
         # ortadan kalktı.
-        self.assertIn("PARAGRAFINDA HİÇ YAZMA", self.PROMPT)
-        self.assertNotIn("{TEMA}", self.PROMPT)
-        self.assertNotIn("{ORAN}", self.PROMPT)
-        self.assertNotIn("{SIDDET}", self.PROMPT)
-        self.assertNotIn("tema adını tırnak içinde YAZARAK başla", self.PROMPT)
+        self.assertIn("PARAGRAFINDA HİÇ YAZMA", self.DIAGNOSIS_PROMPT)
+        self.assertNotIn("{TEMA}", self.DIAGNOSIS_PROMPT)
+        self.assertNotIn("{ORAN}", self.DIAGNOSIS_PROMPT)
+        self.assertNotIn("{SIDDET}", self.DIAGNOSIS_PROMPT)
+        self.assertNotIn("tema adını tırnak içinde YAZARAK başla", self.DIAGNOSIS_PROMPT)
 
     def test_prompt_gives_no_theme_name_as_an_example(self):
         # BU BİR HATA KAYDIDIR (önceki sürümden). Açılış kuralı önce
@@ -464,17 +464,17 @@ class DiagnosisPromptContractTests(unittest.TestCase):
         # prompt'ta yine de kopyalanabilir somut bir tema adı bulunmamalı.
         for theme in ("Sözün İnceliği", "Anlam Arayışı", "Anlamın Yapı Taşları", "Dilin Zenginliği"):
             with self.subTest(theme=theme):
-                self.assertNotIn(theme, self.PROMPT)
+                self.assertNotIn(theme, self.DIAGNOSIS_PROMPT)
 
     def test_inventing_outcome_codes_is_forbidden(self):
         # Ölçümde model sarmal risk cümlesinde var olmayan kodlar üretti
         # (ör. teşhis ettiği kazanımı "gelecekteki kazanım" diye andı).
-        self.assertIn("kod UYDURMA", self.PROMPT)
+        self.assertIn("kod UYDURMA", self.DIAGNOSIS_PROMPT)
 
     def test_measured_mechanisms_survived(self):
         # Bunlar ölçümde çalışıyordu; prompt yeniden yazılırken düşmemeleri şart.
-        self.assertIn("Bu bilgi belgede bulunmuyor.", self.PROMPT)
-        self.assertIn("tek akıcı paragraf", self.PROMPT)
+        self.assertIn("Bu bilgi belgede bulunmuyor.", self.DIAGNOSIS_PROMPT)
+        self.assertIn("tek akıcı paragraf", self.DIAGNOSIS_PROMPT)
 
 
 if __name__ == "__main__":

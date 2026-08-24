@@ -12,10 +12,10 @@ from typing import Iterable
 from .parsing_utils import (
     TOTAL_MISMATCH_TOLERANCE,
     calculate_total,
-    normalise_label,
-    parse_integer,
-    parse_number,
-    question_number,
+    _normalise_label,
+    _integer,
+    _number,
+    _question_number,
 )
 
 
@@ -53,7 +53,7 @@ def parse_tabular_document(
 
 
 def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[str, object] | None:
-    headings = [normalise_label(cell) for cell in rows[0]]
+    headings = [_normalise_label(cell) for cell in rows[0]]
     number_index = _find_index(headings, _is_student_number_heading)
     total_index = _find_index(headings, _is_total_heading)
     row_index = _find_index(headings, lambda label: label in {"sira", "sira no"})
@@ -61,9 +61,9 @@ def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[st
     tckn_indexes = [index for index, label in enumerate(headings) if _is_tckn_heading(label)]
     score_columns = sorted(
         (
-            (question_number(label), index, _max_score_from_heading(rows[0][index]))
+            (_question_number(label), index, _max_score_from_heading(rows[0][index]))
             for index, label in enumerate(headings)
-            if question_number(label) is not None
+            if _question_number(label) is not None
         ),
         key=lambda item: item[0],
     )
@@ -79,8 +79,8 @@ def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[st
     for source_row in rows[1:]:
         row = source_row + [""] * max(0, len(headings) - len(source_row))
         student_no = row[number_index].strip()
-        scores = [parse_number(row[index]) for _, index, _ in score_columns]
-        total_score = parse_number(row[total_index]) if total_index is not None else None
+        scores = [_number(row[index]) for _, index, _ in score_columns]
+        total_score = _number(row[total_index]) if total_index is not None else None
         if not (student_no or any(score is not None for score in scores) or total_score is not None):
             continue
         privacy_findings = []
@@ -90,7 +90,7 @@ def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[st
             privacy_findings.append("AD_SOYAD")
         students.append(
             {
-                "rowNumber": parse_integer(row[row_index]) if row_index is not None else len(students) + 1,
+                "rowNumber": _integer(row[row_index]) if row_index is not None else len(students) + 1,
                 "studentNo": student_no,
                 "scores": scores,
                 "totalScore": total_score,
@@ -163,4 +163,4 @@ def _is_total_heading(label: str) -> bool:
 def _max_score_from_heading(value: object) -> float | int | None:
     text = str(value)
     match = re.search(r"(?:\(|\b)(\d+(?:[.,]\d+)?)\s*(?:p|puan)\b", text, flags=re.IGNORECASE)
-    return parse_number(match.group(1)) if match else None
+    return _number(match.group(1)) if match else None

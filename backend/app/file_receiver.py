@@ -411,20 +411,26 @@ def _teacher_review_fallback(warning: str) -> dict[str, object]:
 # uzantı -> (ayrıştırıcı, başarı mesajındaki ad, öğretmen kontrolüne düşme mesajı).
 # Üç dal (docx/pdf/xlsx) yalnızca bu üçü ile farklılaşıyordu; geri kalan akış
 # (dene/oku/özet çıkar, ValueError'da kontrol ekranına düş) birebir aynıydı.
+#
+# Ayrıştırıcılar burada DOĞRUDAN fonksiyon nesnesi olarak değil, o adı modül
+# düzeyinde ÇAĞRI ANINDA arayan bir lambda ile saklanır: sözlük yalnızca
+# modül import edilirken BİR KEZ kurulur, bu yüzden doğrudan referans
+# `unittest.mock.patch("...file_receiver.parse_mahir_docx", ...)` ile
+# değiştirilemez hâle gelirdi (sözlük patch'ten ÖNCEKİ nesneyi tutardı).
 _DOCUMENT_PARSERS: dict[str, tuple[Callable[[bytes], dict[str, object]], str, str]] = {
     ".docx": (
-        parse_mahir_docx,
+        lambda content: parse_mahir_docx(content),
         "Word belgesi",
         "Word belgesi alındı. Alanlar otomatik okunamadığı için bilgiler "
         "öğretmen kontrol ekranında tamamlanacaktır.",
     ),
     ".pdf": (
-        parse_score_pdf,
+        lambda content: parse_score_pdf(content),
         "PDF tablosu",
         "PDF belgesi alındı; tablo otomatik okunamadığı için bilgiler öğretmen kontrol ekranında tamamlanacaktır.",
     ),
     ".xlsx": (
-        parse_score_xlsx,
+        lambda content: parse_score_xlsx(content),
         "Excel tablosu",
         "Excel belgesi alındı; tablo otomatik okunamadığı için bilgiler öğretmen kontrol ekranında tamamlanacaktır.",
     ),
