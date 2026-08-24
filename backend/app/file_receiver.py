@@ -221,7 +221,16 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                     structured_data.setdefault("warnings", []).extend(
                         warning_messages(document_quality)
                     )
-                measured["ogrenci"] = len((structured_data or {}).get("students") or [])
+                measured_data = structured_data or {}
+                measured_students = list(measured_data.get("students") or [])
+                if not measured_students:
+                    measured_students = [
+                        student
+                        for group in (measured_data.get("groups") or [])
+                        if isinstance(group, dict)
+                        for student in (group.get("students") or [])
+                    ]
+                measured["ogrenci"] = len(measured_students)
                 measured["sonuc"] = "tamam" if flow_ok else "basarisiz"
 
             if flow_ok:
