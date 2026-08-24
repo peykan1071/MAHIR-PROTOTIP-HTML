@@ -806,7 +806,7 @@ def _compose_grounded_pedagogical_answer(
     # nedensellik iddiası kurdu (ör. "...nedeniyle %3 başarı oranı elde
     # ediyorlar") - tüm yanıtı atmak yerine yalnız o cümleyi kırp, geri
     # kalan (genelde iyi) içeriği koru.
-    diagnosis, stripped_scope_sentences = _strip_scope_violations(diagnosis)
+    diagnosis, stripped_scope_sentences = _strip_scope_violations(diagnosis, reasons)
     if not diagnosis:
         _note_reason(reasons, "kapsam-kirpmasi-bosaltti (tüm cümleler nedensellik/öneri dili içeriyordu)")
         return ""
@@ -1012,7 +1012,33 @@ _ACTION_LANGUAGE_PATTERNS = (
 _RATE_MENTION_PATTERN = re.compile(r"%\s*\d|yüzde\s+\d", re.IGNORECASE)
 
 
-def _strip_scope_violations(text: str) -> tuple[str, int]:
+def _sentence_violation(sentence: str) -> str:
+    """Cümleyi eleyen kuralı döndürür; temizse boş string.
+
+    Sebebi METİN olarak döndürmek kasıtlı: `run_diagnosis_test.py`in
+    doğrulama kaydı, hangi cümlenin HANGİ kalıp yüzünden atıldığını
+    yazabilsin diye - aksi hâlde "hepsi kırpıldı" gibi bir sonuçta ham
+    çıktıyı elle inceleyip kalıbı tahmin etmek gerekiyor.
+    """
+
+    folded = sentence.casefold()
+    for term in _UNSUPPORTED_CLAIM_PATTERNS:
+        if term in folded:
+            return f"nedensellik:'{term}'"
+    for term in _ACTION_LANGUAGE_PATTERNS:
+        if term in folded:
+            return f"eylem-dili:'{term}'"
+    # Modele yüzdeyi yazmaması söylendi ama yine de yazabiliyor (canlı
+    # ölçümde görüldü). MAHİR oranı zaten kendi açılış cümlesinde
+    # söylediğinden böyle bir cümle en iyi ihtimalle gereksiz tekrar, en
+    # kötü ihtimalle modelin uydurduğu FARKLI bir sayı olur - ikisi de
+    # rapora girmemeli.
+    if _RATE_MENTION_PATTERN.search(sentence):
+        return "oran-tekrari"
+    return ""
+
+
+def _strip_scope_violations(text: str, reasons: list[str] | None = None) -> tuple[str, int]:
     """Nedensellik iddiası veya öneri/etkinlik dili taşıyan cümleleri
     paragraftan çıkarır; geri kalanı korur.
 
@@ -1026,16 +1052,13 @@ def _strip_scope_violations(text: str) -> tuple[str, int]:
     cümle atılır."""
 
     sentences = re.split(r"(?<=[.!?])\s+", text)
-    kept = [
-        sentence for sentence in sentences
-        if not any(term in sentence.casefold() for term in _UNSUPPORTED_CLAIM_PATTERNS + _ACTION_LANGUAGE_PATTERNS)
-        # Modele yüzdeyi yazmaması söylendi ama yine de yazabiliyor (canlı
-        # ölçümde görüldü). MAHİR oranı zaten kendi açılış cümlesinde
-        # söylediğinden böyle bir cümle en iyi ihtimalle gereksiz tekrar,
-        # en kötü ihtimalle modelin uydurduğu FARKLI bir sayı olur - ikisi de
-        # rapora girmemeli.
-        and not _RATE_MENTION_PATTERN.search(sentence)
-    ]
+    kept: list[str] = []
+    for sentence in sentences:
+        violation = _sentence_violation(sentence)
+        if violation:
+            _note_reason(reasons, f"bilgi: kırpılan cümle [{violation}]: {sentence.strip()[:120]}")
+        else:
+            kept.append(sentence)
     dropped = len(sentences) - len(kept)
     if kept and dropped and sentences and sentences[0] not in kept:
         # İLK cümle atıldıysa, hayatta kalan metin ona geri gönderme yapan bir
