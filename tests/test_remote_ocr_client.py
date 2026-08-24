@@ -12,6 +12,7 @@ NOT be retried.
 """
 
 import io
+import http.client
 import json
 import unittest
 import urllib.error
@@ -102,6 +103,33 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertEqual(message, "yetkisiz")
+        self.assertIsNone(data)
+        mock_urlopen.assert_called_once()
+        self.mock_sleep.assert_not_called()
+
+    def test_truncated_401_body_reports_authorization_without_crashing(self):
+        class _TruncatedBody:
+            def read(self):
+                raise http.client.IncompleteRead(b"", 43)
+
+            def close(self):
+                pass
+
+        http_error = urllib.error.HTTPError(
+            url=_FAKE_URL,
+            code=401,
+            msg="Unauthorized",
+            hdrs=None,
+            fp=_TruncatedBody(),
+        )
+        with patch(
+            "backend.app.remote_ocr_client.urllib.request.urlopen",
+            side_effect=http_error,
+        ) as mock_urlopen:
+            ok, message, data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
+
+        self.assertFalse(ok)
+        self.assertIn("yetkilendirmesi başarısız", message)
         self.assertIsNone(data)
         mock_urlopen.assert_called_once()
         self.mock_sleep.assert_not_called()

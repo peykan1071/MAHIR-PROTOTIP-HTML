@@ -375,11 +375,57 @@ def run_existing_backend_flow(
         return run_image_group_ocr(uploaded_files)
 
     if len(uploaded_files) > 1:
-        # No field-merge parsing exists across a group of non-image documents -
-        # forward the whole group the same way a single unrecognised document
-        # is accepted today, and let the teacher complete the validation screen
-        # manually.
-        return True, f"{len(uploaded_files)} görsel alındı ve öğretmen kontrolüne hazırlandı.", None
+        groups: list[dict[str, object]] = []
+        warnings: list[str] = []
+
+        # Word/PDF/Excel belgeleri birbirine alan bazında karıştırılmaz. Her belge
+        # kendi sınav grubu olarak okunur; böylece aynı sınıfa ait Yazılı, Dinleme
+        # ve Konuşma evrakları ayrı ayrı öğretmen kontrolüne sunulur.
+        for uploaded_file, file_check in zip(uploaded_files, file_checks):
+            ok, message, structured_data = run_existing_backend_flow(
+                [uploaded_file], [file_check]
+            )
+            if not ok:
+                return False, message, structured_data
+            if not structured_data:
+                continue
+
+            nested_groups = structured_data.get("groups")
+            if isinstance(nested_groups, list):
+                groups.extend(group for group in nested_groups if isinstance(group, dict))
+            else:
+                group = dict(structured_data)
+                group["sourceFileName"] = uploaded_file.file_name
+                groups.append(group)
+
+            document_warnings = structured_data.get("warnings")
+            if isinstance(document_warnings, list):
+                warnings.extend(str(warning) for warning in document_warnings)
+
+        question_count = sum(
+            len(group.get("questions") or []) for group in groups
+        )
+        student_count = sum(
+            len(group.get("students") or []) for group in groups
+        )
+        return (
+            True,
+            f"{len(uploaded_files)} veri belgesi ayrı sınav grupları olarak okundu: "
+            f"{question_count} soru ve {student_count} öğrenci satırı öğretmen kontrolüne aktarıldı.",
+            {
+                "exam": {},
+                "questions": [],
+                "students": [],
+                "groups": groups,
+                "warnings": warnings,
+                "summary": {
+                    "questionCount": question_count,
+                    "studentCount": student_count,
+                    "groupCount": len(groups),
+                    "warningCount": len(warnings),
+                },
+            },
+        )
 
     uploaded_file = uploaded_files[0]
     file_check = file_checks[0]
