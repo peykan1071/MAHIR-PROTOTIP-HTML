@@ -1,13 +1,32 @@
 import unittest
 from unittest.mock import patch
 
-from backend.app.ocr_engine import _parse_exam_rows
+from backend.app.ocr_engine import _parse_exam_rows, read_exam_document
 from backend.app.ocr_worker import _run_image_group_ocr
 from backend.app.file_receiver import UploadedFile, FileCheckResult
 from backend.app.ocr_quality_agent import OCRDecision, assess_result
 
 
 class ExamDocumentParserTests(unittest.TestCase):
+    @patch("backend.app.ocr_engine._detect_marked_exam_type", return_value="Dinleme")
+    @patch("backend.app.ocr_engine._extract_table_rows")
+    @patch("backend.app.ocr_engine._run_ocr", return_value="<table></table>")
+    def test_visual_checkbox_overrides_wrong_nonempty_table_ocr(
+        self, _run_ocr, extract_rows, _detect_marked_exam_type
+    ):
+        extract_rows.return_value = [
+            ["Öğrencinin Adı-Soyadı", "ÖĞRENCİ-001", "Sınav Türü", "Konuşma"],
+            ["Öğrenci Okul No", "OGR-001"],
+            ["Sınıf/Şube", "9-A"],
+            ["Azami Puan", "10", "10", "20"],
+            ["Öğrencinin Aldığı Puan", "2", "3", "5"],
+        ]
+
+        result = read_exam_document(b"image", ".png")
+
+        self.assertEqual(result["exam"]["examType"], "Dinleme")
+        self.assertEqual(result["exam"]["examTypeSource"], "visual-checkbox")
+
     def test_class_section_accepts_ocr_space_separator(self):
         rows = [["Sınıf/Şube", "9", "A"]]
 
