@@ -19,6 +19,34 @@ SAMPLE_ROWS = [
 
 
 class DocumentTableParserTests(unittest.TestCase):
+    def test_multiple_word_documents_remain_separate_exam_groups(self):
+        written = {
+            "exam": {"classSection": "9-A", "examType": "Yazılı"},
+            "questions": [{"number": 1, "maxScore": 10}],
+            "students": [{"studentNo": "001", "scores": [8], "totalScore": 8}],
+            "warnings": [],
+            "summary": {"questionCount": 1, "studentCount": 1, "warningCount": 0},
+        }
+        listening = {
+            "exam": {"classSection": "9-A", "examType": "Dinleme"},
+            "questions": [{"number": 1, "maxScore": 10}],
+            "students": [{"studentNo": "001", "scores": [7], "totalScore": 7}],
+            "warnings": [],
+            "summary": {"questionCount": 1, "studentCount": 1, "warningCount": 0},
+        }
+        files = [UploadedFile("yazili.docx", b"written"), UploadedFile("dinleme.docx", b"listening")]
+        checks = [validate_file_name(uploaded.file_name) for uploaded in files]
+
+        with patch("backend.app.file_receiver.parse_mahir_docx", side_effect=[written, listening]):
+            ok, message, structured = run_existing_backend_flow(files, checks)
+
+        self.assertTrue(ok)
+        self.assertIn("2 veri belgesi ayrı sınav grupları olarak okundu", message)
+        self.assertEqual(len(structured["groups"]), 2)
+        self.assertEqual([group["exam"]["examType"] for group in structured["groups"]], ["Yazılı", "Dinleme"])
+        self.assertEqual(structured["summary"]["studentCount"], 2)
+        self.assertEqual(structured["groups"][0]["sourceFileName"], "yazili.docx")
+
     def test_teacher_columns_are_mapped_by_heading_and_identity_is_removed(self):
         result = parse_tabular_document([SAMPLE_ROWS], source_label="Deneme")
         self.assertEqual(result["questions"], [

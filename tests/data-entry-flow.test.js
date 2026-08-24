@@ -29,6 +29,7 @@ assert.match(html, /Sınıf\/şube \(ör\. 9-A\) ile sınav türü \(Yazılı, D
 
 assert.match(script, /const detectedGroups = hasFileNameExamEvidence/);
 assert.match(script, /legacyRowExplosion/);
+assert.match(script, /isImageUpload && \(legacyRowExplosion \|\| !hasReadableGroupContext\)/);
 assert.match(script, /data-apply-recovered-question-count/);
 assert.match(script, /Math\.min\(50, detectedQuestionCount\)/);
 assert.match(script, /azami puanı sıfırdan büyük olmalıdır/);

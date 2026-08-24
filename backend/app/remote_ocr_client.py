@@ -9,6 +9,7 @@ shape as the local file receiver.
 from __future__ import annotations
 
 import json
+import http.client
 import mimetypes
 import os
 import time
@@ -94,7 +95,13 @@ def run_remote_image_group_ocr(
         try:
             payload = json.loads(error.read().decode("utf-8"))
             return False, str(payload.get("message") or error), None
-        except (ValueError, UnicodeDecodeError):
+        except (ValueError, UnicodeDecodeError, http.client.IncompleteRead):
+            if error.code == 401:
+                return (
+                    False,
+                    "Uzak OCR yetkilendirmesi başarısız. Yerel ve Modal OCR anahtarlarını eşitleyiniz.",
+                    None,
+                )
             return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as error:
         return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None

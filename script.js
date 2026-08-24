@@ -4949,6 +4949,7 @@ const fileUploadBridge = (() => {
       // önce: eksik alan uyarısıyla dönülen yol bir "OCR işlemi" değil.
       const stopTimer = startTimer("OCR");
       const uploadedBytes = uploadBatch.reduce((sum, file) => sum + file.size, 0);
+      const isImageUpload = uploadBatch.every((file) => /\.(?:jpe?g|png|webp)$/i.test(file.name));
 
       const uploadChunks = Array.from({ length: Math.ceil(uploadBatch.length / 10) }, (_, index) => uploadBatch.slice(index * 10, index * 10 + 10));
       const uploadChunksWithConcurrency = async (chunks, concurrency = 3) => {
@@ -4995,7 +4996,7 @@ const fileUploadBridge = (() => {
             );
           });
           const legacyRowExplosion = returnedDocumentCount > uploadBatch.length;
-          if (legacyRowExplosion || !hasReadableGroupContext) {
+          if (isImageUpload && (legacyRowExplosion || !hasReadableGroupContext)) {
             const reason = legacyRowExplosion
               ? `OCR ${uploadBatch.length} evraktan ${returnedDocumentCount} satır üretti; tablo başlıkları öğrenci kaydı olarak yorumlanmış olabilir.`
               : "OCR evrakların sınıf/şube ve sınav türü bilgilerini birlikte okuyamadı.";
