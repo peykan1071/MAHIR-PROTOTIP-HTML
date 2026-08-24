@@ -14,6 +14,7 @@ hiçbiri LLM tarafından üretilmez veya değiştirilmez; her çağrı ilgili aj
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import logging
@@ -21,7 +22,6 @@ import re
 from typing import Any
 
 from .. import measurement_engine
-from ..charter_guard import strip_recommendation_sentences
 from ..models import CEDValidationIssue
 from ..program_catalog import validate_question_program_context
 from .base import AgentContext, AgentIssue, AgentResult
@@ -185,8 +185,28 @@ _REASON_UNKNOWN = "bilinmeyen"
 
 
 def _note_reason(reasons: list[str] | None, code: str) -> None:
+    """Ret sebebini (varsa) çağıranın listesine düşürür.
+
+    `backend/run_diagnosis_test.py` bunu kullanarak "neden reddedildi"yi
+    doğrudan terminale yazar - aksi hâlde her başarısız üretim, ham çıktıyı
+    elle inceleyip hangi kuralın tetiklendiğini tahmin etmeyi gerektiriyor.
+    Üretim yolunda çağıranlar `None` geçer ve hiçbir maliyeti olmaz.
+    """
+
     if reasons is not None:
         reasons.append(code)
+
+
+def _reason_code(reason: str) -> str:
+    """`_note_reason`a yazılan metinden sabit KODU ayıklar.
+
+    Birçok sebep, kodun ardından teşhis amaçlı ayrıntı taşır (ör.
+    `f"{_REASON_TERM_UNGROUNDED} (0/2 ...)"`, `"kod-sizintisi: [...] (...)"`).
+    Sayım (`ragRejectReasons`) ve retry ipucu seçimi (`_grounding_retry_hint_for`)
+    kodun KENDİSİYLE eşleşmeli - ayrıntı her çağrıda farklı olduğundan ham
+    metni anahtar/anahtar-arama olarak kullanmak hiçbir zaman eşleşmez."""
+
+    return reason.split(" (", 1)[0].split(":", 1)[0].strip()
 
 
 # `PedagogicalAnalysisAgent._evaluate_diagnosis_result`in "retry" durumu için:
@@ -244,7 +264,7 @@ def _grounding_retry_hint_for(reason: str | None) -> str:
 
     if reason is None:
         return _GROUNDING_RETRY_HINT
-    return _RETRY_HINTS_BY_REASON.get(reason, _GROUNDING_RETRY_HINT)
+    return _RETRY_HINTS_BY_REASON.get(_reason_code(reason), _GROUNDING_RETRY_HINT)
 
 
 def _build_grounding_retry_prompt(original: dict[str, Any], reason: str | None = None) -> dict[str, Any]:
@@ -704,7 +724,6 @@ class PedagogicalAnalysisAgent:
         - bkz. `run_file_receiver.py::_configure_logging`).
         """
 
-        targets = context.scratch.get("diagnosisTargets", {})
         prompts_by_name = {
             str(item.get("name")): item
             for item in context.llm_queue
@@ -712,44 +731,59 @@ class PedagogicalAnalysisAgent:
         }
 
         grounded = 0
+        reject_reasons: dict[str, int] = {}
+        retry_candidates: list[tuple[str, dict[str, Any], str | None]] = []
         for name, outcome in context.scratch.get("diagnosisTargets", {}).items():
             code = str(outcome.get("outcomeCode") or "?")
             result = context.llm_result(name)
-            if not result:
-                _logger.info("RAG atlandı: cikti=%s sebep=sonuc-yok", code)
-                continue
-            if not result.get("sources"):
-                # Kaynak yoksa getirim hiç isabet vermemiştir - filtrelerden
-                # (program/sınıf/tema) biri tutmamış demektir.
-                _logger.info("RAG atlandı: cikti=%s sebep=kaynak-yok", code)
-                continue
-            answer = str(result.get("answer") or "").strip()
-            # startswith + kırpma, tam eşleşme değil: model doğru bağlamla
-            # beslendiğinde bile cevabı sık sık bu cümleyle başlatıp ardından
-            # gerçek teşhisle devam ediyor (gerçek dizin karşısında ölçüldü).
-            if answer.startswith(_RAG_NO_ANSWER_TEXT):
-                # Model kaynak yetersizliğini bildirdiyse devamına eklediği
-                # metin güvenilir kabul edilemez. Ret cümlesini kırpıp kalan
-                # olası halüsinasyonu rapora taşımak yerine yanıtın tamamı
-                # elenir.
-                answer = ""
-            if not answer:
-                _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti", code)
-                continue
-            raw_sources = result.get("sources") or []
-            # Güncel RAG uç noktası kaynak parçalarının kısa alıntılarını da
-            # döndürür. Bu durumda model nihai raporu yazmaz; yalnız kaynakta
-            # birebir doğrulanabilen iki kanıt terimi seçer ve paragrafı MAHİR
-            # belirlenimci olarak kurar. Eski/aletsiz uçların alıntısız kaynak
-            # biçimi geriye uyumluluk için mevcut sözleşmeyle denetlenir.
-            if any(str(source.get("excerpt") or "").strip() for source in raw_sources if isinstance(source, dict)):
-                answer = _compose_grounded_pedagogical_answer(answer, outcome, raw_sources)
-            if not answer or not _answer_matches_outcome_scope(answer, outcome):
-                _logger.info("RAG atlandı: cikti=%s sebep=yanit-sozlesmesi", code)
+            status, _stripped, reason = self._evaluate_diagnosis_result(code, result, outcome)
+            if status == "grounded":
+                grounded += 1
+            elif status == "retry":
+                retry_candidates.append((name, outcome, reason))
+            # "skip": kaynak/cevap hiç yok ya da model dürüstçe reddetti -
+            # outcome'a hiç dokunulmaz, ragContext boş kalır.
+
+        if retry_candidates:
+            from ..approved_data_analyzer import MAHIR_RAG_REMOTE_URL
+            from .llm import run_agent_prompts
+
+            retry_prompts = [
+                _build_grounding_retry_prompt(prompts_by_name[name], reason)
+                for name, _outcome, reason in retry_candidates
+                if name in prompts_by_name
+            ]
+            retry_results: dict[str, dict[str, Any]] = {}
+            if retry_prompts and MAHIR_RAG_REMOTE_URL:
+                try:
+                    ok, message, results = run_agent_prompts(retry_prompts, MAHIR_RAG_REMOTE_URL)
+                except Exception:  # noqa: BLE001 - retry turu da ana tur gibi ajanı asla düşürmez.
+                    _logger.exception("RAG yeniden deneme turu istisna verdi")
+                    ok, message, results = False, "istisna", None
+                if ok and results:
+                    retry_results = {str(item.get("name")): item for item in results}
+                else:
+                    _logger.warning("RAG yeniden deneme turu başarısız (%s); ajan sonuçsuz devam edecek", message)
+
+            for name, outcome, first_reason in retry_candidates:
+                code = str(outcome.get("outcomeCode") or "?")
+                status, _stripped, final_reason = self._evaluate_diagnosis_result(
+                    code, retry_results.get(name), outcome
+                )
+                if status == "grounded":
+                    grounded += 1
+                    continue
+                first_code = _reason_code(first_reason) if first_reason else _REASON_UNKNOWN
+                final_code = _reason_code(final_reason) if final_reason else first_code
                 outcome["ragContext"] = _RAG_SCOPE_REJECTED_TEXT
                 outcome["ragSources"] = []
+                reject_reasons[final_code] = reject_reasons.get(final_code, 0) + 1
+                _logger.info(
+                    "RAG yeniden-deneme-de-basarisiz: cikti=%s ilk_ayrinti=%s son_ayrinti=%s",
+                    code, first_code, final_code,
+                )
 
-        return AgentResult(outputs={"curriculumGroundedCount": grounded})
+        return AgentResult(outputs={"curriculumGroundedCount": grounded, "ragRejectReasons": reject_reasons})
 
 
 class ReportingAgent:
@@ -1049,17 +1083,25 @@ def _grounded_word_overlap(diagnosis: str, evidence: str, theme: str = "") -> li
     return matched
 
 
-def _note_reason(reasons: list[str] | None, code: str) -> None:
-    """Ret sebebini (varsa) çağıranın listesine düşürür.
+def _is_not_found_response(answer: str) -> bool:
+    """Modelin `{"status":"not_found"}` biçiminde dönebileceği - önceki
+    sürüm şemasının - dürüst ret sinyalini tanır.
 
-    `backend/run_diagnosis_test.py` bunu kullanarak "neden reddedildi"yi
-    doğrudan terminale yazar - aksi hâlde her başarısız üretim, ham çıktıyı
-    elle inceleyip hangi kuralın tetiklendiğini tahmin etmeyi gerektiriyor.
-    Üretim yolunda çağıranlar `None` geçer ve hiçbir maliyeti olmaz.
+    Güncel prompt (`agents/prompts.py`) modelden bu şekli hiç istemiyor;
+    model artık ya bir `{"diagnosis": ...}` nesnesi ya da (nadiren) düz metin
+    döndürüyor. Yine de uç noktadan bu eski biçim gelirse `_RAG_NO_ANSWER_TEXT`
+    ile AYNI şekilde ele alınmalı: görünür bir ret mesajı üretmeden sessizce
+    atlanmalı - `_evaluate_diagnosis_result` bunu çağırır.
     """
 
-    if reasons is not None:
-        reasons.append(code)
+    candidate = answer.strip()
+    if candidate.startswith("```"):
+        candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.IGNORECASE)
+    try:
+        payload, _unused_tail = json.JSONDecoder().raw_decode(candidate)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return False
+    return isinstance(payload, dict) and str(payload.get("status") or "").strip().lower() == "not_found"
 
 
 def _compose_grounded_pedagogical_answer(
@@ -1143,7 +1185,7 @@ def _compose_grounded_pedagogical_answer(
     if len(grounded_words) < _MIN_GROUNDED_WORDS:
         _note_reason(
             reasons,
-            f"kaynak-ortusmesi-yetersiz ({len(grounded_words)}/{_MIN_GROUNDED_WORDS} "
+            f"{_REASON_TERM_UNGROUNDED} ({len(grounded_words)}/{_MIN_GROUNDED_WORDS} "
             f"ayırt edici sözcük; bulunan: {grounded_words})",
         )
         return ""
