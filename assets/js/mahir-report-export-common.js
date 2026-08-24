@@ -902,11 +902,14 @@
     return element;
   };
 
-  // Ekran önizlemesini "hoş" kılan görsel katman: bilinen düzey metinlerini
-  // renkli rozete, saf yüzde hücrelerini mini bir çubuğa çevirir. Bu katman
-  // SADECE ekranda (renderPreviewBody) çalışır - PDF/Word çıktısı hâlâ
-  // getReportModel'in düz metin hücrelerinden üretiliyor, burada hiçbir
-  // sayı veya oran değişmez, yalnız aynı metin görsel olarak vurgulanır.
+  // Rapor tablolarını "hoş" kılan görsel katman: bilinen düzey metinlerini
+  // renkli rozete, saf yüzde hücrelerini mini bir çubuğa çevirir. Tespit
+  // mantığı (`cellVisual`) ve renk paleti (`TONE_COLORS`) BURADA, tek yerde
+  // tanımlı - ekran (bu dosya), PDF (`mahir-pdf-exporter.js`) ve Word
+  // (`mahir-docx-exporter.js`) üçü de aynı fonksiyonu çağırır. Hiçbir sayı
+  // veya oran değişmez; yalnız aynı metin üç çıktıda da AYNI şekilde
+  // vurgulanır - üç ayrı yerde üç ayrı algılama mantığı yazmak er ya da geç
+  // birbirinden sapardı.
   const LEVEL_TONE_MAP = new Map([
     ["Beklenen düzeyin üzerinde", "excellent"],
     ["Beklenen düzeyde", "good"],
@@ -926,6 +929,16 @@
     return "priority";
   };
 
+  // Dört düzey tonu için tek renk kaynağı. `bg`/`text` rozet (düzey hücreleri)
+  // için, `bar` yüzde çubuğunun dolgu rengi için - üçü de "#" ÖNEKSİZ hex
+  // (DOCX `w:shd`/`w:color` böyle ister; PDF/ekran "#" ekleyerek kullanır).
+  const TONE_COLORS = {
+    excellent: { bg: "dcf3e3", text: "187a41", bar: "2fa360" },
+    good: { bg: "dceef8", text: "1c6ba8", bar: "008c95" },
+    developing: { bg: "fbedcf", text: "92620a", bar: "d99a1c" },
+    priority: { bg: "fbdedb", text: "b3392f", bar: "d1453b" }
+  };
+
   // Sütun başlığı "gerçekleşme" veya "başarı" içermiyorsa (ör. "Ağırlık" gibi
   // bir dağılım yüzdesi) çubuk çizilmez - o yüzdenin renk anlamı başarı
   // düzeyi değildir, çubuk yanlış bir yorum önerirdi.
@@ -934,31 +947,49 @@
     return normalized.includes("gerceklesme") || normalized.includes("basari");
   };
 
-  const decoratePreviewCell = (td, text, columnIsPerformancePercent) => {
+  // Bir hücrenin görsel muamele GEREKTİRİP gerektirmediğini ve nasıl
+  // çizileceğini tarif eden tek karar noktası. `null` dönerse hücre düz
+  // metin kalır (üç render hedefi de bunu aynı şekilde yorumlar).
+  const cellVisual = (text, columnIsPerformancePercent) => {
     const value = String(text ?? "");
     const tone = levelTone(value);
-    if (tone) {
+    if (tone) return { kind: "level", tone, colors: TONE_COLORS[tone], text: value };
+    if (!columnIsPerformancePercent) return null;
+    const match = value.match(/^%(-?\d+(?:,\d+)?)$/);
+    if (!match) return null;
+    const numeric = Number(match[1].replace(",", "."));
+    if (!Number.isFinite(numeric)) return null;
+    const tonePercent = percentTone(numeric);
+    return {
+      kind: "percent",
+      tone: tonePercent,
+      colors: TONE_COLORS[tonePercent],
+      text: value,
+      percent: Math.max(0, Math.min(100, numeric))
+    };
+  };
+
+  const decoratePreviewCell = (td, text, columnIsPerformancePercent) => {
+    const visual = cellVisual(text, columnIsPerformancePercent);
+    if (!visual) return;
+    if (visual.kind === "level") {
       const badge = document.createElement("span");
-      badge.className = `level-badge level-badge--${tone}`;
-      badge.textContent = value;
+      badge.className = `level-badge level-badge--${visual.tone}`;
+      badge.textContent = visual.text;
       td.replaceChildren(badge);
       return;
     }
-    const percentMatch = columnIsPerformancePercent && value.match(/^%(-?\d+(?:,\d+)?)$/);
-    const numeric = percentMatch ? Number(percentMatch[1].replace(",", ".")) : NaN;
-    if (percentMatch && Number.isFinite(numeric)) {
-      const wrap = document.createElement("span");
-      wrap.className = "percent-cell";
-      const bar = document.createElement("span");
-      bar.className = "percent-cell-bar";
-      bar.dataset.tone = percentTone(numeric);
-      bar.style.setProperty("--pct", `${Math.max(0, Math.min(100, numeric))}%`);
-      const label = document.createElement("span");
-      label.className = "percent-cell-label";
-      label.textContent = value;
-      wrap.append(bar, label);
-      td.replaceChildren(wrap);
-    }
+    const wrap = document.createElement("span");
+    wrap.className = "percent-cell";
+    const bar = document.createElement("span");
+    bar.className = "percent-cell-bar";
+    bar.dataset.tone = visual.tone;
+    bar.style.setProperty("--pct", `${visual.percent}%`);
+    const label = document.createElement("span");
+    label.className = "percent-cell-label";
+    label.textContent = visual.text;
+    wrap.append(bar, label);
+    td.replaceChildren(wrap);
   };
 
   // Kanıt hücresini ekranda açılır hâle getirir: özet her zaman görünür,
@@ -1113,6 +1144,12 @@
     normalizeText,
     formatNumber,
     formatPercent,
+    // Tablo hücrelerinin görsel muamelesi (rozet/çubuk) için tek karar
+    // noktası - PDF ve Word dışa aktarıcıları bunu KULLANIR, yeniden
+    // uygulamaz (bkz. yukarıdaki `cellVisual` yorumu).
+    cellVisual,
+    isPerformancePercentHeading,
+    TONE_COLORS,
     // Analiz ekranı da aynı cümleleri kullanıyor (bkz. script.js
     // renderAgentTrace) - ekran ile rapor asla farklı şey söylememeli.
     agentTaskText,
