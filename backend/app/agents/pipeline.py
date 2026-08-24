@@ -14,12 +14,15 @@ hiçbiri LLM tarafından üretilmez veya değiştirilmez; her çağrı ilgili aj
 
 from __future__ import annotations
 
+import difflib
+import hashlib
 import json
 import logging
 import re
 from typing import Any
 
 from .. import measurement_engine
+from ..charter_guard import strip_recommendation_sentences
 from ..models import CEDValidationIssue
 from ..program_catalog import validate_question_program_context
 from .base import AgentContext, AgentIssue, AgentResult
@@ -36,9 +39,118 @@ from .prompts import DIAGNOSIS_SYSTEM_PROMPT, STRENGTH_SYSTEM_PROMPT, build_anom
 # gürültüden başka bir şey olmaz.
 _NO_ANOMALY_TEXT = "Belirgin bir tutarsızlık görülmedi"
 
-# Getirimde çekilecek parça sayısı - backend/app/rag_client.py ile aynı
-# gerekçe: parçalar 512 token ve getirim zaten tek temaya kısıtlı.
+# Getirimde MODELE gönderilecek NİHAİ parça sayısı - bu, `rag_service.py`nin
+# Qdrant'tan çektiği HAM aday sayısı DEĞİL (bkz. orada `_MMR_CANDIDATE_
+# MULTIPLIER`/`_MMR_MIN_CANDIDATE_POOL`, o çok daha geniş bir havuz çekip
+# `_mmr_select` ile bu sayıya iner). 2026-08-22 önce 8 -> 16 -> 12 arası
+# gidip geldi (bkz. git geçmişi): aynı kazanımın birbirine çok benzeyen
+# "kazanım tanımlama" satırları düz "en yüksek skorlu top_k" seçiminde tek
+# başına tüm slotları doldurup temanın asıl zengin içeriğini dışarıda
+# bırakıyordu, ama `top_k`yi büyütmek BAŞKA bir sorguda kalabalık/tekrarlı
+# bağlamın modelin dikkatini dağıtmasına yol açtı (ölçüldü: 5/5 -> 0/5).
+# Kök sorun bir SAYI ayarıyla çözülemeyen yapısal bir tekrar sorunuydu; asıl
+# çözüm `rag_service.py`ye eklenen MMR (Maximal Marginal Relevance)
+# yeniden-sıralaması - o artık alaka VE çeşitliliği birlikte gözetiyor, bu
+# yüzden nihai sayı tekrar makul/küçük bir değere (8) çekilebildi.
 _DIAGNOSIS_TOP_K = 8
+
+# `_compose_grounded_pedagogical_answer`in cümle kalıp havuzları. Model
+# BAĞLAM'dan doğrulanmış BİR ya da İKİ terim seçiyor, cümlenin TAMAMINI
+# MAHİR kuruyor (kanıt garantisi bundan geliyor) - ama tek bir sabit kalıp
+# her satırı birebir aynı iskelete sokup raporu robotik/tek düze gösteriyordu.
+# Her varyant aynı zorunlu parçaları taşımak ZORUNDA (tırnaklı tema adı,
+# terim(ler), "%<oran> olarak hesaplanmıştır" - `RagContextAttachmentTests`
+# bunu doğruluyor); yalnız cümlenin çevresi değişiyor. `{terms}` tek bir
+# terimde "X", ikide "X ve Y" olarak önceden birleştirilip veriliyor - ayrı
+# `{term1}`/`{term2}` yer tutucuları TEK terimli durumda boş kalırdı.
+# Seçim `_pick_template` ile GİRDİYE göre belirlenimci (aynı kazanım aynı
+# yeniden üretimde hep aynı kalıbı alır - test edilebilirlik/kararlılık
+# için) ama farklı kazanımlar farklı kalıp alır, bu yüzden bir raporun
+# tamamı tek tip görünmez.
+#
+# 2026-08-22 (4. sürüm): TAM OLARAK İKİ zorunluluğu kaldırıldı - dar
+# kapsamlı bazı kazanımlarda BAĞLAM'da gerçekten TEK güçlü/somut aday
+# bulunuyor, model ikinciyi uydurmak yerine tamamen `not_found` diyip
+# öğretmene hiçbir yorum göstermiyordu. Artık BİR terim de kabul ediliyor;
+# doğrulama kuralı (`_term_is_grounded`) ve kanıt garantisi DEĞİŞMEDİ.
+_OPENING_TEMPLATES = (
+    (
+        '"{theme}" temasında {terms} kapsamındaki sınıf başarı oranı '
+        "%{percent} olarak hesaplanmıştır."
+    ),
+    (
+        '"{theme}" temasındaki {terms} bileşeninde sınıf başarı '
+        "oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        'Sınıfın "{theme}" temasında {terms} kapsamındaki başarı oranı '
+        "%{percent} olarak hesaplanmıştır."
+    ),
+    (
+        '"{theme}" temasında ölçülen {terms} performansına göre sınıf '
+        "başarı oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        '"{theme}" temasına ait {terms} göstergesinde sınıf başarı '
+        "oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        'Elde edilen verilere göre "{theme}" temasında {terms} '
+        "açısından sınıf başarı oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        '"{theme}" temasında {terms} temel alınarak sınıf '
+        "başarı oranı %{percent} olarak hesaplanmıştır."
+    ),
+    (
+        'Değerlendirme sonuçlarına göre "{theme}" temasında {terms} '
+        "bakımından sınıf başarı oranı %{percent} olarak hesaplanmıştır."
+    ),
+)
+_WEAK_CLOSING_TEMPLATES = (
+    (
+        "Eksikliğin şiddeti: {severity}. Bu performans, seçilen öğrenme "
+        "çıktısının sonraki süreçleri açısından sarmal risk taşır."
+    ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu durum, ileri düzey kazanımlar için "
+        "sarmal bir risk oluşturmaktadır."
+    ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu eksiklik, sonraki öğrenme "
+        "süreçlerine sarmal biçimde yansıyabilir."
+    ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu düzey, ilerleyen kazanımların "
+        "sağlıklı biçimde oluşması açısından risk taşımaktadır."
+    ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu tablo, sonraki öğrenme "
+        "basamaklarına sarmal biçimde etki edebilir."
+    ),
+    (
+        "Eksikliğin şiddeti: {severity}. Bu sonuç, ileriki kazanımların "
+        "temelini oluşturan bir alanda risk işaret etmektedir."
+    ),
+)
+_STRONG_CLOSING_TEMPLATES = (
+    "Bu sonuç, seçilen öğrenme çıktısında güçlü bir performans alanını gösterir.",
+    "Bu veriler, seçilen öğrenme çıktısında sağlam bir kazanım düzeyine işaret eder.",
+    "Sınıf, seçilen öğrenme çıktısında bu alanda belirgin bir başarı sergilemektedir.",
+    "Elde edilen veriler, seçilen öğrenme çıktısında yüksek bir yeterlik düzeyine karşılık gelmektedir.",
+    "Bu bulgular, seçilen öğrenme çıktısında sınıfın büyük ölçüde başarılı olduğunu göstermektedir.",
+    "Seçilen öğrenme çıktısına ilişkin veriler, güçlü bir performans düzeyini yansıtmaktadır.",
+)
+
+
+def _pick_template(templates: tuple[str, ...], *seed_parts: str) -> str:
+    """`seed_parts`e göre belirlenimci bir kalıp seçer (rastgele değil - aynı
+    girdi her zaman aynı kalıbı almalı, aksi hâlde bir raporu iki kez
+    üretmek farklı metin verirdi)."""
+
+    digest = hashlib.md5("|".join(seed_parts).encode("utf-8")).hexdigest()
+    return templates[int(digest, 16) % len(templates)]
+
 
 # LLM/RAG bir kaynak bulsa bile yanıt seçilen sınav becerisine saparsa metni
 # rapora taşımayız. Hücreyi sessizce boş bırakmak yerine öğretmene nedenini
@@ -47,7 +159,107 @@ _RAG_SCOPE_REJECTED_TEXT = (
     "Seçilen sınav türü ve öğrenme çıktısıyla uyumlu, doğrulanmış bir kaynak bağlamı oluşturulamadı."
 )
 
+# 2026-08-23: doğrulama neden başarısız olduğunu tanılamak için sebep kodları.
+# `_compose_grounded_pedagogical_answer`/`_answer_matches_outcome_scope`
+# çağrılırken opsiyonel `reasons` listesine yazılır, `apply_llm` bunu hem
+# loglar hem `AgentResult.outputs["ragRejectReasons"]`a sayar (bkz. o
+# fonksiyonun docstring'i). Amaç: `_RAG_SCOPE_REJECTED_TEXT`in GERÇEKTE hangi
+# sebeple tetiklendiğini ölçebilmek - önceden yalnızca tek bir genel
+# "yanit-sozlesmesi" logu vardı, hangi kontrolün tetiklendiği ayırt
+# edilemiyordu. GİZLİLİK: yalnızca bu KOD loglanır, model cevabı/gerekçe
+# metni/kaynak alıntısı asla (bkz. `agents/llm.py::trace_entry`deki aynı
+# disiplin).
+_REASON_STATUS_NOT_SUCCESS = "durum-basarisiz"
+_REASON_EVIDENCE_COUNT = "kanit-sayisi"
+_REASON_EVIDENCE_ITEM_SHAPE = "kanit-ogesi-bicimsiz"
+_REASON_TERM_SHAPE = "terim-bicimsiz"
+_REASON_RATIONALE_STRIPPED = "gerekce-charter-bosaltti"
+_REASON_DUPLICATE_TERMS = "yinelenen-terim"
+_REASON_TERM_UNGROUNDED = "terim-baglamda-yok"
+_REASON_THEME_MISSING = "tema-eksik"
+_REASON_TOO_LONG = "uzunluk-asimi"
+_REASON_CAUSAL_OVERCLAIM = "nedensellik-iddiasi"
+_REASON_ACTION_LANGUAGE = "eylem-dili"
+_REASON_CODE_LEAK = "kod-sizintisi"
+_REASON_CROSS_SKILL_LEAK = "capraz-beceri-sizintisi"
+_REASON_UNKNOWN = "bilinmeyen"
+
+
+def _note_reason(reasons: list[str] | None, code: str) -> None:
+    if reasons is not None:
+        reasons.append(code)
+
+
+# `PedagogicalAnalysisAgent._evaluate_diagnosis_result`in "retry" durumu için:
+# ilk denemede doğrulanamayan çıktılar, başarısızlığın SEBEBİNE göre seçilen
+# bir düzeltici notla AYNI getirime bir kez daha sorulur. Önceden tek bir
+# sabit ipucu vardı (yalnızca terim-ayarı sorunundan bahsediyordu) - gerçek
+# sebep başka bir şeyse (ör. gerekçe charter filtresiyle boşaldıysa) o ipucu
+# alakasızdı ve retry aynı sebeple tekrar başarısız olma ihtimali yüksekti.
+_GROUNDING_RETRY_HINT = (
+    "\n\nNOT: Önceki denemende seçtiğin en az bir terim BAĞLAM'da BİREBİR "
+    "geçmiyordu (eş anlamlı ya da çekim eki değiştirilmiş bir ifade "
+    "kullanmıştın) veya yanıtın seçilen öğrenme çıktısının kapsamı dışına "
+    "çıkmıştı. Bu kez YALNIZCA BAĞLAM'da harfi harfine geçen kelime veya "
+    "kelime öbeklerini seç; hiçbir kelimeyi değiştirme."
+)
+
+_RATIONALE_RETRY_HINT = (
+    "\n\nNOT: Önceki denemende gerekçe (gapRationale/strengthRationale) "
+    "zorunluluk kipiyle yazılmıştı (ör. '...gerekir', '...gereklidir', "
+    "'...yapılmalıdır', '...önerilir') ve bu yüzden tamamen elendi. Bu kez "
+    "gerekçeyi DOĞRUDAN GÖZLEMSEL bir cümleyle yaz - ne yapılması "
+    "GEREKTİĞİNİ değil, öğrencide NE EKSİK/NE GÜÇLÜ olduğunu anlat. Örnek "
+    "kalıplar: '...net biçimde kurulamamaktadır.', '...sınırlı düzeyde "
+    "kalmaktadır.', '...başarıyla uygulanmaktadır.'"
+)
+
+_SCOPE_RETRY_HINT = (
+    "\n\nNOT: Önceki denemen ya çok uzundu, ya kanıtlanamayacak bir "
+    "nedensellik/öğrenci sayısı iddiası içeriyordu, ya öneri/etkinlik dili "
+    "kullanmıştı ya da izin verilmeyen bir kazanım kodu/beceri alanı "
+    "sızdırmıştı. Bu kez YALNIZCA seçilen öğrenme çıktısının kapsamında "
+    "kal, kısa ve tanı-odaklı yaz; hiçbir öneri, etkinlik veya nedensellik "
+    "iddiası ekleme."
+)
+
+# Sebep kodu -> retry ipucu. Eşlenmeyen sebepler (ör. kanıt sayısı/biçim
+# sorunları - bunlar zaten JSON şemasının kendisiyle ilgili, prompttaki
+# ÇIKTI FORMATI zaten bunu anlatıyor) varsayılan (terim-ayarı) ipucuna düşer.
+_RETRY_HINTS_BY_REASON: dict[str, str] = {
+    _REASON_TERM_UNGROUNDED: _GROUNDING_RETRY_HINT,
+    _REASON_RATIONALE_STRIPPED: _RATIONALE_RETRY_HINT,
+    _REASON_TOO_LONG: _SCOPE_RETRY_HINT,
+    _REASON_CAUSAL_OVERCLAIM: _SCOPE_RETRY_HINT,
+    _REASON_ACTION_LANGUAGE: _SCOPE_RETRY_HINT,
+    _REASON_CODE_LEAK: _SCOPE_RETRY_HINT,
+    _REASON_CROSS_SKILL_LEAK: _SCOPE_RETRY_HINT,
+}
+
 _logger = logging.getLogger(__name__)
+
+
+def _grounding_retry_hint_for(reason: str | None) -> str:
+    """Sebep koduna göre düzeltici ipucu seçer; eşlenmeyen/`None` sebep
+    varsayılan (terim-ayarı) ipucuna düşer - bkz. `_RETRY_HINTS_BY_REASON`."""
+
+    if reason is None:
+        return _GROUNDING_RETRY_HINT
+    return _RETRY_HINTS_BY_REASON.get(reason, _GROUNDING_RETRY_HINT)
+
+
+def _build_grounding_retry_prompt(original: dict[str, Any], reason: str | None = None) -> dict[str, Any]:
+    """Doğrulama başarısız olduğunda AYNI getirimle (aynı BAĞLAM) tek seferlik
+    yeniden deneme prompt'u kurar - `system`/`retrieval` aynı kalır, yalnız
+    `user`e, başarısızlığın SEBEBİNE göre seçilen düzeltici bir not eklenir
+    (bkz. `_grounding_retry_hint_for`). Aynı `retrieval` kasıtlı: getirim
+    zaten deterministik, sorun modelin BAĞLAM'ı yanlış kullanmasıydı, hangi
+    BAĞLAM'ın getirildiği değil.
+    """
+
+    retry = dict(original)
+    retry["user"] = str(original.get("user") or "") + _grounding_retry_hint_for(reason)
+    return retry
 
 
 class DocumentUnderstandingAgent:
@@ -388,6 +600,83 @@ class PedagogicalAnalysisAgent:
             }
         )
 
+    def _evaluate_diagnosis_result(
+        self, code: str, result: dict[str, Any] | None, outcome: dict[str, Any]
+    ) -> tuple[str, int, str | None]:
+        """Tek bir teşhis denemesini değerlendirir; başarılıysa `outcome`u yazar.
+
+        Döner: `(durum, kırpılan_cümle_sayısı, sebep)`. `durum` üçünden biri:
+        - `"grounded"`: rapora yazıldı.
+        - `"retry"`: model bir cevap ÜRETTİ ama doğrulanamadı (BAĞLAM'da
+          birebir geçmeyen terim, kapsam dışı yanıt vb.) - yeniden denemeye
+          değer, çünkü üretim stokastik ve aynı soru ikinci seferde farklı
+          (ve doğrulanabilir) bir terim seçebilir.
+        - `"skip"`: kaynak/cevap hiç yok ya da model dürüstçe "bu kazanıma
+          BAĞLAM'da içerik yok" dedi - yeniden denemek sonucu değiştirmez.
+
+        `sebep` yalnızca `"retry"` durumunda dolu (bkz. `_REASON_*`
+        sabitleri) - `apply_llm` bunu hem loglamak hem retry ipucunu
+        seçmek (`_grounding_retry_hint_for`) için kullanır.
+        """
+
+        from ..approved_data_analyzer import _RAG_NO_ANSWER_TEXT
+
+        if not result:
+            _logger.info("RAG atlandı: cikti=%s sebep=sonuc-yok", code)
+            return "skip", 0, None
+        if not result.get("sources"):
+            # Kaynak yoksa getirim hiç isabet vermemiştir - filtrelerden
+            # (program/sınıf/tema) biri tutmamış demektir.
+            _logger.info("RAG atlandı: cikti=%s sebep=kaynak-yok", code)
+            return "skip", 0, None
+        answer = str(result.get("answer") or "").strip()
+        # startswith + kırpma, tam eşleşme değil: model doğru bağlamla
+        # beslendiğinde bile cevabı sık sık bu cümleyle başlatıp ardından
+        # gerçek teşhisle devam ediyor (gerçek dizin karşısında ölçüldü).
+        # `_is_not_found_response`, 2026-08-22 (2. sürüm) şemasının
+        # `{"status":"not_found"}` biçimini AYNI şekilde ele alır - ikisi
+        # de "BAĞLAM'da içerik yok" demenin dürüst bir yolu, sözleşme
+        # ihlali değil; ikisi de görünür ret mesajı OLMADAN sessizce
+        # atlanmalı (aksi hâlde meşru "bu konuda içerik yok" durumları
+        # öğretmene sanki model hata yapmış gibi görünürdü).
+        if answer.startswith(_RAG_NO_ANSWER_TEXT) or _is_not_found_response(answer):
+            # Model kaynak yetersizliğini bildirdiyse devamına eklediği
+            # metin güvenilir kabul edilemez. Ret cümlesini kırpıp kalan
+            # olası halüsinasyonu rapora taşımak yerine yanıtın tamamı
+            # elenir.
+            answer = ""
+        if not answer:
+            _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti", code)
+            return "skip", 0, None
+        stripped = int(result.get("strippedSentences") or 0)
+        raw_sources = result.get("sources") or []
+        reasons: list[str] = []
+        # Güncel RAG uç noktası kaynak parçalarının kısa alıntılarını da
+        # döndürür. Bu durumda model nihai raporu yazmaz; yalnız kaynakta
+        # birebir doğrulanabilen iki kanıt terimi seçer ve paragrafı MAHİR
+        # belirlenimci olarak kurar. Eski/aletsiz uçların alıntısız kaynak
+        # biçimi geriye uyumluluk için mevcut sözleşmeyle denetlenir.
+        if any(str(source.get("excerpt") or "").strip() for source in raw_sources if isinstance(source, dict)):
+            answer = _compose_grounded_pedagogical_answer(answer, outcome, raw_sources, reasons)
+        if not answer or not _answer_matches_outcome_scope(answer, outcome, reasons):
+            # `reasons`a en fazla BİR kod yazılır: `_compose_grounded_
+            # pedagogical_answer` reddederse `answer` boşalır ve `or`
+            # `_answer_matches_outcome_scope`i hiç ÇAĞIRMAZ (kısa devre) -
+            # iki fonksiyon aynı anda kendi sebebini eklemez.
+            reason = reasons[0] if reasons else _REASON_UNKNOWN
+            _logger.info("RAG doğrulanamadı: cikti=%s sebep=yanit-sozlesmesi ayrinti=%s", code, reason)
+            return "retry", stripped, reason
+        merged_sources = _merge_rag_sources(raw_sources)
+        if not merged_sources:
+            _logger.info("RAG atlandı: cikti=%s sebep=gecersiz-kaynak", code)
+            return "skip", stripped, None
+        outcome["ragContext"] = answer
+        outcome["ragSources"] = merged_sources
+        _logger.info(
+            "RAG dolduruldu: cikti=%s sebep=basarili kaynak=%d", code, len(outcome["ragSources"])
+        )
+        return "grounded", stripped, None
+
     def apply_llm(self, context: AgentContext) -> AgentResult:
         """Teşhis yanıtlarını `ragContext`e, dayandığı kaynakları `ragSources`a yazar.
 
@@ -402,65 +691,101 @@ class PedagogicalAnalysisAgent:
         geldiğini söylüyordu; bu da bir teşhisin hangi BELGE SAYFASINDAN
         geldiğini söylüyor. Veri zaten uçtan geliyordu (`sources`) ve yalnız
         "boş mu" diye bakılıp atılıyordu.
+
+        2026-08-22 (3. sürüm): canlı ölçümde ilk üretimde ~%40 doğrulanamama
+        oranı görüldü (dominant sebep: model BAĞLAM'daki terimi birebir
+        değil, eş anlamlısıyla seçiyor). Üretim stokastik olduğundan aynı
+        soruyu bir kez daha sormak makul bir düzeltme - bu yüzden `"retry"`
+        durumundaki çıktılar TEK bir ek tur için toplanıp aynı getirimle
+        (aynı BAĞLAM) yeniden sorulur. Toleransı gevşetmek yerine bu yol
+        seçildi çünkü doğrulama kuralının kendisine DOKUNMUYOR - charter
+        garantisini zayıflatmadan modele ikinci bir şans veriyor.
+
+        2026-08-23: retry artık SEBEBE göre farklı bir düzeltici ipucu
+        kullanıyor (bkz. `_grounding_retry_hint_for`) - önceden tek sabit
+        ipucu vardı ve gerçek sebep başkaysa (ör. gerekçe charter
+        filtresiyle boşaldıysa) alakasızdı. `outputs["ragRejectReasons"]`
+        (sebep→sayı) da eklendi - `_RAG_SCOPE_REJECTED_TEXT`in ne sıklıkta
+        hangi sebeple tetiklendiğini ölçmek için (loglama YAPILANDIRILMIŞSA
+        - bkz. `run_file_receiver.py::_configure_logging`).
         """
 
-        from ..approved_data_analyzer import _RAG_NO_ANSWER_TEXT
+        targets = context.scratch.get("diagnosisTargets", {})
+        prompts_by_name = {
+            str(item.get("name")): item
+            for item in context.llm_queue
+            if item.get("agent") == self.name
+        }
 
         grounded = 0
         stripped = 0
-        for name, outcome in context.scratch.get("diagnosisTargets", {}).items():
+        pending: dict[str, dict[str, Any]] = {}
+        retry_reasons: dict[str, str] = {}
+        reject_reason_counts: dict[str, int] = {}
+        for name, outcome in targets.items():
             code = str(outcome.get("outcomeCode") or "?")
-            result = context.llm_result(name)
-            if not result:
-                _logger.info("RAG atlandı: cikti=%s sebep=sonuc-yok", code)
-                continue
-            if not result.get("sources"):
-                # Kaynak yoksa getirim hiç isabet vermemiştir - filtrelerden
-                # (program/sınıf/tema) biri tutmamış demektir.
-                _logger.info("RAG atlandı: cikti=%s sebep=kaynak-yok", code)
-                continue
-            answer = str(result.get("answer") or "").strip()
-            # startswith + kırpma, tam eşleşme değil: model doğru bağlamla
-            # beslendiğinde bile cevabı sık sık bu cümleyle başlatıp ardından
-            # gerçek teşhisle devam ediyor (gerçek dizin karşısında ölçüldü).
-            if answer.startswith(_RAG_NO_ANSWER_TEXT):
-                # Model kaynak yetersizliğini bildirdiyse devamına eklediği
-                # metin güvenilir kabul edilemez. Ret cümlesini kırpıp kalan
-                # olası halüsinasyonu rapora taşımak yerine yanıtın tamamı
-                # elenir.
-                answer = ""
-            if not answer:
-                _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti", code)
-                continue
-            stripped += int(result.get("strippedSentences") or 0)
-            raw_sources = result.get("sources") or []
-            # Güncel RAG uç noktası kaynak parçalarının kısa alıntılarını da
-            # döndürür. Bu durumda model nihai raporu yazmaz; yalnız kaynakta
-            # birebir doğrulanabilen iki kanıt terimi seçer ve paragrafı MAHİR
-            # belirlenimci olarak kurar. Eski/aletsiz uçların alıntısız kaynak
-            # biçimi geriye uyumluluk için mevcut sözleşmeyle denetlenir.
-            if any(str(source.get("excerpt") or "").strip() for source in raw_sources if isinstance(source, dict)):
-                answer = _compose_grounded_pedagogical_answer(answer, outcome, raw_sources)
-            if not answer or not _answer_matches_outcome_scope(answer, outcome):
-                _logger.info("RAG atlandı: cikti=%s sebep=yanit-sozlesmesi", code)
+            status, delta, reason = self._evaluate_diagnosis_result(code, context.llm_result(name), outcome)
+            stripped += delta
+            if status == "grounded":
+                grounded += 1
+            elif status == "retry" and name in prompts_by_name:
+                pending[name] = outcome
+                if reason:
+                    retry_reasons[name] = reason
+
+        if pending:
+            retry_items = [
+                _build_grounding_retry_prompt(prompts_by_name[name], retry_reasons.get(name)) for name in pending
+            ]
+            from ..approved_data_analyzer import MAHIR_RAG_REMOTE_URL
+
+            retry_results: list[dict[str, Any]] | None = None
+            if MAHIR_RAG_REMOTE_URL:
+                from .llm import run_agent_prompts
+
+                ok, message, retry_results = run_agent_prompts(retry_items, MAHIR_RAG_REMOTE_URL)
+                if not ok:
+                    _logger.warning("RAG yeniden deneme turu başarısız: %s", message)
+                    retry_results = None
+
+            retry_by_name = {str(item.get("name")): item for item in (retry_results or [])}
+            trace = context.trace_for(self.name)
+            if retry_results:
+                from .llm import trace_entry
+
+                for result in retry_results:
+                    if trace is not None:
+                        trace.llm_calls.append(trace_entry(result))
+
+            for name, outcome in pending.items():
+                code = str(outcome.get("outcomeCode") or "?")
+                status, delta, retry_reason = self._evaluate_diagnosis_result(code, retry_by_name.get(name), outcome)
+                stripped += delta
+                if status == "grounded":
+                    grounded += 1
+                    continue
+                # Yeniden deneme de doğrulanamadı (ya da hiç sonuç gelmedi) -
+                # öğretmene "bir şey bulundu ama doğrulanamadı" mesajı
+                # gösterilir; sessizce boş bırakmak, iki gerçek denemenin
+                # ikisinin de reddedildiğini gizlerdi. İlk denemenin VE
+                # retry'ın sebebi birlikte loglanır - sebep DEĞİŞTİYSE bu da
+                # tek başına bir sinyal (ipucu sorunu çözmek yerine
+                # kaydırmış olabilir).
+                final_reason = retry_reason or _REASON_UNKNOWN
+                reject_reason_counts[final_reason] = reject_reason_counts.get(final_reason, 0) + 1
+                _logger.info(
+                    "RAG atlandı: cikti=%s sebep=yeniden-deneme-de-basarisiz ilk_ayrinti=%s son_ayrinti=%s",
+                    code, retry_reasons.get(name, _REASON_UNKNOWN), final_reason,
+                )
                 outcome["ragContext"] = _RAG_SCOPE_REJECTED_TEXT
                 outcome["ragSources"] = []
-                continue
-            merged_sources = _merge_rag_sources(raw_sources)
-            if not merged_sources:
-                _logger.info("RAG atlandı: cikti=%s sebep=gecersiz-kaynak", code)
-                continue
-            outcome["ragContext"] = answer
-            outcome["ragSources"] = merged_sources
-            grounded += 1
-            _logger.info(
-                "RAG dolduruldu: cikti=%s sebep=basarili kaynak=%d",
-                code,
-                len(outcome["ragSources"]),
-            )
 
         return AgentResult(
-            outputs={"curriculumGroundedCount": grounded, "llmStrippedSentences": stripped}
+            outputs={
+                "curriculumGroundedCount": grounded,
+                "llmStrippedSentences": stripped,
+                "ragRejectReasons": reject_reason_counts,
+            }
         )
 
 
@@ -594,55 +919,128 @@ def _sanitize_anomaly_finding(answer: str, valid_question_numbers: set[int]) -> 
     return "\n".join(accepted)
 
 
+def _decode_json_object(text: str) -> dict[str, Any] | None:
+    """Model çıktısını JSON NESNESİ olarak ayrıştırmayı dener; olmazsa `None`.
+
+    Küçük modeller "yalnız JSON" talimatına rağmen geçerli nesnenin arkasına
+    açıklama ekleyebiliyor ya da onu ``` kod bloğuna sarabiliyor - ilk JSON
+    nesnesi güvenle ayrıştırılır, devamındaki serbest metin hiçbir çağıran
+    tarafından kullanılmaz.
+    """
+
+    candidate = text.strip()
+    if candidate.startswith("```"):
+        candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.IGNORECASE)
+    try:
+        payload, _unused_tail = json.JSONDecoder().raw_decode(candidate)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _is_not_found_response(answer: str) -> bool:
+    """Modelin `{"status": "not_found"}` yanıtını tanır (bkz. DIAGNOSIS_
+    SYSTEM_PROMPT madde 3). Bu, BAĞLAM'da kazanıma dair içerik olmadığının
+    dürüst bir bildirimi - bir sözleşme ihlali DEĞİL; `apply_llm` bunu
+    sessizce (görünür ret mesajı olmadan) atlamalı, tıpkı eski düz-metin
+    "Bu bilgi belgede bulunmuyor." sentinel'inin yaptığı gibi."""
+
+    payload = _decode_json_object(answer)
+    return bool(payload) and payload.get("status") == "not_found"
+
+
 def _compose_grounded_pedagogical_answer(
     answer: str,
     outcome: dict[str, Any],
     sources: list[dict[str, Any]],
+    reasons: list[str] | None = None,
 ) -> str:
-    """LLM'nin seçtiği iki kaynak teriminden güvenli rapor paragrafı kurar.
+    """LLM'nin döndürdüğü yapılandırılmış kanıtlardan güvenli rapor paragrafı kurar.
 
-    Terimler kaynak alıntılarında birebir bulunmuyorsa hiçbir metin üretilmez.
+    2026-08-22 (2. sürüm): model artık iki çıplak terim değil, her biri
+    `exactTerm` + `pedagogicalRole` + `gapRationale`/`strengthRationale`
+    taşıyan bir `evidence` dizisi döndürüyor (bkz. `agents/prompts.py::
+    DIAGNOSIS_SYSTEM_PROMPT`in ÇIKTI FORMATI'). `exactTerm`in BAĞLAM'da
+    karşılığı yoksa (Türkçe çekim eki farklılıklarına toleranslı - bkz.
+    `_term_is_grounded`) hiçbir metin üretilmez.
+
+    2026-08-22 (4. sürüm): `evidence` artık TAM OLARAK İKİ değil, BİR ya da
+    İKİ öğe taşıyabilir - dar kapsamlı kazanımlarda BAĞLAM'da gerçekten TEK
+    güçlü aday bulunabiliyor, ikisini zorunlu tutmak modeli ya ikinciyi
+    uydurmaya ya da tamamen `not_found` deyip pes etmeye itiyordu (canlıda
+    gözlenen "bazı kazanımlara hiç yorum yapılamıyor" durumunun bir nedeni).
+
+    Yeni şemanın model promptunda AÇIKÇA yazılı bir öneri/etkinlik yasağı
+    YOK (yalnız "kod UYDURMA" ve "başarı oranını terim olarak alma"
+    uyarıları var) - bu yüzden `gapRationale`/`strengthRationale` metni
+    rapora eklenmeden önce `charter_guard.strip_recommendation_sentences`
+    ile süzülür (DEVELOPMENT_CHARTER.md: "MAHİR ... öğretim yöntemi veya
+    telafi programı önermez"); süzgeç bir kanıt öğesinin gerekçesini
+    tamamen boşaltırsa o öğe (dolayısıyla TÜM yanıt) reddedilir - kısmen
+    öneri içeren bir gerekçeyi "temizleyip" yayınlamak yerine hücreyi boş
+    bırakmak doğrusu (bkz. `strip_recommendation_sentences` docstring'i).
+    `_answer_matches_outcome_scope` (bu fonksiyonun çağırandan sonraki
+    adımı) kod uydurma/beceri kayması gibi kalan riskleri ayrıca denetler.
+
     Başarı oranı ve şiddet modelden değil, ölçme motorunun sonucundan alınır.
     """
 
-    candidate = answer.strip()
-    if candidate.startswith("```"):
-        candidate = re.sub(r"^```(?:json)?\s*|\s*```$", "", candidate, flags=re.IGNORECASE)
-    try:
-        # Küçük modeller, "yalnız JSON" talimatına rağmen geçerli nesnenin
-        # arkasına açıklama ekleyebiliyor. İlk JSON nesnesi güvenle ayrıştırılır;
-        # devamındaki serbest metin rapora hiçbir koşulda taşınmaz.
-        payload, _unused_tail = json.JSONDecoder().raw_decode(candidate)
-    except (TypeError, ValueError, json.JSONDecodeError):
+    payload = _decode_json_object(answer)
+    if not payload or payload.get("status") != "success":
+        _note_reason(reasons, _REASON_STATUS_NOT_SUCCESS)
         return ""
-    terms = payload.get("evidenceTerms") if isinstance(payload, dict) else None
-    if not isinstance(terms, list) or len(terms) != 2:
-        return ""
-    terms = [" ".join(str(term).split()).strip(" .,:;\"'") for term in terms]
-    if any(not term or len(term) > 90 for term in terms) or terms[0].casefold() == terms[1].casefold():
-        return ""
-
-    evidence = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
-    normalized_evidence = _normalize_evidence_text(evidence)
-    if any(_normalize_evidence_text(term) not in normalized_evidence for term in terms):
+    evidence_items = payload.get("evidence")
+    if not isinstance(evidence_items, list) or not 1 <= len(evidence_items) <= 2:
+        _note_reason(reasons, _REASON_EVIDENCE_COUNT)
         return ""
 
     rate = float(outcome.get("successRate") or 0.0)
-    percent = round(rate * 100)
+    is_weak = rate < 0.70
+    rationale_key = "gapRationale" if is_weak else "strengthRationale"
+
+    parsed_evidence: list[tuple[str, str]] = []
+    for item in evidence_items:
+        if not isinstance(item, dict):
+            _note_reason(reasons, _REASON_EVIDENCE_ITEM_SHAPE)
+            return ""
+        term = " ".join(str(item.get("exactTerm") or "").split()).strip(" .,:;\"'")
+        rationale, _stripped = strip_recommendation_sentences(str(item.get(rationale_key) or "").strip())
+        rationale = rationale.strip()
+        if not term or len(term) > 90:
+            _note_reason(reasons, _REASON_TERM_SHAPE)
+            return ""
+        if not rationale:
+            _note_reason(reasons, _REASON_RATIONALE_STRIPPED)
+            return ""
+        parsed_evidence.append((term, rationale))
+    terms = [term for term, _ in parsed_evidence]
+    if len(terms) == 2 and terms[0].casefold() == terms[1].casefold():
+        _note_reason(reasons, _REASON_DUPLICATE_TERMS)
+        return ""
+
+    evidence_text = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
+    if any(not _term_is_grounded(term, evidence_text) for term in terms):
+        _note_reason(reasons, _REASON_TERM_UNGROUNDED)
+        return ""
+
     theme = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", str(outcome.get("outcomeTheme") or ""), flags=re.IGNORECASE).strip()
     if not theme:
+        _note_reason(reasons, _REASON_THEME_MISSING)
         return ""
-    first = (
-        f'"{theme}" temasında {terms[0]} ve {terms[1]} kapsamındaki '
-        f"sınıf başarı oranı %{percent} olarak hesaplanmıştır."
+    percent = round(rate * 100)
+    terms_phrase = " ve ".join(terms)
+    opening = _pick_template(_OPENING_TEMPLATES, theme, *terms).format(
+        theme=theme, terms=terms_phrase, percent=percent
     )
-    if rate < 0.70:
+    rationale_text = " ".join(rationale for _, rationale in parsed_evidence)
+    if is_weak:
         severity = "Kritik" if rate < 0.50 else "Orta"
-        return (
-            f"{first} Eksikliğin şiddeti: {severity}. "
-            "Bu performans, seçilen öğrenme çıktısının sonraki süreçleri açısından sarmal risk taşır."
+        closing = _pick_template(_WEAK_CLOSING_TEMPLATES, theme, *terms, severity).format(
+            severity=severity
         )
-    return f"{first} Bu sonuç, seçilen öğrenme çıktısında güçlü bir performans alanını gösterir."
+        return f"{opening} {rationale_text} {closing}"
+    closing = _pick_template(_STRONG_CLOSING_TEMPLATES, theme, *terms)
+    return f"{opening} {rationale_text} {closing}"
 
 
 def _normalize_evidence_text(value: str) -> str:
@@ -650,6 +1048,47 @@ def _normalize_evidence_text(value: str) -> str:
 
     value = re.sub(r"\s*-\s*", "", value.casefold())
     return " ".join(value.split())
+
+
+# 2026-08-22: bir terim BAĞLAM'da geçiyor mu kontrolü, önceden birebir
+# alt-dize (`in` operatörü) ile yapılıyordu. Bu ÇOK katıydı: model doğru,
+# BAĞLAM'daki gerçek bir ifadeyi seçse bile Türkçe'nin çekim ekleri
+# ("görsellerden"/"görsellerinden", "ön bilgileri ile"/"ön bilgilerle",
+# "metni"/"metinleri") yüzünden karakter karakter eşleşmiyordu - gerçek
+# sorgularla ölçüldü, bu halüsinasyon değil, yalnızca yazım farkıydı.
+# Bunun yerine terim SÖZCÜK SÖZCÜK BAĞLAM'daki en yakın sözcükle
+# karşılaştırılır (`difflib.SequenceMatcher`, eşik aşağıda). 3 karakter ve
+# altı sözcükler ("ile", "ve", "bir"...) işlevsel kabul edilip her zaman
+# geçer. Eşik (0,80) dört gerçek uydurma örneğiyle (model SORU'nun kendi
+# cümlesini veya kendi "BAĞLAM" etiketini içeriğe sızdırdığında - ör.
+# "sarmal risk", "%30 başarı oranı", "bağlamanın kontrol listesi",
+# "kısaltma") kalibre edildi; bkz. `tests/test_agent_llm_round.py`daki
+# kalibrasyon testleri - dördü de bu eşikte doğru reddediliyor.
+_TERM_WORD_SIMILARITY_THRESHOLD = 0.80
+_WORD_PATTERN = re.compile(r"[\wçğıöşüÇĞİÖŞÜ]+")
+
+
+def _word_is_grounded(word: str, evidence_words: list[str]) -> bool:
+    """Tek bir sözcüğün BAĞLAM'da (çekim eki farklı olsa bile) karşılığı var mı."""
+
+    if len(word) <= 3:
+        return True
+    return any(
+        difflib.SequenceMatcher(None, word, evidence_word).ratio() >= _TERM_WORD_SIMILARITY_THRESHOLD
+        for evidence_word in evidence_words
+    )
+
+
+def _term_is_grounded(term: str, evidence: str) -> bool:
+    """`term`in BAĞLAM'da (`evidence`) - Türkçe çekim eki farklılıklarına
+    tolerans tanıyarak - gerçekten geçtiğini doğrular. Bkz. yukarıdaki
+    modül notu."""
+
+    evidence_words = _WORD_PATTERN.findall(_normalize_evidence_text(evidence))
+    term_words = _WORD_PATTERN.findall(_normalize_evidence_text(term))
+    if not term_words:
+        return False
+    return all(_word_is_grounded(word, evidence_words) for word in term_words)
 
 
 def _enqueue_diagnosis_prompts(
@@ -687,10 +1126,14 @@ def _enqueue_diagnosis_prompts(
     for outcome in outcome_results:
         code = str(outcome.get("outcomeCode") or "?")
         is_weak = float(outcome.get("successRate") or 0.0) < _RAG_WEAK_THRESHOLD
+        # Başarı oranı KASITLI OLARAK burada yok (bkz. _build_rag_question'ın
+        # 2026-08-22 notu) - model artık paragraf yazmıyor, yalnız BAĞLAM'dan
+        # iki terim seçiyor; oranı sorguya gömmek modelin SORU'nun kendi
+        # cümlesini (ör. "%90") "evidenceTerms" diye seçmesine yol açıyordu.
         question = _build_rag_question(outcome) if is_weak else (
             f"{' - '.join(str(part) for part in (outcome.get('outcomeTheme'), outcome.get('outcomeCode'), outcome.get('outcomeDescription'), outcome.get('outcomeSkill')) if part)} "
-            f"öğrenme çıktısında başarı oranı %{round(float(outcome.get('successRate') or 0.0) * 100)}. "
-            "BAĞLAM'daki somut süreç bileşenlerine dayanarak güçlü alanı ve başarının sürdürülme odağını açıkla."
+            "öğrenme çıktısı için BAĞLAM'daki somut süreç bileşenlerine dayanarak güçlü "
+            "performansı kanıtlayan iki somut terimi adıyla anarak seç."
         )
         if not question:
             _logger.info("RAG atlandı: cikti=%s sebep=soru-bos", code)
@@ -721,20 +1164,15 @@ def _enqueue_diagnosis_prompts(
                     and outcome.get("parentOutcomeCode") != outcome.get("outcomeCode")
                     else ""
                 )
+                # Eskiden burada ayrıca bir "YANIT SÖZLEŞMESİ" bloğu vardı
+                # (evidenceTerms'e özgü JSON talimatı) - 2026-08-22 (2. sürüm)
+                # yeni sistem promptu kendi ÇIKTI FORMATI'nı zaten tam
+                # taşıdığından KALDIRILDI; o eski blok bırakılsaydı yeni
+                # şemayla ("evidence"/"gapRationale") ÇELİŞİRDİ - tam olarak
+                # bu oturumun daha önce düzelttiği "sistem promptu ile
+                # kullanıcı mesajı çelişiyor" hatasının aynısını geri
+                # getirirdi.
                 + f"SORU: {question}\n\nYalnızca bu sınav türü, seçilmiş öğrenme çıktısı ve yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla."
-                + (
-                    "\n\nYANIT SÖZLEŞMESİ: Paragraf yazma. Yalnız geçerli JSON döndür: "
-                    "{\"evidenceTerms\":[\"BAĞLAMDA AYNEN GEÇEN TERİM 1\",\"BAĞLAMDA AYNEN GEÇEN TERİM 2\"]}. "
-                    "Her terim BAĞLAM içinde kesintisiz ve birebir geçen kısa bir ifade olmalı; sözcük türetme, "
-                    "ek değiştirme, özetleme veya iki ayrı parçayı birleştirme. "
-                    "Kod, oran, şiddet, neden, yorum, risk, etkinlik, çözüm veya öneri ekleme. Markdown kullanma."
-                    if is_weak else
-                    "\n\nYANIT SÖZLEŞMESİ: Paragraf yazma. Yalnız geçerli JSON döndür: "
-                    "{\"evidenceTerms\":[\"BAĞLAMDA AYNEN GEÇEN TERİM 1\",\"BAĞLAMDA AYNEN GEÇEN TERİM 2\"]}. "
-                    "Her terim BAĞLAM içinde kesintisiz ve birebir geçen kısa bir ifade olmalı; sözcük türetme, "
-                    "ek değiştirme, özetleme veya iki ayrı parçayı birleştirme. "
-                    "Kod, oran, neden, yorum, etkinlik, çözüm veya öneri ekleme. Markdown kullanma."
-                )
             ),
             "retrieval": {
                 "programId": program.id,
@@ -752,19 +1190,24 @@ def _enqueue_diagnosis_prompts(
     return targets
 
 
-def _answer_matches_outcome_scope(answer: str, outcome: dict[str, Any]) -> bool:
+def _answer_matches_outcome_scope(
+    answer: str, outcome: dict[str, Any], reasons: list[str] | None = None
+) -> bool:
     """Pedagojik LLM yanıtının güvenli yayın sözleşmesine uyduğunu doğrula.
 
     Model metni burada düzeltilmez. Uzunluk, öneri/etkinlik dili, başarı
     oranından kanıtlanamayacak nedensellik veya kapsam sapması varsa yanıtın
     tamamı elenir. Böylece akıcı görünen fakat kanıtı aşan bir metin rapora
-    taşınmaz.
+    taşınmaz. `reasons` verilirse hangi kontrolün tetiklendiği ona yazılır
+    (bkz. `_REASON_*` sabitleri) - `_evaluate_diagnosis_result` bunu retry
+    ipucu seçimi ve loglama için kullanır.
     """
 
     normalized = " ".join(answer.casefold().split())
     word_count = len(re.findall(r"\b[\wÇĞİÖŞÜçğıöşü]+(?:['’][\wÇĞİÖŞÜçğıöşü]+)?\b", answer))
     is_weak = float(outcome.get("successRate") or 0.0) < 0.70
     if word_count > (70 if is_weak else 60):
+        _note_reason(reasons, _REASON_TOO_LONG)
         return False
 
     # Toplu başarı oranı performans düzeyini gösterir; hatanın nedenini,
@@ -780,7 +1223,11 @@ def _answer_matches_outcome_scope(answer: str, outcome: dict[str, Any]) -> bool:
         "geliştirilmeli", "desteklenmeli", "gerekmektedir", "gereklidir",
         "ihtiyaç duyul",
     )
-    if any(term in normalized for term in unsupported_claims + action_language):
+    if any(term in normalized for term in unsupported_claims):
+        _note_reason(reasons, _REASON_CAUSAL_OVERCLAIM)
+        return False
+    if any(term in normalized for term in action_language):
+        _note_reason(reasons, _REASON_ACTION_LANGUAGE)
         return False
 
     allowed_codes = {
@@ -788,6 +1235,7 @@ def _answer_matches_outcome_scope(answer: str, outcome: dict[str, Any]) -> bool:
     }
     mentioned_codes = {code.upper() for code in re.findall(r"\bTDE\d+(?:\.\d+)+\b", answer, re.IGNORECASE)}
     if mentioned_codes - allowed_codes:
+        _note_reason(reasons, _REASON_CODE_LEAK)
         return False
     component = str(outcome.get("componentType") or "").lower()
     forbidden = {
@@ -798,7 +1246,10 @@ def _answer_matches_outcome_scope(answer: str, outcome: dict[str, Any]) -> bool:
         "speaking": ("okuma beceri", "yazma beceri", "dinleme/izleme beceri", "dinleme beceri"),
     }.get(component, ())
     selected_text = " ".join(str(outcome.get(key) or "") for key in ("outcomeDescription", "parentOutcomeDescription")).casefold()
-    return not any(term in normalized and term not in selected_text for term in forbidden)
+    if any(term in normalized and term not in selected_text for term in forbidden):
+        _note_reason(reasons, _REASON_CROSS_SKILL_LEAK)
+        return False
+    return True
 
 
 def issues_to_ced_validation(issues: list[AgentIssue]) -> list[CEDValidationIssue]:

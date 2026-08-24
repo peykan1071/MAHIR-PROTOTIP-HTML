@@ -47,10 +47,20 @@ def run_agent_prompts(
 ) -> tuple[bool, str, list[dict[str, Any]] | None]:
     """Prompt'ları tek partide çalıştırır; sonuçlar giriş sırasıyla döner.
 
-    Her yanıt `charter_guard`dan geçirilir - DEVELOPMENT_CHARTER.md'nin
+    Her DÜZ METİN yanıt `charter_guard`dan geçirilir - DEVELOPMENT_CHARTER.md'nin
     "MAHİR yöntem/telafi önermez" kuralı artık tek bir ajanın değil, LLM üreten
     her ajanın sorunu. Kırpılan cümle sayısı sonuca yazılır ki çağıran ize
     kaydedebilsin.
+
+    JSON ŞEKİLLİ yanıtlar (ör. Pedagojik Analiz Ajanı'nın yapılandırılmış
+    kanıt şeması - bkz. `agents/prompts.py::DIAGNOSIS_SYSTEM_PROMPT`) bu
+    kırpmadan MUAFTIR: `strip_recommendation_sentences` cümleleri `. `/`! `/
+    `? ` sınırlarında ayırıyor, ve bu yanıtların `gapRationale`/
+    `strengthRationale` gibi ALANLARININ İÇİNDE de tam cümleler (nokta ile
+    biten) var - JSON'un TAMAMINI cümle sanıp bölerse, alan sınırlarını
+    hiç tanımadan ortadan bir parçayı silip geçerli JSON'u bozabilir. Charter
+    süzgeci bu yanıtlar için ALAN DÜZEYİNDE, JSON ayrıştırıldıktan SONRA
+    `pipeline.py::_compose_grounded_pedagogical_answer` içinde uygulanır.
 
     Dönen her öğe: `{"name", "answer", "strippedSentences", "promptChars",
     "answerChars", "durationMs"}`.
@@ -83,7 +93,12 @@ def run_agent_prompts(
     enriched: list[dict[str, Any]] = []
     for item, result in zip(items, results):
         raw_answer = str((result or {}).get("answer") or "")
-        answer, stripped = strip_recommendation_sentences(raw_answer)
+        if raw_answer.lstrip().startswith("{"):
+            # JSON şekilli - bkz. docstring. Alan-düzeyinde kırpma
+            # `pipeline.py::_compose_grounded_pedagogical_answer`nin işi.
+            answer, stripped = raw_answer, 0
+        else:
+            answer, stripped = strip_recommendation_sentences(raw_answer)
         enriched.append({
             "name": str(item.get("name") or ""),
             "answer": answer,

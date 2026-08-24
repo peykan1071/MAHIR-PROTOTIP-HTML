@@ -642,6 +642,40 @@ input[type="checkbox"] {
   width: 100%;
 }
 
+.saved-groups-tables {
+  display: grid;
+  gap: 20px;
+}
+
+.saved-group-table {
+  display: grid;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border);
+}
+
+.saved-group-table-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.saved-group-table-heading h4,
+.saved-group-table-heading p {
+  margin: 0;
+}
+
+.saved-group-table-heading p {
+  color: var(--color-muted);
+}
+
+.question-configuration-row:has(.outcome-combobox.is-open),
+.outcome-combobox.is-open {
+  position: relative;
+  z-index: 60;
+}
+
 .outcome-native-select {
   display: none;
 }
@@ -703,12 +737,8 @@ input[type="checkbox"] {
 }
 
 .outcome-combobox-listbox {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 100%;
-  max-width: 100%;
+  position: fixed;
+  z-index: 1000;
   padding: 4px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -718,11 +748,6 @@ input[type="checkbox"] {
   border-radius: 10px;
   background: var(--color-surface);
   box-shadow: 0 12px 28px rgba(18, 52, 91, 0.18);
-}
-
-.outcome-combobox.opens-up .outcome-combobox-listbox {
-  top: auto;
-  bottom: calc(100% + 6px);
 }
 
 .outcome-combobox-listbox[hidden] {
@@ -741,6 +766,44 @@ input[type="checkbox"] {
   overflow-wrap: anywhere;
   word-break: normal;
   cursor: pointer;
+}
+
+.exam-structure-card[hidden] {
+  display: none !important;
+}
+
+.question-map-card[hidden],
+.student-data-card[hidden],
+.question-count-recovery-card[hidden] {
+  display: none !important;
+}
+
+.question-count-recovery-card {
+  padding: 1.25rem;
+  border: 1px solid #e0a12f;
+  border-radius: 0.75rem;
+  background: #fffaf0;
+}
+
+.question-count-recovery-form {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+[data-classified-groups] section {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color, #cfe0e7);
+  border-radius: 0.75rem;
+}
+
+.classified-group-button {
+  display: block;
+  width: 100%;
+  margin-block-start: 0.5rem;
+  text-align: left;
 }
 
 .outcome-combobox-option-heading {
@@ -829,6 +892,48 @@ input[type="checkbox"] {
 .data-source-options input { margin-top: 3px; }
 .data-source-options span { display: grid; gap: 4px; }
 .data-source-options small { color: var(--color-muted); }
+
+.personalized-upload-guide {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid #9fd3d6;
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, #f4fbfb 0%, #ffffff 72%);
+}
+
+.personalized-upload-guide-heading,
+.personalized-upload-guide-heading h3,
+.personalized-upload-guide-heading p,
+.personalized-upload-guide section h4,
+.personalized-upload-note { margin: 0; }
+
+.personalized-upload-guide-heading { display: grid; gap: 8px; }
+.personalized-upload-guide-heading h3 { color: var(--color-secondary); }
+.personalized-upload-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.personalized-upload-guide section {
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #ffffff;
+}
+.personalized-upload-guide section h4 { color: var(--color-primary-dark); }
+.personalized-upload-guide ul,
+.personalized-upload-guide ol { margin: 10px 0 0; padding-left: 20px; }
+.personalized-upload-guide li { margin-top: 6px; line-height: 1.45; }
+.personalized-upload-guide section:last-child {
+  max-height: 360px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 900px) {
+  .personalized-upload-guide-grid { grid-template-columns: 1fr; }
+}
 
 .ocr-guidance-card {
   display: grid;
@@ -1023,11 +1128,136 @@ button[aria-disabled="true"] {
 .data-confirmation-layout {
   display: grid;
   gap: 22px;
+  min-width: 0;
 }
 
 .table-wrap {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+#validation-screen,
+#validation-screen > *,
+.data-confirmation-layout > *,
+.saved-groups-tables,
+.saved-group-table {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.saved-group-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-block: 0.75rem;
+}
+
+.saved-group-status {
+  font-weight: 700;
+  color: var(--color-primary, #007f86);
+}
+
+/* Çok sorulu Dinleme/İzleme tablolarında Toplam ve İşlem sütunları da
+   ilk bakışta görünür kalsın. Yatay kaydırma yalnız dar mobil ekranlarda
+   güvenlik ağı olarak devam eder. */
+.data-table.saved-group-data-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.78rem;
+}
+
+.saved-group-data-table th,
+.saved-group-data-table td {
+  min-width: 0;
+  padding: 6px 4px;
+  text-align: center;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.saved-group-data-table th:first-child,
+.saved-group-data-table td:first-child,
+.saved-group-data-table th:nth-child(2),
+.saved-group-data-table td:nth-child(2) {
+  font-size: 0.72rem;
+}
+
+.saved-group-inline-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 3px 4px;
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.saved-group-data-table .student-record-remove-button {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 3px;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  white-space: normal;
+}
+
+.saved-group-validation-note {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #d66b5f;
+  border-left-width: 4px;
+  border-radius: 8px;
+  color: #84291f;
+  background: #fff5f3;
+  font-size: 0.88rem;
+}
+
+.saved-group-validation-note[hidden] {
+  display: none !important;
+}
+
+.saved-group-validation-note ul {
+  margin: 6px 0 0;
+  padding-left: 1.2rem;
+}
+
+.report-next-exam-card {
+  padding: 20px;
+  border: 1px solid #72aeb2;
+  border-left: 4px solid var(--color-primary);
+  border-radius: 12px;
+  background: #f2fbf6;
+}
+
+.report-next-exam-card[hidden] {
+  display: none !important;
+}
+
+.report-next-exam-card h3,
+.report-next-exam-card p {
+  margin-top: 0;
+}
+
+.report-next-exam-list {
+  display: grid;
+  gap: 10px;
+}
+
+.report-next-exam-list .primary-button {
+  width: 100%;
+  text-align: left;
+}
+
+@media (max-width: 760px) {
+  .data-table.saved-group-data-table {
+    min-width: 860px;
+  }
 }
 
 .data-table {
