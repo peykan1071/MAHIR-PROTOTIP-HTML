@@ -683,13 +683,29 @@ def _content_words(text: str) -> list[str]:
 _CONSONANT_ALTERNATIONS = str.maketrans({"ğ": "k", "b": "p", "c": "ç", "d": "t"})
 
 
+# İki sözcüğün ortak önekinin, "aynı kök" sayılması için en az kaç karakter
+# olması gerektiği - bkz. `_shares_root`. Canlı ölçüm: "oluşturmayı" (teşhis)
+# ile "oluşturabilme" (kaynak) aynı "oluştur" kökünden ama biri diğerinin TAM
+# öneki DEĞİL - ikisi de kökten (7 harf) sonra farklı eklerle ayrışıyor
+# ("-mayı" / "-abilme"). Salt "biri diğerinin öneki mi" testi bunu kaçırdı ve
+# gerçekten kaynaklı bir teşhis 0 kanıt sözcüğüyle reddedildi. 5, "içerik" /
+# "inceleme" gibi yalnız ilk harfi ortak sözcükleri (ortak önek 1) hâlâ
+# eleyecek kadar sıkı, "oluştur" gibi 7 harflik gerçek kökleri hâlâ
+# yakalayacak kadar gevşek.
+_MIN_SHARED_STEM_LENGTH = 5
+
+
 def _shares_root(left: str, right: str) -> bool:
     """İki sözcüğün aynı kökten geldiğini gevşek biçimde kabul eder.
 
-    Türkçe eklemeli olduğundan tam eşleşme aranmaz: biri diğerinin öneki
-    ise (ör. "unsurları" / "unsurlarını", "çözümleyebilme" /
-    "çözümleyebilmek") aynı kök sayılır. Ünsüz yumuşaması da hesaba katılır
-    (bkz. `_CONSONANT_ALTERNATIONS`). En az dört karakter şartı, kısa
+    Türkçe eklemeli olduğundan tam eşleşme aranmaz. İki ayrı durum aynı kök
+    sayılır: (1) biri diğerinin öneki (ör. "unsurları" / "unsurlarını",
+    "çözümleyebilme" / "çözümleyebilmek"), (2) ikisi de en az
+    `_MIN_SHARED_STEM_LENGTH` karakterlik ortak bir kökten sonra FARKLI
+    eklerle ayrışıyor (ör. "oluşturmayı" / "oluşturabilme" - "oluştur"
+    kökünden sonra biri "-mayı", biri "-abilme" alıyor; ikisi de birbirinin
+    TAM öneki değil ama aynı fiilin çekimleri). Ünsüz yumuşaması da hesaba
+    katılır (bkz. `_CONSONANT_ALTERNATIONS`). En az dört karakter şartı, kısa
     tesadüfi örtüşmeleri engeller.
     """
 
@@ -697,7 +713,14 @@ def _shares_root(left: str, right: str) -> bool:
         return False
     left_key = left.translate(_CONSONANT_ALTERNATIONS)
     right_key = right.translate(_CONSONANT_ALTERNATIONS)
-    return left_key.startswith(right_key) or right_key.startswith(left_key)
+    if left_key.startswith(right_key) or right_key.startswith(left_key):
+        return True
+    common_prefix_length = 0
+    for left_char, right_char in zip(left_key, right_key):
+        if left_char != right_char:
+            break
+        common_prefix_length += 1
+    return common_prefix_length >= _MIN_SHARED_STEM_LENGTH
 
 
 def _grounded_word_overlap(diagnosis: str, evidence: str, theme: str = "") -> list[str]:

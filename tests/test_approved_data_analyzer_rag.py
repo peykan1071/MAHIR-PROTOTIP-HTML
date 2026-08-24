@@ -227,6 +227,20 @@ class RagContextAttachmentTests(unittest.TestCase):
         # Yumuşama toleransı alakasız sözcükleri birleştirmemeli.
         self.assertFalse(_shares_root("içerik", "inceleme"))
 
+    def test_diverging_verb_forms_still_count_as_the_same_root(self):
+        # Canlı ölçüm: model "oluşturmayı" yazdı, kaynak "oluşturabilme"
+        # diyordu - aynı "oluştur" kökü (7 harf) ama biri diğerinin TAM
+        # öneki DEĞİL, ikisi de kökten sonra farklı eklerle ayrışıyor
+        # ("-mayı" / "-abilme"). Eski "biri diğerinin öneki mi" testi bunu
+        # kaçırdı ve gerçekten kaynaklı bir teşhis 0 kanıt sözcüğüyle
+        # reddedildi.
+        from backend.app.agents.pipeline import _shares_root
+
+        self.assertTrue(_shares_root("oluşturmayı", "oluşturabilme"))
+        # Ortak önek 5 karakterden kısaysa (burada 4: "anla") hâlâ eşleşmemeli
+        # - "içerik"/"inceleme" gibi alakasız sözcükleri birleştirme riski.
+        self.assertFalse(_shares_root("anlama", "anlaşma"))
+
     def test_two_distinctive_words_are_enough_evidence(self):
         # Eşik 3'ten 2'ye çekildi: tema adı ve müfredat kalıp sözcükleri
         # ("ele alınan", "hareketle") artık sayılmadığından 3, fiilen çok
