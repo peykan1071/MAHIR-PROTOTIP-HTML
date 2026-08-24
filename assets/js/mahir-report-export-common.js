@@ -902,6 +902,65 @@
     return element;
   };
 
+  // Ekran önizlemesini "hoş" kılan görsel katman: bilinen düzey metinlerini
+  // renkli rozete, saf yüzde hücrelerini mini bir çubuğa çevirir. Bu katman
+  // SADECE ekranda (renderPreviewBody) çalışır - PDF/Word çıktısı hâlâ
+  // getReportModel'in düz metin hücrelerinden üretiliyor, burada hiçbir
+  // sayı veya oran değişmez, yalnız aynı metin görsel olarak vurgulanır.
+  const LEVEL_TONE_MAP = new Map([
+    ["Beklenen düzeyin üzerinde", "excellent"],
+    ["Beklenen düzeyde", "good"],
+    ["Gelişimi sürmekte", "developing"],
+    ["Gelişim desteği öncelikli", "priority"],
+    ["Zenginleştirme", "excellent"],
+    ["Derinleştirme ve sürdürme", "good"],
+    ["Gelişimi destekleme", "developing"],
+    ["Öncelikli destekleme", "priority"]
+  ].map(([text, tone]) => [normalizeForCompare(text), tone]));
+  const levelTone = (text) => LEVEL_TONE_MAP.get(normalizeForCompare(text)) || "";
+
+  const percentTone = (numeric) => {
+    if (numeric >= 85) return "excellent";
+    if (numeric >= 70) return "good";
+    if (numeric >= 50) return "developing";
+    return "priority";
+  };
+
+  // Sütun başlığı "gerçekleşme" veya "başarı" içermiyorsa (ör. "Ağırlık" gibi
+  // bir dağılım yüzdesi) çubuk çizilmez - o yüzdenin renk anlamı başarı
+  // düzeyi değildir, çubuk yanlış bir yorum önerirdi.
+  const isPerformancePercentHeading = (heading) => {
+    const normalized = normalizeForCompare(heading);
+    return normalized.includes("gerceklesme") || normalized.includes("basari");
+  };
+
+  const decoratePreviewCell = (td, text, columnIsPerformancePercent) => {
+    const value = String(text ?? "");
+    const tone = levelTone(value);
+    if (tone) {
+      const badge = document.createElement("span");
+      badge.className = `level-badge level-badge--${tone}`;
+      badge.textContent = value;
+      td.replaceChildren(badge);
+      return;
+    }
+    const percentMatch = columnIsPerformancePercent && value.match(/^%(-?\d+(?:,\d+)?)$/);
+    const numeric = percentMatch ? Number(percentMatch[1].replace(",", ".")) : NaN;
+    if (percentMatch && Number.isFinite(numeric)) {
+      const wrap = document.createElement("span");
+      wrap.className = "percent-cell";
+      const bar = document.createElement("span");
+      bar.className = "percent-cell-bar";
+      bar.dataset.tone = percentTone(numeric);
+      bar.style.setProperty("--pct", `${Math.max(0, Math.min(100, numeric))}%`);
+      const label = document.createElement("span");
+      label.className = "percent-cell-label";
+      label.textContent = value;
+      wrap.append(bar, label);
+      td.replaceChildren(wrap);
+    }
+  };
+
   // Kanıt hücresini ekranda açılır hâle getirir: özet her zaman görünür,
   // soru bazındaki ayrıntı tıklayınca açılır. Özet metni hücrenin başında
   // olduğu için geri kalanı ayrıntı sayılır; ikisi de aynı düz metinden
@@ -926,7 +985,7 @@
     return td;
   };
 
-  const renderTable = (rows, details = null, widths = null) => {
+  const renderTable = (rows, details = null, widths = null, visual = false) => {
     const table = document.createElement("table");
     if (Array.isArray(widths) && widths.length) {
       const colgroup = document.createElement("colgroup");
@@ -938,13 +997,19 @@
       table.append(colgroup);
       table.style.tableLayout = "fixed";
     }
+    const headerRow = rows[0] || [];
+    const performancePercentColumns = visual
+      ? headerRow.map((heading) => isPerformancePercentHeading(heading))
+      : [];
     rows.forEach((row, rowIndex) => {
       const tr = document.createElement("tr");
       row.forEach((item, columnIndex) => {
         const isEvidence = details && rowIndex > 0 && columnIndex === details.column;
-        tr.append(isEvidence
+        const td = isEvidence
           ? evidenceCell(item, details.summaries?.[rowIndex - 1])
-          : cell(rowIndex === 0 ? "th" : "td", item));
+          : cell(rowIndex === 0 ? "th" : "td", item);
+        if (visual && !isEvidence && rowIndex > 0) decoratePreviewCell(td, item, performancePercentColumns[columnIndex]);
+        tr.append(td);
       });
       table.append(tr);
     });
@@ -1004,7 +1069,7 @@
         p.textContent = paragraph;
         section.append(p);
       });
-      block.tables.forEach((tableRows, tableIndex) => section.append(renderTable(tableRows, block.details, block.tableWidths?.[tableIndex])));
+      block.tables.forEach((tableRows, tableIndex) => section.append(renderTable(tableRows, block.details, block.tableWidths?.[tableIndex], true)));
       appendNotes(section, block);
       body.append(section);
     });
