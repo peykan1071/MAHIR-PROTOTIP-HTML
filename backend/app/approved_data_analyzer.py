@@ -8,10 +8,6 @@ import re
 import time
 from typing import Any
 
-# Charter süzgeci `charter_guard`a taşındı: kısıt tek bir ajanın değil, LLM
-# üreten her ajanın sorunu. Takma ad, mevcut çağrı yerlerini ve testleri
-# değiştirmeden bırakmak için.
-from .charter_guard import strip_recommendation_sentences as _strip_recommendation_sentences
 from .assessment_profiles import (
     COMPONENT_LABELS,
     GENERAL,

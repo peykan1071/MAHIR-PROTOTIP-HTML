@@ -298,12 +298,7 @@ class MeasurementAgent:
         if finding.startswith(_NO_ANOMALY_TEXT):
             finding = ""
         context.scratch["anomalies"] = finding
-        return AgentResult(
-            outputs={
-                "anomalyFindings": finding.count("-") if finding else 0,
-                "llmStrippedSentences": result.get("strippedSentences", 0),
-            }
-        )
+        return AgentResult(outputs={"anomalyFindings": finding.count("-") if finding else 0})
 
 
 class PedagogicalAnalysisAgent:
@@ -408,7 +403,6 @@ class PedagogicalAnalysisAgent:
         from ..approved_data_analyzer import _RAG_NO_ANSWER_TEXT
 
         grounded = 0
-        stripped = 0
         for name, outcome in context.scratch.get("diagnosisTargets", {}).items():
             code = str(outcome.get("outcomeCode") or "?")
             result = context.llm_result(name)
@@ -433,7 +427,6 @@ class PedagogicalAnalysisAgent:
             if not answer:
                 _logger.info("RAG atlandı: cikti=%s sebep=model-reddetti", code)
                 continue
-            stripped += int(result.get("strippedSentences") or 0)
             raw_sources = result.get("sources") or []
             # Güncel RAG uç noktası kaynak parçalarının kısa alıntılarını da
             # döndürür. Bu durumda model nihai raporu yazmaz; yalnız kaynakta
@@ -460,9 +453,7 @@ class PedagogicalAnalysisAgent:
                 len(outcome["ragSources"]),
             )
 
-        return AgentResult(
-            outputs={"curriculumGroundedCount": grounded, "llmStrippedSentences": stripped}
-        )
+        return AgentResult(outputs={"curriculumGroundedCount": grounded})
 
 
 class ReportingAgent:
@@ -802,16 +793,17 @@ def _compose_grounded_pedagogical_answer(
     if "{" in diagnosis or "}" in diagnosis:
         _note_reason(reasons, "susulu-parantez-kalintisi (model yer tutucu yazdı)")
         return ""
-    # Promptun açık yasağına rağmen canlı ölçümde model tekrar tekrar
-    # nedensellik iddiası kurdu (ör. "...nedeniyle %3 başarı oranı elde
-    # ediyorlar") - tüm yanıtı atmak yerine yalnız o cümleyi kırp, geri
-    # kalan (genelde iyi) içeriği koru.
+    # Model prompttaki yasağa rağmen kendi yazdığı yüzdeyi tekrar edebiliyor
+    # (canlı ölçümde görüldü) - MAHİR oranı zaten kendi açılış cümlesinde
+    # söylediğinden bu ya gereksiz tekrar ya da modelin uydurduğu FARKLI bir
+    # sayı olur; tüm yanıtı atmak yerine yalnız o cümleyi kırp, geri kalan
+    # (genelde iyi) içeriği koru.
     diagnosis, stripped_scope_sentences = _strip_scope_violations(diagnosis, reasons)
     if not diagnosis:
-        _note_reason(reasons, "kapsam-kirpmasi-bosaltti (tüm cümleler nedensellik/öneri dili içeriyordu)")
+        _note_reason(reasons, "kapsam-kirpmasi-bosaltti (tüm cümleler oran tekrarı içeriyordu)")
         return ""
     if stripped_scope_sentences:
-        _note_reason(reasons, f"bilgi: {stripped_scope_sentences} cümle nedensellik/öneri dili nedeniyle kırpıldı")
+        _note_reason(reasons, f"bilgi: {stripped_scope_sentences} cümle oran tekrarı nedeniyle kırpıldı")
 
     theme = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", str(outcome.get("outcomeTheme") or ""), flags=re.IGNORECASE).strip()
     if not theme:
@@ -958,14 +950,12 @@ def _enqueue_diagnosis_prompts(
                     "\n\nYANIT SÖZLEŞMESİ: Yalnız geçerli JSON döndür: "
                     "{\"diagnosis\":\"tema/yüzde/şiddet İÇERMEYEN, yalnız nitel teşhis paragrafı\"}. "
                     "Tema adı, yüzde sayısı veya şiddet kelimesi yazma - bunlar ayrıca ekleniyor. "
-                    "Eksikliği orana \"nedeniyle\", \"bu yüzden\", \"dolayısıyla\" gibi bağlaçlarla "
-                    "BAĞLAMA. BAĞLAM'daki müfredat sözcüklerini kendi sözcüklerinle değiştirmeden "
+                    "BAĞLAM'daki müfredat sözcüklerini kendi sözcüklerinle değiştirmeden "
                     "kullan. Markdown kullanma."
                     if is_weak else
                     "\n\nYANIT SÖZLEŞMESİ: Yalnız geçerli JSON döndür: "
                     "{\"diagnosis\":\"tema/yüzde İÇERMEYEN, yalnız nitel teşhis paragrafı\"}. Tema "
-                    "adı veya yüzde sayısı yazma - bunlar ayrıca ekleniyor. Anlattığın başarıyı orana "
-                    "\"nedeniyle\", \"bu yüzden\", \"dolayısıyla\" gibi bağlaçlarla BAĞLAMA. "
+                    "adı veya yüzde sayısı yazma - bunlar ayrıca ekleniyor. "
                     "BAĞLAM'daki müfredat sözcüklerini kendi sözcüklerinle değiştirmeden kullan. "
                     "Markdown kullanma."
                 )
@@ -974,6 +964,14 @@ def _enqueue_diagnosis_prompts(
                 "programId": program.id,
                 "grade": program.grade,
                 "theme": theme,
+                # Aynı tema içinde dört beceri listesi (Dinleme/İzleme, Konuşma,
+                # Okuma, Yazma) yalnız kod önekiyle ayrışıyor, metinleri
+                # neredeyse birebir aynı - gömme onları ayırt EDEMEZ. Beceri
+                # adı getirim tarafına bu yüzden gidiyor: sunucu yanlış
+                # beceriye ait parçaları eliyor (bkz. rag_service
+                # `_detect_skill_key`). Boş bırakılırsa eleme yapılmaz,
+                # bugünkü davranış korunur.
+                "skill": outcome.get("outcomeSkill") or "",
                 # Getirimde gömülen metin, üretim talimatından KASITLI ayrı:
                 # başarı oranı ve "teşhis et" emri müfredat düzyazısında
                 # karşılığı olmayan, sorgu vektörünü uzaklaştıran gürültü.
@@ -984,28 +982,6 @@ def _enqueue_diagnosis_prompts(
         targets[name] = outcome
 
     return targets
-
-
-# Toplu başarı oranı performans düzeyini gösterir; hatanın nedenini,
-# öğrenci niyetini veya öğrenci sayısını kanıtlamaz.
-_UNSUPPORTED_CLAIM_PATTERNS = (
-    "temel neden", "temel sebep", "nedeni", "sebebi", "kaynaklan",
-    "öğrencilerin say", "öğrenci say", "yetersiz bilgi",
-    # 2026-08-24 canlı ölçüm: model eksikliği doğrudan orana bağlayan
-    # "...bu yüzden %45 başarı oranına NEDEN OLMAKTADIR" cümlesi kurdu ve
-    # yukarıdaki desenlerin hiçbiri onu yakalamadı ("nedeni" ile "neden
-    # olmaktadır" farklı gövdeler). Oran performans DÜZEYİNİ gösterir,
-    # nedenselliği kanıtlamaz - bu bağlaçların hepsi elenmeli.
-    "neden ol", "sebep ol", "yol aç", "bu yüzden", "dolayısıyla", "sonucunda",
-    "sonucu ortaya", "sonucu olarak", "sonucudur", "buna bağlı",
-)
-# MAHİR tanı koyabilir fakat öğretmene etkinlik/telafi işi yazamaz.
-_ACTION_LANGUAGE_PATTERNS = (
-    "etkinlik", "aktivite", "alıştırma", "uygulama çalış",
-    "telafi", "önerilir", "tavsiye", "yapılmalı", "verilmeli",
-    "geliştirilmeli", "desteklenmeli", "gerekmektedir", "gereklidir",
-    "ihtiyaç duyul",
-)
 
 
 # Modelin yazdığı yüzde ifadesi ("%35", "yüzde 35"). Oranı MAHİR söylüyor.
@@ -1021,13 +997,6 @@ def _sentence_violation(sentence: str) -> str:
     çıktıyı elle inceleyip kalıbı tahmin etmek gerekiyor.
     """
 
-    folded = sentence.casefold()
-    for term in _UNSUPPORTED_CLAIM_PATTERNS:
-        if term in folded:
-            return f"nedensellik:'{term}'"
-    for term in _ACTION_LANGUAGE_PATTERNS:
-        if term in folded:
-            return f"eylem-dili:'{term}'"
     # Modele yüzdeyi yazmaması söylendi ama yine de yazabiliyor (canlı
     # ölçümde görüldü). MAHİR oranı zaten kendi açılış cümlesinde
     # söylediğinden böyle bir cümle en iyi ihtimalle gereksiz tekrar, en
@@ -1039,17 +1008,11 @@ def _sentence_violation(sentence: str) -> str:
 
 
 def _strip_scope_violations(text: str, reasons: list[str] | None = None) -> tuple[str, int]:
-    """Nedensellik iddiası veya öneri/etkinlik dili taşıyan cümleleri
-    paragraftan çıkarır; geri kalanı korur.
+    """Oran tekrarı taşıyan cümleleri paragraftan çıkarır; geri kalanı korur.
 
-    Aynı `charter_guard.strip_recommendation_sentences` tekniği: canlı
-    ölçümde model, prompttaki açık yasağa (bkz. DIAGNOSIS_SYSTEM_PROMPT
-    madde 3) rağmen "...nedeniyle %3 başarı oranı elde ediyorlar" gibi
-    nedensellik iddiası kurmaya devam etti - küçük bir modelin bir OLUMSUZ
-    talimatı güvenilir biçimde izlemesi beklenemez. `_answer_matches_
-    outcome_scope`nin ikili ret/kabulüne bırakılsaydı, aksi hâlde iyi olan
-    tüm teşhis TEK kötü cümle yüzünden kaybedilirdi; bunun yerine yalnız o
-    cümle atılır."""
+    `_answer_matches_outcome_scope`nin ikili ret/kabulüne bırakılsaydı, aksi
+    hâlde iyi olan tüm teşhis TEK kötü cümle yüzünden kaybedilirdi; bunun
+    yerine yalnız o cümle atılır."""
 
     sentences = re.split(r"(?<=[.!?])\s+", text)
     kept: list[str] = []
@@ -1119,9 +1082,11 @@ def _answer_matches_outcome_scope(
 
     Model metni burada düzeltilmez (bkz. `_strip_scope_violations` - o adım
     burada değil, `_compose_grounded_pedagogical_answer` içinde, sarmadan
-    ÖNCE çalışır). Bu fonksiyon yalnız SON bir güvenlik ağı: uzunluk, kalan
-    öneri/etkinlik dili, nedensellik iddiası veya kapsam sapması varsa
-    yanıtın tamamı elenir.
+    ÖNCE çalışır - oran tekrarı orada, HAM teşhis üzerinde temizlenir). Bu
+    fonksiyon SARILMIŞ (opening+diagnosis+closing) tam metni görür - MAHİR'in
+    kendi açılış cümlesi zaten oranı söylediği için burada oran ARAMAZ. Bu
+    fonksiyon yalnız SON bir güvenlik ağı: uzunluk veya kapsam sapması
+    (kod sızıntısı, beceri/bileşen uyuşmazlığı) varsa yanıtın tamamı elenir.
 
     `reasons` verilirse ret sebebi oraya yazılır (bkz. `_note_reason`).
     """
@@ -1136,11 +1101,6 @@ def _answer_matches_outcome_scope(
     limit = 90 if is_weak else 70
     if word_count > limit:
         _note_reason(reasons, f"uzunluk-asimi ({word_count} kelime, sınır {limit})")
-        return False
-
-    hits = [term for term in _UNSUPPORTED_CLAIM_PATTERNS + _ACTION_LANGUAGE_PATTERNS if term in normalized]
-    if hits:
-        _note_reason(reasons, f"nedensellik-veya-eylem-dili: {hits}")
         return False
 
     allowed_codes = {

@@ -33,7 +33,12 @@ from app.agents.pipeline import (
     _compose_grounded_pedagogical_answer,
     _enqueue_diagnosis_prompts,
 )
-from app.approved_data_analyzer import MAHIR_RAG_REMOTE_URL, _RAG_NO_ANSWER_TEXT, _RAG_WEAK_THRESHOLD
+from app.approved_data_analyzer import (
+    MAHIR_RAG_REMOTE_URL,
+    _RAG_NO_ANSWER_TEXT,
+    _RAG_WEAK_THRESHOLD,
+    _normalize_theme_for_rag,
+)
 from app.models import CEDAssessment, CEDDocument, CEDMetadata
 from app.program_catalog import PROGRAMS, ProgramProfile, validate_question_program_context
 
@@ -82,7 +87,9 @@ def _load_catalog(program: ProgramProfile) -> list[dict]:
     return payload.get("learning_outcomes") or []
 
 
-def _lookup_outcome(program: ProgramProfile, outcome_code: str) -> dict[str, str] | None:
+def _lookup_outcome(
+    program: ProgramProfile, outcome_code: str, theme_hint: str | None = None
+) -> dict[str, str] | None:
     """Kazanım kodunu katalogda ara; süreç bileşeni kodlarını da tanır.
 
     `mahir-program-catalog.js::filterOutcomes`in yaptığı üst kazanım/süreç
@@ -90,10 +97,25 @@ def _lookup_outcome(program: ProgramProfile, outcome_code: str) -> dict[str, str
     `parentDescription` üst kazanıma, `outcomeDescription` bileşenin kendi
     başlığına işaret eder - üretimde soruya seçilen kazanımın taşıdığı
     alanlarla birebir aynı şekil.
+
+    `theme_hint` verilmişse (kullanıcı `--theme` geçtiyse) yalnız O temadaki
+    kayıt eşleşir. TDE9'da neredeyse her kod (TDE1.1, TDE2.2, TDE3.3 ...) 4
+    temanın HEPSİNDE tekrar ediyor ve kazanım METNİ temaya göre değişiyor
+    ("'Sözün İnceliği' temasında ele alınan ..." / "'Anlam Arayışı'
+    temasında ele alınan ..."). `theme_hint` yoksayılırsa `--theme` yalnızca
+    getirim filtresini değiştirir, `outcomeDescription` katalogdaki İLK
+    (dosya sırasına göre 1. Tema) kayıttan gelmeye devam eder - kullanıcının
+    seçtiği temayla TUTARSIZ bir kazanım metni prompt'a girer. Karşılaştırma
+    `_normalize_theme_for_rag` ile yapılır: aynı fonksiyon getirim tarafında
+    da kullanıldığı için "1. Tema: Sözün İnceliği" ile salt "Sözün İnceliği"
+    burada da orada da aynı şeyi ifade eder.
     """
 
     target = outcome_code.strip().upper()
+    normalized_hint = _normalize_theme_for_rag(theme_hint) if theme_hint else ""
     for outcome in _load_catalog(program):
+        if normalized_hint and _normalize_theme_for_rag(str(outcome.get("theme") or "")) != normalized_hint:
+            continue
         if str(outcome.get("code") or "").upper() == target:
             return {
                 "theme": str(outcome.get("theme") or ""),
@@ -141,7 +163,7 @@ def main() -> int:
     args = _parse_args()
 
     program = _resolve_program_for_code(args.outcome_code)
-    catalog_entry = _lookup_outcome(program, args.outcome_code) if program else None
+    catalog_entry = _lookup_outcome(program, args.outcome_code, args.theme) if program else None
 
     course = args.course or (program.course_names[0] if program else None)
     grade = args.grade or (program.grade if program else None)
@@ -156,6 +178,16 @@ def main() -> int:
         print(
             f"UYARI: '{args.outcome_code}' katalogda bulunamadı ve --course/--grade/--theme "
             "elle verilmedi. Pilot dışı bir kod için bu üçünü elle girin."
+        )
+        return 1
+    if program is not None and catalog_entry is None and args.theme is not None and not outcome_desc:
+        # program çözüldü (kod tanıdık bir önekle başlıyor) ama --theme ile
+        # istenen KOMBİNASYON (bu kod + bu tema) katalogda yok - kodun
+        # kendisi başka temalarda var olabilir. Sessizce devam etmek --theme'i
+        # yoksayıp yanlış temanın kazanım metnini prompt'a sokardı.
+        print(
+            f"UYARI: '{args.outcome_code}' kodu \"{theme}\" temasında katalogda bulunamadı "
+            "(başka bir temada var olabilir). --outcome-desc ile elle de girilebilir."
         )
         return 1
 

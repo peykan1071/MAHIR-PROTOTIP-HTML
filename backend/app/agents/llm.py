@@ -18,8 +18,6 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from ..charter_guard import strip_recommendation_sentences
-
 # Uzak uç noktanın sınırlarıyla aynı olmalı (bkz. rag_service.py MAX_AGENT_*).
 # Burada da kontrol ediliyor ki ağ turu boşa harcanmasın ve hata mesajı
 # çağırana yakın yerde üretilsin.
@@ -47,12 +45,7 @@ def run_agent_prompts(
 ) -> tuple[bool, str, list[dict[str, Any]] | None]:
     """Prompt'ları tek partide çalıştırır; sonuçlar giriş sırasıyla döner.
 
-    Her yanıt `charter_guard`dan geçirilir - DEVELOPMENT_CHARTER.md'nin
-    "MAHİR yöntem/telafi önermez" kuralı artık tek bir ajanın değil, LLM üreten
-    her ajanın sorunu. Kırpılan cümle sayısı sonuca yazılır ki çağıran ize
-    kaydedebilsin.
-
-    Dönen her öğe: `{"name", "answer", "strippedSentences", "promptChars",
+    Dönen her öğe: `{"name", "answer", "sources", "promptChars",
     "answerChars", "durationMs"}`.
     """
 
@@ -82,8 +75,7 @@ def run_agent_prompts(
 
     enriched: list[dict[str, Any]] = []
     for item, result in zip(items, results):
-        raw_answer = str((result or {}).get("answer") or "")
-        answer, stripped = strip_recommendation_sentences(raw_answer)
+        answer = str((result or {}).get("answer") or "")
         enriched.append({
             "name": str(item.get("name") or ""),
             "answer": answer,
@@ -91,7 +83,6 @@ def run_agent_prompts(
             # teşhis yazma" diyor (bkz. PedagogicalAnalysisAgent.apply_llm).
             # Düşürülürse getirim çalışsa bile her teşhis sessizce elenir.
             "sources": (result or {}).get("sources") or [],
-            "strippedSentences": stripped,
             "promptChars": len(str(item.get("system") or "")) + len(str(item.get("user") or "")),
             "answerChars": len(answer),
             # Parti tek istek olduğu için süre partinin tamamına ait; öğe
@@ -113,6 +104,5 @@ def trace_entry(result: dict[str, Any]) -> dict[str, Any]:
         "agent": result.get("name", ""),
         "promptChars": result.get("promptChars", 0),
         "answerChars": result.get("answerChars", 0),
-        "strippedSentences": result.get("strippedSentences", 0),
         "durationMs": result.get("durationMs", 0.0),
     }

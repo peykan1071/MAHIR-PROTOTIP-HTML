@@ -2,9 +2,7 @@
 
 Prompt'lar ajan sınıflarından ayrı tutuluyor: metinleri değiştirmek üretim
 davranışını değiştirir ve bu, akış mantığından bağımsız olarak gözden
-geçirilmesi gereken bir şey. Hepsi `DEVELOPMENT_CHARTER.md`nin "MAHİR öğretim
-yöntemi veya telafi programı önermez" kuralına uyar; kod tarafındaki emniyet
-ağı için ayrıca bkz. `backend/app/charter_guard.py`.
+geçirilmesi gereken bir şey.
 """
 
 from __future__ import annotations
@@ -108,25 +106,14 @@ DIAGNOSIS_SYSTEM_PROMPT = (
     "hiç yazma ve bileşeni adıyla an.\n"
     "3) Tema adını, yüzde sayısını (\"%\" işareti dahil) veya \"Eksikliğin şiddeti\" ifadesini "
     "PARAGRAFINDA HİÇ YAZMA - bunlar ayrı, sistem tarafından üretilen bir cümlede zaten "
-    "belirtilecek. Anlattığın eksikliği bir sonuca veya orana BAĞLAMA: \"nedeniyle\", \"bu "
-    "yüzden\", \"dolayısıyla\", \"sonucunda\" gibi bağlaçları hiç kullanma. Sen yalnızca "
-    "SEÇTİĞİN müfredat öğelerini ve bu öğelerdeki somut eksikliği, orandan bağımsız bir gözlem "
-    "olarak anlat.\n"
+    "belirtilecek.\n"
     "4) Eleştirel ve gerçekçi ol: yüzeysel teselliler (\"geçerli bir puan\", \"gelişime açık\" "
     "gibi yuvarlak ifadeler) yasak. Düşük başarı oranını doğrudan öğrenme kaybı veya kazanımın "
     "kavranamadığı şeklinde net teşhis et. Belirsizlik dolgusu da yasak: \"belirli\", "
     "\"genellikle\", \"bazı\", \"birtakım\", \"söz konusu\" gibi sözcükleri kullanma; her cümle "
     "somut bir iddia taşısın. Eksikliğin sonraki öğrenmelere yansıyan sarmal/kümülatif riskini "
     "YAZMA - o değerlendirme ayrı, sistem tarafından üretilen bir cümlede zaten ekleniyor; sen "
-    "yalnızca bugün gözlenen eksikliği anlat.\n"
-    "5) Yalnızca teşhis koy, ÇÖZÜM ÖNERME - bu kural istisnasızdır ve paragrafın SON cümlesi "
-    "dâhil her cümlesi için geçerlidir. Etkinlik, kaynak, ders, öğretim yöntemi, çalışma veya "
-    "telafi programı önerme. Şu ifadeleri hiç kullanma: \"önerilir\", \"tavsiye edilir\", "
-    "\"gerekmektedir\", \"gerekir\", \"gereklidir\", \"ihtiyaç duyulmaktadır\", \"yapılmalıdır\", "
-    "\"verilmelidir\", \"geliştirilmelidir\", \"desteklenmelidir\". Ayrıca \"etkinlik\", "
-    "\"alıştırma\", \"uygulama çalışması\", \"destek\" gibi YAPILACAK İŞ adlarını hiç anma - ne "
-    "önererek ne de betimleyerek. Ne YAPILMASI gerektiğini değil, yalnızca NE OLDUĞUNU yaz: "
-    "durumu ve eksikliği kanıtlarıyla belirle ve orada bitir.\n\n"
+    "yalnızca bugün gözlenen eksikliği anlat.\n\n"
     "BİÇİM: Türkçe, tek akıcı paragraf (madde işareti, başlık veya markdown kullanma; tema adı, "
     "yüzde veya \"Eksikliğin şiddeti\" YOK). UZUNLUK SINIRI: EN ÇOK 45 KELİME - bu sınır "
     "katıdır, aşma; 15 kelimenin altına da düşme.\n\n"
@@ -139,13 +126,9 @@ STRENGTH_SYSTEM_PROMPT = (
     "türü ve seçilmiş öğrenme çıktısını kullanarak güçlü performans alanını betimleyen TEK, "
     "akıcı bir paragraf yazmaktır. Başka beceri, tema veya öğrenme çıktısı kodu yazma. Başarı "
     "oranı yalnız performans düzeyini gösterir; neden, öğrenci sayısı, öğrenci niyeti veya "
-    "kalıcı öğrenme hakkında çıkarım yapma. Etkinlik, yöntem, çözüm, öneri veya yapılacak iş "
-    "yazma.\n\n"
+    "kalıcı öğrenme hakkında çıkarım yapma.\n\n"
     "Tema adını veya yüzde sayısını (\"%\" işareti dahil) PARAGRAFINDA HİÇ YAZMA - bunlar ayrı, "
-    "sistem tarafından üretilen bir cümlede zaten belirtilecek. Anlattığın başarıyı bir sonuca "
-    "veya orana BAĞLAMA: \"nedeniyle\", \"bu yüzden\", \"dolayısıyla\", \"sonucunda\" gibi "
-    "bağlaçları hiç kullanma. Sen yalnızca SEÇTİĞİN müfredat öğelerindeki somut başarıyı, "
-    "orandan bağımsız bir gözlem olarak anlat.\n\n"
+    "sistem tarafından üretilen bir cümlede zaten belirtilecek.\n\n"
     "BAĞLAM'dan EN AZ BİR, EN ÇOK BEŞ somut süreç bileşeni ya da kavramı adıyla anarak güçlü "
     "performans alanını betimle; her öğeyi BAĞLAM'dan BİREBİR kopyala (doğal bir cümle kurmak "
     "için Türkçe çekim eki alabilir).\n\n"

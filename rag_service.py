@@ -111,10 +111,8 @@ _RELATIVE_SCORE_FLOOR = 0.78
 GRADE_HEADING_PATTERN = re.compile(r"^\s*(HAZIRLIK SINIFI TEMALARI|\d+\.\s*SINIF TEMALARI)\s*$", re.MULTILINE)
 TEMA_HEADING_PATTERN = re.compile(r"^\s*\d+\.\s*TEMA\s*:\s*(.+?)\s*$", re.MULTILINE)
 
-# Müfredata demirlenmiş teşhis prompt'u - yalnızca TEŞHİS (kanıtlarıyla
-# eksiklik/risk tespiti), asla ÇÖZÜM/YÖNTEM önerisi değil
-# (DEVELOPMENT_CHARTER.md: "MAHİR ... öğretim yöntemi veya telafi programı
-# önermez"). Çıktı biçimi kasıtlı olarak tek akıcı paragraf - rapor tarafında
+# Müfredata demirlenmiş teşhis prompt'u - kanıtlarıyla eksiklik/risk tespiti.
+# Çıktı biçimi kasıtlı olarak tek akıcı paragraf - rapor tarafında
 # bu metin tek bir tablo hücresine yazılıyor (mahir-report-export-common.js
 # normalizeText() tüm satır sonlarını tek boşluğa indirger), bu yüzden
 # başlık/madde işareti/markdown biçimlendirmesi burada anlamsız olurdu.
@@ -150,25 +148,14 @@ SYSTEM_PROMPT = (
     "hiç yazma ve bileşeni adıyla an.\n"
     "3) Tema adını, yüzde sayısını (\"%\" işareti dahil) veya \"Eksikliğin şiddeti\" ifadesini "
     "PARAGRAFINDA HİÇ YAZMA - bunlar ayrı, sistem tarafından üretilen bir cümlede zaten "
-    "belirtilecek. Anlattığın eksikliği bir sonuca veya orana BAĞLAMA: \"nedeniyle\", \"bu "
-    "yüzden\", \"dolayısıyla\", \"sonucunda\" gibi bağlaçları hiç kullanma. Sen yalnızca "
-    "SEÇTİĞİN müfredat öğelerini ve bu öğelerdeki somut eksikliği, orandan bağımsız bir gözlem "
-    "olarak anlat.\n"
+    "belirtilecek.\n"
     "4) Eleştirel ve gerçekçi ol: yüzeysel teselliler (\"geçerli bir puan\", \"gelişime açık\" "
     "gibi yuvarlak ifadeler) yasak. Düşük başarı oranını doğrudan öğrenme kaybı veya kazanımın "
     "kavranamadığı şeklinde net teşhis et. Belirsizlik dolgusu da yasak: \"belirli\", "
     "\"genellikle\", \"bazı\", \"birtakım\", \"söz konusu\" gibi sözcükleri kullanma; her cümle "
     "somut bir iddia taşısın. Eksikliğin sonraki öğrenmelere yansıyan sarmal/kümülatif riskini "
     "YAZMA - o değerlendirme ayrı, sistem tarafından üretilen bir cümlede zaten ekleniyor; sen "
-    "yalnızca bugün gözlenen eksikliği anlat.\n"
-    "5) Yalnızca teşhis koy, ÇÖZÜM ÖNERME - bu kural istisnasızdır ve paragrafın SON cümlesi "
-    "dâhil her cümlesi için geçerlidir. Etkinlik, kaynak, ders, öğretim yöntemi, çalışma veya "
-    "telafi programı önerme. Şu ifadeleri hiç kullanma: \"önerilir\", \"tavsiye edilir\", "
-    "\"gerekmektedir\", \"gerekir\", \"gereklidir\", \"ihtiyaç duyulmaktadır\", \"yapılmalıdır\", "
-    "\"verilmelidir\", \"geliştirilmelidir\", \"desteklenmelidir\". Ayrıca \"etkinlik\", "
-    "\"alıştırma\", \"uygulama çalışması\", \"destek\" gibi YAPILACAK İŞ adlarını hiç anma - ne "
-    "önererek ne de betimleyerek. Ne YAPILMASI gerektiğini değil, yalnızca NE OLDUĞUNU yaz: "
-    "durumu ve eksikliği kanıtlarıyla belirle ve orada bitir.\n\n"
+    "yalnızca bugün gözlenen eksikliği anlat.\n\n"
     "BİÇİM: Türkçe, tek akıcı paragraf (madde işareti, başlık veya markdown kullanma; tema adı, "
     "yüzde veya \"Eksikliğin şiddeti\" YOK). UZUNLUK SINIRI: EN ÇOK 45 KELİME - bu sınır "
     "katıdır, aşma; 15 kelimenin altına da düşme.\n\n"
@@ -293,6 +280,88 @@ def _theme_match_key(theme_text: str) -> str:
     aynı fonksiyon kullanılmalı."""
 
     return re.sub(r"\s+", "", theme_text.upper())
+
+
+# MEB müfredat belgesinde bir kazanım listesinin hangi BECERİYE ait olduğunu
+# söyleyen başlıklar. Aynı tema içinde bu dört liste yalnızca kod önekiyle
+# ayrışıyor, metinleri neredeyse birebir aynı:
+#     TDE2.2. 'Anlamın Yapı Taşları' temasında ele alınan metinlerde anlam oluşturabilme
+#     TDE1.2. 'Anlamın Yapı Taşları' temasında ele alınan metinlerde anlam oluşturabilme
+# Hiçbir gömme modeli bunları ayırt edemez (canlı ölçüm: okuma sorgusunda
+# Dinleme/İzleme listesi 0,813 alıp top_k'yı doldurdu ve model TDE2.3 teşhisine
+# TDE2.1/TDE2.2'yi karıştırdı). Ayrım anlamsal değil YAPISAL olduğu için
+# çözümü de yapısal: belgenin kendi başlığından okunur.
+#
+# Değerler `shared/pilot/*/learning-outcomes-template.json` içindeki `skill`
+# alanıyla aynı kaynaktan (MEB programı) geliyor; iki taraf da
+# `_skill_match_key` altında aynı anahtara düştüğü için eşleşme birebir kalır.
+_SKILL_HEADINGS = ("Dinleme/İzleme", "Konuşma", "Okuma", "Yazma")
+
+# `casefold()` tek başına "İ"yi "i" + U+0307 yapar ve "I"yı "i"ye çevirir -
+# ikisi de Türkçe metinde yanlış anahtar üretir.
+_TURKISH_LOWER_MAP = str.maketrans(
+    {"İ": "i", "I": "ı", "Ş": "ş", "Ğ": "ğ", "Ü": "ü", "Ö": "ö", "Ç": "ç"}
+)
+
+
+def _skill_match_key(skill_text: str) -> str:
+    """Beceri adı/başlığı -> eşleştirme anahtarı ("Dinleme/İzleme" -> "dinlemeizleme").
+
+    Harf dışındaki her şey atılır: belgedeki başlık ile katalogdaki `skill`
+    alanı arasındaki eğik çizgi/boşluk/tire farkları eşleşmeyi kaçırmasın.
+    Hem indeksleme hem sorgu tarafında AYNI fonksiyon kullanılmalı.
+    """
+
+    folded = skill_text.translate(_TURKISH_LOWER_MAP).casefold()
+    return "".join(char for char in folded if char.isalnum())
+
+
+_KNOWN_SKILL_KEYS = frozenset(_skill_match_key(name) for name in _SKILL_HEADINGS)
+
+# TDE9 kod önekinin BECERİ ile eşlemesi - `tdeogr.pdf`'teki 4 tema × 4 beceri
+# üzerinde elle doğrulandı ve ayrıca `shared/pilot/tde9/
+# learning-outcomes-template.json`daki TÜM kayıtlarla programatik çapraz
+# kontrol edildi (bkz. `tests/test_rag_service_indexing.py::
+# SkillRegistryContractTests`): TDE1.x her zaman Dinleme/İzleme, TDE2.x her
+# zaman Okuma, TDE3.x her zaman Konuşma, TDE4.x her zaman Yazma. Bu, üst
+# başlık tespitinin (aşağıda) kaçırdığı asıl durumu yakalamak için var: alt
+# süreç bileşeni başlıkları ("c) TDE1.2.3. Çıkarım yapar.") Docling'in başlık
+# zincirinde üst beceri başlığını ("Dinleme/İzleme") TAŞIMIYOR - yalnız kendi
+# alt başlığını taşıyor. Üst başlık eşleşmesi bu yüzden TEK BAŞINA yeterli
+# değil (canlı ölçüm: Yazma istenen bir sorguda TDE1.2.1-1.2.4 alt bileşenleri
+# hiç elenmeden sızdı - başlıkları "Dinleme/İzleme" değil "a) TDE1.2.1. ..."
+# idi).
+_CODE_PREFIX_TO_SKILL = {"1": "Dinleme/İzleme", "2": "Okuma", "3": "Konuşma", "4": "Yazma"}
+_CODE_PREFIX_PATTERN = re.compile(r"TDE(\d+)\.")
+
+
+def _detect_skill_key(headings: object, text: str = "") -> str | None:
+    """Bir parçanın hangi BECERİYE ait olduğunu iki sinyalle çıkarır, yoksa `None`.
+
+    1) Üst düzey beceri başlığı zincirde birebir geçiyorsa (ör. bir bölümün
+       KENDİSİ "Okuma" başlığını taşıyorsa) onu kullan - en güvenilir sinyal.
+    2) Yoksa, başlıklardan VEYA gövde metninden bir "TDE{N}." kod öneki çıkar
+       ve `_CODE_PREFIX_TO_SKILL` ile beceriye çevir - alt süreç bileşeni
+       başlıkları (yukarıdaki not) bu yol olmadan hiç yakalanmaz.
+
+    `None` KASITLI bir değer, "bilinmiyor" demek değil: tema tanıtımı ya da
+    "Öğrenme-Öğretme Uygulamaları" gibi bölümler hiçbir beceriye ait DEĞİL ve
+    her beceri için geçerli. Sorgu tarafındaki filtre bunları eler değil,
+    korur - yalnız YANLIŞ beceriye ait olduğu belgeden okunan parçaları atar.
+    """
+
+    heading_list = [str(heading) for heading in (headings or [])]
+    for heading in heading_list:
+        key = _skill_match_key(heading)
+        if key in _KNOWN_SKILL_KEYS:
+            return key
+
+    match = _CODE_PREFIX_PATTERN.search(" ".join(heading_list) + " " + str(text or ""))
+    if match:
+        skill_name = _CODE_PREFIX_TO_SKILL.get(match.group(1))
+        if skill_name:
+            return _skill_match_key(skill_name)
+    return None
 
 
 def _normalize_grade_label(raw_heading: str) -> str:
@@ -690,6 +759,9 @@ def index_pdf(
                     "theme_key": _theme_match_key(theme_name) if theme_name else None,
                     "pages": pages,
                     "headings": list(getattr(chunk.meta, "headings", None) or []),
+                    "skill_key": _detect_skill_key(
+                        getattr(chunk.meta, "headings", None), chunk.text
+                    ),
                     "chunk_index": index,
                 },
             )
@@ -1035,7 +1107,7 @@ class RAGInference:
         """
 
         from qdrant_client import QdrantClient
-        from qdrant_client.models import FieldCondition, Filter, MatchValue
+        from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue
 
         # Bu konteyner sıcak kalırken başka bir konteynerde (index_pdf) commit
         # edilmiş yeni belgeleri görebilmek için reload. Volume reload() açık
@@ -1080,11 +1152,32 @@ class RAGInference:
                     )
                 )
 
+            # YANLIŞ BECERİ elemesi. Tema filtresi gibi bir `must` DEĞİL,
+            # `must_not`: beceri başlığı taşımayan parçalar (tema tanıtımı,
+            # "Öğrenme-Öğretme Uygulamaları") her beceri için geçerli kanıttır
+            # ve korunmalı - `must` olsaydı onlar da elenirdi. Aynı sebeple
+            # `skill_key` alanı OLMAYAN eski parçalar da korunur: bu alan
+            # eklenmeden önce yazılmış bir dizin sessizce boşalmaz, yalnız
+            # filtreden faydalanamaz (çözümü yeniden indekslemek).
+            exclusions = []
+            requested_skill = _skill_match_key(str(spec.get("skill") or ""))
+            if requested_skill in _KNOWN_SKILL_KEYS:
+                exclusions.append(
+                    FieldCondition(
+                        key="skill_key",
+                        match=MatchAny(any=sorted(_KNOWN_SKILL_KEYS - {requested_skill})),
+                    )
+                )
+
             try:
                 hits = self._qdrant.query_points(
                     collection_name=QDRANT_COLLECTION_NAME,
                     query=query_vectors[position].tolist(),
-                    query_filter=Filter(must=conditions) if conditions else None,
+                    query_filter=(
+                        Filter(must=conditions or None, must_not=exclusions or None)
+                        if conditions or exclusions
+                        else None
+                    ),
                     limit=int(_number_or(spec.get("topK"), DEFAULT_TOP_K)),
                     with_payload=True,
                 ).points

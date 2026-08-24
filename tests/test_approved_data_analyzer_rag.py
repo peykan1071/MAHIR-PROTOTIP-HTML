@@ -7,7 +7,6 @@ from backend.app.approved_data_analyzer import (
     _build_rag_question,
     _build_rag_retrieval_query,
     _normalize_theme_for_rag,
-    _strip_recommendation_sentences,
     analyze_approved_data,
 )
 from backend.app.agents.pipeline import (
@@ -32,7 +31,7 @@ def _llm_reply(*answers):
         results = []
         for item in items:
             if not str(item.get("name", "")).startswith("pedagoji/"):
-                results.append({"name": item["name"], "answer": "", "sources": [], "strippedSentences": 0})
+                results.append({"name": item["name"], "answer": "", "sources": []})
                 continue
             index = diagnoses.index(item)
             answer, sources = answers[index] if index < len(answers) else ("", [])
@@ -44,7 +43,6 @@ def _llm_reply(*answers):
                 "name": item["name"],
                 "answer": answer,
                 "sources": sources,
-                "strippedSentences": 0,
             })
         return True, "Ajan yanıtları üretildi.", results
 
@@ -173,11 +171,12 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertIn("Okuma stratejisi ve inceleme birlikteliği", result)
         self.assertNotIn("serbest açıklama", result)
 
-    def test_causal_overclaim_sentence_is_stripped_not_the_whole_answer(self):
-        # Canlı ölçüm: promptun açık yasağına rağmen model "...nedeniyle %3
-        # başarı oranı elde ediyorlar" gibi nedensellik iddiası kurmaya
-        # devam etti. Tüm yanıtı atmak yerine yalnız o cümle kırpılır, geri
-        # kalan (iyi) içerik korunur.
+    def test_causal_language_is_preserved(self):
+        # Nedensellik yasağı kaldırıldı (kullanıcı isteği + DEVELOPMENT_
+        # CHARTER.md güncellemesi) - model artık "nedeniyle" gibi bağlaçlar
+        # kullanabilir, MAHİR bunları kırpmaz. Bu, kasıtlı davranış
+        # değişikliğinin regresyon kaydı: eski filtre yanlışlıkla geri
+        # gelirse burada yakalanır.
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
         sources = [{"excerpt": "Metinde ana duygu ve ana düşünce bütünlük içinde ele alınır."}]
         answer = (
@@ -186,13 +185,14 @@ class RagContextAttachmentTests(unittest.TestCase):
         )
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
         self.assertIn("Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır.", result)
-        self.assertNotIn("nedeniyle", result)
+        self.assertIn("nedeniyle", result)
 
     def test_dangling_reference_is_removed_when_the_first_sentence_is_stripped(self):
-        # Canlı ölçüm (2026-08-24): modelin İLK cümlesi nedensellik iddiası
-        # içerdiği için kırpıldı, geriye kalan metin "Bu eksiklik, ..." diye
+        # İlk cümle oran tekrarı içerdiği için kırpılır (bkz.
+        # _RATE_MENTION_PATTERN - nedensellik artık kırpılmıyor, kalan tek
+        # tetikleyici bu), geriye kalan metin "Bu eksiklik, ..." diye
         # başlıyordu - artık var olmayan bir cümleye atıf yapan, havada kalan
-        # bir paragraf öğretmene gitti. Bağlayıcı öbek atılmalı.
+        # bir paragraf öğretmene gitmemeli. Bağlayıcı öbek atılmalı.
         outcome = {"outcomeTheme": "1. Tema: Sözün İnceliği", "successRate": 0.35}
         sources = [{
             "excerpt": (
@@ -201,8 +201,9 @@ class RagContextAttachmentTests(unittest.TestCase):
             )
         }]
         answer = (
-            '{"diagnosis":"Tahmin etme yeteneğinin eksikliği nedeniyle sorun oluşmaktadır. '
-            'Bu eksiklik, metnin görsellerinden ve başlıktan amacını belirlemesine engel oluyor."}'
+            '{"diagnosis":"Tahmin etme yeteneği eksiktir; %35 başarı oranı bunu '
+            'göstermektedir. Bu eksiklik, metnin görsellerinden ve başlıktan '
+            'amacını belirlemesine engel oluyor."}'
         )
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
         self.assertNotIn("Bu eksiklik, metnin görsellerinden", result)
@@ -318,15 +319,20 @@ class RagContextAttachmentTests(unittest.TestCase):
         answer = " ".join(["kanıt"] * 91)
         self.assertFalse(_answer_matches_outcome_scope(answer, outcome))
 
-    def test_causal_overclaim_and_student_count_are_rejected(self):
+    def test_causal_language_and_student_count_are_accepted(self):
+        # Nedensellik/öğrenci-sayısı yasağı kaldırıldı - bu ifadeler artık
+        # kapsam denetiminden geçer. Kasıtlı davranış değişikliğinin
+        # regresyon kaydı.
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
-        self.assertFalse(_answer_matches_outcome_scope("Düşüklüğün temel nedeni yetersiz bilgidir.", outcome))
-        self.assertFalse(_answer_matches_outcome_scope("Zorluk çeken öğrencilerin sayısı yüksektir.", outcome))
+        self.assertTrue(_answer_matches_outcome_scope("Düşüklüğün temel nedeni yetersiz bilgidir.", outcome))
+        self.assertTrue(_answer_matches_outcome_scope("Zorluk çeken öğrencilerin sayısı yüksektir.", outcome))
 
-    def test_activity_or_remediation_language_is_rejected(self):
+    def test_activity_or_remediation_language_is_accepted(self):
+        # Öneri/etkinlik yasağı kaldırıldı (DEVELOPMENT_CHARTER.md güncellendi) -
+        # bu ifadeler artık kapsam denetiminden geçer.
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
-        self.assertFalse(_answer_matches_outcome_scope("Bu çıktı için etkinlik önerilir.", outcome))
-        self.assertFalse(_answer_matches_outcome_scope("Telafi çalışması yapılmalıdır.", outcome))
+        self.assertTrue(_answer_matches_outcome_scope("Bu çıktı için etkinlik önerilir.", outcome))
+        self.assertTrue(_answer_matches_outcome_scope("Telafi çalışması yapılmalıdır.", outcome))
 
     def test_concise_evidence_bounded_diagnosis_is_accepted(self):
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
@@ -380,6 +386,9 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertEqual(prompts[0]["retrieval"]["programId"], "tde-9-tymm")
         self.assertEqual(prompts[0]["retrieval"]["grade"], "9")
         self.assertEqual(prompts[0]["retrieval"]["theme"], "SÖZÜN İNCELİĞİ")
+        # Beceri de gidiyor: aynı temada dört beceri listesi neredeyse birebir
+        # aynı metni taşıyor, ayrımı sunucu tarafında yalnız bu alan sağlıyor.
+        self.assertEqual(prompts[0]["retrieval"]["skill"], "Dinleme/İzleme")
         self.assertEqual(result["outcomes"][0]["ragContext"], "Bu kazanım dinleme becerisini kapsar.")
 
     def test_outcome_description_reaches_both_question_and_retrieval_query(self):
@@ -634,67 +643,6 @@ class RagBatchingTests(unittest.TestCase):
 
         contexts = [item["ragContext"] for item in result["outcomes"]]
         self.assertEqual(contexts, ["", "ikinci teşhis"])
-
-
-class RecommendationStrippingTests(unittest.TestCase):
-    # DEVELOPMENT_CHARTER.md: MAHİR yöntem/telafi programı önermez. Canlı
-    # ölçümde 8 yanıtın 2'si öneri cümlesiyle bitti - prompt tek başına yetmiyor.
-    def test_trailing_recommendation_sentence_is_dropped(self):
-        answer, dropped = _strip_recommendation_sentences(
-            "Kazanımın bilişsel düzeyi Anlama. Eksikliğin şiddeti: Kritik. "
-            "Bu nedenle okuma stratejileri uygulama programları önerilir."
-        )
-        self.assertEqual(dropped, 1)
-        self.assertNotIn("önerilir", answer)
-        self.assertIn("Eksikliğin şiddeti: Kritik.", answer)
-
-    def test_necessity_phrasing_is_dropped(self):
-        answer, dropped = _strip_recommendation_sentences(
-            "Öğrenme kaybı vardır. Daha kapsamlı bir yaklaşımla eğitim verilmelidir."
-        )
-        self.assertEqual(dropped, 1)
-        self.assertEqual(answer, "Öğrenme kaybı vardır.")
-
-    def test_gereklidir_is_dropped_but_gerekli_olan_is_kept(self):
-        # Canlı ölçümde "... ek destek ve öğretim gereklidir." hem prompt'tan
-        # hem de ilk desenden kaçtı; "gerekli olan" ise teşhis dilinde meşru.
-        answer, dropped = _strip_recommendation_sentences(
-            "Öğrencilere ek destek ve öğretim gereklidir. "
-            "Kazanım için gerekli olan bilişsel yeterlilik kazandırılamamıştır."
-        )
-        self.assertEqual(dropped, 1)
-        self.assertEqual(answer, "Kazanım için gerekli olan bilişsel yeterlilik kazandırılamamıştır.")
-
-    def test_remediation_need_closing_is_dropped_but_gelisim_ihtiyaci_is_kept(self):
-        # "eksikliği giderme ihtiyacı ortaya çıkmaktadır" canlı ölçümde hem
-        # prompt'tan hem de desenden kaçtı. Tetikleyici "ihtiyaç" OLAMAZ:
-        # "gelişim ihtiyacı" MAHİR'in raporundaki kendi terimi.
-        answer, dropped = _strip_recommendation_sentences(
-            "Bu eksikliği giderme ihtiyacı ortaya çıkmaktadır. "
-            "Bu kazanımda net bir gelişim ihtiyacı vardır."
-        )
-        self.assertEqual(dropped, 1)
-        self.assertEqual(answer, "Bu kazanımda net bir gelişim ihtiyacı vardır.")
-
-    def test_diagnostic_gerektirir_is_not_dropped(self):
-        # "gerektirir" teşhis dilinde meşru - "gerekir"le karıştırılmamalı.
-        answer, dropped = _strip_recommendation_sentences(
-            "Bu kazanım üst düzey analiz becerisi gerektirir."
-        )
-        self.assertEqual(dropped, 0)
-        self.assertEqual(answer, "Bu kazanım üst düzey analiz becerisi gerektirir.")
-
-    def test_all_recommendation_answer_is_discarded_and_leaves_ragcontext_empty(self):
-        # Charter süzgeci artık ortak LLM katmanında (agents/llm.py) çalışıyor
-        # ve burada mock'landığı için, süzgeçten SONRAKİ hâl simüle ediliyor:
-        # yanıtın tamamı öneriyse geriye boş string kalır ve hat o çıktıyı
-        # atlamalı - charter ihlali içeren bir metni raporlamaktansa hücreyi
-        # boş bırakmak doğrusu. Süzgecin kendisi tests/test_agent_llm.py'de.
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.agents.llm.run_agent_prompts",
-                       side_effect=_llm_reply(("", [{"documentName": "x"}]))):
-                result = analyze_approved_data(_weak_tde_payload())
-        self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
 
 class NoBloomTests(unittest.TestCase):

@@ -68,7 +68,6 @@ def _capture(answer=""):
                 "name": item["name"],
                 "answer": answer,
                 "sources": [{"documentName": "x"}] if "retrieval" in item else [],
-                "strippedSentences": 0,
                 "promptChars": len(item.get("system", "")) + len(item.get("user", "")),
                 "answerChars": len(answer),
                 "durationMs": 1.0,
@@ -232,8 +231,7 @@ class DiagnosisSourceTests(unittest.TestCase):
                     "name": item["name"],
                     "answer": "teşhis" if "retrieval" in item else "",
                     "sources": sources if "retrieval" in item else [],
-                    "strippedSentences": 0,
-                }
+                    }
                 for item in items
             ]
 
@@ -455,18 +453,9 @@ class DiagnosisPromptContractTests(unittest.TestCase):
         # (ör. teşhis ettiği kazanımı "gelecekteki kazanım" diye andı).
         self.assertIn("kod UYDURMA", self.PROMPT)
 
-    def test_activity_names_are_banned_not_just_recommendations(self):
-        # Charter süzgeci "gerekli olan"ı bilerek koruyor (teşhis dili), ama
-        # ölçümde model "gerekli olan ... analiz ETKİNLİKLERİNE" yazdı: öneri
-        # kipi olmadan etkinlik ADLANDIRMAK da charter ihlali.
-        self.assertIn("YAPILACAK İŞ", self.PROMPT)
-        self.assertIn("ne önererek ne de betimleyerek", self.PROMPT)
-
     def test_measured_mechanisms_survived(self):
-        # Bunlar ölçümde çalışıyordu (0 öneri sızıntısı); prompt yeniden
-        # yazılırken düşmemeleri şart.
+        # Bunlar ölçümde çalışıyordu; prompt yeniden yazılırken düşmemeleri şart.
         self.assertIn("Bu bilgi belgede bulunmuyor.", self.PROMPT)
-        self.assertIn("ÇÖZÜM ÖNERME", self.PROMPT)
         self.assertIn("tek akıcı paragraf", self.PROMPT)
 
 
