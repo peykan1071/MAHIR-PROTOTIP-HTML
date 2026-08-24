@@ -27,7 +27,7 @@ def parse_mahir_docx(content: bytes) -> dict[str, object]:
         document_type = "mahir-class-score-template"
         if not questions:
             questions = _questions_from_student_headings(student_table)
-        students = _parse_students_flexible(student_table)
+        students = _parse_students_flexible(student_table, questions)
     elif single_student_table:
         document_type = "single-student-score-sheet"
         if not questions:
@@ -390,7 +390,9 @@ def _parse_students(
     return students
 
 
-def _parse_students_flexible(rows: list[list[str]]) -> list[dict[str, object]]:
+def _parse_students_flexible(
+    rows: list[list[str]], questions: list[dict[str, object]] | None = None
+) -> list[dict[str, object]]:
     """Read a student-score table by its headings rather than column positions."""
 
     if not rows:
@@ -407,6 +409,17 @@ def _parse_students_flexible(rows: list[list[str]]) -> list[dict[str, object]]:
         index for index, label in enumerate(headings)
         if re.match(r"^(?:s|soru) ?\d+\b", label)
     ]
+    explicit_question_numbers = {
+        int(question["number"])
+        for question in (questions or [])
+        if question.get("number") is not None
+    }
+    if explicit_question_numbers:
+        score_indexes = [
+            index for index in score_indexes
+            if (match := re.match(r"^(?:s|soru) ?(\d+)\b", headings[index]))
+            and int(match.group(1)) in explicit_question_numbers
+        ]
     students = []
 
     for source_row in rows[1:]:

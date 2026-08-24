@@ -121,12 +121,15 @@ class OfficialDocxTemplateTests(unittest.TestCase):
         ):
             cell.text = value
 
-        students = document.add_table(rows=3, cols=5)
-        for cell, value in zip(students.rows[0].cells, ["Sıra", "Okul No", "S1", "Toplam", "Kontrol"]):
+        students = document.add_table(rows=3, cols=14)
+        for cell, value in zip(
+            students.rows[0].cells,
+            ["Sıra", "Okul No", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10", "Toplam", "Kontrol"],
+        ):
             cell.text = value
-        for cell, value in zip(students.rows[1].cells, ["AZAMİ", "—", "10", "10", ""]):
+        for cell, value in zip(students.rows[1].cells, ["AZAMİ", "—", "10", "", "", "", "", "", "", "", "", "", "10", ""]):
             cell.text = value
-        for cell, value in zip(students.rows[2].cells, ["1", "OGR-001", "8", "8", ""]):
+        for cell, value in zip(students.rows[2].cells, ["1", "OGR-001", "8", "", "", "", "", "", "", "", "", "", "8", ""]):
             cell.text = value
 
         output = io.BytesIO()
@@ -143,6 +146,7 @@ class OfficialDocxTemplateTests(unittest.TestCase):
         self.assertEqual(result["questions"][0]["maxScore"], 10)
         self.assertEqual(result["summary"]["studentCount"], 1)
         self.assertEqual(result["students"][0]["studentNo"], "OGR-001")
+        self.assertEqual(result["students"][0]["scores"], [8])
 
 
 if __name__ == "__main__":
