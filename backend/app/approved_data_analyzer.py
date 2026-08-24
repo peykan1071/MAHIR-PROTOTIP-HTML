@@ -8,10 +8,6 @@ import re
 import time
 from typing import Any
 
-# Charter süzgeci `charter_guard`a taşındı: kısıt tek bir ajanın değil, LLM
-# üreten her ajanın sorunu. Takma ad, mevcut çağrı yerlerini ve testleri
-# değiştirmeden bırakmak için.
-from .charter_guard import strip_recommendation_sentences as _strip_recommendation_sentences
 from .assessment_profiles import (
     COMPONENT_LABELS,
     GENERAL,
@@ -395,7 +391,7 @@ def _build_rag_question(outcome: dict[str, Any]) -> str:
 
     2026-08-22: Başarı oranı ve şiddet etiketi buradan KALDIRILDI. Eskiden
     model paragrafın kendisini yazdığı için bunlara ihtiyacı vardı; artık
-    yalnızca BAĞLAM'dan iki terim SEÇİYOR (`{"evidenceTerms":[...]}`,
+    yalnızca BAĞLAM'dan bir ila üç terim SEÇİYOR (`{"evidenceTerms":[...]}`,
     `pipeline.py::_compose_grounded_pedagogical_answer`) ve oranı/şiddeti
     MAHİR kendi hesaplıyor - modelin bunlara erişimi gerekmiyor. Canlı
     ölçümde bu sayılar sorudayken model tekrar tekrar "%30 başarı oranı"
@@ -409,6 +405,7 @@ def _build_rag_question(outcome: dict[str, Any]) -> str:
         return ""
     return (
         f"{' - '.join(parts)} öğrenme çıktısı için BAĞLAM'daki öğretim "
-        "programı metninden bu çıktıyla doğrudan ilgili iki somut terimi "
-        "adıyla anarak seç."
+        "programı metninden bu çıktıyla doğrudan ilgili bir ila üç somut "
+        "terimi adıyla anarak yanıtla. Eksikliğin nedenini, öğrenci "
+        "sayısını veya öğrencinin bilgisini tahmin etme."
     )

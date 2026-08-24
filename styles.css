@@ -1366,10 +1366,90 @@ button[aria-disabled="true"] {
 
 .report-preview-sections th,
 .report-preview-sections td {
-  padding: 9px 10px;
+  padding: 9px 12px;
   border: 1px solid var(--color-border);
+  border-top: none;
+  border-left: none;
   text-align: left;
   vertical-align: top;
+}
+
+.report-preview-sections tr > :first-child {
+  border-left: none;
+}
+
+.report-preview-sections tr:first-child th {
+  background: linear-gradient(180deg, #eef6f7, #e2f0f1);
+  color: var(--color-secondary);
+  font-weight: 800;
+  border-top: none;
+}
+
+.report-preview-sections tr:nth-child(even) td {
+  background: #f7fafb;
+}
+
+.report-preview-sections tr:not(:first-child):hover td {
+  background: #eef7f8;
+}
+
+/* Bilinen düzey metinleri ("Beklenen düzeyde" vb.) rengi taşıyan bir rozete
+   dönüşür - sayı ya da oran değişmez, yalnız aynı metin daha okunaklı olur. */
+.report-preview-sections .level-badge {
+  display: inline-block;
+  max-width: 100%;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 0.86em;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: normal;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.report-preview-sections .level-badge--excellent { background: #dcf3e3; color: #187a41; }
+.report-preview-sections .level-badge--good { background: #dceef8; color: #1c6ba8; }
+.report-preview-sections .level-badge--developing { background: #fbedcf; color: #92620a; }
+.report-preview-sections .level-badge--priority { background: #fbdedb; color: #b3392f; }
+
+/* Yalnız başarı/gerçekleşme yüzdesi taşıyan hücreler (bkz. mahir-report-export-common.js
+   isPerformancePercentHeading) mini bir çubukla gösterilir; ağırlık gibi
+   dağılım yüzdeleri bu görsele hiç girmez. */
+.report-preview-sections .percent-cell {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 96px;
+}
+
+.report-preview-sections .percent-cell-bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: 999px;
+  background: #e6edf0;
+  overflow: hidden;
+}
+
+.report-preview-sections .percent-cell-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--pct, 0%);
+  border-radius: inherit;
+  background: currentColor;
+}
+
+.report-preview-sections .percent-cell-bar[data-tone="excellent"] { color: #2fa360; }
+.report-preview-sections .percent-cell-bar[data-tone="good"] { color: var(--color-primary); }
+.report-preview-sections .percent-cell-bar[data-tone="developing"] { color: #d99a1c; }
+.report-preview-sections .percent-cell-bar[data-tone="priority"] { color: #d1453b; }
+
+.report-preview-sections .percent-cell-label {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* "Kanıtları Gör": D bölümünde her oranın hangi sorulardan ve kaç öğrenciden

@@ -18,8 +18,6 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from ..charter_guard import strip_recommendation_sentences
-
 # Uzak uç noktanın sınırlarıyla aynı olmalı (bkz. rag_service.py MAX_AGENT_*).
 # Burada da kontrol ediliyor ki ağ turu boşa harcanmasın ve hata mesajı
 # çağırana yakın yerde üretilsin.
@@ -47,23 +45,17 @@ def run_agent_prompts(
 ) -> tuple[bool, str, list[dict[str, Any]] | None]:
     """Prompt'ları tek partide çalıştırır; sonuçlar giriş sırasıyla döner.
 
-    Her DÜZ METİN yanıt `charter_guard`dan geçirilir - DEVELOPMENT_CHARTER.md'nin
-    "MAHİR yöntem/telafi önermez" kuralı artık tek bir ajanın değil, LLM üreten
-    her ajanın sorunu. Kırpılan cümle sayısı sonuca yazılır ki çağıran ize
-    kaydedebilsin.
+    Dönen her öğe: `{"name", "answer", "sources", "promptChars",
+    "answerChars", "durationMs", "strippedSentences"}`.
 
-    JSON ŞEKİLLİ yanıtlar (ör. Pedagojik Analiz Ajanı'nın yapılandırılmış
-    kanıt şeması - bkz. `agents/prompts.py::DIAGNOSIS_SYSTEM_PROMPT`) bu
-    kırpmadan MUAFTIR: `strip_recommendation_sentences` cümleleri `. `/`! `/
-    `? ` sınırlarında ayırıyor, ve bu yanıtların `gapRationale`/
-    `strengthRationale` gibi ALANLARININ İÇİNDE de tam cümleler (nokta ile
-    biten) var - JSON'un TAMAMINI cümle sanıp bölerse, alan sınırlarını
-    hiç tanımadan ortadan bir parçayı silip geçerli JSON'u bozabilir. Charter
-    süzgeci bu yanıtlar için ALAN DÜZEYİNDE, JSON ayrıştırıldıktan SONRA
-    `pipeline.py::_compose_grounded_pedagogical_answer` içinde uygulanır.
-
-    Dönen her öğe: `{"name", "answer", "strippedSentences", "promptChars",
-    "answerChars", "durationMs"}`.
+    `strippedSentences` her zaman 0: bu katman yanıt METNİNE hiç dokunmaz -
+    cümle düzeyinde kırpma JSON alan sınırlarını tanımadan çalışıp
+    yapılandırılmış yanıtları bozardı (bkz. `test_json_shaped_answers_are_
+    exempt_from_sentence_stripping`). Charter süzgeci artık ayrıştırılmış
+    `diagnosis` alanı üzerinde, `pipeline.py::_compose_grounded_pedagogical_
+    answer` içindeki `_strip_scope_violations`de uygulanır - alan hâlâ
+    burada taşınıyor çünkü `PedagogicalAnalysisAgent._evaluate_diagnosis_
+    result` onu okuyor.
     """
 
     if not items:
@@ -92,13 +84,7 @@ def run_agent_prompts(
 
     enriched: list[dict[str, Any]] = []
     for item, result in zip(items, results):
-        raw_answer = str((result or {}).get("answer") or "")
-        if raw_answer.lstrip().startswith("{"):
-            # JSON şekilli - bkz. docstring. Alan-düzeyinde kırpma
-            # `pipeline.py::_compose_grounded_pedagogical_answer`nin işi.
-            answer, stripped = raw_answer, 0
-        else:
-            answer, stripped = strip_recommendation_sentences(raw_answer)
+        answer = str((result or {}).get("answer") or "")
         enriched.append({
             "name": str(item.get("name") or ""),
             "answer": answer,
@@ -106,12 +92,12 @@ def run_agent_prompts(
             # teşhis yazma" diyor (bkz. PedagogicalAnalysisAgent.apply_llm).
             # Düşürülürse getirim çalışsa bile her teşhis sessizce elenir.
             "sources": (result or {}).get("sources") or [],
-            "strippedSentences": stripped,
             "promptChars": len(str(item.get("system") or "")) + len(str(item.get("user") or "")),
             "answerChars": len(answer),
             # Parti tek istek olduğu için süre partinin tamamına ait; öğe
             # başına ayrıştırmak mümkün değil ve yanıltıcı olurdu.
             "durationMs": round(duration_ms, 1),
+            "strippedSentences": 0,
         })
     return True, message, enriched
 
@@ -128,6 +114,5 @@ def trace_entry(result: dict[str, Any]) -> dict[str, Any]:
         "agent": result.get("name", ""),
         "promptChars": result.get("promptChars", 0),
         "answerChars": result.get("answerChars", 0),
-        "strippedSentences": result.get("strippedSentences", 0),
         "durationMs": result.get("durationMs", 0.0),
     }

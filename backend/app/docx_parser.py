@@ -7,6 +7,14 @@ import re
 import zipfile
 from xml.etree import ElementTree
 
+from .parsing_utils import (
+    TOTAL_MISMATCH_TOLERANCE,
+    calculate_total,
+    _normalise_label,
+    _integer,
+    _number,
+    _question_number,
+)
 
 WORD_NAMESPACE = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 
@@ -109,7 +117,7 @@ def _find_student_table(tables: list[list[list[str]]]) -> list[list[str]] | None
             continue
         labels = {_normalise_label(cell) for cell in table[0]}
         has_number = any(label in {"okul no", "ogrenci no", "numara", "no"} for label in labels)
-        has_score = any(re.match(r"^(?:s|soru) ?\d+\b", label) for label in labels)
+        has_score = any(_question_number(label) is not None for label in labels)
         if has_number and has_score:
             return table
     return None
@@ -274,12 +282,12 @@ def _questions_from_student_headings(rows: list[list[str]]) -> list[dict[str, ob
     questions = []
     for cell in rows[0]:
         label = _normalise_label(cell)
-        match = re.match(r"^(?:s|soru) ?(\d+)\b", label)
-        if not match:
+        number = _question_number(label)
+        if number is None:
             continue
         questions.append(
             {
-                "number": int(match.group(1)),
+                "number": number,
                 "outcomeCode": "",
                 "outcomeDescription": "",
                 "maxScore": None,
@@ -303,13 +311,13 @@ def _parse_single_student_questions(rows: list[list[str]]) -> list[dict[str, obj
     questions = []
     for index, cell in enumerate(question_row[1:], start=1):
         label = _normalise_label(cell)
-        match = re.match(r"^(?:s|soru) ?(\d+)\b", label)
-        if not match:
+        number = _question_number(label)
+        if number is None:
             continue
         max_score = _number(max_row[index]) if index < len(max_row) else None
         questions.append(
             {
-                "number": int(match.group(1)),
+                "number": number,
                 "outcomeCode": "",
                 "outcomeDescription": "",
                 "maxScore": max_score,
@@ -351,7 +359,7 @@ def _parse_single_student_scores(
             "studentNo": student_no.strip(),
             "scores": scores,
             "totalScore": total_score,
-            "calculatedTotal": round(sum(score or 0 for score in scores), 2),
+            "calculatedTotal": calculate_total(scores),
             "control": "",
         }
     ]
@@ -407,7 +415,7 @@ def _parse_students_flexible(
     total_index = find_index(lambda label: label == "puan" or label.startswith("toplam"))
     score_indexes = [
         index for index, label in enumerate(headings)
-        if re.match(r"^(?:s|soru) ?\d+\b", label)
+        if _question_number(label) is not None
     ]
     explicit_question_numbers = {
         int(question["number"])
@@ -438,7 +446,7 @@ def _parse_students_flexible(
                 "studentNo": student_no,
                 "scores": scores,
                 "totalScore": total_score,
-                "calculatedTotal": round(sum(score or 0 for score in scores), 2),
+                "calculatedTotal": calculate_total(scores),
                 "control": "",
             }
         )
@@ -483,18 +491,13 @@ def _build_warnings(
     for student in students:
         if (
             student["totalScore"] is not None
-            and abs(float(student["totalScore"]) - float(student["calculatedTotal"])) > 0.01
+            and abs(float(student["totalScore"]) - float(student["calculatedTotal"])) > TOTAL_MISMATCH_TOLERANCE
         ):
             warnings.append(
                 f"{student['rowNumber']}. satırında yazılan toplam "
                 f"({student['totalScore']}) ile hesaplanan toplam ({student['calculatedTotal']}) farklı."
             )
     return warnings
-
-
-def _normalise_label(value: str) -> str:
-    translation = str.maketrans("ÇĞİÖŞÜçğıöşü", "CGIOSUcgiosu")
-    return re.sub(r"[^a-z0-9]+", " ", value.translate(translation).casefold()).strip()
 
 
 def _selected_option(value: str) -> str:

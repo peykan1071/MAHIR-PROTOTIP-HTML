@@ -49,6 +49,58 @@
     return y + lines.length * lineHeight;
   };
 
+  const roundedRect = (context, x, y, width, height, radius) => {
+    if (typeof context.roundRect === "function") {
+      context.beginPath();
+      context.roundRect(x, y, width, height, radius);
+      return;
+    }
+    const r = Math.min(radius, width / 2, height / 2);
+    context.beginPath();
+    context.moveTo(x + r, y);
+    context.arcTo(x + width, y, x + width, y + height, r);
+    context.arcTo(x + width, y + height, x, y + height, r);
+    context.arcTo(x, y + height, x, y, r);
+    context.arcTo(x, y, x + width, y, r);
+    context.closePath();
+  };
+
+  // Ekrandaki `.level-badge` rozetinin PDF karşılığı: metnin arkasına
+  // tonlu, yuvarlak köşeli bir dolgu, metin de tonun kendi renginde. `lines`
+  // zaten kolon genişliğine göre sarılmış (bkz. measureTable) - rozet kutusu
+  // en uzun satıra göre boyanır, asla `maxWidth`i aşmaz.
+  const drawLevelBadge = (context, visual, lines, x, y, maxWidth, design) => {
+    setFont(context, design.tableSize, 700);
+    const paddingX = 6;
+    const lineHeight = design.tableLine;
+    const widest = Math.min(maxWidth, Math.max(...lines.map((line) => context.measureText(line).width)));
+    const height = lines.length * lineHeight + 3;
+    roundedRect(context, x, y, widest + paddingX * 2, height, Math.min(height / 2, 8));
+    context.fillStyle = `#${visual.colors.bg}`;
+    context.fill();
+    context.fillStyle = `#${visual.colors.text}`;
+    lines.forEach((line, index) => context.fillText(line, x + paddingX, y + 2 + index * lineHeight));
+  };
+
+  // Ekrandaki `.percent-cell` çubuğunun PDF karşılığı: soluk bir "iz"
+  // üzerinde tonlu bir dolgu, ardından yüzde etiketi (koyu, normal metin -
+  // etiketin kendisi tonlanmaz, yalnız çubuk tonlanır; bkz. styles.css).
+  const drawPercentBar = (context, visual, x, y, maxWidth, design) => {
+    const barHeight = 7;
+    const barWidth = Math.max(16, Math.min(50, maxWidth * 0.45));
+    const barY = y + (design.tableLine - barHeight) / 2;
+    roundedRect(context, x, barY, barWidth, barHeight, barHeight / 2);
+    context.fillStyle = "#e6edf0";
+    context.fill();
+    const filledWidth = Math.max(barHeight, (barWidth * visual.percent) / 100);
+    roundedRect(context, x, barY, filledWidth, barHeight, barHeight / 2);
+    context.fillStyle = `#${visual.colors.bar}`;
+    context.fill();
+    setFont(context, design.tableSize, 700);
+    context.fillStyle = "#1f1f1f";
+    context.fillText(visual.text, x + barWidth + 8, y);
+  };
+
   const normalizeColumnWidths = (weights, columnCount, width) => {
     const normalized = Array.isArray(weights) && weights.length === columnCount
       ? weights.map((value) => Math.max(Number(value) || 0, 0))
@@ -63,13 +115,27 @@
   };
 
   const measureTable = (context, table, width, design, weights = null) => {
+    const common = getCommon();
     const columnCount = Math.max(...table.map((row) => row.length), 1);
     const columnWidths = normalizeColumnWidths(weights, columnCount, width);
+    const headerRow = table[0] || [];
+    const performancePercentColumns = headerRow.map((heading) => common.isPerformancePercentHeading(heading));
     const rowLayouts = table.map((row, rowIndex) => {
       const cells = Array.from({ length: columnCount }, (_, index) => {
-        setFont(context, design.tableSize, rowIndex === 0 || (index === 0 && columnCount === 2) ? 800 : 400);
-        const lines = wrapText(context, row[index] || "", columnWidths[index] - design.tableCellPaddingX * 2);
-        return { lines, header: rowIndex === 0, label: index === 0 && columnCount === 2 };
+        const header = rowIndex === 0;
+        const visual = header ? null : common.cellVisual(row[index], performancePercentColumns[index]);
+        setFont(context, design.tableSize, header || (index === 0 && columnCount === 2) ? 800 : 400);
+        const availableWidth = columnWidths[index] - design.tableCellPaddingX * 2;
+        // Rozet metni de KOLON GENİŞLİĞİNE göre sarılır (bkz. styles.css'teki
+        // ekran karşılığı) - aksi hâlde "Gelişim desteği öncelikli" gibi uzun
+        // bir düzey metni dar bir sütunda komşu hücreye taşardı. Çubuklu
+        // hücrenin etiketi ("%78") zaten kısa, sarmaya gerek yok.
+        const lines = visual?.kind === "level"
+          ? wrapText(context, visual.text, availableWidth - 12)
+          : visual
+            ? [visual.text]
+            : wrapText(context, row[index] || "", availableWidth);
+        return { lines, header, label: index === 0 && columnCount === 2, visual };
       });
       const height = Math.max(21, Math.max(...cells.map((cell) => cell.lines.length * design.tableLine + design.tableCellPaddingY * 2)));
       return { cells, height };
@@ -164,9 +230,29 @@
         context.strokeStyle = colors.border;
         context.lineWidth = 1;
         context.strokeRect(cellX, cursorY, columnWidth, row.height);
-        context.fillStyle = cell.header ? colors.navy : colors.ink;
-        setFont(context, design.tableSize, cell.header || cell.label ? 800 : 400);
-        drawLines(context, cell.lines, cellX + design.tableCellPaddingX, cursorY + design.tableCellPaddingY, design.tableLine);
+        const textX = cellX + design.tableCellPaddingX;
+        const textY = cursorY + design.tableCellPaddingY;
+        const cellInnerWidth = columnWidth - design.tableCellPaddingX * 2;
+        if (cell.visual) {
+          // Güvenlik ağı: genişlik hesabı her zaman kolonu aşmayacak şekilde
+          // kurulur (bkz. measureTable/drawLevelBadge) ama kırpma, herhangi
+          // bir kenar durumunun komşu hücreye taşmasını yapısal olarak
+          // imkânsız kılar - CSS'teki `overflow` güvencesinin PDF karşılığı.
+          context.save();
+          context.beginPath();
+          context.rect(cellX, cursorY, columnWidth, row.height);
+          context.clip();
+          if (cell.visual.kind === "level") {
+            drawLevelBadge(context, cell.visual, cell.lines, textX, textY, cellInnerWidth, design);
+          } else {
+            drawPercentBar(context, cell.visual, textX, textY, cellInnerWidth, design);
+          }
+          context.restore();
+        } else {
+          context.fillStyle = cell.header ? colors.navy : colors.ink;
+          setFont(context, design.tableSize, cell.header || cell.label ? 800 : 400);
+          drawLines(context, cell.lines, textX, textY, design.tableLine);
+        }
         cursorX += columnWidth;
       });
       cursorY += row.height;

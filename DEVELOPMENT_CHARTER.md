@@ -9,7 +9,6 @@ Bu belge, MAHİR projesinin geliştirme kurallarını, sürüm yönetimini, dosy
 MAHİR; sınav verilerini okuyan, öğretmen doğrulamasından geçiren, sonuçları resmî öğrenme çıktıları ve becerilerle ilişkilendirerek analiz eden ve tek bir **Sınav Sonuçları Analiz Raporu** oluşturan kamu evrakı temelli karar destek ajanıdır.
 
 - Prototipte idareci modülü ve başka evrak türü bulunmaz.
-- MAHİR etkinlik, kaynak, kitap sayfası, öğretim yöntemi veya telafi programı önermez.
 - MAHİR yalnız güçlü alanları, gelişim ihtiyacını, kapsamı ve öncelik düzeyini kanıtlarıyla belirler.
 - Soru–puan–öğrenme çıktısı eşleştirmesini öğretmen Veri Ekleme aşamasında yapar.
 - Okunan öğrenci verisi, öğretmenin belirttiği öğrenci sayısı kadar satırda doğrulanır; okunamayan alan öğretmen tarafından düzeltilmeden analiz yapılamaz.

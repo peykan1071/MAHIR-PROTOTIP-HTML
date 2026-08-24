@@ -60,7 +60,7 @@ PROFILES = {
 }
 
 
-def _normalized_course_name(course_name: str) -> str:
+def _normalized_course_name(course_name: object) -> str:
     value = unicodedata.normalize("NFKC", str(course_name or "")).translate(
         str.maketrans({"I": "ı", "İ": "i"})
     )

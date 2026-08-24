@@ -31,15 +31,29 @@
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 
-  const paragraph = (text, style = "Normal", options = {}) => {
+  const run = (text, options = {}) => {
     const bold = options.bold ? "<w:b/>" : "";
     const color = options.color ? `<w:color w:val="${options.color}"/>` : "";
     const size = options.size ? `<w:sz w:val="${options.size}"/><w:szCs w:val="${options.size}"/>` : "";
+    const content = escapeXml(text).replace(/\r?\n/g, '</w:t><w:br/><w:t xml:space="preserve">');
+    return `<w:r><w:rPr>${bold}${color}${size}</w:rPr><w:t xml:space="preserve">${content}</w:t></w:r>`;
+  };
+
+  const paragraph = (text, style = "Normal", options = {}) => {
     const align = options.align ? `<w:jc w:val="${options.align}"/>` : "";
     const keepNext = options.keepNext ? "<w:keepNext/>" : "";
     const spacing = `<w:spacing w:after="${options.after ?? 80}" w:line="${options.line ?? 252}" w:lineRule="auto"/>`;
-    const content = escapeXml(text).replace(/\r?\n/g, '</w:t><w:br/><w:t xml:space="preserve">');
-    return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${keepNext}${align}${spacing}</w:pPr><w:r><w:rPr>${bold}${color}${size}</w:rPr><w:t xml:space="preserve">${content}</w:t></w:r></w:p>`;
+    return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${keepNext}${align}${spacing}</w:pPr>${run(text, options)}</w:p>`;
+  };
+
+  // `paragraph()` tek renkte tek run üretir; yüzde çubuğu (tonlu blok
+  // karakterleri + koyu etiket) gibi TEK satırda BİRDEN ÇOK renkli parça
+  // gereken hücreler için - bkz. `percentBarParagraph`.
+  const multiRunParagraph = (runs, style = "Normal", options = {}) => {
+    const align = options.align ? `<w:jc w:val="${options.align}"/>` : "";
+    const spacing = `<w:spacing w:after="${options.after ?? 80}" w:line="${options.line ?? 252}" w:lineRule="auto"/>`;
+    const content = runs.map((part) => run(part.text, part)).join("");
+    return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${align}${spacing}</w:pPr>${content}</w:p>`;
   };
 
   const cell = (content, options = {}) => {
@@ -48,6 +62,39 @@
     const gridSpan = options.gridSpan ? `<w:gridSpan w:val="${options.gridSpan}"/>` : "";
     const borders = options.noBorders ? "" : "<w:tcBorders><w:top w:val=\"single\" w:sz=\"4\" w:color=\"9EBCD3\"/><w:left w:val=\"single\" w:sz=\"4\" w:color=\"9EBCD3\"/><w:bottom w:val=\"single\" w:sz=\"4\" w:color=\"9EBCD3\"/><w:right w:val=\"single\" w:sz=\"4\" w:color=\"9EBCD3\"/></w:tcBorders>";
     return `<w:tc><w:tcPr>${width}${gridSpan}${shade}${borders}<w:tcMar><w:top w:w="90" w:type="dxa"/><w:left w:w="120" w:type="dxa"/><w:bottom w:w="90" w:type="dxa"/><w:right w:w="120" w:type="dxa"/></w:tcMar></w:tcPr>${content}</w:tc>`;
+  };
+
+  // Yüzde çubuğunun Word karşılığı: gömülü çizim/şekil desteği olmadan,
+  // 10 basamaklı bir dolu/boş blok karakteri dizisi ile - ekrandaki
+  // `.percent-cell-bar`in metin tabanlı eşdeğeri. Etiket ("%78") tonlanmaz,
+  // yalnız çubuk tonlanır (bkz. styles.css'teki aynı ayrım).
+  const PERCENT_BAR_SEGMENTS = 10;
+  const percentBarRuns = (visual) => {
+    const filled = Math.round((visual.percent / 100) * PERCENT_BAR_SEGMENTS);
+    const runs = [];
+    if (filled > 0) runs.push({ text: "█".repeat(filled), color: visual.colors.bar });
+    if (filled < PERCENT_BAR_SEGMENTS) runs.push({ text: "░".repeat(PERCENT_BAR_SEGMENTS - filled), color: "C7D2D8" });
+    runs.push({ text: `  ${visual.text}`, color: "1F1F1F", bold: true });
+    return runs;
+  };
+
+  // Bir hücrenin görsel muamele (rozet/çubuk) gerektirip gerektirmediğine
+  // `common().cellVisual` karar verir - ekran ve PDF ile AYNI mantık (bkz.
+  // mahir-report-export-common.js). Gerektirmiyorsa `null` döner, çağıran
+  // düz metin hücresine düşer.
+  const visualCellXml = (text, columnIsPerformancePercent) => {
+    const visual = common().cellVisual(text, columnIsPerformancePercent);
+    if (!visual) return null;
+    if (visual.kind === "level") {
+      return {
+        shade: visual.colors.bg,
+        xml: paragraph(visual.text, "TableText", { bold: true, color: visual.colors.text, after: 0, line: 224 })
+      };
+    }
+    return {
+      shade: "",
+      xml: multiRunParagraph(percentBarRuns(visual), "TableText", { after: 0, line: 224 })
+    };
   };
 
   const columnWidthsDxa = (weights, columnCount) => {
@@ -69,17 +116,22 @@
     if (!rows?.length) return "";
     const columnCount = Math.max(...rows.map((row) => row.length), 1);
     const widths = columnWidthsDxa(options.widths, columnCount);
+    const headerRow = rows[0] || [];
+    const performancePercentColumns = headerRow.map((heading) => common().isPerformancePercentHeading(heading));
     const tableRows = rows.map((row, rowIndex) => {
       const rowProps = `<w:trPr><w:cantSplit/>${rowIndex === 0 ? "<w:tblHeader/>" : ""}</w:trPr>`;
       const cells = Array.from({ length: columnCount }, (_, index) => {
         const header = rowIndex === 0;
         const labelColumn = !header && index === 0 && columnCount === 2;
-        return cell(paragraph(row[index] || "", "TableText", {
+        const visual = header ? null : visualCellXml(row[index], performancePercentColumns[index]);
+        const content = visual ? visual.xml : paragraph(row[index] || "", "TableText", {
           bold: header || labelColumn,
           color: header ? "17365D" : "1F1F1F",
           after: 0,
           line: 224
-        }), { width: widths[index], shade: header ? "D9EAF7" : (labelColumn ? "F8FBFD" : "") });
+        });
+        const shade = header ? "D9EAF7" : (visual?.shade || (labelColumn ? "F8FBFD" : ""));
+        return cell(content, { width: widths[index], shade });
       }).join("");
       return `<w:tr>${rowProps}${cells}</w:tr>`;
     }).join("");

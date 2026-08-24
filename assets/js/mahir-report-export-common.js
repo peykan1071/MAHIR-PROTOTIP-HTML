@@ -902,6 +902,96 @@
     return element;
   };
 
+  // Rapor tablolarını "hoş" kılan görsel katman: bilinen düzey metinlerini
+  // renkli rozete, saf yüzde hücrelerini mini bir çubuğa çevirir. Tespit
+  // mantığı (`cellVisual`) ve renk paleti (`TONE_COLORS`) BURADA, tek yerde
+  // tanımlı - ekran (bu dosya), PDF (`mahir-pdf-exporter.js`) ve Word
+  // (`mahir-docx-exporter.js`) üçü de aynı fonksiyonu çağırır. Hiçbir sayı
+  // veya oran değişmez; yalnız aynı metin üç çıktıda da AYNI şekilde
+  // vurgulanır - üç ayrı yerde üç ayrı algılama mantığı yazmak er ya da geç
+  // birbirinden sapardı.
+  const LEVEL_TONE_MAP = new Map([
+    ["Beklenen düzeyin üzerinde", "excellent"],
+    ["Beklenen düzeyde", "good"],
+    ["Gelişimi sürmekte", "developing"],
+    ["Gelişim desteği öncelikli", "priority"],
+    ["Zenginleştirme", "excellent"],
+    ["Derinleştirme ve sürdürme", "good"],
+    ["Gelişimi destekleme", "developing"],
+    ["Öncelikli destekleme", "priority"]
+  ].map(([text, tone]) => [normalizeForCompare(text), tone]));
+  const levelTone = (text) => LEVEL_TONE_MAP.get(normalizeForCompare(text)) || "";
+
+  const percentTone = (numeric) => {
+    if (numeric >= 85) return "excellent";
+    if (numeric >= 70) return "good";
+    if (numeric >= 50) return "developing";
+    return "priority";
+  };
+
+  // Dört düzey tonu için tek renk kaynağı. `bg`/`text` rozet (düzey hücreleri)
+  // için, `bar` yüzde çubuğunun dolgu rengi için - üçü de "#" ÖNEKSİZ hex
+  // (DOCX `w:shd`/`w:color` böyle ister; PDF/ekran "#" ekleyerek kullanır).
+  const TONE_COLORS = {
+    excellent: { bg: "dcf3e3", text: "187a41", bar: "2fa360" },
+    good: { bg: "dceef8", text: "1c6ba8", bar: "008c95" },
+    developing: { bg: "fbedcf", text: "92620a", bar: "d99a1c" },
+    priority: { bg: "fbdedb", text: "b3392f", bar: "d1453b" }
+  };
+
+  // Sütun başlığı "gerçekleşme" veya "başarı" içermiyorsa (ör. "Ağırlık" gibi
+  // bir dağılım yüzdesi) çubuk çizilmez - o yüzdenin renk anlamı başarı
+  // düzeyi değildir, çubuk yanlış bir yorum önerirdi.
+  const isPerformancePercentHeading = (heading) => {
+    const normalized = normalizeForCompare(heading);
+    return normalized.includes("gerceklesme") || normalized.includes("basari");
+  };
+
+  // Bir hücrenin görsel muamele GEREKTİRİP gerektirmediğini ve nasıl
+  // çizileceğini tarif eden tek karar noktası. `null` dönerse hücre düz
+  // metin kalır (üç render hedefi de bunu aynı şekilde yorumlar).
+  const cellVisual = (text, columnIsPerformancePercent) => {
+    const value = String(text ?? "");
+    const tone = levelTone(value);
+    if (tone) return { kind: "level", tone, colors: TONE_COLORS[tone], text: value };
+    if (!columnIsPerformancePercent) return null;
+    const match = value.match(/^%(-?\d+(?:,\d+)?)$/);
+    if (!match) return null;
+    const numeric = Number(match[1].replace(",", "."));
+    if (!Number.isFinite(numeric)) return null;
+    const tonePercent = percentTone(numeric);
+    return {
+      kind: "percent",
+      tone: tonePercent,
+      colors: TONE_COLORS[tonePercent],
+      text: value,
+      percent: Math.max(0, Math.min(100, numeric))
+    };
+  };
+
+  const decoratePreviewCell = (td, text, columnIsPerformancePercent) => {
+    const visual = cellVisual(text, columnIsPerformancePercent);
+    if (!visual) return;
+    if (visual.kind === "level") {
+      const badge = document.createElement("span");
+      badge.className = `level-badge level-badge--${visual.tone}`;
+      badge.textContent = visual.text;
+      td.replaceChildren(badge);
+      return;
+    }
+    const wrap = document.createElement("span");
+    wrap.className = "percent-cell";
+    const bar = document.createElement("span");
+    bar.className = "percent-cell-bar";
+    bar.dataset.tone = visual.tone;
+    bar.style.setProperty("--pct", `${visual.percent}%`);
+    const label = document.createElement("span");
+    label.className = "percent-cell-label";
+    label.textContent = visual.text;
+    wrap.append(bar, label);
+    td.replaceChildren(wrap);
+  };
+
   // Kanıt hücresini ekranda açılır hâle getirir: özet her zaman görünür,
   // soru bazındaki ayrıntı tıklayınca açılır. Özet metni hücrenin başında
   // olduğu için geri kalanı ayrıntı sayılır; ikisi de aynı düz metinden
@@ -926,7 +1016,7 @@
     return td;
   };
 
-  const renderTable = (rows, details = null, widths = null) => {
+  const renderTable = (rows, details = null, widths = null, visual = false) => {
     const table = document.createElement("table");
     if (Array.isArray(widths) && widths.length) {
       const colgroup = document.createElement("colgroup");
@@ -938,13 +1028,19 @@
       table.append(colgroup);
       table.style.tableLayout = "fixed";
     }
+    const headerRow = rows[0] || [];
+    const performancePercentColumns = visual
+      ? headerRow.map((heading) => isPerformancePercentHeading(heading))
+      : [];
     rows.forEach((row, rowIndex) => {
       const tr = document.createElement("tr");
       row.forEach((item, columnIndex) => {
         const isEvidence = details && rowIndex > 0 && columnIndex === details.column;
-        tr.append(isEvidence
+        const td = isEvidence
           ? evidenceCell(item, details.summaries?.[rowIndex - 1])
-          : cell(rowIndex === 0 ? "th" : "td", item));
+          : cell(rowIndex === 0 ? "th" : "td", item);
+        if (visual && !isEvidence && rowIndex > 0) decoratePreviewCell(td, item, performancePercentColumns[columnIndex]);
+        tr.append(td);
       });
       table.append(tr);
     });
@@ -1004,7 +1100,7 @@
         p.textContent = paragraph;
         section.append(p);
       });
-      block.tables.forEach((tableRows, tableIndex) => section.append(renderTable(tableRows, block.details, block.tableWidths?.[tableIndex])));
+      block.tables.forEach((tableRows, tableIndex) => section.append(renderTable(tableRows, block.details, block.tableWidths?.[tableIndex], true)));
       appendNotes(section, block);
       body.append(section);
     });
@@ -1048,6 +1144,12 @@
     normalizeText,
     formatNumber,
     formatPercent,
+    // Tablo hücrelerinin görsel muamelesi (rozet/çubuk) için tek karar
+    // noktası - PDF ve Word dışa aktarıcıları bunu KULLANIR, yeniden
+    // uygulamaz (bkz. yukarıdaki `cellVisual` yorumu).
+    cellVisual,
+    isPerformancePercentHeading,
+    TONE_COLORS,
     // Analiz ekranı da aynı cümleleri kullanıyor (bkz. script.js
     // renderAgentTrace) - ekran ile rapor asla farklı şey söylememeli.
     agentTaskText,

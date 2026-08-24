@@ -1,10 +1,9 @@
 """Tests for the shared LLM layer the agents talk to.
 
-Driven against a real local HTTP server rather than a mock, because the two
-things most worth proving are wire-level: that every queued agent prompt goes
-out in ONE request (the current product uses two LLM-assisted roles, while the
-batch transport is tested with larger prompt groups), and
-that the charter filter is applied to every answer on the way back.
+Driven against a real local HTTP server rather than a mock, because the thing
+most worth proving is wire-level: that every queued agent prompt goes out in
+ONE request (the current product uses two LLM-assisted roles, while the batch
+transport is tested with larger prompt groups).
 """
 
 import json
@@ -124,26 +123,16 @@ class AgentLlmTests(unittest.TestCase):
         self.assertEqual([item["name"] for item in results], ["ajan-0", "ajan-1", "ajan-2"])
         self.assertEqual([item["answer"] for item in results], ["birinci", "ikinci", "üçüncü"])
 
-    # --- Charter süzgeci her yanıta uygulanıyor ---
-
-    def test_charter_filter_is_applied_to_every_answer(self):
+    def test_answer_passes_through_unmodified(self):
+        # Bu katman artık metni işlemiyor - model yanıtı olduğu gibi döner.
         self._reply([
             ("a", "Öğrenme kaybı vardır. Ek çalışma yapılması önerilir."),
             ("b", "Analiz düzeyinde eksiklik var. Telafi programı uygulanmalıdır."),
         ])
         _ok, _message, results = llm.run_agent_prompts(self._prompts(2), self.url)
 
-        self.assertEqual(results[0]["answer"], "Öğrenme kaybı vardır.")
-        self.assertEqual(results[0]["strippedSentences"], 1)
-        self.assertEqual(results[1]["answer"], "Analiz düzeyinde eksiklik var.")
-        self.assertEqual(results[1]["strippedSentences"], 1)
-
-    def test_diagnostic_language_survives_the_filter(self):
-        # "gerektirir" reçete değil teşhis - elenmemeli.
-        self._reply([("a", "Bu kazanım analiz becerisi gerektirir.")])
-        _ok, _message, results = llm.run_agent_prompts(self._prompts(1), self.url)
-        self.assertEqual(results[0]["answer"], "Bu kazanım analiz becerisi gerektirir.")
-        self.assertEqual(results[0]["strippedSentences"], 0)
+        self.assertEqual(results[0]["answer"], "Öğrenme kaybı vardır. Ek çalışma yapılması önerilir.")
+        self.assertEqual(results[1]["answer"], "Analiz düzeyinde eksiklik var. Telafi programı uygulanmalıdır.")
 
     def test_json_shaped_answers_are_exempt_from_sentence_stripping(self):
         # 2026-08-22: Pedagojik Analiz Ajanı'nın yapılandırılmış kanıt şeması
@@ -203,7 +192,6 @@ class AgentLlmTests(unittest.TestCase):
         entry = llm.trace_entry(results[0])
 
         self.assertEqual(entry["agent"], "ajan-0")
-        self.assertEqual(entry["strippedSentences"], 1)
         self.assertGreater(entry["promptChars"], 0)
         blob = repr(entry)
         self.assertNotIn("Öğrenme kaybı", blob, "İz, yanıt metnini taşımamalı.")

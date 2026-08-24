@@ -68,7 +68,6 @@ def _capture(answer=""):
                 "name": item["name"],
                 "answer": answer,
                 "sources": [{"documentName": "x"}] if "retrieval" in item else [],
-                "strippedSentences": 0,
                 "promptChars": len(item.get("system", "")) + len(item.get("user", "")),
                 "answerChars": len(answer),
                 "durationMs": 1.0,
@@ -232,8 +231,7 @@ class DiagnosisSourceTests(unittest.TestCase):
                     "name": item["name"],
                     "answer": "teşhis" if "retrieval" in item else "",
                     "sources": sources if "retrieval" in item else [],
-                    "strippedSentences": 0,
-                }
+                    }
                 for item in items
             ]
 
@@ -419,6 +417,45 @@ class DiagnosisPromptContractTests(unittest.TestCase):
             with self.subTest(term=term):
                 self.assertNotIn(term, self.DIAGNOSIS_PROMPT)
 
+    def test_grounding_is_required_not_suggested(self):
+        # Teşhisi değerli kılan tek şey: yalnız getirimin bilebileceği içeriği
+        # kullanması. İstek "yapabilirsin" değil, ZORUNLULUK olmalı.
+        self.assertIn("DEMİRLE", self.DIAGNOSIS_PROMPT)
+        self.assertIn("ZORUNDA", self.DIAGNOSIS_PROMPT)
+        self.assertIn("BAŞARISIZ sayılır", self.DIAGNOSIS_PROMPT)
+
+    def test_filler_words_are_banned(self):
+        # Ölçüm: "belirli" 14 kez, 8 yanıtın 4'ünde.
+        for word in ("belirli", "genellikle", "bazı", "birtakım"):
+            with self.subTest(word=word):
+                self.assertIn(f'"{word}"', self.DIAGNOSIS_PROMPT)
+
+    def test_length_budget_is_stated_as_a_hard_cap(self):
+        # 2026-08-24 (3. sürüm): model artık yalnız NİTEL teşhis paragrafı
+        # yazıyor (tema/yüzde/şiddet MAHİR tarafından ayrıca ekleniyor, bkz.
+        # `test_theme_rate_and_severity_are_never_the_models_job`) - bu
+        # yüzden bütçe küçüldü, ama "katı sınır" dersi (İlk sürüm "40-70
+        # kelime" diyordu ve 8 yanıtın 3'ü 73-75 kelimeye çıktı) aynen geçerli.
+        self.assertIn("EN ÇOK 45 KELİME", self.DIAGNOSIS_PROMPT)
+        self.assertIn("15 kelimenin altına da düşme", self.DIAGNOSIS_PROMPT)
+
+    def test_theme_rate_and_severity_are_never_the_models_job(self):
+        # 2026-08-24 (3. sürüm): 2. sürümün {TEMA}/{ORAN}/{SIDDET} yer
+        # tutucu sözleşmesi canlı ölçümde tutmadı - küçük model yer
+        # tutucuları hiç kullanmadı, gerçek değerleri (yanlış olabilecek
+        # biçimde) kendi uydurdu. Bu yüzden model artık tema/yüzde/şiddeti
+        # PARAGRAFINDA HİÇ YAZMAMASI için açıkça yönlendiriliyor; bunları
+        # `pipeline.py::_compose_grounded_pedagogical_answer` modelin
+        # paragrafının dışında, kendi ürettiği bir kalıptan ekliyor - model
+        # bir daha bu değerleri hiç görmez/yazmaz, yanlış yazma riski de
+        # yapılandırılmış yer tutucu takip etme riski de yapısal olarak
+        # ortadan kalktı.
+        self.assertIn("PARAGRAFINDA HİÇ YAZMA", self.DIAGNOSIS_PROMPT)
+        self.assertNotIn("{TEMA}", self.DIAGNOSIS_PROMPT)
+        self.assertNotIn("{ORAN}", self.DIAGNOSIS_PROMPT)
+        self.assertNotIn("{SIDDET}", self.DIAGNOSIS_PROMPT)
+        self.assertNotIn("tema adını tırnak içinde YAZARAK başla", self.DIAGNOSIS_PROMPT)
+
     def test_prompt_gives_no_theme_name_as_an_example(self):
         # BU BİR HATA KAYDIDIR (önceki sürümden). Açılış kuralı önce
         # örnekle yazılmıştı; model örneği KOPYALADI ve başka bir temanın
@@ -429,68 +466,15 @@ class DiagnosisPromptContractTests(unittest.TestCase):
             with self.subTest(theme=theme):
                 self.assertNotIn(theme, self.DIAGNOSIS_PROMPT)
 
-    def test_grounding_to_context_is_required(self):
-        self.assertIn("BAĞLAMA VE VERİYE DEMİRLE", self.DIAGNOSIS_PROMPT)
-        self.assertIn("BİREBİR geçen terimleri", self.DIAGNOSIS_PROMPT)
-        self.assertIn("Soru metnini görmediğini unutma", self.DIAGNOSIS_PROMPT)
+    def test_inventing_outcome_codes_is_forbidden(self):
+        # Ölçümde model sarmal risk cümlesinde var olmayan kodlar üretti
+        # (ör. teşhis ettiği kazanımı "gelecekteki kazanım" diye andı).
+        self.assertIn("kod UYDURMA", self.DIAGNOSIS_PROMPT)
 
-    def test_success_rate_leaking_as_a_term_is_banned(self):
-        # Bu oturumun ayrı bir kök nedeni: SORU'daki başarı oranı modelin
-        # "kanıt terimi" olarak seçtiği bir tuzaktı (bkz. approved_data_
-        # analyzer.py::_build_rag_question'ın 2026-08-22 notu).
-        self.assertIn("Başarı oranını", self.DIAGNOSIS_PROMPT)
-        self.assertIn("kanıt terimi olarak alma", self.DIAGNOSIS_PROMPT)
-        self.assertIn("Başarı oranını", self.STRENGTH_PROMPT)
-        self.assertIn("terim olarak seçme", self.STRENGTH_PROMPT)
-
-    def test_not_found_sentinel_is_json_not_plain_text(self):
-        # Eski sürümde "Bu bilgi belgede bulunmuyor." düz metniydi;
-        # `apply_llm` artık `_is_not_found_response` ile bu JSON durumunu
-        # ayrıca tanıyor (bkz. pipeline.py).
-        for prompt in (self.DIAGNOSIS_PROMPT, self.STRENGTH_PROMPT):
-            with self.subTest(prompt=prompt[:20]):
-                self.assertIn('"status": "not_found"', prompt)
-
-    def test_output_schema_requires_structured_evidence(self):
-        # Kök nedenin kendisi: prompt artık çıplak iki terim değil, her biri
-        # `exactTerm`+`pedagogicalRole`+gerekçe taşıyan bir `evidence` listesi
-        # istemeli - `_compose_grounded_pedagogical_answer` yalnız bu biçimi
-        # ayrıştırabiliyor.
-        for prompt in (self.DIAGNOSIS_PROMPT, self.STRENGTH_PROMPT):
-            with self.subTest(prompt=prompt[:20]):
-                self.assertIn('"status": "success"', prompt)
-                self.assertIn('"evidence"', prompt)
-                self.assertIn('"exactTerm"', prompt)
-                self.assertIn('"pedagogicalRole"', prompt)
-        self.assertIn('"gapRationale"', self.DIAGNOSIS_PROMPT)
-        self.assertIn('"strengthRationale"', self.STRENGTH_PROMPT)
-
-    def test_evidence_count_is_bounded_at_one_to_two_not_forced_to_two(self):
-        # 2026-08-22 canlı ölçüm, 3. sürüm: madde eklenmeden ÖNCE model 8
-        # turun 6'sında yalnızca BİR kanıt öğesi döndürdü (`evidence` dizisi
-        # şemada örnekle 2 gösteriliyordu ama KURAL olarak yazılı değildi) -
-        # `_compose_grounded_pedagogical_answer` o zaman tam 2 öğe şart
-        # koştuğundan bu, ölçülen 2/8 başarı oranına yol açtı.
-        #
-        # 4. sürüm: "TAM OLARAK İKİ" zorunluluğu GEVŞETİLDİ - dar kapsamlı
-        # bazı kazanımlarda BAĞLAM'da gerçekten TEK güçlü aday bulunuyordu,
-        # model ikinciyi uydurmak yerine tamamen `not_found` deyip
-        # öğretmene hiçbir yorum göstermiyordu. Artık BİR veya İKİ kabul
-        # ediliyor; kural hâlâ İKİDEN FAZLASINI (üç ve üzeri) yasaklıyor.
-        for prompt in (self.DIAGNOSIS_PROMPT, self.STRENGTH_PROMPT):
-            with self.subTest(prompt=prompt[:20]):
-                self.assertNotIn("TAM OLARAK İKİ", prompt)
-                self.assertIn("EN AZ BİR, EN ÇOK İKİ", prompt)
-
-    def test_prompt_no_longer_states_an_explicit_recommendation_ban(self):
-        # Bu bir HATA KAYDI DEĞİL - bilinçli bir gözlem (bkz. sınıf notu).
-        # Önceki sürümde burada "öneri/etkinlik CÜMLESİ olmasın", "kod
-        # UYDURMA" gibi açık charter maddeleri vardı; bu yeni promptta yok.
-        # Charter güvencesi artık kod tarafında (`_compose_grounded_
-        # pedagogical_answer`'ın `strip_recommendation_sentences` çağrısı +
-        # `_answer_matches_outcome_scope`).
-        self.assertNotIn("YAPILACAK İŞ", self.DIAGNOSIS_PROMPT)
-        self.assertNotIn("Kod UYDURMA", self.DIAGNOSIS_PROMPT)
+    def test_measured_mechanisms_survived(self):
+        # Bunlar ölçümde çalışıyordu; prompt yeniden yazılırken düşmemeleri şart.
+        self.assertIn("Bu bilgi belgede bulunmuyor.", self.DIAGNOSIS_PROMPT)
+        self.assertIn("tek akıcı paragraf", self.DIAGNOSIS_PROMPT)
 
 
 if __name__ == "__main__":

@@ -7,8 +7,10 @@ installed - which is what makes these helpers testable at all. `index_pdf`
 and `RAGInference` are NOT tested here; they need the container.
 """
 
+import json
 import unittest
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 
 import rag_service
@@ -106,6 +108,139 @@ class DeterministicPointIdTests(unittest.TestCase):
         first = rag_service._deterministic_point_id("tde-9-tymm", "tdeogr.pdf", 3, "aynı başlık satırı")
         second = rag_service._deterministic_point_id("tde-9-tymm", "tdeogr.pdf", 9, "aynı başlık satırı")
         self.assertNotEqual(first, second)
+
+
+class SkillMatchKeyTests(unittest.TestCase):
+    """Belgedeki başlık ile katalogdaki `skill` alanı aynı anahtara düşmeli."""
+
+    def test_catalog_skill_and_document_heading_agree(self):
+        # Katalog "Dinleme/İzleme" yazıyor, belge başlığı da öyle - ama biri
+        # eğik çizgi/boşlukta farklılaşırsa filtre sessizce hiçbir şey elemez.
+        self.assertEqual(
+            rag_service._skill_match_key("Dinleme/İzleme"),
+            rag_service._skill_match_key("Dinleme / İzleme"),
+        )
+
+    def test_case_differences_collapse(self):
+        self.assertEqual(
+            rag_service._skill_match_key("OKUMA"), rag_service._skill_match_key("Okuma")
+        )
+
+    def test_turkish_capital_i_does_not_split(self):
+        # casefold() tek başına "İ"yi i + U+0307 yapar; anahtar bozulurdu.
+        self.assertNotIn("̇", rag_service._skill_match_key("İZLEME"))
+        self.assertEqual(
+            rag_service._skill_match_key("İZLEME"), rag_service._skill_match_key("izleme")
+        )
+
+    def test_every_known_skill_has_a_distinct_key(self):
+        keys = [rag_service._skill_match_key(name) for name in rag_service._SKILL_HEADINGS]
+        self.assertEqual(len(set(keys)), len(keys))
+        self.assertEqual(set(keys), set(rag_service._KNOWN_SKILL_KEYS))
+
+    def test_unrelated_text_is_not_a_skill(self):
+        self.assertNotIn(
+            rag_service._skill_match_key("Öğrenme-Öğretme Uygulamaları"),
+            rag_service._KNOWN_SKILL_KEYS,
+        )
+
+
+class DetectSkillKeyTests(unittest.TestCase):
+    def test_skill_heading_is_found_anywhere_in_the_chain(self):
+        # Docling başlık zinciri hiyerarşik gelir; beceri en sonda olabilir.
+        self.assertEqual(
+            rag_service._detect_skill_key(["3. TEMA:  ANLAMIN YAPI TAŞLARI", "Okuma"]), "okuma"
+        )
+
+    def test_sibling_skills_get_different_keys(self):
+        # Filtrenin tüm varlık sebebi: bu iki liste metinsel olarak neredeyse
+        # aynı, ayrımı yalnız başlık taşıyor.
+        self.assertNotEqual(
+            rag_service._detect_skill_key(["Okuma"]),
+            rag_service._detect_skill_key(["Dinleme/İzleme"]),
+        )
+
+    def test_non_skill_section_returns_none(self):
+        # Tema tanıtımı ve uygulama bölümleri HER beceri için geçerli kanıt;
+        # None olmaları onları filtreden muaf tutuyor.
+        self.assertIsNone(rag_service._detect_skill_key(["3. TEMA:  SÖZÜN İNCELİĞİ"]))
+        self.assertIsNone(rag_service._detect_skill_key(["Öğrenme-Öğretme Uygulamaları"]))
+
+    def test_missing_or_empty_headings_are_safe(self):
+        self.assertIsNone(rag_service._detect_skill_key(None))
+        self.assertIsNone(rag_service._detect_skill_key([]))
+
+
+    def test_subsection_heading_without_the_skill_name_still_resolves(self):
+        # Canlı ölçümde tam olarak bu sızdı: alt süreç bileşeni başlıkları
+        # ("c) TDE1.2.3. Çıkarım yapar.") Docling'in başlık zincirinde üst
+        # beceri başlığını ("Dinleme/İzleme") TAŞIMIYOR - yalnız kendi alt
+        # başlığını taşıyor. Yalnız üst-başlık eşleşmesi bunu hiç yakalamazdı.
+        self.assertEqual(
+            rag_service._detect_skill_key(["c) TDE1.2.3. Çıkarım yapar."]), "dinlemeizleme"
+        )
+        self.assertEqual(
+            rag_service._detect_skill_key(["a) TDE1.2.1. Ön bilgilerle bağlantı kurar."]),
+            "dinlemeizleme",
+        )
+        self.assertEqual(
+            rag_service._detect_skill_key(["ç) TDE4.4.2. Bir şey yapar."]), "yazma"
+        )
+
+    def test_code_prefix_is_read_from_body_text_too(self):
+        # Bir bölümün üst-düzey özet parçası ("Okuma" başlıklı) gövdesinde
+        # "TDE2.1. ... TDE2.2. ..." yazıyor olsa bile başlık zaten "Okuma" -
+        # burada asıl test, başlık YOKKEN yalnız gövdeden çözülebilmesi.
+        self.assertEqual(rag_service._detect_skill_key(None, "TDE4.1. Yapısını incelikle ördüğü"), "yazma")
+        self.assertEqual(rag_service._detect_skill_key([], "TDE3.2. Muhatabını ikna eder."), "konuşma")
+
+    def test_unknown_code_prefix_stays_none(self):
+        # TDE9 yalnız 1-4 arası beceri kodu kullanıyor; beşinci bir kod
+        # (belge yapısı hakkında yanlış varsayımda bulunmak yerine) None
+        # kalmalı, rastgele bir beceriye atanmamalı.
+        self.assertIsNone(rag_service._detect_skill_key(["x) TDE9.9.9. Bilinmeyen."]))
+
+    def test_code_prefix_digit_mapping_matches_the_catalog(self):
+        # `_CODE_PREFIX_TO_SKILL`in elle bakımlanan bir kopya OLMADIĞINI,
+        # kataloğun kendisiyle aynı gerçeği söylediğini doğrular - bkz.
+        # `SkillRegistryContractTests` (aynı kaynağın diğer yarısı).
+        expected = {"1": "dinlemeizleme", "2": "okuma", "3": "konuşma", "4": "yazma"}
+        for digit, skill_key in expected.items():
+            with self.subTest(digit=digit):
+                self.assertEqual(
+                    rag_service._detect_skill_key([f"x) TDE{digit}.1.1. Örnek."]), skill_key
+                )
+
+
+class SkillRegistryContractTests(unittest.TestCase):
+    """`_SKILL_HEADINGS` ile kazanım kataloğu arasındaki sessiz kayma koruması.
+
+    Filtre, katalogdaki `skill` değerinin sunucudaki anahtarla eşleşmesine
+    dayanıyor. MEB adlandırmayı değiştirir ya da katalog yeni bir beceriyle
+    genişlerse eşleşme kaybolur ve filtre HİÇBİR ŞEY elemez - hatasız,
+    sessizce. Tek fark edilme yolu bu test.
+    """
+
+    @staticmethod
+    def _catalog_skills():
+        catalog = Path(__file__).resolve().parent.parent / "shared" / "pilot" / "tde9"
+        data = json.loads((catalog / "learning-outcomes-template.json").read_text(encoding="utf-8"))
+        return sorted({str(outcome.get("skill") or "") for outcome in data["learning_outcomes"]})
+
+    def test_every_catalog_skill_is_known_to_the_server(self):
+        for skill in self._catalog_skills():
+            with self.subTest(skill=skill):
+                self.assertIn(
+                    rag_service._skill_match_key(skill),
+                    rag_service._KNOWN_SKILL_KEYS,
+                    f"Katalogdaki {skill!r} becerisi rag_service._SKILL_HEADINGS'te yok; "
+                    "filtre bu beceride sessizce devre dışı kalır.",
+                )
+
+    def test_catalog_actually_carries_the_four_skills(self):
+        # Testin kendisinin boşa dönmediğini garanti eder: katalog `skill`
+        # alanını kaybederse yukarıdaki döngü sıfır kez çalışıp yeşil kalırdı.
+        self.assertEqual(len(self._catalog_skills()), len(rag_service._SKILL_HEADINGS))
 
 
 class DropWeakHitsTests(unittest.TestCase):

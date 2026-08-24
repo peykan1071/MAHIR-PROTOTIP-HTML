@@ -1,12 +1,12 @@
 """Minimal local file receiver for MAHIR frontend/backend integration.
 
-The receiver detects that a file reached the Python backend, validates its
-filename extension, and triggers the existing backend reporting flow for CSV
-uploads. Word, PDF and image documents are accepted by the prototype and
-forwarded to the teacher-validation step; DOCX tables are parsed when their
-headings can be recognised, and image groups are OCR'd by a remote MAHIR
-backend (see `remote_ocr_client.py`) when `MAHIR_OCR_REMOTE_URL` is set - no
-OCR pipeline runs on this machine. A fixed MAHIR template is never required.
+The receiver detects that a file reached the Python backend and validates its
+filename extension. Word, PDF and image documents are accepted by the
+prototype and forwarded to the teacher-validation step; DOCX/PDF/XLSX tables
+are parsed when their headings can be recognised, and image groups are OCR'd
+by a remote MAHIR backend (see `remote_ocr_client.py`) when
+`MAHIR_OCR_REMOTE_URL` is set - no OCR pipeline runs on this machine. A fixed
+MAHIR template is never required.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ import threading
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from typing import Callable
 from urllib.parse import parse_qs, urlparse
 
 from .docx_parser import parse_mahir_docx
@@ -38,6 +39,9 @@ RAG_WARMUP_PATH = "/mahir-rag-warmup"
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 MAX_FILES_PER_UPLOAD = 10
 MAX_REQUEST_SIZE = MAX_UPLOAD_SIZE * MAX_FILES_PER_UPLOAD
+# Genel değerlendirme tam olarak yazılı + dinleme/izleme + konuşma raporu ister
+# (bkz. `general_report_merger.REQUIRED_COMPONENTS`) - bu yüzden sabit 3.
+REQUIRED_MERGE_REPORT_COUNT = 3
 ALLOWED_EXTENSIONS = {
     ".csv",
     ".doc",
@@ -160,15 +164,20 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         if request_path != UPLOAD_PATH:
             self._send_json(404, {"ok": False, "message": "Bilinmeyen alıcı yolu."})
             return
+        self._handle_upload_request()
 
-        content_length = int(self.headers.get("Content-Length", "0") or "0")
+    def _handle_upload_request(self) -> None:
+        content_length = self._content_length()
         content_type = self.headers.get("Content-Type", "")
 
         if content_length <= 0:
             self._send_json(400, {"ok": False, "message": "Dosya verisi alınamadı."})
             return
         if content_length > MAX_REQUEST_SIZE:
-            self._send_json(413, {"ok": False, "message": "Dosya 20 MB sınırını aşıyor."})
+            total_limit_mb = MAX_REQUEST_SIZE // (1024 * 1024)
+            self._send_json(
+                413, {"ok": False, "message": f"Yüklenen dosyaların toplam boyutu {total_limit_mb} MB sınırını aşıyor."}
+            )
             return
 
         body = self.rfile.read(content_length)
@@ -178,14 +187,22 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
             self._send_json(400, {"ok": False, "message": "Dosya verisi alınamadı."})
             return
         if len(uploaded_files) > MAX_FILES_PER_UPLOAD:
-            self._send_json(400, {"ok": False, "message": "Bir görsel grubunda en fazla 10 dosya seçebilirsiniz."})
+            self._send_json(
+                400,
+                {"ok": False, "message": f"Bir görsel grubunda en fazla {MAX_FILES_PER_UPLOAD} dosya seçebilirsiniz."},
+            )
             return
 
+        file_limit_mb = MAX_UPLOAD_SIZE // (1024 * 1024)
         oversized = next((f for f in uploaded_files if len(f.content) > MAX_UPLOAD_SIZE), None)
         if oversized is not None:
             self._send_json(
                 413,
-                {"ok": False, "fileName": oversized.file_name, "message": "Dosya 20 MB sınırını aşıyor."},
+                {
+                    "ok": False,
+                    "fileName": oversized.file_name,
+                    "message": f"Dosya {file_limit_mb} MB sınırını aşıyor.",
+                },
             )
             return
 
@@ -276,7 +293,7 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_analysis_request(self) -> None:
-        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        content_length = self._content_length()
         if content_length <= 0 or content_length > MAX_UPLOAD_SIZE:
             self._send_json(400, {"ok": False, "message": "Onaylanan veri alınamadı."})
             return
@@ -318,17 +335,21 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         )
 
     def _handle_general_report_merge(self) -> None:
-        content_length = int(self.headers.get("Content-Length", "0") or "0")
+        content_length = self._content_length()
         content_type = self.headers.get("Content-Type", "")
         if content_length <= 0:
             self._send_json(400, {"ok": False, "message": "Analiz raporları alınamadı."})
             return
-        if content_length > MAX_UPLOAD_SIZE * 3:
-            self._send_json(413, {"ok": False, "message": "Üç raporun toplam boyutu 60 MB sınırını aşıyor."})
+        if content_length > MAX_UPLOAD_SIZE * REQUIRED_MERGE_REPORT_COUNT:
+            total_limit_mb = (MAX_UPLOAD_SIZE * REQUIRED_MERGE_REPORT_COUNT) // (1024 * 1024)
+            self._send_json(
+                413,
+                {"ok": False, "message": f"Üç raporun toplam boyutu {total_limit_mb} MB sınırını aşıyor."},
+            )
             return
 
         uploaded_files = extract_uploaded_files(self.rfile.read(content_length), content_type)
-        if len(uploaded_files) != 3:
+        if len(uploaded_files) != REQUIRED_MERGE_REPORT_COUNT:
             self._send_json(400, {"ok": False, "message": "Genel değerlendirme için üç MAHİR Word analiz raporu yüklenmelidir."})
             return
         if any(validate_file_name(file.file_name).extension != ".docx" for file in uploaded_files):
@@ -357,6 +378,9 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
             },
         )
 
+    def _content_length(self) -> int:
+        return int(self.headers.get("Content-Length", "0") or "0")
+
     def _send_json(self, status_code: int, payload: dict[str, object]) -> None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status_code)
@@ -364,6 +388,53 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+
+def _teacher_review_fallback(warning: str) -> dict[str, object]:
+    """Belge/tablo otomatik okunamadığında öğretmen kontrol ekranına düşen boş yük.
+
+    `warningCount`, sabit `1` yerine `len(warnings)`den türetiliyor - bugün
+    her çağrıda tek uyarı olduğu için çıktı DEĞİŞMİYOR, yalnız ileride bu
+    yardımcıya ikinci bir uyarı eklenirse sayı sessizce bayatlamayacak.
+    """
+
+    warnings = [warning]
+    return {
+        "exam": {},
+        "questions": [],
+        "students": [],
+        "warnings": warnings,
+        "summary": {"questionCount": 0, "studentCount": 0, "warningCount": len(warnings)},
+    }
+
+
+# uzantı -> (ayrıştırıcı, başarı mesajındaki ad, öğretmen kontrolüne düşme mesajı).
+# Üç dal (docx/pdf/xlsx) yalnızca bu üçü ile farklılaşıyordu; geri kalan akış
+# (dene/oku/özet çıkar, ValueError'da kontrol ekranına düş) birebir aynıydı.
+#
+# Ayrıştırıcılar burada DOĞRUDAN fonksiyon nesnesi olarak değil, o adı modül
+# düzeyinde ÇAĞRI ANINDA arayan bir lambda ile saklanır: sözlük yalnızca
+# modül import edilirken BİR KEZ kurulur, bu yüzden doğrudan referans
+# `unittest.mock.patch("...file_receiver.parse_mahir_docx", ...)` ile
+# değiştirilemez hâle gelirdi (sözlük patch'ten ÖNCEKİ nesneyi tutardı).
+_DOCUMENT_PARSERS: dict[str, tuple[Callable[[bytes], dict[str, object]], str, str]] = {
+    ".docx": (
+        lambda content: parse_mahir_docx(content),
+        "Word belgesi",
+        "Word belgesi alındı. Alanlar otomatik okunamadığı için bilgiler "
+        "öğretmen kontrol ekranında tamamlanacaktır.",
+    ),
+    ".pdf": (
+        lambda content: parse_score_pdf(content),
+        "PDF tablosu",
+        "PDF belgesi alındı; tablo otomatik okunamadığı için bilgiler öğretmen kontrol ekranında tamamlanacaktır.",
+    ),
+    ".xlsx": (
+        lambda content: parse_score_xlsx(content),
+        "Excel tablosu",
+        "Excel belgesi alındı; tablo otomatik okunamadığı için bilgiler öğretmen kontrol ekranında tamamlanacaktır.",
+    ),
+}
 
 
 def run_existing_backend_flow(
@@ -430,81 +501,30 @@ def run_existing_backend_flow(
     uploaded_file = uploaded_files[0]
     file_check = file_checks[0]
 
-    if file_check.extension == ".docx":
+    parser_entry = _DOCUMENT_PARSERS.get(file_check.extension)
+    if parser_entry is not None:
+        parser, noun, fallback_message = parser_entry
         try:
-            structured_data = parse_mahir_docx(uploaded_file.content)
+            structured_data = parser(uploaded_file.content)
             summary = structured_data["summary"]
             return (
                 True,
-                f"Word belgesi okundu: {summary['questionCount']} soru ve "
+                f"{noun} okundu: {summary['questionCount']} soru ve "
                 f"{summary['studentCount']} öğrenci satırı öğretmen kontrolüne aktarıldı.",
                 structured_data,
             )
         except ValueError as error:
-            # A readable Word package may still contain an unfamiliar teacher-made
+            # A readable document may still contain an unfamiliar teacher-made
             # layout. Do not reject it merely because it is not a MAHIR template.
-            return (
-                True,
-                "Word belgesi alındı. Alanlar otomatik okunamadığı için bilgiler "
-                "öğretmen kontrol ekranında tamamlanacaktır.",
-                {
-                    "exam": {},
-                    "questions": [],
-                    "students": [],
-                    "warnings": [str(error)],
-                    "summary": {"questionCount": 0, "studentCount": 0, "warningCount": 1},
-                },
-            )
-
-    if file_check.extension == ".pdf":
-        try:
-            structured_data = parse_score_pdf(uploaded_file.content)
-            summary = structured_data["summary"]
-            return (
-                True,
-                f"PDF tablosu okundu: {summary['questionCount']} soru ve "
-                f"{summary['studentCount']} öğrenci satırı öğretmen kontrolüne aktarıldı.",
-                structured_data,
-            )
-        except ValueError as error:
-            return (
-                True,
-                "PDF belgesi alındı; tablo otomatik okunamadığı için bilgiler öğretmen kontrol ekranında tamamlanacaktır.",
-                {
-                    "exam": {}, "questions": [], "students": [], "warnings": [str(error)],
-                    "summary": {"questionCount": 0, "studentCount": 0, "warningCount": 1},
-                },
-            )
-
-    if file_check.extension == ".xlsx":
-        try:
-            structured_data = parse_score_xlsx(uploaded_file.content)
-            summary = structured_data["summary"]
-            return (
-                True,
-                f"Excel tablosu okundu: {summary['questionCount']} soru ve "
-                f"{summary['studentCount']} öğrenci satırı öğretmen kontrolüne aktarıldı.",
-                structured_data,
-            )
-        except ValueError as error:
-            return (
-                True,
-                "Excel belgesi alındı; tablo otomatik okunamadığı için bilgiler öğretmen kontrol ekranında tamamlanacaktır.",
-                {
-                    "exam": {}, "questions": [], "students": [], "warnings": [str(error)],
-                    "summary": {"questionCount": 0, "studentCount": 0, "warningCount": 1},
-                },
-            )
+            return True, fallback_message, _teacher_review_fallback(str(error))
 
     if file_check.extension == ".xls":
         return (
             True,
             "Eski .xls biçimi alındı; otomatik okuma için dosyayı Excel'de .xlsx olarak kaydediniz.",
-            {
-                "exam": {}, "questions": [], "students": [],
-                "warnings": ["Eski .xls biçimi doğrudan okunmuyor. Dosyayı .xlsx biçiminde kaydedip yeniden yükleyiniz."],
-                "summary": {"questionCount": 0, "studentCount": 0, "warningCount": 1},
-            },
+            _teacher_review_fallback(
+                "Eski .xls biçimi doğrudan okunmuyor. Dosyayı .xlsx biçiminde kaydedip yeniden yükleyiniz."
+            ),
         )
 
     # Buraya kadar tanınmayan her biçim öğretmen kontrol ekranına düşer.
@@ -553,19 +573,6 @@ def extract_uploaded_files(body: bytes, content_type: str) -> list[UploadedFile]
             files.append(UploadedFile(file_name=_clean_filename(match.group(1)), content=content.rstrip(b"\r\n")))
 
     return files
-
-
-def extract_uploaded_file(body: bytes, content_type: str) -> UploadedFile:
-    """Extract the first browser-supplied file from multipart form data."""
-
-    files = extract_uploaded_files(body, content_type)
-    return files[0] if files else UploadedFile(file_name="", content=b"")
-
-
-def extract_filename(body: bytes, content_type: str) -> str:
-    """Extract a browser-supplied filename from multipart form data."""
-
-    return extract_uploaded_file(body, content_type).file_name
 
 
 def validate_file_name(file_name: str) -> FileCheckResult:

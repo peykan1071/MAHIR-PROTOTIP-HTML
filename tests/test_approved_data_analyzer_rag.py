@@ -14,7 +14,6 @@ from backend.app.agents.pipeline import (
     _REASON_EVIDENCE_COUNT,
     _REASON_EVIDENCE_ITEM_SHAPE,
     _REASON_RATIONALE_STRIPPED,
-    _REASON_STATUS_NOT_SUCCESS,
     _REASON_TERM_SHAPE,
     _REASON_TERM_UNGROUNDED,
     _REASON_THEME_MISSING,
@@ -28,7 +27,6 @@ from backend.app.approved_data_analyzer import (
     _build_rag_question,
     _build_rag_retrieval_query,
     _normalize_theme_for_rag,
-    _strip_recommendation_sentences,
     analyze_approved_data,
     analyze_approved_data_traced,
 )
@@ -37,12 +35,16 @@ _FAKE_REMOTE_URL = "https://fake.example/web_query"
 
 
 def _evidence_json(terms, rationales, key="gapRationale"):
-    """2026-08-22 (2. sürüm) yapılandırılmış kanıt şemasını üretir - testler
-    her seferinde tam JSON'u elle yazmasın diye. `key`, zayıf çıktılar için
-    `"gapRationale"`, güçlü çıktılar için `"strengthRationale"`."""
+    """2026-08-24 (3. sürüm) `{"diagnosis": "..."}` şemasını üretir - testler
+    her seferinde tam JSON'u elle yazmasın diye. `terms`, grounding ölçümünün
+    (bkz. pipeline.py::_grounded_word_overlap) yakalaması gereken ayırt edici
+    sözcükleri BİREBİR taşır; `rationales` çevresindeki doğal cümleyi verir.
+    `key` eski çoklu-terim şemasının kalıntısı, artık kullanılmıyor - yalnız
+    çağıran tarafları değiştirmemek için imzada tutuluyor."""
 
-    evidence = [{"exactTerm": term, key: rationale} for term, rationale in zip(terms, rationales)]
-    return json.dumps({"status": "success", "evidence": evidence})
+    del key
+    sentences = [f"{term} {rationale}".strip() for term, rationale in zip(terms, rationales)]
+    return json.dumps({"diagnosis": " ".join(sentences)})
 
 
 def _llm_reply(*answers):
@@ -59,7 +61,7 @@ def _llm_reply(*answers):
         results = []
         for item in items:
             if not str(item.get("name", "")).startswith("pedagoji/"):
-                results.append({"name": item["name"], "answer": "", "sources": [], "strippedSentences": 0})
+                results.append({"name": item["name"], "answer": "", "sources": []})
                 continue
             index = diagnoses.index(item)
             answer, sources = answers[index] if index < len(answers) else ("", [])
@@ -71,7 +73,6 @@ def _llm_reply(*answers):
                 "name": item["name"],
                 "answer": answer,
                 "sources": sources,
-                "strippedSentences": 0,
             })
         return True, "Ajan yanıtları üretildi.", results
 
@@ -154,124 +155,66 @@ def _llm_patch(**kwargs):
 
 
 class RagContextAttachmentTests(unittest.TestCase):
-    def test_structured_evidence_builds_deterministic_diagnosis(self):
+    """Kanıt garantisi 2026-08-24'te ÖLÇÜLEN bir şeye dönüştü.
+
+    Önceki tasarımda model kendi kullandığı terimleri `groundedTerms`
+    alanında BEYAN ediyor, MAHİR de o beyanı kaynağa karşı doğruluyordu.
+    Canlı ölçümde model beyanı defalarca yanlış doldurdu - kendi
+    cümlesinden aldığı, hatta olumsuz çekimli ifadeler yazdı ("...
+    kullanamaması", "...yer vermemesi"; müfredatta böyle geçmesi imkânsız)
+    ve aslında kaynağa dayalı olan iyi teşhisler bu yüzden elendi.
+
+    Artık beyan istenmiyor: `_grounded_word_overlap` teşhis metninin
+    KENDİSİ ile kaynak alıntıları arasındaki ayırt edici sözcük örtüşmesini
+    ölçüyor. Garanti modelin uyumuna hiç bağlı değil - model kanıtı
+    "iddia" edemez, MAHİR ölçer.
+    """
+
+    def test_grounded_diagnosis_is_wrapped_with_deterministic_facts(self):
         outcome = {
             "outcomeCode": "TDE2.2",
             "outcomeTheme": "2. Tema: Anlam Arayışı",
             "successRate": 0.20,
         }
-        answer = _evidence_json(
-            ["ana duygu", "ana düşünce"],
-            ["Ana duygu net kurulamıyor.", "Ana düşünce belirlenemiyor."],
+        # Model yalnız nitel teşhis yazar; tema/yüzde/şiddet MAHİR'den gelir.
+        answer = (
+            '{"diagnosis":"Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır."}'
         )
-        sources = [{"excerpt": "Metinde konu, ana duygu ve ana düşünce bir bütünün parçalarıdır."}]
+        sources = [{"excerpt": "Metinde konu, ana duygu ve ana düşünce bütünlük içinde ele alınır."}]
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
         self.assertIn('"Anlam Arayışı"', result)
         self.assertIn("%20 olarak hesaplanmıştır", result)
         self.assertIn("Eksikliğin şiddeti: Kritik.", result)
-        self.assertIn("Ana duygu net kurulamıyor.", result)
+        self.assertIn("Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır.", result)
         self.assertNotIn("etkinlik", result)
 
-    def test_single_evidence_item_is_now_accepted(self):
-        # 2026-08-22 (4. sürüm): dar kapsamlı kazanımlarda BAĞLAM'da
-        # gerçekten TEK güçlü aday bulunabiliyor - artık ikinciyi
-        # uydurmak zorunda değil, TEK terimle de rapor kuruluyor.
-        outcome = {
-            "outcomeCode": "TDE2.2",
-            "outcomeTheme": "2. Tema: Anlam Arayışı",
-            "successRate": 0.20,
-        }
-        answer = _evidence_json(["ana duygu"], ["Ana duygu net kurulamıyor."])
-        sources = [{"excerpt": "Metinde ana duygu bir bütünün parçasıdır."}]
+    def test_diagnosis_sharing_too_little_with_the_source_is_rejected(self):
+        # Genel geçer, her kazanıma yazılabilecek bir cümle: kaynakla
+        # ayırt edici hiçbir sözcük paylaşmıyor.
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu ve ana düşünce belirlenir."}]
+        answer = '{"diagnosis":"Öğrenciler bu alanda yeterli düzeye ulaşamamıştır."}'
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources), "")
+
+    def test_negated_curriculum_vocabulary_still_counts_as_grounded(self):
+        # Zayıf çıktı teşhisleri DOĞASI gereği müfredatın olumlu ifadesini
+        # olumsuzlar ("tahlil edebilme" -> "tahlil edememekte"). Sözcük
+        # köküne dayalı ölçüm bunu doğru biçimde kanıtlı sayar.
+        outcome = {"outcomeTheme": "3. Tema: Anlamın Yapı Taşları", "successRate": 0.03}
+        sources = [{
+            "excerpt": (
+                "Öğrencilerin metinleri olay, kişi, mekân, zaman gibi yapı "
+                "unsurları bakımından tahlil edebilmeleri amaçlanmaktadır."
+            )
+        }]
+        answer = (
+            '{"diagnosis":"Olay, kişi, mekân ve zaman unsurları bakımından tahlil '
+            'edememektedirler."}'
+        )
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
-        self.assertIn('"Anlam Arayışı"', result)
-        self.assertIn("ana duygu", result)
-        self.assertIn("Ana duygu net kurulamıyor.", result)
-        self.assertNotIn(" ve ", result.split("kapsamındaki")[0])
+        self.assertIn("tahlil edememektedirler", result)
 
-    def test_zero_or_three_plus_evidence_items_are_still_rejected(self):
-        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
-        sources = [{"excerpt": "Metinde ana duygu ve ana düşünce ve konu belirlenir."}]
-        empty = json.dumps({"status": "success", "evidence": []})
-        three = _evidence_json(
-            ["ana duygu", "ana düşünce", "konu"], ["a.", "b.", "c."]
-        )
-        empty_reasons: list[str] = []
-        three_reasons: list[str] = []
-        self.assertEqual(_compose_grounded_pedagogical_answer(empty, outcome, sources, empty_reasons), "")
-        self.assertEqual(_compose_grounded_pedagogical_answer(three, outcome, sources, three_reasons), "")
-        self.assertEqual(empty_reasons, [_REASON_EVIDENCE_COUNT])
-        self.assertEqual(three_reasons, [_REASON_EVIDENCE_COUNT])
-
-    def test_evidence_item_not_a_dict_is_rejected(self):
-        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
-        sources = [{"excerpt": "Metinde ana duygu belirlenir."}]
-        answer = json.dumps({"status": "success", "evidence": ["ana duygu"]})
-        reasons: list[str] = []
-        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
-        self.assertEqual(reasons, [_REASON_EVIDENCE_ITEM_SHAPE])
-
-    def test_empty_or_overlong_term_is_rejected(self):
-        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
-        sources = [{"excerpt": "Metinde ana duygu belirlenir."}]
-        overlong_term = "a" * 91
-        answer = _evidence_json([overlong_term], ["Bu bileşen net kurulamamaktadır."])
-        reasons: list[str] = []
-        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
-        self.assertEqual(reasons, [_REASON_TERM_SHAPE])
-
-    def test_unverified_evidence_term_is_rejected(self):
-        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
-        sources = [{"excerpt": "Metinde ana duygu ve ana düşünce belirlenir."}]
-        answer = _evidence_json(
-            ["ana duygu", "edebiyat atölyesi"], ["Ana duygu eksik.", "Edebiyat atölyesi eksik."]
-        )
-        reasons: list[str] = []
-        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
-        self.assertEqual(reasons, [_REASON_TERM_UNGROUNDED])
-
-    def test_duplicate_terms_are_rejected(self):
-        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
-        sources = [{"excerpt": "Metinde ana duygu belirlenir."}]
-        answer = _evidence_json(
-            ["ana duygu", "Ana Duygu"], ["Ana duygu net kurulamıyor.", "Yine net kurulamıyor."]
-        )
-        reasons: list[str] = []
-        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
-        self.assertEqual(reasons, [_REASON_DUPLICATE_TERMS])
-
-    def test_missing_theme_is_rejected(self):
-        outcome = {"outcomeTheme": "", "successRate": 0.20}
-        sources = [{"excerpt": "Metinde ana duygu belirlenir."}]
-        answer = _evidence_json(["ana duygu"], ["Ana duygu net kurulamıyor."])
-        reasons: list[str] = []
-        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
-        self.assertEqual(reasons, [_REASON_THEME_MISSING])
-
-    def test_status_not_found_is_rejected(self):
-        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
-        answer = json.dumps({"status": "not_found"})
-        reasons: list[str] = []
-        self.assertEqual(
-            _compose_grounded_pedagogical_answer(answer, outcome, [{"excerpt": "ana duygu"}], reasons), ""
-        )
-        self.assertEqual(reasons, [_REASON_STATUS_NOT_SUCCESS])
-
-    def test_recommendation_language_in_rationale_is_stripped_and_then_rejected(self):
-        # gapRationale tamamen öneri cümlesiyse strip_recommendation_sentences
-        # onu boşaltır - boş gerekçe TÜM yanıtı reddettirir (bkz.
-        # _compose_grounded_pedagogical_answer docstring'i).
-        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
-        sources = [{"excerpt": "Metinde ana duygu ve ana düşünce belirlenir."}]
-        answer = _evidence_json(
-            ["ana duygu", "ana düşünce"],
-            ["Bu eksiklik giderilmelidir ve telafi programı önerilir.", "Ana düşünce eksik."],
-        )
-        reasons: list[str] = []
-        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources, reasons), "")
-        self.assertEqual(reasons, [_REASON_RATIONALE_STRIPPED])
-
-    def test_non_json_model_paragraph_is_rejected_when_structured_evidence_is_expected(self):
+    def test_non_json_model_paragraph_is_rejected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
         reasons: list[str] = []
         self.assertEqual(
@@ -280,21 +223,129 @@ class RagContextAttachmentTests(unittest.TestCase):
             ),
             "",
         )
-        self.assertEqual(reasons, [_REASON_STATUS_NOT_SUCCESS])
+        self.assertEqual(len(reasons), 1)
+        self.assertTrue(reasons[0].startswith("json-ayristirilamadi"))
 
     def test_valid_json_is_used_and_trailing_model_prose_is_ignored(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.40}
         sources = [{"excerpt": "Okuma stratejisi ile metinleri inceleme birlikte ele alınır."}]
         answer = (
-            _evidence_json(
-                ["Okuma stratejisi", "metinleri inceleme"],
-                ["Okuma stratejisi tutarsız uygulanıyor.", "Metinleri inceleme yüzeysel kalıyor."],
-            )
-            + "\n\nBu bölüm modelin kaynak dışına çıkabilen serbest açıklamasıdır."
+            '{"diagnosis":"Okuma stratejisi ve inceleme birlikteliği sınırlı '
+            'kalmaktadır."}\n\n'
+            "Bu bölüm modelin kaynak dışına çıkabilen serbest açıklamasıdır."
         )
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
-        self.assertIn("Okuma stratejisi ve metinleri inceleme", result)
+        self.assertIn("Okuma stratejisi ve inceleme birlikteliği", result)
         self.assertNotIn("serbest açıklama", result)
+
+    def test_causal_language_is_preserved(self):
+        # Nedensellik yasağı kaldırıldı (kullanıcı isteği + DEVELOPMENT_
+        # CHARTER.md güncellemesi) - model artık "nedeniyle" gibi bağlaçlar
+        # kullanabilir, MAHİR bunları kırpmaz. Bu, kasıtlı davranış
+        # değişikliğinin regresyon kaydı: eski filtre yanlışlıkla geri
+        # gelirse burada yakalanır.
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu ve ana düşünce bütünlük içinde ele alınır."}]
+        answer = (
+            '{"diagnosis":"Ana duygu, ana düşünce ve bütünlük ilişkisi '
+            'kurulamamaktadır. Bu, ayırt edememe nedeniyle ortaya çıkmıştır."}'
+        )
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertIn("Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır.", result)
+        self.assertIn("nedeniyle", result)
+
+    def test_dangling_reference_is_removed_when_the_first_sentence_is_stripped(self):
+        # İlk cümle oran tekrarı içerdiği için kırpılır (bkz.
+        # _RATE_MENTION_PATTERN - nedensellik artık kırpılmıyor, kalan tek
+        # tetikleyici bu), geriye kalan metin "Bu eksiklik, ..." diye
+        # başlıyordu - artık var olmayan bir cümleye atıf yapan, havada kalan
+        # bir paragraf öğretmene gitmemeli. Bağlayıcı öbek atılmalı.
+        outcome = {"outcomeTheme": "1. Tema: Sözün İnceliği", "successRate": 0.35}
+        sources = [{
+            "excerpt": (
+                "Metnin başlık ve görsellerinden hareketle metnin yazılış amacını "
+                "tahmin eder ve içeriğini karşılaştırır."
+            )
+        }]
+        answer = (
+            '{"diagnosis":"Tahmin etme yeteneği eksiktir; %35 başarı oranı bunu '
+            'göstermektedir. Bu eksiklik, metnin görsellerinden ve başlıktan '
+            'amacını belirlemesine engel oluyor."}'
+        )
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertNotIn("Bu eksiklik, metnin görsellerinden", result)
+        self.assertIn("Metnin görsellerinden ve başlıktan amacını belirlemesine engel oluyor.", result)
+
+    def test_consonant_mutation_counts_as_the_same_root(self):
+        # Türkçe ünsüz yumuşaması: sözcük ünlüyle başlayan ek alınca sondaki
+        # sert ünsüz yumuşar (içeriK -> içeriĞi). Düz önek karşılaştırması
+        # bunu kaçırıyordu; canlı ölçümde "içerik" ile "içeriği" eşleşmeyince
+        # kanıt sayısı bir eksik çıkıp iyi bir teşhis reddedildi.
+        from backend.app.agents.pipeline import _shares_root
+
+        for stem, inflected in (
+            ("içerik", "içeriği"),
+            ("kitap", "kitabı"),
+            ("amaç", "amacını"),
+            ("kanat", "kanadı"),
+        ):
+            with self.subTest(stem=stem):
+                self.assertTrue(_shares_root(stem, inflected))
+        # Yumuşama toleransı alakasız sözcükleri birleştirmemeli.
+        self.assertFalse(_shares_root("içerik", "inceleme"))
+
+    def test_diverging_verb_forms_still_count_as_the_same_root(self):
+        # Canlı ölçüm: model "oluşturmayı" yazdı, kaynak "oluşturabilme"
+        # diyordu - aynı "oluştur" kökü (7 harf) ama biri diğerinin TAM
+        # öneki DEĞİL, ikisi de kökten sonra farklı eklerle ayrışıyor
+        # ("-mayı" / "-abilme"). Eski "biri diğerinin öneki mi" testi bunu
+        # kaçırdı ve gerçekten kaynaklı bir teşhis 0 kanıt sözcüğüyle
+        # reddedildi.
+        from backend.app.agents.pipeline import _shares_root
+
+        self.assertTrue(_shares_root("oluşturmayı", "oluşturabilme"))
+        # Ortak önek 5 karakterden kısaysa (burada 4: "anla") hâlâ eşleşmemeli
+        # - "içerik"/"inceleme" gibi alakasız sözcükleri birleştirme riski.
+        self.assertFalse(_shares_root("anlama", "anlaşma"))
+
+    def test_two_distinctive_words_are_enough_evidence(self):
+        # Eşik 3'ten 2'ye çekildi: tema adı ve müfredat kalıp sözcükleri
+        # ("ele alınan", "hareketle") artık sayılmadığından 3, fiilen çok
+        # daha yüksek bir bar hâline gelmişti ve canlı ölçümde iyi bir
+        # teşhis 2/3 ile reddedildi.
+        outcome = {
+            "outcomeCode": "TDE3.3",
+            "outcomeTheme": "1. Tema: Sözün İnceliği",
+            "successRate": 0.35,
+            "componentType": "speaking",
+        }
+        sources = [{
+            "excerpt": (
+                "TDE3.2. Muhatabını ikna etmek için söyleyiş inceliklerine yer veren bir "
+                "konuşma içeriği oluşturabilme. TDE3.3. Muhatabını ikna etmek için "
+                "konuşmada kural uygulayabilme."
+            )
+        }]
+        answer = '{"diagnosis":"Konuşmada kural uygulama ve içerik oluşturma sınırlı kalmaktadır."}'
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertIn("kural uygulama ve içerik oluşturma", result)
+
+    def test_missing_diagnosis_is_rejected(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "ana duygu"}]
+        self.assertEqual(_compose_grounded_pedagogical_answer("{}", outcome, sources), "")
+
+    def test_model_still_writing_placeholder_syntax_is_rejected(self):
+        # 2026-08-24: canlı ölçümde model bir önceki tasarımın {TEMA}/{ORAN}/
+        # {SIDDET} yer tutucularını hiç kullanmadı, gerçek değerleri kendi
+        # uydurdu - bu yüzden yer tutucu sözleşmesi tamamen kaldırıldı. Model
+        # yine de eski alışkanlıkla süslü parantez yazarsa (ör. "{TEMA}"),
+        # bu çirkin bir kalıntı olarak öğretmene gitmesin diye tüm yanıt
+        # reddedilir.
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "ana duygu metinde geçer."}]
+        answer = '{"diagnosis":"{TEMA} temasında ana duygu belirsizdir.","groundedTerms":["ana duygu"]}'
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources), "")
 
     def test_ragcontext_field_always_present_even_without_remote_url(self):
         # MAHIR_RAG_REMOTE_URL artık koda gömülü bir varsayılana sahip (bkz.
@@ -341,33 +392,31 @@ class RagContextAttachmentTests(unittest.TestCase):
         }
         reasons: list[str] = []
         self.assertFalse(_answer_matches_outcome_scope("TDE2.2.3 okuma becerileri eksiktir.", outcome, reasons))
-        self.assertEqual(reasons, [_REASON_CODE_LEAK])
+        self.assertEqual(len(reasons), 1)
+        self.assertTrue(reasons[0].startswith(_REASON_CODE_LEAK))
         self.assertTrue(_answer_matches_outcome_scope("TDE3.3 konuşma becerisi güçlüdür.", outcome))
 
     def test_overlong_pedagogical_answer_is_rejected(self):
+        # MAHİR'in ürettiği açılış+kapanış cümleleriyle sarıldığından (bkz.
+        # `_compose_grounded_pedagogical_answer`) sınır 70'ten 90'a çıktı.
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
-        answer = " ".join(["kanıt"] * 71)
-        reasons: list[str] = []
-        self.assertFalse(_answer_matches_outcome_scope(answer, outcome, reasons))
-        self.assertEqual(reasons, [_REASON_TOO_LONG])
+        answer = " ".join(["kanıt"] * 91)
+        self.assertFalse(_answer_matches_outcome_scope(answer, outcome))
 
-    def test_causal_overclaim_and_student_count_are_rejected(self):
+    def test_causal_language_and_student_count_are_accepted(self):
+        # Nedensellik/öğrenci-sayısı yasağı kaldırıldı - bu ifadeler artık
+        # kapsam denetiminden geçer. Kasıtlı davranış değişikliğinin
+        # regresyon kaydı.
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
-        reasons_1: list[str] = []
-        reasons_2: list[str] = []
-        self.assertFalse(_answer_matches_outcome_scope("Düşüklüğün temel nedeni yetersiz bilgidir.", outcome, reasons_1))
-        self.assertFalse(_answer_matches_outcome_scope("Zorluk çeken öğrencilerin sayısı yüksektir.", outcome, reasons_2))
-        self.assertEqual(reasons_1, [_REASON_CAUSAL_OVERCLAIM])
-        self.assertEqual(reasons_2, [_REASON_CAUSAL_OVERCLAIM])
+        self.assertTrue(_answer_matches_outcome_scope("Düşüklüğün temel nedeni yetersiz bilgidir.", outcome))
+        self.assertTrue(_answer_matches_outcome_scope("Zorluk çeken öğrencilerin sayısı yüksektir.", outcome))
 
-    def test_activity_or_remediation_language_is_rejected(self):
+    def test_activity_or_remediation_language_is_accepted(self):
+        # Öneri/etkinlik yasağı kaldırıldı (DEVELOPMENT_CHARTER.md güncellendi) -
+        # bu ifadeler artık kapsam denetiminden geçer.
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
-        reasons_1: list[str] = []
-        reasons_2: list[str] = []
-        self.assertFalse(_answer_matches_outcome_scope("Bu çıktı için etkinlik önerilir.", outcome, reasons_1))
-        self.assertFalse(_answer_matches_outcome_scope("Telafi çalışması yapılmalıdır.", outcome, reasons_2))
-        self.assertEqual(reasons_1, [_REASON_ACTION_LANGUAGE])
-        self.assertEqual(reasons_2, [_REASON_ACTION_LANGUAGE])
+        self.assertTrue(_answer_matches_outcome_scope("Bu çıktı için etkinlik önerilir.", outcome))
+        self.assertTrue(_answer_matches_outcome_scope("Telafi çalışması yapılmalıdır.", outcome))
 
     def test_concise_evidence_bounded_diagnosis_is_accepted(self):
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
@@ -390,8 +439,10 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertTrue(_answer_matches_outcome_scope("Öğrenciler mülakat metnini dinleyerek iletiyi belirler.", outcome))
         self.assertFalse(_answer_matches_outcome_scope("Okuma stratejileri uygulanmalıdır.", outcome, reasons_2))
         self.assertTrue(_answer_matches_outcome_scope("Dinlediği metindeki açık ve örtük iletiyi belirler.", outcome))
-        self.assertEqual(reasons_1, [_REASON_CROSS_SKILL_LEAK])
-        self.assertEqual(reasons_2, [_REASON_CROSS_SKILL_LEAK])
+        self.assertEqual(len(reasons_1), 1)
+        self.assertTrue(reasons_1[0].startswith(_REASON_CROSS_SKILL_LEAK))
+        self.assertEqual(len(reasons_2), 1)
+        self.assertTrue(reasons_2[0].startswith(_REASON_CROSS_SKILL_LEAK))
 
     def test_rejected_listening_drift_is_reported_without_the_unsafe_context(self):
         payload = _weak_tde_payload()
@@ -425,6 +476,9 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertEqual(prompts[0]["retrieval"]["programId"], "tde-9-tymm")
         self.assertEqual(prompts[0]["retrieval"]["grade"], "9")
         self.assertEqual(prompts[0]["retrieval"]["theme"], "SÖZÜN İNCELİĞİ")
+        # Beceri de gidiyor: aynı temada dört beceri listesi neredeyse birebir
+        # aynı metni taşıyor, ayrımı sunucu tarafında yalnız bu alan sağlıyor.
+        self.assertEqual(prompts[0]["retrieval"]["skill"], "Dinleme/İzleme")
         self.assertEqual(result["outcomes"][0]["ragContext"], "Bu kazanım dinleme becerisini kapsar.")
 
     def test_outcome_description_reaches_both_question_and_retrieval_query(self):
@@ -605,33 +659,6 @@ class DiagnosisGroundingRetryTests(unittest.TestCase):
         # Getirim (aynı BAĞLAM) retry'de DEĞİŞMEMELİ - sorun modelin BAĞLAM'ı
         # yanlış kullanmasıydı, hangi BAĞLAM'ın getirildiği değil.
         self.assertEqual(retry_items[0]["retrieval"], _diagnosis_prompts(mock_query)[0]["retrieval"])
-
-    def test_rationale_stripped_first_attempt_gets_rationale_specific_retry_hint(self):
-        # 2026-08-23: retry ipucu artık sebebe göre seçiliyor - terim zaten
-        # BAĞLAM'da geçerliyken yalnızca gerekçe (zorunluluk kipi yüzünden)
-        # charter filtresince boşaltılırsa, "BİREBİR terim seç" ipucu
-        # alakasız olurdu; bu senaryoda gerekçeye özgü ipucu gitmeli.
-        bad_rationale = _evidence_json(
-            ["Sözün İnceliği", "anlam oluşturma"],
-            ["Bu bileşen geliştirilmelidir.", "Bu bileşen de geliştirilmelidir."],
-        )
-        good = _evidence_json(
-            ["Sözün İnceliği", "anlam oluşturma"],
-            ["Bu bileşen net biçimde kurulamamaktadır.", "Bu bileşen sınırlı düzeyde kalmaktadır."],
-        )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch(
-                "backend.app.agents.llm.run_agent_prompts",
-                side_effect=_llm_reply_sequence([(bad_rationale, self._SOURCES)], [(good, self._SOURCES)]),
-            ) as mock_query:
-                result = analyze_approved_data(_weak_tde_payload())
-
-        self.assertEqual(mock_query.call_count, 2)
-        context = result["outcomes"][0]["ragContext"]
-        self.assertNotIn("doğrulanmış bir kaynak bağlamı oluşturulamadı", context)
-        retry_items = mock_query.call_args_list[1][0][0]
-        self.assertIn("GÖZLEMSEL", retry_items[0]["user"])
-        self.assertNotIn("BİREBİR", retry_items[0]["user"])
 
     def test_ungrounded_after_retry_is_rejected_and_tried_only_twice(self):
         bad = _evidence_json(
@@ -886,67 +913,6 @@ class RagBatchingTests(unittest.TestCase):
 
         contexts = [item["ragContext"] for item in result["outcomes"]]
         self.assertEqual(contexts, ["", "ikinci teşhis"])
-
-
-class RecommendationStrippingTests(unittest.TestCase):
-    # DEVELOPMENT_CHARTER.md: MAHİR yöntem/telafi programı önermez. Canlı
-    # ölçümde 8 yanıtın 2'si öneri cümlesiyle bitti - prompt tek başına yetmiyor.
-    def test_trailing_recommendation_sentence_is_dropped(self):
-        answer, dropped = _strip_recommendation_sentences(
-            "Kazanımın bilişsel düzeyi Anlama. Eksikliğin şiddeti: Kritik. "
-            "Bu nedenle okuma stratejileri uygulama programları önerilir."
-        )
-        self.assertEqual(dropped, 1)
-        self.assertNotIn("önerilir", answer)
-        self.assertIn("Eksikliğin şiddeti: Kritik.", answer)
-
-    def test_necessity_phrasing_is_dropped(self):
-        answer, dropped = _strip_recommendation_sentences(
-            "Öğrenme kaybı vardır. Daha kapsamlı bir yaklaşımla eğitim verilmelidir."
-        )
-        self.assertEqual(dropped, 1)
-        self.assertEqual(answer, "Öğrenme kaybı vardır.")
-
-    def test_gereklidir_is_dropped_but_gerekli_olan_is_kept(self):
-        # Canlı ölçümde "... ek destek ve öğretim gereklidir." hem prompt'tan
-        # hem de ilk desenden kaçtı; "gerekli olan" ise teşhis dilinde meşru.
-        answer, dropped = _strip_recommendation_sentences(
-            "Öğrencilere ek destek ve öğretim gereklidir. "
-            "Kazanım için gerekli olan bilişsel yeterlilik kazandırılamamıştır."
-        )
-        self.assertEqual(dropped, 1)
-        self.assertEqual(answer, "Kazanım için gerekli olan bilişsel yeterlilik kazandırılamamıştır.")
-
-    def test_remediation_need_closing_is_dropped_but_gelisim_ihtiyaci_is_kept(self):
-        # "eksikliği giderme ihtiyacı ortaya çıkmaktadır" canlı ölçümde hem
-        # prompt'tan hem de desenden kaçtı. Tetikleyici "ihtiyaç" OLAMAZ:
-        # "gelişim ihtiyacı" MAHİR'in raporundaki kendi terimi.
-        answer, dropped = _strip_recommendation_sentences(
-            "Bu eksikliği giderme ihtiyacı ortaya çıkmaktadır. "
-            "Bu kazanımda net bir gelişim ihtiyacı vardır."
-        )
-        self.assertEqual(dropped, 1)
-        self.assertEqual(answer, "Bu kazanımda net bir gelişim ihtiyacı vardır.")
-
-    def test_diagnostic_gerektirir_is_not_dropped(self):
-        # "gerektirir" teşhis dilinde meşru - "gerekir"le karıştırılmamalı.
-        answer, dropped = _strip_recommendation_sentences(
-            "Bu kazanım üst düzey analiz becerisi gerektirir."
-        )
-        self.assertEqual(dropped, 0)
-        self.assertEqual(answer, "Bu kazanım üst düzey analiz becerisi gerektirir.")
-
-    def test_all_recommendation_answer_is_discarded_and_leaves_ragcontext_empty(self):
-        # Charter süzgeci artık ortak LLM katmanında (agents/llm.py) çalışıyor
-        # ve burada mock'landığı için, süzgeçten SONRAKİ hâl simüle ediliyor:
-        # yanıtın tamamı öneriyse geriye boş string kalır ve hat o çıktıyı
-        # atlamalı - charter ihlali içeren bir metni raporlamaktansa hücreyi
-        # boş bırakmak doğrusu. Süzgecin kendisi tests/test_agent_llm.py'de.
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
-            with patch("backend.app.agents.llm.run_agent_prompts",
-                       side_effect=_llm_reply(("", [{"documentName": "x"}]))):
-                result = analyze_approved_data(_weak_tde_payload())
-        self.assertEqual(result["outcomes"][0]["ragContext"], "")
 
 
 class NoBloomTests(unittest.TestCase):

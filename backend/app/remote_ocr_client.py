@@ -18,6 +18,7 @@ import urllib.request
 import uuid
 
 from .file_receiver import UploadedFile
+from .ocr_protocol import SHARED_SECRET_HEADER, UPLOAD_PATH, WARMUP_PATH
 from .timing import stage
 
 _REMOTE_TIMEOUT_SECONDS = 300
@@ -71,9 +72,9 @@ def run_remote_image_group_ocr(
     headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
     shared_secret = os.environ.get("MAHIR_OCR_SHARED_SECRET", "")
     if shared_secret:
-        headers[_SHARED_SECRET_HEADER] = shared_secret
+        headers[SHARED_SECRET_HEADER] = shared_secret
     request = urllib.request.Request(
-        remote_url.rstrip("/") + "/mahir-upload",
+        remote_url.rstrip("/") + UPLOAD_PATH,
         data=body,
         method="POST",
         headers=headers,
