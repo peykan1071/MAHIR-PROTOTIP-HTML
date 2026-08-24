@@ -83,6 +83,8 @@ assert.match(styles, /\.classified-group-button/);
 assert.match(styles, /\.outcome-combobox-listbox[\s\S]*position: fixed;[\s\S]*z-index: 1000;/);
 assert.match(styles, /\.data-table\.saved-group-data-table[\s\S]*table-layout: fixed;/);
 assert.match(styles, /\.saved-group-inline-input[\s\S]*width: 100%;/);
+assert.match(script, /const detectedQuestionCount = detectedQuestions\.length \|\| Math\.max\(/);
+assert.match(script, /const questionCount = \(group\.questions \|\| \[\]\)\.length \|\| Math\.max\(/);
 assert.match(script, /saved-group-validation-note/);
 assert.match(script, /Ayrıntılar tablonun altında gösterildi/);
 assert.match(styles, /\.saved-group-validation-note/);

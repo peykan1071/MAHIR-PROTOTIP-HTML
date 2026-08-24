@@ -3747,8 +3747,9 @@ const fileUploadBridge = (() => {
       const warningList = document.querySelector("[data-validation-warnings]");
       const documentReadGuidance = document.querySelector("[data-document-read-guidance]");
       const detectedQuestions = Array.isArray(data.questions) ? data.questions : [];
-      const detectedQuestionCount = Math.max(
-        detectedQuestions.length,
+      // Belgede açık bir soru listesi varsa gerçek sınav yapısı odur. Word
+      // çizelgesindeki boş yedek S8-S10 sütunları soru sayısını büyütmemeli.
+      const detectedQuestionCount = detectedQuestions.length || Math.max(
         Number(data.summary?.questionCount) || 0,
         ...(data.students || []).map((student) => Array.isArray(student.scores) ? student.scores.length : 0)
       );
@@ -4202,7 +4203,7 @@ const fileUploadBridge = (() => {
         caption.textContent = `${examGroupLabel(group.exam)} öğrenci puanları`;
         const head = document.createElement("thead");
         const headerRow = document.createElement("tr");
-        const questionCount = Math.max((group.questions || []).length, 0, ...group.students.map((student) => (student.scores || []).length));
+        const questionCount = (group.questions || []).length || Math.max(0, ...group.students.map((student) => (student.scores || []).length));
         const questionHeaders = Array.from({ length: questionCount }, (_, questionIndex) => `S${group.questions?.[questionIndex]?.number || questionIndex + 1}`);
         const showSourceFile = group.students.some((student) => usefulValue(student.sourceFile));
         [
