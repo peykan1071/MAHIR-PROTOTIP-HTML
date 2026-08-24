@@ -267,7 +267,13 @@ class TraceWireFormatTests(unittest.TestCase):
         # alan olmadan gösterebilmesini sağlıyor.
         _analysis, trace = analyze_approved_data_traced(_payload())
         self.assertGreaterEqual(trace["totalMs"], 0.0)
-        agent_total = sum(entry["durationMs"] for entry in trace["agents"])
+        # Ajan süreleri dış sözleşmede onda bir milisaniyeye yuvarlanır.
+        # Toplarken oluşabilen 0.30000000000000004 benzeri ikili kayan nokta
+        # artığını aynı sözleşme hassasiyetine indirerek kararsızlığı önle.
+        agent_total = round(
+            sum(entry["durationMs"] for entry in trace["agents"]),
+            1,
+        )
         self.assertGreaterEqual(
             trace["totalMs"], agent_total, "Toplam, ajan sürelerinin altına düşemez."
         )
