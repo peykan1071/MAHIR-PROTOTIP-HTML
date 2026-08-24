@@ -27,7 +27,8 @@ assert.match(html, /<tr><th>Sınıf\/Şube<\/th><td colspan="5">9-A<\/td><\/tr>/
 assert.match(html, /<tr><th>Sınav Türü<\/th><td colspan="5">Yazılı<\/td><\/tr>/);
 assert.match(html, /Sınıf\/şube \(ör\. 9-A\) ile sınav türü \(Yazılı, Dinleme veya Konuşma\) açıkça belirtilmelidir/);
 
-assert.match(script, /const detectedGroups = hasFileNameExamEvidence/);
+assert.match(script, /const detectedGroups = mergedData\.documents\.length/);
+assert.doesNotMatch(script, /hasFileNameExamEvidence/);
 assert.match(script, /legacyRowExplosion/);
 assert.match(script, /isImageUpload && \(legacyRowExplosion \|\| !hasReadableGroupContext\)/);
 assert.match(script, /data-apply-recovered-question-count/);
@@ -115,9 +116,11 @@ assert.match(script, /uploadChunksWithConcurrency\(uploadChunks, 3\)/);
 assert.match(script, /Promise\.all\(Array\.from/);
 assert.match(script, /const consolidatedGroupMap = new Map\(\)/);
 assert.match(script, /existing\.students\.push/);
-assert.match(script, /const examTypeFromFileName/);
-assert.match(script, /examTypeSource: "file-name"/);
-assert.match(script, /reliableFileType \? "file-name-confirmed" : questionShape/);
+assert.doesNotMatch(script, /const examTypeFromFileName/);
+assert.doesNotMatch(script, /examTypeSource: "file-name"/);
+assert.match(script, /const normalizeClassSection =/);
+assert.match(script, /const normalizeExamType =/);
+assert.match(script, /normalizedClassSection,[\s\S]*normalizedExamType[\s\S]*\.join\("::"\)/);
 assert.match(script, /En çok tekrar eden ortak yapı tabloya uygulandı/);
 assert.match(html, /Tek seferde en fazla 100 görsel/);
 

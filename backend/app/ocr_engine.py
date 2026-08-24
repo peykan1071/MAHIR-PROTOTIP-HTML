@@ -118,8 +118,13 @@ def read_exam_document(image_bytes: bytes, extension: str) -> dict[str, object]:
     rows = _extract_table_rows(html_text)
     document = _parse_exam_rows(rows)
     exam = document.get("exam") or {}
-    if not exam.get("examType"):
-        exam["examType"] = _detect_marked_exam_type(image_bytes)
+    # Tablo OCR'si boş kutuları zaman zaman işaretliymiş gibi metne döküyor.
+    # Şablondaki mavi işaret doğrudan pikselden güvenle okunabiliyorsa metin
+    # tahmininden daha güçlü kanıttır ve yanlış bir "Konuşma" sonucunu düzeltir.
+    visually_marked_exam_type = _detect_marked_exam_type(image_bytes)
+    if visually_marked_exam_type:
+        exam["examType"] = visually_marked_exam_type
+        exam["examTypeSource"] = "visual-checkbox"
     return document
 
 

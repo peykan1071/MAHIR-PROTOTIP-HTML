@@ -2822,6 +2822,31 @@ const fileUploadBridge = (() => {
     const currentCourseName = () => window.MAHIRPreparationContext?.courseName || "";
     const currentGrade = () => window.MAHIRPreparationContext?.grade || "";
     const currentStage = () => window.MAHIRPreparationContext?.educationStage || "";
+    const normalizeClassSection = (value) => {
+      const normalized = String(value || "")
+        .normalize("NFKC")
+        .toLocaleUpperCase("tr-TR")
+        .replace(/[‐‑‒–—―−﹘﹣－]/gu, "-")
+        .replace(/(?:SINIFI|SINIF|ŞUBESİ|ŞUBE)/gu, " ")
+        .trim();
+      const classMatch = normalized.match(/(\d{1,2})\s*[-/.\s]?\s*([A-ZÇĞİÖŞÜ])/u);
+      if (classMatch) return `${Number(classMatch[1])}-${classMatch[2]}`;
+      return normalized.replace(/\s+/g, "").replace(/[/.]/g, "-");
+    };
+    const normalizeExamType = (value) => {
+      const normalized = String(value || "").normalize("NFKC").toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+      if (normalized.includes("dinleme") || normalized.includes("izleme")) return "listening";
+      if (normalized.includes("konuşma") || normalized.includes("konusma")) return "speaking";
+      if (normalized.includes("yazılı") || normalized.includes("yazili")) return "written";
+      if (normalized.includes("genel")) return "general";
+      return normalized;
+    };
+    const normalizedExamTypeLabel = (examTypeKey, fallback = "") => ({
+      listening: "Dinleme",
+      speaking: "Konuşma",
+      written: "Yazılı",
+      general: "Genel Değerlendirme"
+    })[examTypeKey] || fallback;
     const isPrototypeScopeEnabled = () => (
       currentRole() === "Branş Öğretmeni"
       && currentStage() === "Lise"
@@ -5056,27 +5081,16 @@ const fileUploadBridge = (() => {
       // Öğretmen tek seferde 100 evraka kadar seçer. Uzak OCR işçisinin güvenli
       // istek sınırı 10 dosya olduğundan arayüz bunları öğretmene teknik "grup"
       // göstermeden arka planda 10'lu dilimler hâlinde sırayla gönderir.
-      const examTypeFromFileName = (fileName) => {
-        const stem = String(fileName || "").replace(/\.[^.]+$/, "").toLocaleLowerCase("tr-TR").trim();
-        const suffix = stem.match(/(?:^|[-_\s])(dinleme|yazılı|yazili|konuşma|konusma|d|y|k)$/)?.[1] || "";
-        if (suffix === "d" || suffix === "dinleme") return "Dinleme";
-        if (suffix === "y" || suffix === "yazılı" || suffix === "yazili") return "Yazılı";
-        if (suffix === "k" || suffix === "konuşma" || suffix === "konusma") return "Konuşma";
-        return "";
-      };
-
-      const attachOriginalFileEvidence = (payload, files) => {
+      // Dosya adı yalnız öğretmen izlenebilirliği için saklanır; sınav türü veya
+      // grup kimliği IMG_1234, WhatsApp Image ya da -d/-y gibi ad parçalarından
+      // hiçbir koşulda çıkarılmaz.
+      const attachOriginalFileMetadata = (payload, files) => {
         const structuredData = payload.structuredData || {};
         const documents = (structuredData.documents || []).map((document, index) => {
           const file = files[index];
-          const fileExamType = examTypeFromFileName(file?.name);
           return {
             ...document,
-            originalFileName: file?.name || "",
-            exam: {
-              ...(document.exam || {}),
-              ...(fileExamType ? { examType: fileExamType, examTypeSource: "file-name" } : {})
-            }
+            originalFileName: file?.name || ""
           };
         });
         return { ...payload, structuredData: { ...structuredData, documents } };
@@ -5088,7 +5102,7 @@ const fileUploadBridge = (() => {
         return fetch("/mahir-upload", { method: "POST", body: formData })
           .then((response) => response.json().catch(() => ({})).then((payload) => {
             if (!response.ok) throw new Error(payload.message || `${files.length} belge işlenemedi.`);
-            return attachOriginalFileEvidence(payload, files);
+            return attachOriginalFileMetadata(payload, files);
           }));
       };
 
@@ -5153,8 +5167,7 @@ const fileUploadBridge = (() => {
           window.clearInterval(progressTimer);
           uploadBatch.forEach((file) => processedDocumentKeys.add(`${file.name}|${file.size}|${file.lastModified}`));
           pendingOcrGroups = [];
-          const hasFileNameExamEvidence = mergedData.documents.some((document) => document.exam?.examTypeSource === "file-name");
-          const detectedGroups = hasFileNameExamEvidence
+          const detectedGroups = mergedData.documents.length
             ? mergedData.documents.map((document) => ({
                 exam: document.exam || {},
                 questions: document.questions || [],
@@ -5170,17 +5183,23 @@ const fileUploadBridge = (() => {
           detectedGroups.forEach((group) => {
             const exam = group.exam || {};
             const questionShape = (group.questions || []).map((question) => `${question.number}:${Number(question.maxScore || 0)}`).join("|");
-            const reliableFileType = exam.examTypeSource === "file-name";
+            const normalizedClassSection = normalizeClassSection(exam.classSection);
+            const normalizedExamType = normalizeExamType(exam.examType);
             const key = [
-              String(exam.course || exam.courseName || currentCourseName() || "").toLocaleLowerCase("tr-TR").trim(),
-              String(exam.classSection || "").toLocaleUpperCase("tr-TR").trim(),
-              String(exam.examType || "").toLocaleLowerCase("tr-TR").trim(),
-              reliableFileType ? "file-name-confirmed" : questionShape
+              normalizedClassSection,
+              normalizedExamType
             ].join("::");
             const existing = consolidatedGroupMap.get(key);
             if (!existing) {
               consolidatedGroupMap.set(key, {
                 ...group,
+                exam: {
+                  ...exam,
+                  course: currentCourseName() || exam.course,
+                  courseName: currentCourseName() || exam.courseName || exam.course,
+                  classSection: normalizedClassSection || exam.classSection,
+                  examType: normalizedExamTypeLabel(normalizedExamType, exam.examType)
+                },
                 students: [...(group.students || [])],
                 documents: [...(group.documents || [])],
                 warnings: [...(group.warnings || [])],
@@ -5201,7 +5220,7 @@ const fileUploadBridge = (() => {
             const questionShapes = Array.from(group.questionShapeCounts?.values() || []);
             const consensus = questionShapes.sort((left, right) => right.count - left.count)[0];
             if (consensus?.questions?.length) group.questions = consensus.questions;
-            if (questionShapes.length > 1 && group.exam?.examTypeSource === "file-name") {
+            if (questionShapes.length > 1) {
               group.warnings.push(`${group.exam.examType} evraklarında farklı okunan soru/azami puan yapıları bulundu. En çok tekrar eden ortak yapı tabloya uygulandı; farklı satırları öğretmen kontrol ediniz.`);
             }
             delete group.questionShapeCounts;
