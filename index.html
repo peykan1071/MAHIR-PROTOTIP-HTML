@@ -210,7 +210,7 @@
         <p>MAHİR, seçtiğiniz görev rolüne göre yükleyebileceğiniz evrakları ve oluşturabileceğiniz raporları bu ekranda açıklar.</p>
 
         <form class="data-upload-form" aria-labelledby="data-entry-title" data-upload-form>
-          <article class="personalized-upload-guide" data-role-upload-guide data-standard-data-entry aria-labelledby="role-upload-guide-title">
+          <article class="personalized-upload-guide" data-role-upload-guide aria-labelledby="role-upload-guide-title">
             <div class="personalized-upload-guide-heading">
               <p class="data-entry-kicker">Size özel evrak rehberi</p>
               <h3 id="role-upload-guide-title" data-role-upload-title>Evraklarınızı MAHİR'e yükleyin</h3>
@@ -231,6 +231,15 @@
               </section>
             </div>
             <p class="notification-message personalized-upload-note" data-role-upload-note></p>
+          </article>
+
+          <article class="prototype-scope-lock" data-prototype-scope-lock role="alert" aria-labelledby="prototype-scope-lock-title" hidden>
+            <div>
+              <p class="data-entry-kicker">Prototip kapsamı</p>
+              <h3 id="prototype-scope-lock-title">Bu seçim için veri girişi henüz etkin değildir.</h3>
+              <p>Bu prototipte analiz yalnız <strong>Branş Öğretmeni · Lise · 9. sınıf · Türk Dili ve Edebiyatı</strong> için etkindir.</p>
+            </div>
+            <button class="secondary-button" type="button" data-target-screen="preparation-screen">Hazırlık Seçimlerine Dön</button>
           </article>
 
           <article class="exam-structure-card" aria-labelledby="exam-structure-title" data-exam-structure-card hidden>

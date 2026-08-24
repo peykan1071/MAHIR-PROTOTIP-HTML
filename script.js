@@ -2548,6 +2548,8 @@ const fileUploadBridge = (() => {
     const mergeGeneralReportsButton = document.querySelector("[data-merge-general-reports]");
     const generalReportInputs = Array.from(document.querySelectorAll("[data-general-report-file]"));
     const standardDataEntryItems = Array.from(document.querySelectorAll("[data-standard-data-entry]"));
+    const prototypeScopeLock = document.querySelector("[data-prototype-scope-lock]");
+    const uploadForm = document.querySelector("[data-upload-form]");
     const contextStatus = document.querySelector("[data-context-status]");
     const examSequenceField = document.querySelector("[data-exam-sequence-field]");
     const examSequenceSelect = document.querySelector('[data-exam-field="examSequence"]');
@@ -2791,7 +2793,10 @@ const fileUploadBridge = (() => {
     };
     const renderRoleUploadGuidance = () => {
       const guide = currentRoleGuidance();
-      if (roleUploadTitle) roleUploadTitle.textContent = `${currentRole() || "Öğretmen"} olarak neler yapabilirsiniz?`;
+      const teacherTitle = currentRole() === "Branş Öğretmeni" && currentCourseName()
+        ? `${currentCourseName()} Öğretmeni`
+        : currentRole() || "Öğretmen";
+      if (roleUploadTitle) roleUploadTitle.textContent = `${teacherTitle} olarak neler yapabilirsiniz?`;
       if (roleUploadIntro) roleUploadIntro.textContent = guide.intro;
       fillList(roleDocumentList, guide.documents);
       fillList(roleProcessList, defaultProcess);
@@ -2816,6 +2821,13 @@ const fileUploadBridge = (() => {
 
     const currentCourseName = () => window.MAHIRPreparationContext?.courseName || "";
     const currentGrade = () => window.MAHIRPreparationContext?.grade || "";
+    const currentStage = () => window.MAHIRPreparationContext?.educationStage || "";
+    const isPrototypeScopeEnabled = () => (
+      currentRole() === "Branş Öğretmeni"
+      && currentStage() === "Lise"
+      && currentGrade() === "9"
+      && currentCourseName() === "Türk Dili ve Edebiyatı"
+    );
     const currentProfileId = () => profileIdForCourse(currentCourseName());
     const currentProgram = () => window.MAHIRProgramCatalog?.resolve(currentCourseName(), currentGrade()) || null;
     const examFieldAliases = {
@@ -2988,6 +3000,43 @@ const fileUploadBridge = (() => {
       if (!complete) {
         setGeneralReportStatus(`Genel değerlendirme için MAHİR'den indirilen üç Word (.docx) analiz raporu gereklidir. Seçilen rapor: ${selectedCount}/3.`);
       }
+    };
+
+    const updatePrototypeScopeLock = () => {
+      const enabled = isPrototypeScopeEnabled();
+      if (prototypeScopeLock) prototypeScopeLock.hidden = enabled;
+      if (uploadForm) uploadForm.dataset.prototypeScopeEnabled = String(enabled);
+
+      document.querySelectorAll("[data-source-option]").forEach((option) => {
+        option.disabled = !enabled;
+      });
+      generalReportInputs.forEach((input) => {
+        input.disabled = !enabled;
+      });
+      fileInput.disabled = !enabled;
+
+      const fileSelectLabel = document.querySelector("[data-file-select-label]");
+      if (fileSelectLabel) {
+        fileSelectLabel.classList.toggle("is-disabled", !enabled);
+        if (enabled) fileSelectLabel.removeAttribute("aria-disabled");
+        else fileSelectLabel.setAttribute("aria-disabled", "true");
+      }
+
+      if (!enabled) {
+        standardDataEntryItems.forEach((item) => { item.hidden = true; });
+        if (examStructureCard) examStructureCard.hidden = true;
+        if (generalReportMerger) generalReportMerger.hidden = true;
+        if (readButton) {
+          readButton.disabled = true;
+          readButton.setAttribute("aria-disabled", "true");
+        }
+        if (mergeGeneralReportsButton) {
+          mergeGeneralReportsButton.disabled = true;
+          mergeGeneralReportsButton.setAttribute("aria-disabled", "true");
+        }
+      }
+
+      return enabled;
     };
 
     const updateGeneralReportMode = (enabled, profile) => {
@@ -3580,6 +3629,10 @@ const fileUploadBridge = (() => {
     };
 
     const selectFiles = (files) => {
+      if (!isPrototypeScopeEnabled()) {
+        updatePrototypeScopeLock();
+        return;
+      }
       const incoming = Array.from(files || []);
       if (!incoming.length) return;
 
@@ -3606,6 +3659,10 @@ const fileUploadBridge = (() => {
     };
 
     const configureSourceMode = (mode) => {
+      if (!isPrototypeScopeEnabled()) {
+        updatePrototypeScopeLock();
+        return;
+      }
       const multipleDataSources = roleUsesMultipleDataSources();
       sourceMode = multipleDataSources ? mode : "images";
       mode = sourceMode;
@@ -4143,6 +4200,66 @@ const fileUploadBridge = (() => {
       invalidateAnalysisAfterApprovedDataEdit();
     };
 
+    const questionMapCard = document.querySelector(".question-map-card");
+    const questionMapHome = document.createComment("question-map-home");
+    questionMapCard?.parentNode?.insertBefore(questionMapHome, questionMapCard);
+
+    const restoreQuestionMapCard = () => {
+      if (questionMapCard && questionMapHome.parentNode && questionMapCard.parentNode !== questionMapHome.parentNode) {
+        questionMapHome.parentNode.insertBefore(questionMapCard, questionMapHome.nextSibling);
+      }
+    };
+
+    const createSavedOutcomeSummary = (group, index) => {
+      if (!["outcomes-complete", "analyzed"].includes(group.workflowStatus)) return null;
+      const section = document.createElement("section");
+      section.className = "saved-group-outcome-summary";
+      section.dataset.savedOutcomeSummary = String(index);
+      const title = document.createElement("h4");
+      title.textContent = `${examGroupLabel(group.exam)} Öğrenme Çıktıları`;
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "table-wrap";
+      const table = document.createElement("table");
+      table.className = "data-table saved-outcome-data-table";
+      const caption = document.createElement("caption");
+      caption.textContent = `${examGroupLabel(group.exam)} soru, azami puan ve öğrenme çıktısı özeti`;
+      const head = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      ["Soru", "Azami Puan", "Öğrenme Çıktısı"].forEach((text) => {
+        const cell = document.createElement("th");
+        cell.scope = "col";
+        cell.textContent = text;
+        headerRow.append(cell);
+      });
+      head.append(headerRow);
+      const body = document.createElement("tbody");
+      (group.questions || []).forEach((question, questionIndex) => {
+        const row = document.createElement("tr");
+        const outcomes = (question.outcomes || []).length
+          ? question.outcomes.map((outcome) => `${outcome.outcomeCode}${outcome.outcomeDescription ? ` — ${outcome.outcomeDescription}` : ""}`).join("; ")
+          : `${question.outcomeCode || ""}${question.outcomeDescription ? ` — ${question.outcomeDescription}` : ""}`;
+        [question.number || questionIndex + 1, question.maxScore, outcomes || "Öğrenme çıktısı seçilmedi"].forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = value;
+          row.append(cell);
+        });
+        body.append(row);
+      });
+      table.append(caption, head, body);
+      tableWrap.append(table);
+      section.append(title, tableWrap);
+      return section;
+    };
+
+    const placeQuestionMapBeforeGroup = (groupIndex) => {
+      const item = document.querySelector(`[data-saved-group-index="${groupIndex}"]`);
+      if (!questionMapCard || !item?.parentNode) return;
+      const outcomeActions = confirmFinalButton?.closest(".outcome-analysis-actions");
+      if (outcomeActions) questionMapCard.append(outcomeActions);
+      item.parentNode.insertBefore(questionMapCard, item);
+      questionMapCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
     const renderSavedGroups = () => {
       const list = document.querySelector("[data-saved-groups-list]");
       const summary = document.querySelector("[data-saved-groups-summary]");
@@ -4151,10 +4268,12 @@ const fileUploadBridge = (() => {
         ? `${savedGroups.length} sınav grubu içinde ${total} evrak korunuyor.`
         : "Henüz kaydedilmiş sınav grubu bulunmuyor.";
       document.querySelector("[data-saved-groups-card]")?.toggleAttribute("hidden", savedGroups.length === 0);
+      restoreQuestionMapCard();
       list?.replaceChildren();
       savedGroups.forEach((group, index) => {
         const item = document.createElement("section");
         item.className = "saved-group-table";
+        item.dataset.savedGroupIndex = String(index);
         const heading = document.createElement("div");
         heading.className = "saved-group-table-heading";
         const label = document.createElement("h4");
@@ -4190,9 +4309,17 @@ const fileUploadBridge = (() => {
         const outcomeButton = document.createElement("button");
         outcomeButton.type = "button";
         outcomeButton.className = "primary-button compact-button";
-        outcomeButton.dataset.selectClassifiedGroup = String(index);
+        if (group.workflowStatus === "outcomes-complete") {
+          outcomeButton.dataset.analyzeSavedGroup = String(index);
+        } else {
+          outcomeButton.dataset.selectClassifiedGroup = String(index);
+        }
         outcomeButton.disabled = group.workflowStatus === "pending" || Boolean(group.inlineEditing);
-        outcomeButton.textContent = group.workflowStatus === "analyzed" ? "Bu Grubu Yeniden Analiz Et" : "Öğrenme Çıktılarını Seç ve Analiz Et";
+        outcomeButton.textContent = group.workflowStatus === "analyzed"
+          ? "Bu Grubu Yeniden Analiz Et"
+          : group.workflowStatus === "outcomes-complete"
+            ? "Bu Grubun Analizini Başlat"
+            : "Öğrenme Çıktılarını Seç ve Kaydet";
         actions.append(status, reviewButton, outcomeButton);
 
         const tableWrap = document.createElement("div");
@@ -4287,6 +4414,8 @@ const fileUploadBridge = (() => {
           });
           validationNote.append(noteTitle, noteList);
         }
+        const outcomeSummary = createSavedOutcomeSummary(group, index);
+        if (outcomeSummary) item.append(outcomeSummary);
         item.append(heading, privacyNotice, tableWrap, validationNote, actions);
         list?.append(item);
       });
@@ -4537,11 +4666,11 @@ const fileUploadBridge = (() => {
       const approvalMessage = document.querySelector("[data-approval-message]");
       if (approvalMessage) approvalMessage.textContent = "Analiz etmek istediğiniz sınav grubunu seçiniz. Her grup ayrı ayrı raporlanır.";
       outcomeSelectionGroupIndex = -1;
-      const allGroupsReadyForAnalysis = savedGroups.length > 0 && savedGroups.every((group) => ["outcomes-complete", "analyzed"].includes(group.workflowStatus));
-      if (confirmFinalButton) {
-        confirmFinalButton.hidden = !allGroupsReadyForAnalysis;
-        confirmFinalButton.textContent = "Tüm Sınavlar Hazır — Analize Başla";
-      }
+      // Bu kart yalnızca seçili sınavın öğrenme çıktılarını düzenlemek içindir.
+      // Kayıt tamamlandığında açık kalırsa genel değerlendirmeye ait dördüncü
+      // bir sınav varmış gibi görünür. Analiz her sınavın kendi düğmesinden başlar.
+      questionMapCard?.setAttribute("hidden", "");
+      if (confirmFinalButton) confirmFinalButton.hidden = true;
       renderSavedGroups();
       screenManager.showScreen("validation-screen");
     };
@@ -4584,7 +4713,7 @@ const fileUploadBridge = (() => {
       }
       renderValidationData({ ...group, exam: group.exam, warnings: [] }, { finalReview: true, outcomeSelection: true });
       document.querySelector("[data-final-data-review]")?.setAttribute("hidden", "");
-      document.querySelector("[data-student-review-card]")?.removeAttribute("hidden");
+      document.querySelector("[data-student-review-card]")?.setAttribute("hidden", "");
       if (confirmFinalButton) {
         confirmFinalButton.hidden = false;
       confirmFinalButton.textContent = "Bu Grubun Öğrenme Çıktılarını Kaydet";
@@ -4593,6 +4722,7 @@ const fileUploadBridge = (() => {
       if (summary) summary.textContent = learningOutcomes.length
         ? `${examGroupLabel(group.exam)}: ${componentLabels[component]} için ${learningOutcomes.length} öğrenme çıktısı hazır. Soru sayısı ve azami puanlar evraktan otomatik alınmıştır.`
         : `${examGroupLabel(group.exam)} için ${componentLabels[component]} öğrenme çıktıları yüklenemedi. Ders: ${course || "belirlenemedi"}, sınıf: ${grade || "belirlenemedi"}.`;
+      placeQuestionMapBeforeGroup(groupIndex);
     };
 
     const saveCurrentOutcomeSelection = () => {
@@ -4638,15 +4768,23 @@ const fileUploadBridge = (() => {
 
     const nextGroupForAnalysis = () => savedGroups.findIndex((group) => group.workflowStatus === "outcomes-complete");
 
-    const refreshNextExamAction = () => {
-      const card = document.querySelector("[data-next-exam-card]");
-      const list = document.querySelector("[data-next-exam-list]");
-      const message = document.querySelector("[data-next-exam-message]");
-      const readyGroups = savedGroups.map((group, index) => ({ group, index })).filter(({ group }) => group.workflowStatus === "outcomes-complete");
+  const refreshNextExamAction = () => {
+    const card = document.querySelector("[data-next-exam-card]");
+    const list = document.querySelector("[data-next-exam-list]");
+    const message = document.querySelector("[data-next-exam-message]");
+    const groupRecordCount = (group) => Array.isArray(group?.students) ? group.students.length : 0;
+    const totalRecords = savedGroups.reduce((total, group) => total + groupRecordCount(group), 0);
+    const currentGroup = savedGroups[outcomeSelectionGroupIndex];
+    const currentRecords = groupRecordCount(currentGroup);
+    const remainingGroups = savedGroups.filter((group) => group.workflowStatus !== "analyzed");
+    const remainingRecords = remainingGroups.reduce((total, group) => total + groupRecordCount(group), 0);
+    const readyGroups = savedGroups.map((group, index) => ({ group, index })).filter(({ group }) => group.workflowStatus === "outcomes-complete");
       card?.toggleAttribute("hidden", readyGroups.length === 0);
       list?.replaceChildren();
       if (!readyGroups.length || !list) return;
-      if (message) message.textContent = `${readyGroups.length} kayıtlı sınav analize hazır. Geri dönmeden istediğiniz sınıf/şubeyi seçebilirsiniz.`;
+    if (message) {
+      message.textContent = `Toplam ${totalRecords} evrakın tamamı korunuyor. Bu rapor ${currentRecords} evrakı kapsıyor; kalan ${remainingRecords} evrak ${remainingGroups.length} sınav grubunda kayıtlı. ${readyGroups.length} sınav analize hazır. Geri dönmeden istediğiniz sınıf/şubeyi seçebilirsiniz.`;
+    }
       readyGroups.forEach(({ group, index }) => {
         const button = document.createElement("button");
         button.type = "button";
@@ -4726,6 +4864,10 @@ const fileUploadBridge = (() => {
     };
 
     const mergeGeneralReports = () => {
+      if (!isPrototypeScopeEnabled()) {
+        updatePrototypeScopeLock();
+        return;
+      }
       if (!mergeGeneralReportsButton || Object.values(generalReportFiles).some((file) => !file)) return;
       const formData = new FormData();
       Object.entries(generalReportFiles).forEach(([component, file]) => {
@@ -4892,6 +5034,10 @@ const fileUploadBridge = (() => {
     };
 
     const uploadSelectedFile = () => {
+      if (!isPrototypeScopeEnabled()) {
+        updatePrototypeScopeLock();
+        return;
+      }
       const selectedSource = document.querySelector('[data-source-option]:checked')?.value;
       if (selectedSource && selectedSource !== sourceMode) sourceMode = selectedSource;
       if (sourceMode === "manual") {
@@ -5103,9 +5249,11 @@ const fileUploadBridge = (() => {
           showReportIntro(REPORT_UNAVAILABLE_MESSAGE);
         })
         .finally(() => {
-          readButton.disabled = false;
-          readButton.setAttribute("aria-disabled", "false");
-          readButton.textContent = "Verileri Oku ve Kontrol Et";
+          const scopeEnabled = isPrototypeScopeEnabled();
+          readButton.disabled = !scopeEnabled;
+          readButton.setAttribute("aria-disabled", String(!scopeEnabled));
+          if (scopeEnabled) readButton.textContent = "Verileri Oku ve Kontrol Et";
+          else updatePrototypeScopeLock();
         });
     };
 
@@ -5123,6 +5271,11 @@ const fileUploadBridge = (() => {
     });
     assessmentComponent?.addEventListener("change", updateComponentNote);
     generalReportInputs.forEach((input) => input.addEventListener("change", () => {
+      if (!isPrototypeScopeEnabled()) {
+        input.value = "";
+        updatePrototypeScopeLock();
+        return;
+      }
       const component = input.dataset.generalReportFile;
       const file = input.files?.[0] || null;
       generalReportFiles[component] = file;
@@ -5135,6 +5288,7 @@ const fileUploadBridge = (() => {
       renderRoleUploadGuidance();
       configureSourceMode(sourceMode);
       updateComponentNote();
+      updatePrototypeScopeLock();
       loadLearningOutcomes();
       populateContextFields(structuredData?.exam || {});
     });
@@ -5158,7 +5312,11 @@ const fileUploadBridge = (() => {
     returnToUploadButton?.addEventListener("click", returnToUpload);
     confirmFinalButton?.addEventListener("click", () => {
       if (outcomeSelectionGroupIndex >= 0) {
-        if (saveCurrentOutcomeSelection()) showFinalReview();
+        const completedGroupIndex = outcomeSelectionGroupIndex;
+        if (saveCurrentOutcomeSelection()) {
+          showFinalReview();
+          requestAnimationFrame(() => document.querySelector(`[data-saved-outcome-summary="${completedGroupIndex}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+        }
       } else {
         analyzeNextReadyGroup();
       }
@@ -5185,6 +5343,8 @@ const fileUploadBridge = (() => {
       if (reviewButton) reviewSavedGroup(Number(reviewButton.dataset.reviewSavedGroup));
       const outcomeButton = event.target.closest("[data-select-classified-group]");
       if (outcomeButton && !outcomeButton.disabled) startOutcomeSelection(Number(outcomeButton.dataset.selectClassifiedGroup));
+      const analyzeButton = event.target.closest("[data-analyze-saved-group]");
+      if (analyzeButton && !analyzeButton.disabled) analyzeNextReadyGroup(Number(analyzeButton.dataset.analyzeSavedGroup));
     });
     document.querySelector("[data-saved-groups-list]")?.addEventListener("input", (event) => {
       const input = event.target.closest("[data-inline-group-index]");
@@ -5262,6 +5422,7 @@ const fileUploadBridge = (() => {
     configureSourceMode(document.querySelector('[data-source-option]:checked')?.value || "images");
     renderRoleUploadGuidance();
     updateComponentNote();
+    updatePrototypeScopeLock();
     loadLearningOutcomes();
     populateContextFields();
 
@@ -5293,7 +5454,6 @@ const reportApprovalManager = (() => {
   let downloadButton;
   let reportScreen;
   let outputMessage;
-  let returnToAnalysisButton;
 
   const actionButtons = () => [wordButton, downloadButton].filter(Boolean);
 
@@ -5332,10 +5492,6 @@ const reportApprovalManager = (() => {
     reportScreen.querySelectorAll("article, aside").forEach((section) => {
       section.dataset.reportLocked = String(isApproved);
     });
-    if (returnToAnalysisButton) {
-      returnToAnalysisButton.disabled = isApproved;
-      returnToAnalysisButton.setAttribute("aria-disabled", String(isApproved));
-    }
 
     if (!isApproved) {
       setButtonsEnabled(false);
@@ -5407,7 +5563,6 @@ const reportApprovalManager = (() => {
     wordButton = document.querySelector("[data-download-approved-word]");
     downloadButton = document.querySelector("[data-download-approved-pdf]");
     outputMessage = document.querySelector("[data-output-validation-message]");
-    returnToAnalysisButton = document.querySelector("[data-return-to-analysis]");
     if (!reportScreen || !approvalInput || !wordButton || !downloadButton) return;
 
     resetApproval();
