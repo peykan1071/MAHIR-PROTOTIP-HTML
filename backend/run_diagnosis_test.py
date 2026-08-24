@@ -234,15 +234,24 @@ def main() -> int:
         print("(Boş yanıt; hücre boş kalır.)")
         return 0
 
+    # Ret sebepleri toplanıyor: aksi hâlde her başarısız üretimde ham çıktıya
+    # bakıp hangi kuralın tetiklendiğini elle tahmin etmek gerekiyor.
+    reasons: list[str] = []
     if any(str(source.get("excerpt") or "").strip() for source in sources if isinstance(source, dict)):
-        composed = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        composed = _compose_grounded_pedagogical_answer(answer, outcome, sources, reasons)
     else:
         composed = answer
 
-    if not composed or not _answer_matches_outcome_scope(composed, outcome):
-        print(f"REDDEDİLDİ - öğretmene şu gösterilirdi: \"{_RAG_SCOPE_REJECTED_TEXT}\"")
-    else:
+    accepted = bool(composed) and _answer_matches_outcome_scope(composed, outcome, reasons)
+    if accepted:
         print(composed)
+    else:
+        print(f"REDDEDİLDİ - öğretmene şu gösterilirdi: \"{_RAG_SCOPE_REJECTED_TEXT}\"")
+
+    if reasons:
+        print("\n=== DOĞRULAMA KAYDI ===")
+        for reason in reasons:
+            print(f"  - {reason}")
     return 0
 
 

@@ -415,16 +415,30 @@ class DiagnosisPromptContractTests(unittest.TestCase):
                 self.assertIn(f'"{word}"', self.PROMPT)
 
     def test_length_budget_is_stated_as_a_hard_cap(self):
-        # İlk sürüm "40-70 kelime" diyordu ve 8 yanıtın 3'ü 73-75 kelimeye
-        # çıktı; sınırın katı olduğunu söylemek gerekiyor.
-        self.assertIn("EN ÇOK 70 KELİME", self.PROMPT)
-        self.assertIn("40 kelimenin altına da düşme", self.PROMPT)
+        # 2026-08-24 (3. sürüm): model artık yalnız NİTEL teşhis paragrafı
+        # yazıyor (tema/yüzde/şiddet MAHİR tarafından ayrıca ekleniyor, bkz.
+        # `test_theme_rate_and_severity_are_never_the_models_job`) - bu
+        # yüzden bütçe küçüldü, ama "katı sınır" dersi (İlk sürüm "40-70
+        # kelime" diyordu ve 8 yanıtın 3'ü 73-75 kelimeye çıktı) aynen geçerli.
+        self.assertIn("EN ÇOK 45 KELİME", self.PROMPT)
+        self.assertIn("15 kelimenin altına da düşme", self.PROMPT)
 
-    def test_theme_name_must_open_the_answer(self):
-        # Ölçüm: demirleme zorunluluğu tek başına tema adını yanıta sokmadı
-        # (2/8). Açılışı şart koşunca 7-8/8'e çıktı.
-        self.assertIn("tema adını tırnak içinde YAZARAK başla", self.PROMPT)
-        self.assertIn("SORU'dan birebir kopyala", self.PROMPT)
+    def test_theme_rate_and_severity_are_never_the_models_job(self):
+        # 2026-08-24 (3. sürüm): 2. sürümün {TEMA}/{ORAN}/{SIDDET} yer
+        # tutucu sözleşmesi canlı ölçümde tutmadı - küçük model yer
+        # tutucuları hiç kullanmadı, gerçek değerleri (yanlış olabilecek
+        # biçimde) kendi uydurdu. Bu yüzden model artık tema/yüzde/şiddeti
+        # PARAGRAFINDA HİÇ YAZMAMASI için açıkça yönlendiriliyor; bunları
+        # `pipeline.py::_compose_grounded_pedagogical_answer` modelin
+        # paragrafının dışında, kendi ürettiği bir kalıptan ekliyor - model
+        # bir daha bu değerleri hiç görmez/yazmaz, yanlış yazma riski de
+        # yapılandırılmış yer tutucu takip etme riski de yapısal olarak
+        # ortadan kalktı.
+        self.assertIn("PARAGRAFINDA HİÇ YAZMA", self.PROMPT)
+        self.assertNotIn("{TEMA}", self.PROMPT)
+        self.assertNotIn("{ORAN}", self.PROMPT)
+        self.assertNotIn("{SIDDET}", self.PROMPT)
+        self.assertNotIn("tema adını tırnak içinde YAZARAK başla", self.PROMPT)
 
     def test_prompt_gives_no_theme_name_as_an_example(self):
         # BU BİR HATA KAYDIDIR. Açılış kuralı önce örnekle yazılmıştı
@@ -449,9 +463,8 @@ class DiagnosisPromptContractTests(unittest.TestCase):
         self.assertIn("ne önererek ne de betimleyerek", self.PROMPT)
 
     def test_measured_mechanisms_survived(self):
-        # Bunlar ölçümde çalışıyordu (8/8 doğru şiddet, 0 öneri sızıntısı);
-        # prompt yeniden yazılırken düşmemeleri şart.
-        self.assertIn("Eksikliğin şiddeti: <etiket>.", self.PROMPT)
+        # Bunlar ölçümde çalışıyordu (0 öneri sızıntısı); prompt yeniden
+        # yazılırken düşmemeleri şart.
         self.assertIn("Bu bilgi belgede bulunmuyor.", self.PROMPT)
         self.assertIn("ÇÖZÜM ÖNERME", self.PROMPT)
         self.assertIn("tek akıcı paragraf", self.PROMPT)

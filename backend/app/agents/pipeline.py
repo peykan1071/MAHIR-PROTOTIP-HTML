@@ -14,6 +14,7 @@ hiçbiri LLM tarafından üretilmez veya değiştirilmez; her çağrı ilgili aj
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -594,15 +595,151 @@ def _sanitize_anomaly_finding(answer: str, valid_question_numbers: set[int]) -> 
     return "\n".join(accepted)
 
 
+# Model artık tema/yüzde/şiddeti hiç yazmıyor (canlı ölçümde yer tutucu
+# talimatını izlemediği, gerçek değerleri kendi uydurduğu görüldü - küçük bir
+# modelin "burada literal {TEMA} yaz" gibi alışılmadık bir talimatı güvenilir
+# biçimde izlemesi beklenemez). Bunun yerine MAHIR, modelin yalnız NİTEL
+# içerik ürettiği paragrafı DEĞİŞKEN bir açılış/kapanış kalıbıyla sarar - tema
+# adı, yüzde ve şiddet etiketi HİÇBİR ZAMAN modelden gelmez.
+_OPENING_TEMPLATES = (
+    '"{theme}" temasında sınıfın başarı oranı %{percent} olarak hesaplanmıştır.',
+    '"{theme}" temasındaki başarı oranı %{percent} olarak hesaplanmıştır.',
+    'Sınıfın "{theme}" temasındaki başarı oranı %{percent} olarak hesaplanmıştır.',
+    '"{theme}" temasında ölçülen başarı oranı %{percent} olarak hesaplanmıştır.',
+)
+_WEAK_CLOSING_TEMPLATES = (
+    "Eksikliğin şiddeti: {severity}. Bu performans, seçilen öğrenme çıktısının sonraki süreçleri açısından sarmal risk taşır.",
+    "Eksikliğin şiddeti: {severity}. Bu durum, ileri düzey kazanımlar için sarmal bir risk oluşturmaktadır.",
+    "Eksikliğin şiddeti: {severity}. Bu eksiklik, sonraki öğrenme süreçlerine sarmal biçimde yansıyabilir.",
+)
+_STRONG_CLOSING_TEMPLATES = (
+    "Bu sonuç, seçilen öğrenme çıktısında güçlü bir performans alanını gösterir.",
+    "Bu veriler, seçilen öğrenme çıktısında sağlam bir kazanım düzeyine işaret eder.",
+    "Sınıf, seçilen öğrenme çıktısında bu alanda belirgin bir başarı sergilemektedir.",
+)
+
+
+def _pick_template(templates: tuple[str, ...], *seed_parts: str) -> str:
+    """`seed_parts`e göre belirlenimci bir kalıp seçer - aynı girdi her zaman
+    aynı kalıbı almalı, aksi hâlde bir raporu iki kez üretmek farklı metin
+    verirdi. `hash()` kasıtlı olarak kullanılmıyor: Python'da string hash'i
+    çalışmalar arası rastgele tohumlanır, `md5` deterministiktir."""
+
+    digest = hashlib.md5("|".join(seed_parts).encode("utf-8")).hexdigest()
+    return templates[int(digest, 16) % len(templates)]
+
+
+# Grounding ölçümünde SAYILMAYAN sözcükler: her pedagojik cümlede geçtikleri
+# için kaynakla örtüşmeleri hiçbir şey kanıtlamaz. Önek olarak eşleştirilir
+# (Türkçe çekim ekleri yüzünden), bu yüzden liste kökleri taşır.
+_GENERIC_WORD_PREFIXES = (
+    # Her pedagojik cümlede geçen alan sözcükleri.
+    "öğrenc", "öğretm", "metin", "metni", "metne", "beceri", "başar", "oran",
+    "düzey", "durum", "süreç", "sınıf", "kazanım", "öğrenme", "eksik", "performans",
+    "ilgili", "şekil", "bakım", "göster", "belirt", "bulun", "yapıl",
+    "gerçekleş", "önemli", "temas", "tema", "konus", "konu", "veril", "edilm",
+    "değerlend", "çalışma", "yeterl", "gelişim", "sonuç", "alan",
+    # Dört harf ve üzeri işlev sözcükleri: uzunluk süzgecinden geçerler ama
+    # kaynakla örtüşmeleri hiçbir şey kanıtlamaz.
+    "gibi", "için", "olarak", "olan", "olup", "daha", "ancak", "fakat", "veya",
+    "kadar", "sonra", "önce", "üzere", "ayrıca", "yani", "birlikte", "böyle",
+    "şöyle", "bunun", "bunlar", "onlar", "hangi", "diğer", "tüm",
+)
+
+# Grounding eşiği: teşhis metni ile kaynak arasında paylaşılması gereken
+# AYIRT EDİCİ sözcük sayısı. Üç, bir cümlenin tesadüfen değil gerçekten
+# müfredat metninden beslendiğini gösterecek kadar; iyi teşhisleri elemeyecek
+# kadar da düşük (ölçülen gerçek örneklerde 7+ örtüşme görüldü).
+_MIN_GROUNDED_WORDS = 3
+
+_WORD_PATTERN = re.compile(r"[\wÇĞİÖŞÜçğıöşü]+", re.UNICODE)
+
+
+def _content_words(text: str) -> list[str]:
+    """Metnin grounding ölçümünde sayılan sözcüklerini döndürür.
+
+    Dört karakterden kısa sözcükler (bağlaç/edat) ve `_GENERIC_WORD_PREFIXES`
+    ile başlayanlar elenir - geriye yalnız o kazanıma özgü olabilecek
+    içerik sözcükleri kalır.
+    """
+
+    words = _WORD_PATTERN.findall(_normalize_evidence_text(text))
+    return [
+        word for word in words
+        if len(word) >= 4
+        and not word.isdigit()
+        and not any(word.startswith(prefix) for prefix in _GENERIC_WORD_PREFIXES)
+    ]
+
+
+def _shares_root(left: str, right: str) -> bool:
+    """İki sözcüğün aynı kökten geldiğini gevşek biçimde kabul eder.
+
+    Türkçe eklemeli olduğundan tam eşleşme aranmaz: biri diğerinin öneki
+    ise (ör. "unsurları" / "unsurlarını", "çözümleyebilme" /
+    "çözümleyebilmek") aynı kök sayılır. En az dört karakter şartı, kısa
+    tesadüfi örtüşmeleri engeller.
+    """
+
+    return min(len(left), len(right)) >= 4 and (left.startswith(right) or right.startswith(left))
+
+
+def _grounded_word_overlap(diagnosis: str, evidence: str) -> list[str]:
+    """Teşhis metninin kaynakla paylaştığı ayırt edici sözcükleri döndürür.
+
+    Kanıt garantisinin ÖLÇÜLDÜĞÜ yer burası. Önceki tasarımda model kendi
+    kullandığı terimleri `groundedTerms` alanında BEYAN ediyor, MAHİR de o
+    beyanı doğruluyordu; canlı ölçümde model beyanı defalarca yanlış
+    doldurdu (kendi cümlesinden aldığı, hatta olumsuz çekimli ifadeler
+    yazdı - müfredatta böyle geçmesi imkânsız) ve aslında kaynağa dayalı
+    olan iyi teşhisler bu yüzden elendi. Artık beyan istenmiyor: MAHİR
+    doğrudan metnin kendisini ölçüyor, yani garanti modelin uyumuna hiç
+    bağlı değil.
+    """
+
+    evidence_words = _content_words(evidence)
+    matched: list[str] = []
+    for word in _content_words(diagnosis):
+        if any(_shares_root(word, evidence_word) for evidence_word in evidence_words):
+            if not any(_shares_root(word, seen) for seen in matched):
+                matched.append(word)
+    return matched
+
+
+def _note_reason(reasons: list[str] | None, code: str) -> None:
+    """Ret sebebini (varsa) çağıranın listesine düşürür.
+
+    `backend/run_diagnosis_test.py` bunu kullanarak "neden reddedildi"yi
+    doğrudan terminale yazar - aksi hâlde her başarısız üretim, ham çıktıyı
+    elle inceleyip hangi kuralın tetiklendiğini tahmin etmeyi gerektiriyor.
+    Üretim yolunda çağıranlar `None` geçer ve hiçbir maliyeti olmaz.
+    """
+
+    if reasons is not None:
+        reasons.append(code)
+
+
 def _compose_grounded_pedagogical_answer(
     answer: str,
     outcome: dict[str, Any],
     sources: list[dict[str, Any]],
+    reasons: list[str] | None = None,
 ) -> str:
-    """LLM'nin seçtiği iki kaynak teriminden güvenli rapor paragrafı kurar.
+    """Modelin yazdığı nitel teşhis paragrafını, MAHİR'in ürettiği tema/oran/
+    şiddet cümleleriyle sarıp nihai rapor metnini kurar.
 
-    Terimler kaynak alıntılarında birebir bulunmuyorsa hiçbir metin üretilmez.
-    Başarı oranı ve şiddet modelden değil, ölçme motorunun sonucundan alınır.
+    Model yalnız NİTEL teşhisi yazar: tema adı, başarı oranı ve şiddet
+    etiketi HİÇBİR ZAMAN modelden gelmez - MAHIR tarafından, kazanıma göre
+    belirlenimci seçilen bir kalıptan üretilir.
+
+    Kanıt garantisi `_grounded_word_overlap` ile ÖLÇÜLÜR: teşhis metninin
+    kendisi, getirilen müfredat alıntılarıyla en az `_MIN_GROUNDED_WORDS`
+    ayırt edici sözcük paylaşmak zorunda. Modelden "hangi terimleri
+    kullandım" beyanı istenmez - o tasarım canlı ölçümde defalarca yanlış
+    dolduruldu ve iyi teşhisleri eledi.
+
+    `reasons` verilirse her ret dalı oraya bir sebep kodu yazar (bkz.
+    `_note_reason`); üretim yolu bunu kullanmaz.
     """
 
     candidate = answer.strip()
@@ -614,35 +751,64 @@ def _compose_grounded_pedagogical_answer(
         # devamındaki serbest metin rapora hiçbir koşulda taşınmaz.
         payload, _unused_tail = json.JSONDecoder().raw_decode(candidate)
     except (TypeError, ValueError, json.JSONDecodeError):
+        _note_reason(reasons, "json-ayristirilamadi (model geçerli JSON döndürmedi)")
         return ""
-    terms = payload.get("evidenceTerms") if isinstance(payload, dict) else None
-    if not isinstance(terms, list) or len(terms) != 2:
-        return ""
-    terms = [" ".join(str(term).split()).strip(" .,:;\"'") for term in terms]
-    if any(not term or len(term) > 90 for term in terms) or terms[0].casefold() == terms[1].casefold():
+    if not isinstance(payload, dict):
+        _note_reason(reasons, "json-nesne-degil")
         return ""
 
+    diagnosis = " ".join(str(payload.get("diagnosis") or "").split()).strip()
+    if not diagnosis:
+        _note_reason(reasons, "diagnosis-alani-bos")
+        return ""
+    # Canlı ölçümde model eski bir yer tutucu tasarımının kalıntısı olarak
+    # "{TEMA}" gibi süslü parantezli metin yazmayı denedi (bkz. `prompts.py`
+    # DIAGNOSIS_SYSTEM_PROMPT'un tarihçesi). Doğal Türkçe düzyazıda süslü
+    # parantezin hiçbir meşru kullanımı yok - varlığı öğretmene giden metinde
+    # çirkin bir kalıntı bırakır, bu yüzden tüm yanıt reddedilir.
+    if "{" in diagnosis or "}" in diagnosis:
+        _note_reason(reasons, "susulu-parantez-kalintisi (model yer tutucu yazdı)")
+        return ""
+    # Promptun açık yasağına rağmen canlı ölçümde model tekrar tekrar
+    # nedensellik iddiası kurdu (ör. "...nedeniyle %3 başarı oranı elde
+    # ediyorlar") - tüm yanıtı atmak yerine yalnız o cümleyi kırp, geri
+    # kalan (genelde iyi) içeriği koru.
+    diagnosis, stripped_scope_sentences = _strip_scope_violations(diagnosis)
+    if not diagnosis:
+        _note_reason(reasons, "kapsam-kirpmasi-bosaltti (tüm cümleler nedensellik/öneri dili içeriyordu)")
+        return ""
+    if stripped_scope_sentences:
+        _note_reason(reasons, f"bilgi: {stripped_scope_sentences} cümle nedensellik/öneri dili nedeniyle kırpıldı")
+
+    # KANIT GARANTİSİ: teşhis metninin kendisi kaynakla yeterince örtüşüyor mu.
     evidence = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
-    normalized_evidence = _normalize_evidence_text(evidence)
-    if any(_normalize_evidence_text(term) not in normalized_evidence for term in terms):
+    grounded_words = _grounded_word_overlap(diagnosis, evidence)
+    if len(grounded_words) < _MIN_GROUNDED_WORDS:
+        _note_reason(
+            reasons,
+            f"kaynak-ortusmesi-yetersiz ({len(grounded_words)}/{_MIN_GROUNDED_WORDS} "
+            f"ayırt edici sözcük; bulunan: {grounded_words})",
+        )
+        return ""
+    _note_reason(reasons, f"bilgi: kaynakla örtüşen ayırt edici sözcükler: {grounded_words}")
+
+    theme = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", str(outcome.get("outcomeTheme") or ""), flags=re.IGNORECASE).strip()
+    if not theme:
+        _note_reason(reasons, "tema-cozulemedi")
         return ""
 
     rate = float(outcome.get("successRate") or 0.0)
     percent = round(rate * 100)
-    theme = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", str(outcome.get("outcomeTheme") or ""), flags=re.IGNORECASE).strip()
-    if not theme:
-        return ""
-    first = (
-        f'"{theme}" temasında {terms[0]} ve {terms[1]} kapsamındaki '
-        f"sınıf başarı oranı %{percent} olarak hesaplanmıştır."
-    )
+    code = str(outcome.get("outcomeCode") or "")
+    opening = _pick_template(_OPENING_TEMPLATES, code, theme).format(theme=theme, percent=percent)
+
     if rate < 0.70:
         severity = "Kritik" if rate < 0.50 else "Orta"
-        return (
-            f"{first} Eksikliğin şiddeti: {severity}. "
-            "Bu performans, seçilen öğrenme çıktısının sonraki süreçleri açısından sarmal risk taşır."
-        )
-    return f"{first} Bu sonuç, seçilen öğrenme çıktısında güçlü bir performans alanını gösterir."
+        closing = _pick_template(_WEAK_CLOSING_TEMPLATES, code, theme, "weak").format(severity=severity)
+    else:
+        closing = _pick_template(_STRONG_CLOSING_TEMPLATES, code, theme, "strong")
+
+    return f"{opening} {diagnosis} {closing}"
 
 
 def _normalize_evidence_text(value: str) -> str:
@@ -723,17 +889,19 @@ def _enqueue_diagnosis_prompts(
                 )
                 + f"SORU: {question}\n\nYalnızca bu sınav türü, seçilmiş öğrenme çıktısı ve yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla."
                 + (
-                    "\n\nYANIT SÖZLEŞMESİ: Paragraf yazma. Yalnız geçerli JSON döndür: "
-                    "{\"evidenceTerms\":[\"BAĞLAMDA AYNEN GEÇEN TERİM 1\",\"BAĞLAMDA AYNEN GEÇEN TERİM 2\"]}. "
-                    "Her terim BAĞLAM içinde kesintisiz ve birebir geçen kısa bir ifade olmalı; sözcük türetme, "
-                    "ek değiştirme, özetleme veya iki ayrı parçayı birleştirme. "
-                    "Kod, oran, şiddet, neden, yorum, risk, etkinlik, çözüm veya öneri ekleme. Markdown kullanma."
+                    "\n\nYANIT SÖZLEŞMESİ: Yalnız geçerli JSON döndür: "
+                    "{\"diagnosis\":\"tema/yüzde/şiddet İÇERMEYEN, yalnız nitel teşhis paragrafı\"}. "
+                    "Tema adı, yüzde sayısı veya şiddet kelimesi yazma - bunlar ayrıca ekleniyor. "
+                    "Eksikliği orana \"nedeniyle\", \"bu yüzden\", \"dolayısıyla\" gibi bağlaçlarla "
+                    "BAĞLAMA. BAĞLAM'daki müfredat sözcüklerini kendi sözcüklerinle değiştirmeden "
+                    "kullan. Markdown kullanma."
                     if is_weak else
-                    "\n\nYANIT SÖZLEŞMESİ: Paragraf yazma. Yalnız geçerli JSON döndür: "
-                    "{\"evidenceTerms\":[\"BAĞLAMDA AYNEN GEÇEN TERİM 1\",\"BAĞLAMDA AYNEN GEÇEN TERİM 2\"]}. "
-                    "Her terim BAĞLAM içinde kesintisiz ve birebir geçen kısa bir ifade olmalı; sözcük türetme, "
-                    "ek değiştirme, özetleme veya iki ayrı parçayı birleştirme. "
-                    "Kod, oran, neden, yorum, etkinlik, çözüm veya öneri ekleme. Markdown kullanma."
+                    "\n\nYANIT SÖZLEŞMESİ: Yalnız geçerli JSON döndür: "
+                    "{\"diagnosis\":\"tema/yüzde İÇERMEYEN, yalnız nitel teşhis paragrafı\"}. Tema "
+                    "adı veya yüzde sayısı yazma - bunlar ayrıca ekleniyor. Anlattığın başarıyı orana "
+                    "\"nedeniyle\", \"bu yüzden\", \"dolayısıyla\" gibi bağlaçlarla BAĞLAMA. "
+                    "BAĞLAM'daki müfredat sözcüklerini kendi sözcüklerinle değiştirmeden kullan. "
+                    "Markdown kullanma."
                 )
             ),
             "retrieval": {
@@ -752,42 +920,80 @@ def _enqueue_diagnosis_prompts(
     return targets
 
 
-def _answer_matches_outcome_scope(answer: str, outcome: dict[str, Any]) -> bool:
+# Toplu başarı oranı performans düzeyini gösterir; hatanın nedenini,
+# öğrenci niyetini veya öğrenci sayısını kanıtlamaz.
+_UNSUPPORTED_CLAIM_PATTERNS = (
+    "temel neden", "temel sebep", "nedeni", "sebebi", "kaynaklan",
+    "öğrencilerin say", "öğrenci say", "yetersiz bilgi",
+)
+# MAHİR tanı koyabilir fakat öğretmene etkinlik/telafi işi yazamaz.
+_ACTION_LANGUAGE_PATTERNS = (
+    "etkinlik", "aktivite", "alıştırma", "uygulama çalış",
+    "telafi", "önerilir", "tavsiye", "yapılmalı", "verilmeli",
+    "geliştirilmeli", "desteklenmeli", "gerekmektedir", "gereklidir",
+    "ihtiyaç duyul",
+)
+
+
+def _strip_scope_violations(text: str) -> tuple[str, int]:
+    """Nedensellik iddiası veya öneri/etkinlik dili taşıyan cümleleri
+    paragraftan çıkarır; geri kalanı korur.
+
+    Aynı `charter_guard.strip_recommendation_sentences` tekniği: canlı
+    ölçümde model, prompttaki açık yasağa (bkz. DIAGNOSIS_SYSTEM_PROMPT
+    madde 3) rağmen "...nedeniyle %3 başarı oranı elde ediyorlar" gibi
+    nedensellik iddiası kurmaya devam etti - küçük bir modelin bir OLUMSUZ
+    talimatı güvenilir biçimde izlemesi beklenemez. `_answer_matches_
+    outcome_scope`nin ikili ret/kabulüne bırakılsaydı, aksi hâlde iyi olan
+    tüm teşhis TEK kötü cümle yüzünden kaybedilirdi; bunun yerine yalnız o
+    cümle atılır."""
+
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    kept = [
+        sentence for sentence in sentences
+        if not any(term in sentence.casefold() for term in _UNSUPPORTED_CLAIM_PATTERNS + _ACTION_LANGUAGE_PATTERNS)
+    ]
+    return " ".join(kept).strip(), len(sentences) - len(kept)
+
+
+def _answer_matches_outcome_scope(
+    answer: str, outcome: dict[str, Any], reasons: list[str] | None = None
+) -> bool:
     """Pedagojik LLM yanıtının güvenli yayın sözleşmesine uyduğunu doğrula.
 
-    Model metni burada düzeltilmez. Uzunluk, öneri/etkinlik dili, başarı
-    oranından kanıtlanamayacak nedensellik veya kapsam sapması varsa yanıtın
-    tamamı elenir. Böylece akıcı görünen fakat kanıtı aşan bir metin rapora
-    taşınmaz.
+    Model metni burada düzeltilmez (bkz. `_strip_scope_violations` - o adım
+    burada değil, `_compose_grounded_pedagogical_answer` içinde, sarmadan
+    ÖNCE çalışır). Bu fonksiyon yalnız SON bir güvenlik ağı: uzunluk, kalan
+    öneri/etkinlik dili, nedensellik iddiası veya kapsam sapması varsa
+    yanıtın tamamı elenir.
+
+    `reasons` verilirse ret sebebi oraya yazılır (bkz. `_note_reason`).
     """
 
     normalized = " ".join(answer.casefold().split())
     word_count = len(re.findall(r"\b[\wÇĞİÖŞÜçğıöşü]+(?:['’][\wÇĞİÖŞÜçğıöşü]+)?\b", answer))
     is_weak = float(outcome.get("successRate") or 0.0) < 0.70
-    if word_count > (70 if is_weak else 60):
+    # Modelin kendi paragrafı (en çok 45/35 kelime, bkz. DIAGNOSIS_SYSTEM_
+    # PROMPT/STRENGTH_SYSTEM_PROMPT) artık MAHİR'in ürettiği açılış+kapanış
+    # cümleleriyle sarılıyor (bkz. `_compose_grounded_pedagogical_answer`) -
+    # sınır o toplamı karşılayacak kadar geniş tutulur.
+    limit = 90 if is_weak else 70
+    if word_count > limit:
+        _note_reason(reasons, f"uzunluk-asimi ({word_count} kelime, sınır {limit})")
         return False
 
-    # Toplu başarı oranı performans düzeyini gösterir; hatanın nedenini,
-    # öğrenci niyetini veya öğrenci sayısını kanıtlamaz.
-    unsupported_claims = (
-        "temel neden", "temel sebep", "nedeni", "sebebi", "kaynaklan",
-        "öğrencilerin say", "öğrenci say", "yetersiz bilgi",
-    )
-    # MAHİR tanı koyabilir fakat öğretmene etkinlik/telafi işi yazamaz.
-    action_language = (
-        "etkinlik", "aktivite", "alıştırma", "uygulama çalış",
-        "telafi", "önerilir", "tavsiye", "yapılmalı", "verilmeli",
-        "geliştirilmeli", "desteklenmeli", "gerekmektedir", "gereklidir",
-        "ihtiyaç duyul",
-    )
-    if any(term in normalized for term in unsupported_claims + action_language):
+    hits = [term for term in _UNSUPPORTED_CLAIM_PATTERNS + _ACTION_LANGUAGE_PATTERNS if term in normalized]
+    if hits:
+        _note_reason(reasons, f"nedensellik-veya-eylem-dili: {hits}")
         return False
 
     allowed_codes = {
         str(value).upper() for value in (outcome.get("outcomeCode"), outcome.get("parentOutcomeCode")) if value
     }
     mentioned_codes = {code.upper() for code in re.findall(r"\bTDE\d+(?:\.\d+)+\b", answer, re.IGNORECASE)}
-    if mentioned_codes - allowed_codes:
+    leaked_codes = mentioned_codes - allowed_codes
+    if leaked_codes:
+        _note_reason(reasons, f"kod-sizintisi: {sorted(leaked_codes)} (izinli: {sorted(allowed_codes)})")
         return False
     component = str(outcome.get("componentType") or "").lower()
     forbidden = {
@@ -798,7 +1004,11 @@ def _answer_matches_outcome_scope(answer: str, outcome: dict[str, Any]) -> bool:
         "speaking": ("okuma beceri", "yazma beceri", "dinleme/izleme beceri", "dinleme beceri"),
     }.get(component, ())
     selected_text = " ".join(str(outcome.get(key) or "") for key in ("outcomeDescription", "parentOutcomeDescription")).casefold()
-    return not any(term in normalized and term not in selected_text for term in forbidden)
+    drifted = [term for term in forbidden if term in normalized and term not in selected_text]
+    if drifted:
+        _note_reason(reasons, f"capraz-beceri-sizintisi: {drifted} (bileşen: {component})")
+        return False
+    return True
 
 
 def issues_to_ced_validation(issues: list[AgentIssue]) -> list[CEDValidationIssue]:

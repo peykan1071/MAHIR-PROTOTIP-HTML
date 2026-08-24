@@ -93,31 +93,66 @@ def _llm_patch(**kwargs):
 
 
 class RagContextAttachmentTests(unittest.TestCase):
-    def test_structured_evidence_builds_deterministic_diagnosis(self):
+    """Kanıt garantisi 2026-08-24'te ÖLÇÜLEN bir şeye dönüştü.
+
+    Önceki tasarımda model kendi kullandığı terimleri `groundedTerms`
+    alanında BEYAN ediyor, MAHİR de o beyanı kaynağa karşı doğruluyordu.
+    Canlı ölçümde model beyanı defalarca yanlış doldurdu - kendi
+    cümlesinden aldığı, hatta olumsuz çekimli ifadeler yazdı ("...
+    kullanamaması", "...yer vermemesi"; müfredatta böyle geçmesi imkânsız)
+    ve aslında kaynağa dayalı olan iyi teşhisler bu yüzden elendi.
+
+    Artık beyan istenmiyor: `_grounded_word_overlap` teşhis metninin
+    KENDİSİ ile kaynak alıntıları arasındaki ayırt edici sözcük örtüşmesini
+    ölçüyor. Garanti modelin uyumuna hiç bağlı değil - model kanıtı
+    "iddia" edemez, MAHİR ölçer.
+    """
+
+    def test_grounded_diagnosis_is_wrapped_with_deterministic_facts(self):
         outcome = {
             "outcomeCode": "TDE2.2",
             "outcomeTheme": "2. Tema: Anlam Arayışı",
             "successRate": 0.20,
         }
-        answer = '{"evidenceTerms":["ana duygu","ana düşünce"]}'
-        sources = [{"excerpt": "Metinde konu, ana duygu ve ana düşünce bir bütünün parçalarıdır."}]
+        # Model yalnız nitel teşhis yazar; tema/yüzde/şiddet MAHİR'den gelir.
+        answer = (
+            '{"diagnosis":"Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır."}'
+        )
+        sources = [{"excerpt": "Metinde konu, ana duygu ve ana düşünce bütünlük içinde ele alınır."}]
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
         self.assertIn('"Anlam Arayışı"', result)
         self.assertIn("%20 olarak hesaplanmıştır", result)
         self.assertIn("Eksikliğin şiddeti: Kritik.", result)
+        self.assertIn("Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır.", result)
         self.assertNotIn("etkinlik", result)
 
-    def test_unverified_evidence_term_is_rejected(self):
+    def test_diagnosis_sharing_too_little_with_the_source_is_rejected(self):
+        # Genel geçer, her kazanıma yazılabilecek bir cümle: kaynakla
+        # ayırt edici hiçbir sözcük paylaşmıyor.
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
         sources = [{"excerpt": "Metinde ana duygu ve ana düşünce belirlenir."}]
-        self.assertEqual(
-            _compose_grounded_pedagogical_answer(
-                '{"evidenceTerms":["ana duygu","edebiyat atölyesi"]}', outcome, sources
-            ),
-            "",
-        )
+        answer = '{"diagnosis":"Öğrenciler bu alanda yeterli düzeye ulaşamamıştır."}'
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources), "")
 
-    def test_non_json_model_paragraph_is_rejected_when_structured_evidence_is_expected(self):
+    def test_negated_curriculum_vocabulary_still_counts_as_grounded(self):
+        # Zayıf çıktı teşhisleri DOĞASI gereği müfredatın olumlu ifadesini
+        # olumsuzlar ("tahlil edebilme" -> "tahlil edememekte"). Sözcük
+        # köküne dayalı ölçüm bunu doğru biçimde kanıtlı sayar.
+        outcome = {"outcomeTheme": "3. Tema: Anlamın Yapı Taşları", "successRate": 0.03}
+        sources = [{
+            "excerpt": (
+                "Öğrencilerin metinleri olay, kişi, mekân, zaman gibi yapı "
+                "unsurları bakımından tahlil edebilmeleri amaçlanmaktadır."
+            )
+        }]
+        answer = (
+            '{"diagnosis":"Olay, kişi, mekân ve zaman unsurları bakımından tahlil '
+            'edememektedirler."}'
+        )
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertIn("tahlil edememektedirler", result)
+
+    def test_non_json_model_paragraph_is_rejected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
         self.assertEqual(
             _compose_grounded_pedagogical_answer(
@@ -130,12 +165,45 @@ class RagContextAttachmentTests(unittest.TestCase):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.40}
         sources = [{"excerpt": "Okuma stratejisi ile metinleri inceleme birlikte ele alınır."}]
         answer = (
-            '{"evidenceTerms":["Okuma stratejisi","metinleri inceleme"]}\n\n'
+            '{"diagnosis":"Okuma stratejisi ve inceleme birlikteliği sınırlı '
+            'kalmaktadır."}\n\n'
             "Bu bölüm modelin kaynak dışına çıkabilen serbest açıklamasıdır."
         )
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
-        self.assertIn("Okuma stratejisi ve metinleri inceleme", result)
+        self.assertIn("Okuma stratejisi ve inceleme birlikteliği", result)
         self.assertNotIn("serbest açıklama", result)
+
+    def test_causal_overclaim_sentence_is_stripped_not_the_whole_answer(self):
+        # Canlı ölçüm: promptun açık yasağına rağmen model "...nedeniyle %3
+        # başarı oranı elde ediyorlar" gibi nedensellik iddiası kurmaya
+        # devam etti. Tüm yanıtı atmak yerine yalnız o cümle kırpılır, geri
+        # kalan (iyi) içerik korunur.
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "Metinde ana duygu ve ana düşünce bütünlük içinde ele alınır."}]
+        answer = (
+            '{"diagnosis":"Ana duygu, ana düşünce ve bütünlük ilişkisi '
+            'kurulamamaktadır. Bu, ayırt edememe nedeniyle ortaya çıkmıştır."}'
+        )
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertIn("Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır.", result)
+        self.assertNotIn("nedeniyle", result)
+
+    def test_missing_diagnosis_is_rejected(self):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "ana duygu"}]
+        self.assertEqual(_compose_grounded_pedagogical_answer("{}", outcome, sources), "")
+
+    def test_model_still_writing_placeholder_syntax_is_rejected(self):
+        # 2026-08-24: canlı ölçümde model bir önceki tasarımın {TEMA}/{ORAN}/
+        # {SIDDET} yer tutucularını hiç kullanmadı, gerçek değerleri kendi
+        # uydurdu - bu yüzden yer tutucu sözleşmesi tamamen kaldırıldı. Model
+        # yine de eski alışkanlıkla süslü parantez yazarsa (ör. "{TEMA}"),
+        # bu çirkin bir kalıntı olarak öğretmene gitmesin diye tüm yanıt
+        # reddedilir.
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        sources = [{"excerpt": "ana duygu metinde geçer."}]
+        answer = '{"diagnosis":"{TEMA} temasında ana duygu belirsizdir.","groundedTerms":["ana duygu"]}'
+        self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources), "")
 
     def test_ragcontext_field_always_present_even_without_remote_url(self):
         # MAHIR_RAG_REMOTE_URL artık koda gömülü bir varsayılana sahip (bkz.
@@ -184,8 +252,10 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertTrue(_answer_matches_outcome_scope("TDE3.3 konuşma becerisi güçlüdür.", outcome))
 
     def test_overlong_pedagogical_answer_is_rejected(self):
+        # MAHİR'in ürettiği açılış+kapanış cümleleriyle sarıldığından (bkz.
+        # `_compose_grounded_pedagogical_answer`) sınır 70'ten 90'a çıktı.
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
-        answer = " ".join(["kanıt"] * 71)
+        answer = " ".join(["kanıt"] * 91)
         self.assertFalse(_answer_matches_outcome_scope(answer, outcome))
 
     def test_causal_overclaim_and_student_count_are_rejected(self):
