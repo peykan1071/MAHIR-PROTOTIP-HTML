@@ -10,10 +10,10 @@ from xml.etree import ElementTree
 from .parsing_utils import (
     TOTAL_MISMATCH_TOLERANCE,
     calculate_total,
-    normalise_label,
-    parse_integer,
-    parse_number,
-    question_number,
+    _normalise_label,
+    _integer,
+    _number,
+    _question_number,
 )
 
 WORD_NAMESPACE = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
@@ -51,7 +51,7 @@ def parse_mahir_docx(content: bytes) -> dict[str, object]:
     if exam_table:
         identity_cells.extend(cell for row in exam_table for cell in row)
     if identity_cells:
-        headings = {normalise_label(cell) for cell in identity_cells}
+        headings = {_normalise_label(cell) for cell in identity_cells}
         identity_columns = []
         if headings & {"tc kimlik no", "t c kimlik no", "tc kimlik numarasi", "t c kimlik numarasi", "tckn"}:
             identity_columns.append("T.C. kimlik numarası")
@@ -92,7 +92,7 @@ def _find_table(
     for table in tables:
         if not table:
             continue
-        labels = {normalise_label(cell) for cell in table[0]}
+        labels = {_normalise_label(cell) for cell in table[0]}
         if required_labels.issubset(labels):
             return table
     return None
@@ -105,7 +105,7 @@ def _find_exam_table(tables: list[list[list[str]]]) -> list[list[str]] | None:
         "il ilce", "okul", "egitim yili", "sinif ders",
     }
     for table in tables:
-        labels = {normalise_label(cell) for row in table for cell in row}
+        labels = {_normalise_label(cell) for row in table for cell in row}
         if len(labels & metadata_labels) >= 2:
             return table
     return None
@@ -115,9 +115,9 @@ def _find_student_table(tables: list[list[list[str]]]) -> list[list[str]] | None
     for table in tables:
         if not table:
             continue
-        labels = {normalise_label(cell) for cell in table[0]}
+        labels = {_normalise_label(cell) for cell in table[0]}
         has_number = any(label in {"okul no", "ogrenci no", "numara", "no"} for label in labels)
-        has_score = any(question_number(label) is not None for label in labels)
+        has_score = any(_question_number(label) is not None for label in labels)
         if has_number and has_score:
             return table
     return None
@@ -145,7 +145,7 @@ def _find_single_student_score_table(
     for table in tables:
         if len(table) < 3:
             continue
-        row_labels = {normalise_label(row[0]) for row in table if row}
+        row_labels = {_normalise_label(row[0]) for row in table if row}
         if {"sorular", "azami puan", "ogrencinin aldigi puan"}.issubset(row_labels):
             return table
     return None
@@ -201,7 +201,7 @@ def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
         "term": _selected_option(values.get("donem", "")),
         "examType": _normalise_exam_type(_selected_option(values.get("sinav turu", ""))),
         "examDate": values.get("sinav tarihi", ""),
-        "totalMaxScore": parse_number(values.get("toplam puan", "")),
+        "totalMaxScore": _number(values.get("toplam puan", "")),
         "teacherName": values.get("ogretmenin adi soyadi", ""),
         "teachingProgram": values.get("ogretim programi", ""),
         "assessmentBasis": values.get("olcme ve degerlendirme dayanagi", ""),
@@ -231,7 +231,7 @@ def _labeled_values(rows: list[list[str]]) -> dict[str, str]:
     values: dict[str, str] = {}
     for row in rows:
         for index in range(0, len(row) - 1, 2):
-            label = normalise_label(row[index])
+            label = _normalise_label(row[index])
             if label:
                 values[label] = row[index + 1].strip()
     return values
@@ -281,8 +281,8 @@ def _questions_from_student_headings(rows: list[list[str]]) -> list[dict[str, ob
         return []
     questions = []
     for cell in rows[0]:
-        label = normalise_label(cell)
-        number = question_number(label)
+        label = _normalise_label(cell)
+        number = _question_number(label)
         if number is None:
             continue
         questions.append(
@@ -303,18 +303,18 @@ def _parse_single_student_questions(rows: list[list[str]]) -> list[dict[str, obj
     if not rows:
         return []
     question_row = next(
-        (row for row in rows if row and normalise_label(row[0]) == "sorular"), []
+        (row for row in rows if row and _normalise_label(row[0]) == "sorular"), []
     )
     max_row = next(
-        (row for row in rows if row and normalise_label(row[0]) == "azami puan"), []
+        (row for row in rows if row and _normalise_label(row[0]) == "azami puan"), []
     )
     questions = []
     for index, cell in enumerate(question_row[1:], start=1):
-        label = normalise_label(cell)
-        number = question_number(label)
+        label = _normalise_label(cell)
+        number = _question_number(label)
         if number is None:
             continue
-        max_score = parse_number(max_row[index]) if index < len(max_row) else None
+        max_score = _number(max_row[index]) if index < len(max_row) else None
         questions.append(
             {
                 "number": number,
@@ -338,16 +338,16 @@ def _parse_single_student_scores(
         (
             row
             for row in score_rows
-            if row and normalise_label(row[0]) == "ogrencinin aldigi puan"
+            if row and _normalise_label(row[0]) == "ogrencinin aldigi puan"
         ),
         [],
     )
     if not score_row:
         return []
     question_count = len(_parse_single_student_questions(score_rows))
-    scores = [parse_number(value) for value in score_row[1 : 1 + question_count]]
+    scores = [_number(value) for value in score_row[1 : 1 + question_count]]
     total_score = (
-        parse_number(score_row[1 + question_count])
+        _number(score_row[1 + question_count])
         if len(score_row) > 1 + question_count
         else None
     )
@@ -405,7 +405,7 @@ def _parse_students_flexible(
 
     if not rows:
         return []
-    headings = [normalise_label(cell) for cell in rows[0]]
+    headings = [_normalise_label(cell) for cell in rows[0]]
 
     def find_index(predicate) -> int | None:
         return next((index for index, label in enumerate(headings) if predicate(label)), None)
@@ -415,7 +415,7 @@ def _parse_students_flexible(
     total_index = find_index(lambda label: label == "puan" or label.startswith("toplam"))
     score_indexes = [
         index for index, label in enumerate(headings)
-        if question_number(label) is not None
+        if _question_number(label) is not None
     ]
     explicit_question_numbers = {
         int(question["number"])
@@ -432,7 +432,7 @@ def _parse_students_flexible(
 
     for source_row in rows[1:]:
         row = source_row + [""] * max(0, len(headings) - len(source_row))
-        scores = [parse_number(row[index]) for index in score_indexes]
+        scores = [_number(row[index]) for index in score_indexes]
         student_no = row[number_index].strip() if number_index is not None else ""
         total_score = _number(row[total_index]) if total_index is not None else None
         first_cell = _normalise_label(row[0]) if row else ""
@@ -442,7 +442,7 @@ def _parse_students_flexible(
             continue
         students.append(
             {
-                "rowNumber": parse_integer(row[row_index]) if row_index is not None else len(students) + 1,
+                "rowNumber": _integer(row[row_index]) if row_index is not None else len(students) + 1,
                 "studentNo": student_no,
                 "scores": scores,
                 "totalScore": total_score,

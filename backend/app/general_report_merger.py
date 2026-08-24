@@ -7,8 +7,8 @@ from typing import Any
 from .assessment_profiles import (
     GENERAL,
     REQUIRED_COMPONENTS,
+    _normalized_course_name,
     build_general_evaluation,
-    normalize_course_name,
     profile_for_course,
 )
 
@@ -58,18 +58,18 @@ def merge_component_reports(
 
     reference_exam = by_component[REQUIRED_COMPONENTS[0]]["exam"]
     for field, label in REQUIRED_CONTEXT_FIELDS.items():
-        reference_value = normalize_course_name(reference_exam.get(field))
+        reference_value = _normalized_course_name(reference_exam.get(field))
         if not reference_value:
             raise ValueError(f"{label} bilgisi raporlardan birinde bulunmuyor.")
         for component in REQUIRED_COMPONENTS[1:]:
-            candidate = normalize_course_name(by_component[component]["exam"].get(field))
+            candidate = _normalized_course_name(by_component[component]["exam"].get(field))
             if not candidate:
                 raise ValueError(f"{label} bilgisi raporlardan birinde bulunmuyor.")
             if candidate != reference_value:
                 raise ValueError(f"Yüklenen raporların {label.lower()} bilgileri birbiriyle uyuşmuyor.")
 
     course_name = str(reference_exam.get("courseName") or "").strip()
-    if expected_course and normalize_course_name(course_name) != normalize_course_name(expected_course):
+    if expected_course and _normalized_course_name(course_name) != _normalized_course_name(expected_course):
         raise ValueError("Yüklenen raporların dersi, hazırlık aşamasında seçilen dersle uyuşmuyor.")
     if expected_grade:
         report_grade = "".join(character for character in str(reference_exam.get("classSection") or "") if character.isdigit())

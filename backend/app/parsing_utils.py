@@ -15,14 +15,14 @@ import re
 TOTAL_MISMATCH_TOLERANCE = 0.01
 
 
-def normalise_label(value: object) -> str:
+def _normalise_label(value: object) -> str:
     """Türkçe başlık metnini karşılaştırılabilir küçük harfli forma indirger."""
 
     translation = str.maketrans("ÇĞİÖŞÜçğıöşü", "CGIOSUcgiosu")
     return re.sub(r"[^a-z0-9]+", " ", str(value).translate(translation).casefold()).strip()
 
 
-def parse_number(value: object) -> float | int | None:
+def _number(value: object) -> float | int | None:
     """Hücre metninden sayı çıkar (virgüllü ondalık, gömülü metin toleranslı)."""
 
     cleaned = str(value).strip().replace(",", ".")
@@ -35,8 +35,8 @@ def parse_number(value: object) -> float | int | None:
     return int(number) if number.is_integer() else number
 
 
-def parse_integer(value: object) -> int | None:
-    number = parse_number(value)
+def _integer(value: object) -> int | None:
+    number = _number(value)
     return int(number) if number is not None else None
 
 
@@ -46,7 +46,7 @@ def calculate_total(scores: list) -> float:
     return round(sum(score or 0 for score in scores), 2)
 
 
-def question_number(label: str) -> int | None:
+def _question_number(label: str) -> int | None:
     """Normalize edilmiş bir başlıktan ('soru 3' gibi) soru numarasını çıkar."""
 
     match = re.match(r"^(?:s|soru)\s*(\d+)\b", label)

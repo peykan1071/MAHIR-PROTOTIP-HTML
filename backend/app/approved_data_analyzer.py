@@ -391,7 +391,7 @@ def _build_rag_question(outcome: dict[str, Any]) -> str:
 
     2026-08-22: Başarı oranı ve şiddet etiketi buradan KALDIRILDI. Eskiden
     model paragrafın kendisini yazdığı için bunlara ihtiyacı vardı; artık
-    yalnızca BAĞLAM'dan iki terim SEÇİYOR (`{"evidenceTerms":[...]}`,
+    yalnızca BAĞLAM'dan bir ila üç terim SEÇİYOR (`{"evidenceTerms":[...]}`,
     `pipeline.py::_compose_grounded_pedagogical_answer`) ve oranı/şiddeti
     MAHİR kendi hesaplıyor - modelin bunlara erişimi gerekmiyor. Canlı
     ölçümde bu sayılar sorudayken model tekrar tekrar "%30 başarı oranı"
@@ -404,11 +404,8 @@ def _build_rag_question(outcome: dict[str, Any]) -> str:
     if not parts:
         return ""
     return (
-        f"{' - '.join(parts)} öğrenme çıktısında öğrenciler {percent_text} "
-        f"başarı oranı gösterdi. "
-        f"Bu oran için şiddet etiketi: {severity}. "
-        "BAĞLAM'daki öğretim programı metninden bu çıktıyla doğrudan ilgili "
-        "bir ila üç somut terimi adıyla anarak yanıtla. Oranın yalnız "
-        "performans düzeyini gösterdiğini kabul et; eksikliğin nedenini, "
-        "öğrenci sayısını veya öğrencinin bilgisini tahmin etme."
+        f"{' - '.join(parts)} öğrenme çıktısı için BAĞLAM'daki öğretim "
+        "programı metninden bu çıktıyla doğrudan ilgili bir ila üç somut "
+        "terimi adıyla anarak yanıtla. Eksikliğin nedenini, öğrenci "
+        "sayısını veya öğrencinin bilgisini tahmin etme."
     )

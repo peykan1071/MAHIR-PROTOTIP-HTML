@@ -46,7 +46,16 @@ def run_agent_prompts(
     """Prompt'ları tek partide çalıştırır; sonuçlar giriş sırasıyla döner.
 
     Dönen her öğe: `{"name", "answer", "sources", "promptChars",
-    "answerChars", "durationMs"}`.
+    "answerChars", "durationMs", "strippedSentences"}`.
+
+    `strippedSentences` her zaman 0: bu katman yanıt METNİNE hiç dokunmaz -
+    cümle düzeyinde kırpma JSON alan sınırlarını tanımadan çalışıp
+    yapılandırılmış yanıtları bozardı (bkz. `test_json_shaped_answers_are_
+    exempt_from_sentence_stripping`). Charter süzgeci artık ayrıştırılmış
+    `diagnosis` alanı üzerinde, `pipeline.py::_compose_grounded_pedagogical_
+    answer` içindeki `_strip_scope_violations`de uygulanır - alan hâlâ
+    burada taşınıyor çünkü `PedagogicalAnalysisAgent._evaluate_diagnosis_
+    result` onu okuyor.
     """
 
     if not items:
@@ -88,6 +97,7 @@ def run_agent_prompts(
             # Parti tek istek olduğu için süre partinin tamamına ait; öğe
             # başına ayrıştırmak mümkün değil ve yanıltıcı olurdu.
             "durationMs": round(duration_ms, 1),
+            "strippedSentences": 0,
         })
     return True, message, enriched
 
