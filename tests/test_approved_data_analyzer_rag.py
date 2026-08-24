@@ -188,6 +188,66 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertIn("Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır.", result)
         self.assertNotIn("nedeniyle", result)
 
+    def test_dangling_reference_is_removed_when_the_first_sentence_is_stripped(self):
+        # Canlı ölçüm (2026-08-24): modelin İLK cümlesi nedensellik iddiası
+        # içerdiği için kırpıldı, geriye kalan metin "Bu eksiklik, ..." diye
+        # başlıyordu - artık var olmayan bir cümleye atıf yapan, havada kalan
+        # bir paragraf öğretmene gitti. Bağlayıcı öbek atılmalı.
+        outcome = {"outcomeTheme": "1. Tema: Sözün İnceliği", "successRate": 0.35}
+        sources = [{
+            "excerpt": (
+                "Metnin başlık ve görsellerinden hareketle metnin yazılış amacını "
+                "tahmin eder ve içeriğini karşılaştırır."
+            )
+        }]
+        answer = (
+            '{"diagnosis":"Tahmin etme yeteneğinin eksikliği nedeniyle sorun oluşmaktadır. '
+            'Bu eksiklik, metnin görsellerinden ve başlıktan amacını belirlemesine engel oluyor."}'
+        )
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertNotIn("Bu eksiklik, metnin görsellerinden", result)
+        self.assertIn("Metnin görsellerinden ve başlıktan amacını belirlemesine engel oluyor.", result)
+
+    def test_consonant_mutation_counts_as_the_same_root(self):
+        # Türkçe ünsüz yumuşaması: sözcük ünlüyle başlayan ek alınca sondaki
+        # sert ünsüz yumuşar (içeriK -> içeriĞi). Düz önek karşılaştırması
+        # bunu kaçırıyordu; canlı ölçümde "içerik" ile "içeriği" eşleşmeyince
+        # kanıt sayısı bir eksik çıkıp iyi bir teşhis reddedildi.
+        from backend.app.agents.pipeline import _shares_root
+
+        for stem, inflected in (
+            ("içerik", "içeriği"),
+            ("kitap", "kitabı"),
+            ("amaç", "amacını"),
+            ("kanat", "kanadı"),
+        ):
+            with self.subTest(stem=stem):
+                self.assertTrue(_shares_root(stem, inflected))
+        # Yumuşama toleransı alakasız sözcükleri birleştirmemeli.
+        self.assertFalse(_shares_root("içerik", "inceleme"))
+
+    def test_two_distinctive_words_are_enough_evidence(self):
+        # Eşik 3'ten 2'ye çekildi: tema adı ve müfredat kalıp sözcükleri
+        # ("ele alınan", "hareketle") artık sayılmadığından 3, fiilen çok
+        # daha yüksek bir bar hâline gelmişti ve canlı ölçümde iyi bir
+        # teşhis 2/3 ile reddedildi.
+        outcome = {
+            "outcomeCode": "TDE3.3",
+            "outcomeTheme": "1. Tema: Sözün İnceliği",
+            "successRate": 0.35,
+            "componentType": "speaking",
+        }
+        sources = [{
+            "excerpt": (
+                "TDE3.2. Muhatabını ikna etmek için söyleyiş inceliklerine yer veren bir "
+                "konuşma içeriği oluşturabilme. TDE3.3. Muhatabını ikna etmek için "
+                "konuşmada kural uygulayabilme."
+            )
+        }]
+        answer = '{"diagnosis":"Konuşmada kural uygulama ve içerik oluşturma sınırlı kalmaktadır."}'
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        self.assertIn("kural uygulama ve içerik oluşturma", result)
+
     def test_missing_diagnosis_is_rejected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
         sources = [{"excerpt": "ana duygu"}]

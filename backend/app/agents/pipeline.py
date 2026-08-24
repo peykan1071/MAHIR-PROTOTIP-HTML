@@ -644,13 +644,24 @@ _GENERIC_WORD_PREFIXES = (
     "gibi", "için", "olarak", "olan", "olup", "daha", "ancak", "fakat", "veya",
     "kadar", "sonra", "önce", "üzere", "ayrıca", "yani", "birlikte", "böyle",
     "şöyle", "bunun", "bunlar", "onlar", "hangi", "diğer", "tüm",
+    # Müfredat metninin kendi kalıp ifadeleri: her kazanım satırında geçtikleri
+    # için ("... temasında ELE ALINAN metinlerden HAREKETLE ...") kaynakla
+    # örtüşmeleri hiçbir şey kanıtlamaz.
+    "alınan", "hareketle", "ilişkin", "yönelik", "üzerinde", "belirlenen",
 )
 
 # Grounding eşiği: teşhis metni ile kaynak arasında paylaşılması gereken
-# AYIRT EDİCİ sözcük sayısı. Üç, bir cümlenin tesadüfen değil gerçekten
-# müfredat metninden beslendiğini gösterecek kadar; iyi teşhisleri elemeyecek
-# kadar da düşük (ölçülen gerçek örneklerde 7+ örtüşme görüldü).
-_MIN_GROUNDED_WORDS = 3
+# AYIRT EDİCİ sözcük sayısı.
+#
+# 2026-08-24: 3 -> 2. Eşik ilk olarak tema adının VE müfredat kalıp
+# sözcüklerinin ("ele alınan", "hareketle") de sayıldığı bir ölçümle
+# belirlenmişti. O "bedava" eşleşmeler elendikten sonra 3, fiilen çok daha
+# yüksek bir bar hâline geldi ve canlı ölçümde iyi bir teşhis 2/3 ile
+# reddedildi (bulunan sözcükler: "kural", "içerik" - ikisi de TDE3.2/TDE3.3
+# kazanım metninden gelen gerçek müfredat terimleri). Ölçüm sıkılaşınca eşik
+# de yeniden ayarlanmalıydı; iki AYIRT EDİCİ terim, tesadüf olmadığını
+# gösterecek kadar güçlü bir kanıt.
+_MIN_GROUNDED_WORDS = 2
 
 _WORD_PATTERN = re.compile(r"[\wÇĞİÖŞÜçğıöşü]+", re.UNICODE)
 
@@ -672,19 +683,33 @@ def _content_words(text: str) -> list[str]:
     ]
 
 
+# Türkçe ünsüz yumuşaması: sözcük ünlüyle başlayan bir ek aldığında sondaki
+# sert ünsüz yumuşar (içeriK -> içeriĞi, kitaP -> kitaBı, amaÇ -> amaCı,
+# kanaT -> kanaDı). Düz önek karşılaştırması bunu KAÇIRIYORDU - canlı ölçümde
+# "içerik" (teşhis) ile "içeriği" (müfredat) eşleşmedi ve kanıt sayısı bir
+# eksik çıktı. Her iki tarafı da aynı kanonik biçime çevirerek karşılaştırmak
+# sorunu kökten çözer; dönüşüm simetrik olduğu için yanlış eşleşme üretmez.
+_CONSONANT_ALTERNATIONS = str.maketrans({"ğ": "k", "b": "p", "c": "ç", "d": "t"})
+
+
 def _shares_root(left: str, right: str) -> bool:
     """İki sözcüğün aynı kökten geldiğini gevşek biçimde kabul eder.
 
     Türkçe eklemeli olduğundan tam eşleşme aranmaz: biri diğerinin öneki
     ise (ör. "unsurları" / "unsurlarını", "çözümleyebilme" /
-    "çözümleyebilmek") aynı kök sayılır. En az dört karakter şartı, kısa
+    "çözümleyebilmek") aynı kök sayılır. Ünsüz yumuşaması da hesaba katılır
+    (bkz. `_CONSONANT_ALTERNATIONS`). En az dört karakter şartı, kısa
     tesadüfi örtüşmeleri engeller.
     """
 
-    return min(len(left), len(right)) >= 4 and (left.startswith(right) or right.startswith(left))
+    if min(len(left), len(right)) < 4:
+        return False
+    left_key = left.translate(_CONSONANT_ALTERNATIONS)
+    right_key = right.translate(_CONSONANT_ALTERNATIONS)
+    return left_key.startswith(right_key) or right_key.startswith(left_key)
 
 
-def _grounded_word_overlap(diagnosis: str, evidence: str) -> list[str]:
+def _grounded_word_overlap(diagnosis: str, evidence: str, theme: str = "") -> list[str]:
     """Teşhis metninin kaynakla paylaştığı ayırt edici sözcükleri döndürür.
 
     Kanıt garantisinin ÖLÇÜLDÜĞÜ yer burası. Önceki tasarımda model kendi
@@ -695,11 +720,19 @@ def _grounded_word_overlap(diagnosis: str, evidence: str) -> list[str]:
     olan iyi teşhisler bu yüzden elendi. Artık beyan istenmiyor: MAHİR
     doğrudan metnin kendisini ölçüyor, yani garanti modelin uyumuna hiç
     bağlı değil.
+
+    `theme` verilirse tema adının sözcükleri sayılmaz: getirim zaten TEMA
+    filtresiyle yapıldığından tema adı GETİRİLEN HER parçada geçer, yani
+    modelin onu tekrarlaması hiçbir şey kanıtlamaz (canlı ölçümde kanıt
+    listesi "sözün"/"inceliği" ile şişiyordu).
     """
 
+    theme_words = _content_words(theme)
     evidence_words = _content_words(evidence)
     matched: list[str] = []
     for word in _content_words(diagnosis):
+        if any(_shares_root(word, theme_word) for theme_word in theme_words):
+            continue
         if any(_shares_root(word, evidence_word) for evidence_word in evidence_words):
             if not any(_shares_root(word, seen) for seen in matched):
                 matched.append(word)
@@ -780,9 +813,22 @@ def _compose_grounded_pedagogical_answer(
     if stripped_scope_sentences:
         _note_reason(reasons, f"bilgi: {stripped_scope_sentences} cümle nedensellik/öneri dili nedeniyle kırpıldı")
 
+    theme = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", str(outcome.get("outcomeTheme") or ""), flags=re.IGNORECASE).strip()
+    if not theme:
+        _note_reason(reasons, "tema-cozulemedi")
+        return ""
+
+    # Model, prompttaki açık yasağa rağmen paragrafa tema adını yazabiliyor
+    # (canlı ölçümde görüldü). MAHİR tema adını zaten açılış cümlesinde
+    # söylediğinden bu, öğretmene tema adını iki kez okutuyordu - baştaki
+    # "<tema> temasında ..." girişini at.
+    diagnosis = _drop_theme_lead_in(diagnosis, theme)
+
     # KANIT GARANTİSİ: teşhis metninin kendisi kaynakla yeterince örtüşüyor mu.
+    # Tema adı sayılmaz - getirim zaten tema filtresiyle yapıldığı için her
+    # parçada geçer ve tekrarlanması hiçbir şey kanıtlamaz.
     evidence = " ".join(str(source.get("excerpt") or "") for source in sources if isinstance(source, dict))
-    grounded_words = _grounded_word_overlap(diagnosis, evidence)
+    grounded_words = _grounded_word_overlap(diagnosis, evidence, theme)
     if len(grounded_words) < _MIN_GROUNDED_WORDS:
         _note_reason(
             reasons,
@@ -791,11 +837,6 @@ def _compose_grounded_pedagogical_answer(
         )
         return ""
     _note_reason(reasons, f"bilgi: kaynakla örtüşen ayırt edici sözcükler: {grounded_words}")
-
-    theme = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", str(outcome.get("outcomeTheme") or ""), flags=re.IGNORECASE).strip()
-    if not theme:
-        _note_reason(reasons, "tema-cozulemedi")
-        return ""
 
     rate = float(outcome.get("successRate") or 0.0)
     percent = round(rate * 100)
@@ -808,13 +849,38 @@ def _compose_grounded_pedagogical_answer(
     else:
         closing = _pick_template(_STRONG_CLOSING_TEMPLATES, code, theme, "strong")
 
-    return f"{opening} {diagnosis} {closing}"
+    return f"{opening} {_as_standalone_sentence(diagnosis)} {closing}"
+
+
+def _as_standalone_sentence(text: str) -> str:
+    """Model paragrafını, MAHİR'in cümleleri arasına konmaya hazır hâle getirir.
+
+    İki canlı kusuru kapatır: (1) bir giriş öbeği atıldıktan sonra metin küçük
+    harfle başlayabiliyor, (2) model cümlesini noktalama olmadan bitirince
+    kapanış cümlesi ona yapışıyordu ("...zorlanıyor Eksikliğin şiddeti:").
+    """
+
+    text = text.strip()
+    if not text:
+        return text
+    text = text[0].upper() + text[1:]
+    if text[-1] not in ".!?":
+        text += "."
+    return text
+
+
+# Türkçe'ye özgü küçültme: `str.casefold()` "İ"yi "i" + BİRLEŞİK NOKTA
+# (U+0307) çiftine çeviriyor ve o nokta hiçbir sözcük sınıfına girmediği için
+# "İnceliği" -> "i" + "nceliği" diye İKİYE bölünüyordu (canlı ölçümde kanıt
+# listesinde "nceliği" gibi kırık bir token olarak görüldü). Çeviri tablosu
+# casefold'dan ÖNCE uygulanmalı.
+_TURKISH_LOWER_MAP = str.maketrans({"İ": "i", "I": "ı", "Ş": "ş", "Ğ": "ğ", "Ü": "ü", "Ö": "ö", "Ç": "ç"})
 
 
 def _normalize_evidence_text(value: str) -> str:
     """PDF satır sonu ve hece tirelerini kaynak-terim karşılaştırması için düzelt."""
 
-    value = re.sub(r"\s*-\s*", "", value.casefold())
+    value = re.sub(r"\s*-\s*", "", value.translate(_TURKISH_LOWER_MAP).casefold())
     return " ".join(value.split())
 
 
@@ -925,6 +991,13 @@ def _enqueue_diagnosis_prompts(
 _UNSUPPORTED_CLAIM_PATTERNS = (
     "temel neden", "temel sebep", "nedeni", "sebebi", "kaynaklan",
     "öğrencilerin say", "öğrenci say", "yetersiz bilgi",
+    # 2026-08-24 canlı ölçüm: model eksikliği doğrudan orana bağlayan
+    # "...bu yüzden %45 başarı oranına NEDEN OLMAKTADIR" cümlesi kurdu ve
+    # yukarıdaki desenlerin hiçbiri onu yakalamadı ("nedeni" ile "neden
+    # olmaktadır" farklı gövdeler). Oran performans DÜZEYİNİ gösterir,
+    # nedenselliği kanıtlamaz - bu bağlaçların hepsi elenmeli.
+    "neden ol", "sebep ol", "yol aç", "bu yüzden", "dolayısıyla", "sonucunda",
+    "sonucu ortaya", "sonucu olarak", "sonucudur", "buna bağlı",
 )
 # MAHİR tanı koyabilir fakat öğretmene etkinlik/telafi işi yazamaz.
 _ACTION_LANGUAGE_PATTERNS = (
@@ -933,6 +1006,10 @@ _ACTION_LANGUAGE_PATTERNS = (
     "geliştirilmeli", "desteklenmeli", "gerekmektedir", "gereklidir",
     "ihtiyaç duyul",
 )
+
+
+# Modelin yazdığı yüzde ifadesi ("%35", "yüzde 35"). Oranı MAHİR söylüyor.
+_RATE_MENTION_PATTERN = re.compile(r"%\s*\d|yüzde\s+\d", re.IGNORECASE)
 
 
 def _strip_scope_violations(text: str) -> tuple[str, int]:
@@ -952,8 +1029,64 @@ def _strip_scope_violations(text: str) -> tuple[str, int]:
     kept = [
         sentence for sentence in sentences
         if not any(term in sentence.casefold() for term in _UNSUPPORTED_CLAIM_PATTERNS + _ACTION_LANGUAGE_PATTERNS)
+        # Modele yüzdeyi yazmaması söylendi ama yine de yazabiliyor (canlı
+        # ölçümde görüldü). MAHİR oranı zaten kendi açılış cümlesinde
+        # söylediğinden böyle bir cümle en iyi ihtimalle gereksiz tekrar,
+        # en kötü ihtimalle modelin uydurduğu FARKLI bir sayı olur - ikisi de
+        # rapora girmemeli.
+        and not _RATE_MENTION_PATTERN.search(sentence)
     ]
-    return " ".join(kept).strip(), len(sentences) - len(kept)
+    dropped = len(sentences) - len(kept)
+    if kept and dropped and sentences and sentences[0] not in kept:
+        # İLK cümle atıldıysa, hayatta kalan metin ona geri gönderme yapan bir
+        # işaret sözcüğüyle başlayabilir ("Bu eksiklik, ...") - canlı ölçümde
+        # tam olarak bu görüldü ve öğretmene artık var olmayan bir cümleye
+        # atıf yapan, havada kalan bir paragraf gitti. O bağlayıcı öbeği
+        # atıp cümleyi kendi başına ayakta duracak hâle getiriyoruz.
+        kept[0] = _drop_dangling_reference(kept[0])
+    return " ".join(kept).strip(), dropped
+
+
+# "Bu eksiklik," / "Bu durum," gibi, kendinden ÖNCEKİ cümleye gönderme yapan
+# açılış öbekleri. Yalnız virgülle biten kısa bir öbek olarak aranır - cümlenin
+# asıl yüklemine dokunulmaz.
+_DANGLING_REFERENCE_PATTERN = re.compile(
+    r"^(bu|bunlar|bunun|böylece|dolayısıyla|ayrıca|bu durum|bu eksiklik|bu sonuç|bu performans)\b[^,]{0,40},\s*",
+    re.IGNORECASE,
+)
+
+
+def _drop_dangling_reference(sentence: str) -> str:
+    """Cümle başındaki, kaldırılmış bir cümleye gönderme yapan öbeği atar."""
+
+    trimmed = _DANGLING_REFERENCE_PATTERN.sub("", sentence, count=1)
+    if not trimmed or trimmed == sentence:
+        return sentence
+    return trimmed[0].upper() + trimmed[1:]
+
+
+def _drop_theme_lead_in(diagnosis: str, theme: str) -> str:
+    """Paragrafın başındaki `<tema> temasında[ki] ...` girişini atar.
+
+    MAHİR tema adını kendi açılış cümlesinde zaten söylüyor; model de yazınca
+    öğretmen aynı adı iki kez okuyor. Yalnız BAŞTAKİ giriş atılır - metnin
+    ortasında geçen tema adına dokunulmaz, çünkü orada cümlenin anlamını
+    taşıyor olabilir.
+    """
+
+    if not theme:
+        return diagnosis
+    # `(?:ki)?` - `ki?` DEĞİL: ikincisi zorunlu bir "k" arar ve düz
+    # "temasında" ile başlayan metni hiç yakalamaz (canlı ölçümde tema adı
+    # bu yüzden iki kez göründü).
+    pattern = re.compile(
+        r"^[\"'“”]?" + re.escape(theme) + r"[\"'“”]?\s+temasınd[ae](?:ki)?\s+(?:ele\s+alınan\s+)?",
+        re.IGNORECASE,
+    )
+    trimmed = pattern.sub("", diagnosis, count=1)
+    if not trimmed or trimmed == diagnosis:
+        return diagnosis
+    return trimmed[0].upper() + trimmed[1:]
 
 
 def _answer_matches_outcome_scope(
