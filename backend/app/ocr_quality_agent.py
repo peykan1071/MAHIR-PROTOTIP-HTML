@@ -85,6 +85,16 @@ def assess_result(
 
     data = structured_data or {}
     students = list(data.get("students") or [])
+    if not students:
+        # Birden fazla sınav grubu olduğunda OCR işçisi öğrencileri yalnızca
+        # `groups[*].students` altında taşır. Üst düzey listenin boş olması
+        # "0 öğrenci okundu" anlamına gelmez.
+        students = [
+            student
+            for group in (data.get("groups") or [])
+            if isinstance(group, Mapping)
+            for student in (group.get("students") or [])
+        ]
     warnings = [str(item) for item in (data.get("warnings") or [])]
     issues: list[dict[str, str]] = []
 

@@ -9,8 +9,10 @@ shape as the local file receiver.
 from __future__ import annotations
 
 import json
+import http.client
 import mimetypes
 import os
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -20,6 +22,44 @@ from .ocr_protocol import SHARED_SECRET_HEADER, UPLOAD_PATH, WARMUP_PATH
 from .timing import stage
 
 _REMOTE_TIMEOUT_SECONDS = 300
+# Canlıda ölçüldü: WinError 10053 tek bir anlık blip değil, aynı yükleme
+# içinde birden fazla denemeyi arka arkaya vurabilen tekrarlayan bir yerel
+# ağ/rota kesintisi olabiliyor (bkz. `_post_to_worker_with_retry`). Artan
+# beklemeyle 2 yeniden deneme (toplam 3 deneme, ~7 sn ek bekleme) bu tür
+# kesintilere tek seferlik bir denemeden daha dayanıklı.
+_CONNECTION_RETRY_DELAYS_SECONDS = (2, 5)
+_SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
+# `ocr_worker.WARMUP_PATH` ile aynı olmalı - burada elle tekrarlanıyor çünkü bu
+# modül öğretmenin makinesinde çalışıyor ve PaddleOCR bağımlısı `ocr_worker`i
+# import edemez (modül docstring'i).
+WARMUP_PATH = "/mahir-warmup"
+
+
+def _post_to_worker(request: urllib.request.Request) -> dict[str, object]:
+    with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _post_to_worker_with_retry(request: urllib.request.Request) -> dict[str, object]:
+    """Post once, then retry on connection-level failures only.
+
+    `HTTPError` is a real answer from the server (401/500/...) and is
+    re-raised immediately - retrying it would not change the outcome. Only
+    `URLError`/`TimeoutError`/`OSError` (the request never reaching the
+    worker at all, e.g. WinError 10053) gets retried, backing off across
+    `_CONNECTION_RETRY_DELAYS_SECONDS`.
+    """
+    last_error: Exception | None = None
+    for delay in (0, *_CONNECTION_RETRY_DELAYS_SECONDS):
+        if delay:
+            time.sleep(delay)
+        try:
+            return _post_to_worker(request)
+        except urllib.error.HTTPError:
+            raise
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            last_error = error
+    raise last_error
 
 
 def run_remote_image_group_ocr(
@@ -49,15 +89,20 @@ def run_remote_image_group_ocr(
     # `ocr_engine`in bugün yaptığının aynısı.
     try:
         with stage("ocr-uzak", dosya=len(uploaded_files), bayt=len(body)):
-            with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+            payload = _post_to_worker_with_retry(request)
     except urllib.error.HTTPError as error:
         # The worker still answers with its usual {"ok", "message", ...} JSON body even on a
         # non-2xx status - surface that message instead of the generic "HTTP Error 500" text.
         try:
             payload = json.loads(error.read().decode("utf-8"))
             return False, str(payload.get("message") or error), None
-        except (ValueError, UnicodeDecodeError):
+        except (ValueError, UnicodeDecodeError, http.client.IncompleteRead):
+            if error.code == 401:
+                return (
+                    False,
+                    "Uzak OCR yetkilendirmesi başarısız. Yerel ve Modal OCR anahtarlarını eşitleyiniz.",
+                    None,
+                )
             return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as error:
         return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None

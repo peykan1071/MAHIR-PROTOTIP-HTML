@@ -134,6 +134,23 @@ class AgentLlmTests(unittest.TestCase):
         self.assertEqual(results[0]["answer"], "Öğrenme kaybı vardır. Ek çalışma yapılması önerilir.")
         self.assertEqual(results[1]["answer"], "Analiz düzeyinde eksiklik var. Telafi programı uygulanmalıdır.")
 
+    def test_json_shaped_answers_are_exempt_from_sentence_stripping(self):
+        # 2026-08-22: Pedagojik Analiz Ajanı'nın yapılandırılmış kanıt şeması
+        # `gapRationale` gibi alanların İÇİNDE tam cümleler (nokta ile biten)
+        # taşıyor - cümle düzeyinde kırpma bunları JSON alan sınırlarını hiç
+        # tanımadan bölüp geçerli JSON'u bozardı. Bu yanıtlar bu yüzden
+        # HİÇ dokunulmadan geçmeli; charter süzgeci alan düzeyinde
+        # `pipeline.py::_compose_grounded_pedagogical_answer` içinde uygulanır.
+        raw = (
+            '{"status":"success","evidence":[{"exactTerm":"kontrol listesi",'
+            '"gapRationale":"Bu eksiklik giderilmelidir ve telafi programı önerilir."}]}'
+        )
+        self._reply([("a", raw)])
+        _ok, _message, results = llm.run_agent_prompts(self._prompts(1), self.url)
+        self.assertEqual(results[0]["answer"], raw)
+        self.assertEqual(results[0]["strippedSentences"], 0)
+        json.loads(results[0]["answer"])  # hâlâ geçerli JSON olmalı
+
     # --- Asla istisna fırlatmaz ---
 
     def test_remote_failure_returns_false_without_raising(self):

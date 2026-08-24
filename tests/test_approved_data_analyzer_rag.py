@@ -1,20 +1,47 @@
 """Tests for RAG-sourced conceptual context attached to weak outcomes."""
 
+import json
 import unittest
+from typing import ClassVar
 from unittest.mock import patch
 
+from backend.app.agents.pipeline import (
+    _REASON_ACTION_LANGUAGE,
+    _REASON_CAUSAL_OVERCLAIM,
+    _REASON_CODE_LEAK,
+    _REASON_CROSS_SKILL_LEAK,
+    _REASON_DUPLICATE_TERMS,
+    _REASON_EVIDENCE_COUNT,
+    _REASON_EVIDENCE_ITEM_SHAPE,
+    _REASON_RATIONALE_STRIPPED,
+    _REASON_STATUS_NOT_SUCCESS,
+    _REASON_TERM_SHAPE,
+    _REASON_TERM_UNGROUNDED,
+    _REASON_THEME_MISSING,
+    _REASON_TOO_LONG,
+    _answer_matches_outcome_scope,
+    _compose_grounded_pedagogical_answer,
+    _grounding_retry_hint_for,
+    _term_is_grounded,
+)
 from backend.app.approved_data_analyzer import (
     _build_rag_question,
     _build_rag_retrieval_query,
     _normalize_theme_for_rag,
     analyze_approved_data,
-)
-from backend.app.agents.pipeline import (
-    _answer_matches_outcome_scope,
-    _compose_grounded_pedagogical_answer,
+    analyze_approved_data_traced,
 )
 
 _FAKE_REMOTE_URL = "https://fake.example/web_query"
+
+
+def _evidence_json(terms, rationales, key="gapRationale"):
+    """2026-08-22 (2. sürüm) yapılandırılmış kanıt şemasını üretir - testler
+    her seferinde tam JSON'u elle yazmasın diye. `key`, zayıf çıktılar için
+    `"gapRationale"`, güçlü çıktılar için `"strengthRationale"`."""
+
+    evidence = [{"exactTerm": term, key: rationale} for term, rationale in zip(terms, rationales)]
+    return json.dumps({"status": "success", "evidence": evidence})
 
 
 def _llm_reply(*answers):
@@ -43,6 +70,40 @@ def _llm_reply(*answers):
                 "name": item["name"],
                 "answer": answer,
                 "sources": sources,
+            })
+        return True, "Ajan yanıtları üretildi.", results
+
+    return fake
+
+
+def _llm_reply_sequence(*per_call_answers):
+    """`_llm_reply` gibi ama HER ÇAĞRIDA bir sonraki demeti kullanır - ilk
+    deneme/yeniden deneme (retry) senaryolarını test etmek için: ilk çağrı
+    `per_call_answers[0]`i, ikinci çağrı (retry) `per_call_answers[1]`i
+    kullanır. Demet biterse son öğe tekrar kullanılır."""
+
+    call_count = 0
+
+    def fake(items, remote_url):
+        nonlocal call_count
+        index = min(call_count, len(per_call_answers) - 1)
+        call_count += 1
+        answers = per_call_answers[index]
+        diagnoses = [item for item in items if str(item.get("name", "")).startswith("pedagoji/")]
+        results = []
+        for item in items:
+            if not str(item.get("name", "")).startswith("pedagoji/"):
+                results.append({"name": item["name"], "answer": "", "sources": [], "strippedSentences": 0})
+                continue
+            idx = diagnoses.index(item)
+            answer, sources = answers[idx] if idx < len(answers) else ("", [])
+            if not sources:
+                answer = ""
+            results.append({
+                "name": item["name"],
+                "answer": answer,
+                "sources": sources,
+                "strippedSentences": 0,
             })
         return True, "Ajan yanıtları üretildi.", results
 
@@ -152,12 +213,14 @@ class RagContextAttachmentTests(unittest.TestCase):
 
     def test_non_json_model_paragraph_is_rejected(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.20}
+        reasons: list[str] = []
         self.assertEqual(
             _compose_grounded_pedagogical_answer(
-                "Öğrenciler için bir etkinlik önerilir.", outcome, [{"excerpt": "ana duygu"}]
+                "Öğrenciler için bir etkinlik önerilir.", outcome, [{"excerpt": "ana duygu"}], reasons
             ),
             "",
         )
+        self.assertEqual(reasons, [_REASON_STATUS_NOT_SUCCESS])
 
     def test_valid_json_is_used_and_trailing_model_prose_is_ignored(self):
         outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": 0.40}
@@ -323,7 +386,9 @@ class RagContextAttachmentTests(unittest.TestCase):
             "outcomeCode": "TDE3.3", "componentType": "speaking",
             "outcomeDescription": "konuşmada kural uygulayabilme",
         }
-        self.assertFalse(_answer_matches_outcome_scope("TDE2.2.3 okuma becerileri eksiktir.", outcome))
+        reasons: list[str] = []
+        self.assertFalse(_answer_matches_outcome_scope("TDE2.2.3 okuma becerileri eksiktir.", outcome, reasons))
+        self.assertEqual(reasons, [_REASON_CODE_LEAK])
         self.assertTrue(_answer_matches_outcome_scope("TDE3.3 konuşma becerisi güçlüdür.", outcome))
 
     def test_overlong_pedagogical_answer_is_rejected(self):
@@ -363,10 +428,14 @@ class RagContextAttachmentTests(unittest.TestCase):
             "outcomeCode": "TDE1.2", "componentType": "listening",
             "outcomeDescription": "dinlediği/izlediği metinde anlam oluşturabilme",
         }
-        self.assertFalse(_answer_matches_outcome_scope("Öğrenciler mülakatta konuşur ve iletiyi belirler.", outcome))
+        reasons_1: list[str] = []
+        reasons_2: list[str] = []
+        self.assertFalse(_answer_matches_outcome_scope("Öğrenciler mülakatta konuşur ve iletiyi belirler.", outcome, reasons_1))
         self.assertTrue(_answer_matches_outcome_scope("Öğrenciler mülakat metnini dinleyerek iletiyi belirler.", outcome))
-        self.assertFalse(_answer_matches_outcome_scope("Okuma stratejileri uygulanmalıdır.", outcome))
+        self.assertFalse(_answer_matches_outcome_scope("Okuma stratejileri uygulanmalıdır.", outcome, reasons_2))
         self.assertTrue(_answer_matches_outcome_scope("Dinlediği metindeki açık ve örtük iletiyi belirler.", outcome))
+        self.assertEqual(reasons_1, [_REASON_CROSS_SKILL_LEAK])
+        self.assertEqual(reasons_2, [_REASON_CROSS_SKILL_LEAK])
 
     def test_rejected_listening_drift_is_reported_without_the_unsafe_context(self):
         payload = _weak_tde_payload()
@@ -547,6 +616,213 @@ def _two_weak_outcomes_payload():
     }
 
 
+class DiagnosisGroundingRetryTests(unittest.TestCase):
+    """2026-08-22 (3. sürüm): doğrulanamayan ilk deneme TEK bir ek turla
+    yeniden sorulur - canlıda ölçülen ~%40 ilk-üretim reddetme oranını
+    düşürmek için (bkz. `PedagogicalAnalysisAgent._evaluate_diagnosis_result`).
+    Toleransı gevşetmek yerine üretimi tekrarlamak seçildi: doğrulama kuralı
+    değişmiyor, modele ikinci bir şans veriliyor.
+    """
+
+    _SOURCES: ClassVar[list[dict[str, str]]] = [
+        {"documentName": "mufredat.pdf", "excerpt": "Sözün İnceliği temasında anlam oluşturma ele alınır."}
+    ]
+
+    def test_ungrounded_first_attempt_is_retried_and_succeeds(self):
+        bad = _evidence_json(
+            ["dinleme becerisi", "kelime dağarcığı"], ["İlk deneme 1.", "İlk deneme 2."]
+        )
+        good = _evidence_json(
+            ["Sözün İnceliği", "anlam oluşturma"], ["İkinci deneme 1.", "İkinci deneme 2."]
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(bad, self._SOURCES)], [(good, self._SOURCES)]),
+            ) as mock_query:
+                result = analyze_approved_data(_weak_tde_payload())
+
+        self.assertEqual(mock_query.call_count, 2)
+        context = result["outcomes"][0]["ragContext"]
+        self.assertIn("anlam oluşturma", context)
+        self.assertNotIn("doğrulanmış bir kaynak bağlamı oluşturulamadı", context)
+        retry_items = mock_query.call_args_list[1][0][0]
+        self.assertEqual(len(retry_items), 1)
+        self.assertIn("BİREBİR", retry_items[0]["user"])
+        # Getirim (aynı BAĞLAM) retry'de DEĞİŞMEMELİ - sorun modelin BAĞLAM'ı
+        # yanlış kullanmasıydı, hangi BAĞLAM'ın getirildiği değil.
+        self.assertEqual(retry_items[0]["retrieval"], _diagnosis_prompts(mock_query)[0]["retrieval"])
+
+    def test_rationale_stripped_first_attempt_gets_rationale_specific_retry_hint(self):
+        # 2026-08-23: retry ipucu artık sebebe göre seçiliyor - terim zaten
+        # BAĞLAM'da geçerliyken yalnızca gerekçe (zorunluluk kipi yüzünden)
+        # charter filtresince boşaltılırsa, "BİREBİR terim seç" ipucu
+        # alakasız olurdu; bu senaryoda gerekçeye özgü ipucu gitmeli.
+        bad_rationale = _evidence_json(
+            ["Sözün İnceliği", "anlam oluşturma"],
+            ["Bu bileşen geliştirilmelidir.", "Bu bileşen de geliştirilmelidir."],
+        )
+        good = _evidence_json(
+            ["Sözün İnceliği", "anlam oluşturma"],
+            ["Bu bileşen net biçimde kurulamamaktadır.", "Bu bileşen sınırlı düzeyde kalmaktadır."],
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(bad_rationale, self._SOURCES)], [(good, self._SOURCES)]),
+            ) as mock_query:
+                result = analyze_approved_data(_weak_tde_payload())
+
+        self.assertEqual(mock_query.call_count, 2)
+        context = result["outcomes"][0]["ragContext"]
+        self.assertNotIn("doğrulanmış bir kaynak bağlamı oluşturulamadı", context)
+        retry_items = mock_query.call_args_list[1][0][0]
+        self.assertIn("GÖZLEMSEL", retry_items[0]["user"])
+        self.assertNotIn("BİREBİR", retry_items[0]["user"])
+
+    def test_ungrounded_after_retry_is_rejected_and_tried_only_twice(self):
+        bad = _evidence_json(
+            ["dinleme becerisi", "kelime dağarcığı"], ["İlk deneme 1.", "İlk deneme 2."]
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(bad, self._SOURCES)]),
+            ) as mock_query:
+                result = analyze_approved_data(_weak_tde_payload())
+
+        self.assertEqual(mock_query.call_count, 2)
+        context = result["outcomes"][0]["ragContext"]
+        self.assertIn("doğrulanmış bir kaynak bağlamı oluşturulamadı", context)
+        self.assertEqual(result["outcomes"][0]["ragSources"], [])
+
+    def test_final_rejection_is_counted_and_logged_with_both_reasons(self):
+        # 2026-08-23 Track A: `_RAG_SCOPE_REJECTED_TEXT`in GERÇEKTE hangi
+        # sebeple tetiklendiği artık hem `AgentResult.outputs["ragRejectReasons"]`e
+        # sayılıyor hem loglanıyor (ilk deneme VE retry'ın sebebi birlikte -
+        # sebep DEĞİŞTİYSE bu da tek başına bir sinyal).
+        bad = _evidence_json(
+            ["dinleme becerisi", "kelime dağarcığı"], ["İlk deneme 1.", "İlk deneme 2."]
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(bad, self._SOURCES)]),
+            ):
+                with self.assertLogs("backend.app.agents.pipeline", level="INFO") as logs:
+                    _analysis, trace = analyze_approved_data_traced(_weak_tde_payload())
+
+        pedagogical = next(entry for entry in trace["agents"] if entry["agent"] == "pedagojik-analiz")
+        self.assertEqual(pedagogical["outputs"]["ragRejectReasons"], {_REASON_TERM_UNGROUNDED: 1})
+        give_up_lines = [line for line in logs.output if "yeniden-deneme-de-basarisiz" in line]
+        self.assertEqual(len(give_up_lines), 1)
+        self.assertIn(f"ilk_ayrinti={_REASON_TERM_UNGROUNDED}", give_up_lines[0])
+        self.assertIn(f"son_ayrinti={_REASON_TERM_UNGROUNDED}", give_up_lines[0])
+
+    def test_first_attempt_success_never_triggers_a_retry_call(self):
+        good = _evidence_json(
+            ["Sözün İnceliği", "anlam oluşturma"], ["Birinci deneme 1.", "Birinci deneme 2."]
+        )
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+            with patch(
+                "backend.app.agents.llm.run_agent_prompts",
+                side_effect=_llm_reply_sequence([(good, self._SOURCES)]),
+            ) as mock_query:
+                analyze_approved_data(_weak_tde_payload())
+
+        mock_query.assert_called_once()
+
+
+class GroundingRetryHintSelectionTests(unittest.TestCase):
+    """`_grounding_retry_hint_for`: sebep koduna göre doğru ipucu seçiliyor mu.
+
+    2026-08-23: önceden retry TEK sabit ipucu kullanıyordu (yalnızca
+    terim-ayarı sorunundan bahsediyordu) - gerçek sebep başkaysa (ör.
+    gerekçe charter filtresiyle boşaldıysa) o ipucu alakasızdı.
+    """
+
+    def test_term_ungrounded_gets_the_default_grounding_hint(self):
+        hint = _grounding_retry_hint_for(_REASON_TERM_UNGROUNDED)
+        self.assertIn("BİREBİR", hint)
+
+    def test_rationale_stripped_gets_the_rationale_hint(self):
+        hint = _grounding_retry_hint_for(_REASON_RATIONALE_STRIPPED)
+        self.assertIn("GÖZLEMSEL", hint)
+        self.assertNotIn("BİREBİR", hint)
+
+    def test_scope_violation_reasons_get_the_scope_hint(self):
+        for reason in (_REASON_TOO_LONG, _REASON_CAUSAL_OVERCLAIM, _REASON_ACTION_LANGUAGE, _REASON_CODE_LEAK, _REASON_CROSS_SKILL_LEAK):
+            with self.subTest(reason=reason):
+                hint = _grounding_retry_hint_for(reason)
+                self.assertIn("kapsamında kal", hint)
+
+    def test_unmapped_or_missing_reason_falls_back_to_the_default_hint(self):
+        for reason in (_REASON_EVIDENCE_COUNT, _REASON_EVIDENCE_ITEM_SHAPE, _REASON_DUPLICATE_TERMS, None, "bilinmeyen-yeni-sebep"):
+            with self.subTest(reason=reason):
+                self.assertIn("BİREBİR", _grounding_retry_hint_for(reason))
+
+
+class TermGroundingTests(unittest.TestCase):
+    """`_term_is_grounded`in Türkçe çekim eki toleransı - kalibrasyon verisi
+    gerçek sorgulardan (2026-08-22).
+
+    Önceki birebir alt-dize kontrolü, model doğru BAĞLAM ifadesini seçse
+    bile ek farkı yüzünden (ör. "görsellerden"/"görsellerinden") reddediyordu.
+    Bu testler hem gerçek-ama-farklı-ekli ifadelerin artık kabul edildiğini
+    HEM DE gerçek uydurmaların (SORU'nun kendi cümlesi, modelin kendi
+    "BAĞLAM" etiketini içeriğe sızdırması) hâlâ reddedildiğini kilitliyor -
+    ikisi birbirine çok yakın karakter-benzerliği skorlarına sahip
+    olabildiğinden (`difflib` ile ölçüldü: "ön bilgileri ile bağlantı
+    kurar" 0,71 - "bağlamanın kontrol listesi" 0,77) salt bir eşik/skor
+    yaklaşımı yerine sözcük sözcük eşleştirme kullanılıyor.
+    """
+
+    _SOZUN_INCELIGI_EVIDENCE = (
+        "TDE1.1. 'Sözün İnceliği' temasında ele alınan metinlerde dinlemeyi/izlemeyi yönetebil-me "
+        "TDE1.2. 'Sözün İnceliği' temasında ele alınan metinlerde anlam oluşturabilme "
+        "'Sözün İnceliği' temasında ele alınan dinlediği/izlediği metnin başlık ve "
+        "görsellerinden hareketle metnin yazılış amacını tahmin eder. "
+        "'Sözün İnceliği' temasında ele alınan dinleme/izleme metnindeki bilgiler ile "
+        "ön bilgileri arasında bağlantı kurar. "
+        "Öğrenciler, dinleme/izleme öncesinde hazırlanan kontrol listesini gözden geçirir."
+    )
+    _ANLAM_YAPI_EVIDENCE = "TDE1.3. 'Anlamın Yapı Taşları' temasında ele alınan metinleri çözümleyebilme"
+
+    def test_case_ending_difference_is_tolerated(self):
+        self.assertTrue(_term_is_grounded("görsellerden hareketle", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_clitic_split_versus_merged_is_tolerated(self):
+        # Kaynak "bilgilerle" (bitişik "-le"), model "bilgileri ile" (ayrı) yazdı.
+        self.assertTrue(
+            _term_is_grounded("ön bilgileri ile bağlantı kurar", self._SOZUN_INCELIGI_EVIDENCE)
+        )
+
+    def test_success_rate_leaking_from_the_question_is_rejected(self):
+        self.assertFalse(_term_is_grounded("%30 başarı oranı", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_sarmal_risk_leaking_from_the_question_is_rejected(self):
+        self.assertFalse(_term_is_grounded("sarmal risk", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_baglam_label_leaking_into_the_term_is_rejected(self):
+        # "bağlamanın" ("BAĞLAM" etiketinin kendisi + iyelik eki) karakter
+        # düzeyinde gerçek "bağlantı" sözcüğüne şaşırtıcı derecede yakın
+        # (difflib: 0,78) - salt bir benzerlik eşiği bunu kaçırırdı.
+        self.assertFalse(_term_is_grounded("bağlamanın kontrol listesi", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_unrelated_invented_word_is_rejected(self):
+        self.assertFalse(_term_is_grounded("kısaltma", self._SOZUN_INCELIGI_EVIDENCE))
+
+    def test_vowel_drop_suffix_case_is_a_known_gap(self):
+        # "metni" (ünlü düşmesiyle çekimlenmiş) ile kaynaktaki "metinleri"
+        # arasındaki ortak önek çok kısa kalıyor (yalnız "met") - bu, kabul
+        # edilen bir kalan sınır: nadir bir ünlü düşmesi durumu, eşik
+        # gevşetilirse gerçek uydurmaları (yukarısı) da içeri alırdı.
+        self.assertFalse(_term_is_grounded("metni çözümleyebilme", self._ANLAM_YAPI_EVIDENCE))
+
+    def test_empty_term_is_rejected(self):
+        self.assertFalse(_term_is_grounded("   ", self._SOZUN_INCELIGI_EVIDENCE))
+
+
 class RagBatchingTests(unittest.TestCase):
     # Zayıf çıktılar tek istekte, tek vLLM partisinde yanıtlanıyor: ölçüldü,
     # sıcak konteynerde tek sorgunun 7-8,6 sn'si üretim ve bu ~29 token/s tek
@@ -688,10 +964,19 @@ class NoBloomTests(unittest.TestCase):
                 self.assertNotIn("bilişsel düzey", question)
                 self.assertNotIn("Bloom", question)
 
-    def test_question_still_carries_the_severity_label(self):
-        # Şiddet mekanizması ölçümde 8/8 doğruydu - Bloom'la birlikte gitmemeli.
-        self.assertIn("şiddet etiketi: Kritik", self._question(rate=0.4))
-        self.assertIn("şiddet etiketi: Orta", self._question(rate=0.6))
+    def test_question_no_longer_carries_success_rate_or_severity(self):
+        # 2026-08-22: model artık paragraf yazmıyor, yalnız BAĞLAM'dan iki
+        # terim seçiyor; oranı/şiddeti MAHİR kendi hesaplıyor
+        # (_compose_grounded_pedagogical_answer). Canlı ölçümde bu sayılar
+        # sorudayken model tekrar tekrar "%40 başarı oranı"/"Kritik" gibi
+        # SORU'nun kendi cümlesini "evidenceTerms" diye seçip BAĞLAM'daki
+        # gerçek müfredat metnini hiç kullanmadı - kaldırılması bu tuzağı
+        # ortadan kaldırıyor (bkz. _build_rag_question docstring'i).
+        for rate in (0.2, 0.4, 0.6):
+            with self.subTest(rate=rate):
+                question = self._question(rate=rate)
+                self.assertNotIn("şiddet etiketi", question)
+                self.assertNotIn("%", question)
 
     def test_question_asks_for_curriculum_grounding(self):
         # Eski kapanış emri modelin yanıtı bilişsel kıyasa harcamasına yol
@@ -719,28 +1004,37 @@ class NoBloomTests(unittest.TestCase):
         self.assertNotIn("BAĞLAM", retrieval_query)
 
 
-class RagQuestionSeverityTests(unittest.TestCase):
-    # Şiddet etiketi eşiğe dayalı belirlenimci bir karar; modele bırakıldığında
-    # %55'lik vakaların yarısına "Kritik" dediği canlı ölçümle görüldü.
-    def _question_for(self, success_rate):
-        return _build_rag_question({
-            "outcomeTheme": "1. Tema: Sözün İnceliği",
-            "outcomeCode": "TDE1.2",
-            "outcomeSkill": "Okuma",
-            "outcomeDescription": "metinlerde anlam oluşturabilme",
-            "successRate": success_rate,
-        })
+class RagContextSeverityTests(unittest.TestCase):
+    """Şiddet etiketinin eşiğe dayalı, belirlenimci hesabı.
+
+    2026-08-22 öncesi bu hesap `_build_rag_question`da yapılıp SORU içinde
+    modele veriliyordu (modele bırakıldığında %55'lik vakaların yarısına
+    "Kritik" dediği canlı ölçümle görülmüştü). Artık model paragrafın
+    kendisini yazmıyor - yalnız BAĞLAM'dan iki terim seçiyor - ve modele
+    verilen bu sayı, kendi cümlesini ("%40 başarı oranı" gibi)
+    "evidenceTerms" olarak seçmesine yol açan bir tuzağa dönüştü. Hesap bu
+    yüzden tamamen MAHİR'in tarafına (`_compose_grounded_pedagogical_answer`)
+    taşındı; eşik davranışı burada, o fonksiyona karşı test ediliyor.
+    """
+
+    def _answer_for(self, success_rate):
+        outcome = {"outcomeTheme": "2. Tema: Anlam Arayışı", "successRate": success_rate}
+        sources = [{"excerpt": "ana duygu ve ana düşünce"}]
+        answer = _evidence_json(
+            ["ana duygu", "ana düşünce"], ["Ana duygu eksik.", "Ana düşünce eksik."]
+        )
+        return _compose_grounded_pedagogical_answer(answer, outcome, sources)
 
     def test_below_fifty_percent_is_critical(self):
-        self.assertIn("şiddet etiketi: Kritik", self._question_for(0.35))
+        self.assertIn("Eksikliğin şiddeti: Kritik.", self._answer_for(0.35))
 
     def test_fifty_to_sixtynine_percent_is_moderate(self):
-        self.assertIn("şiddet etiketi: Orta", self._question_for(0.55))
+        self.assertIn("Eksikliğin şiddeti: Orta.", self._answer_for(0.55))
 
     def test_exactly_fifty_percent_is_moderate(self):
         # Sınır değer, mahir-report-export-common.js'teki "< 0.50 => Öncelikli"
         # kuralıyla aynı yönde kırılmalı.
-        self.assertIn("şiddet etiketi: Orta", self._question_for(0.50))
+        self.assertIn("Eksikliğin şiddeti: Orta.", self._answer_for(0.50))
 
     def test_severity_label_is_absent_from_retrieval_query(self):
         retrieval_query = _build_rag_retrieval_query({

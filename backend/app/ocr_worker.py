@@ -122,46 +122,74 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
     except RuntimeError as error:
         return False, str(error), None
 
-    students: list[dict[str, object]] = []
+    documents: list[dict[str, object]] = []
     warnings: list[str] = []
 
     for uploaded_file, file_check in zip(uploaded_files, file_checks):
+        document_ref = f"Belge-{len(documents) + 1:03d}"
         try:
-            rows = ocr_engine.read_student_rows(uploaded_file.content, file_check.extension)
+            document = ocr_engine.read_exam_document(uploaded_file.content, file_check.extension)
         except Exception as error:  # noqa: BLE001 - OCR is a third-party ML pipeline; one bad/unreadable
             # image must not drop the whole batch or crash the request thread.
-            warnings.append(f"{uploaded_file.file_name}: {error}")
-            rows = [
-                {
-                    "studentNo": "Okunamadı",
-                    "scores": [],
-                    "totalScore": None,
-                    "calculatedTotal": 0,
-                    "control": "",
-                }
-            ]
-        for row in rows:
-            privacy_findings = set(row.pop("privacyFindings", []) or [])
-            labels = _translate_privacy_findings(privacy_findings)
-            if labels:
-                warnings.append(
-                    f"{uploaded_file.file_name}: KVKK uyarısı — {' ve '.join(labels)} "
-                    "algılandı ve öğrenci analiz verisinden çıkarıldı."
-                )
-            row["rowNumber"] = len(students) + 1
-            students.append(row)
+            warnings.append(f"{document_ref}: Evrak okunamadı; görseli kontrol edip yeniden yükleyiniz.")
+            document = {
+                "exam": {}, "questions": [],
+                "student": {"studentNo": "", "scores": [], "totalScore": None, "calculatedTotal": 0, "control": ""},
+                "privacyFindings": [],
+            }
+        privacy_findings = set(document.pop("privacyFindings", []) or [])
+        if privacy_findings:
+            warnings.append(f"{document_ref}: Kişisel bilgi algılandı; kimlik alanları OCR çıktısına alınmadı.")
+        student = dict(document.pop("student", {}) or {})
+        # Öğrenci adı hiçbir zaman aktarılmaz. Öğretmenin kontrol ekranında
+        # evraktaki "Öğrenci Okul No" gösterilir. Analiz katmanına ise okul
+        # numarası yerine yalnızca bu oturuma ait takma teknik kimlik gider.
+        student_reference = str(student.get("studentNo") or "").strip()
+        student["studentNo"] = student_reference
+        student["technicalId"] = f"Ö-{len(documents) + 1:03d}"
+        student["rowNumber"] = len(documents) + 1
+        student["sourceFile"] = document_ref
+        documents.append({**document, "student": student, "documentRef": document_ref})
+
+    def group_key(document: dict[str, object]) -> tuple[object, ...]:
+        exam = document.get("exam") or {}
+        return (
+            str(exam.get("classSection") or "").casefold().replace(" ", ""),
+            str(exam.get("examType") or "").casefold().strip(),
+        )
+
+    grouped: dict[tuple[object, ...], dict[str, object]] = {}
+    for document in documents:
+        key = group_key(document)
+        group = grouped.setdefault(key, {
+            "exam": document.get("exam") or {}, "questions": document.get("questions") or [],
+            "students": [], "documentRefs": [],
+            "requiresQuestionCount": not bool(document.get("questions")),
+        })
+        document_questions = document.get("questions") or []
+        if not group.get("questions") and document_questions:
+            group["questions"] = document_questions
+        group["requiresQuestionCount"] = not bool(group.get("questions"))
+        group["students"].append(document["student"])
+        group["documentRefs"].append(document["documentRef"])
+
+    groups = list(grouped.values())
+    first = groups[0] if len(groups) == 1 else {"exam": {}, "questions": [], "students": []}
 
     return (
         True,
         f"{len(uploaded_files)} görsel OCR ile okundu ve öğretmen kontrolüne hazırlandı.",
         {
-            "exam": {},
-            "questions": [],
-            "students": students,
+            "exam": first.get("exam") or {},
+            "questions": first.get("questions") or [],
+            "students": first.get("students") or [],
+            "documents": documents,
+            "groups": groups,
             "warnings": warnings,
             "summary": {
-                "questionCount": 0,
-                "studentCount": len(students),
+                "questionCount": len(first.get("questions") or []),
+                "studentCount": len(documents),
+                "groupCount": len(groups),
                 "warningCount": len(warnings),
             },
         },

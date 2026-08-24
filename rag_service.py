@@ -8,7 +8,7 @@ Dağıtım: `modal deploy rag_service.py` (repo kökünden).
 Neden iki ayrı Image (indexing_image / inference_image): PDF ayrıştırma
 (Docling) ve LLM sunumu (vLLM) çok farklı ve ağır bağımlılık ağaçlarına
 sahiptir (ikisi de kendi `torch` sürümünü ister). Aynı image içinde
-dördünü (docling + qdrant-client + sentence-transformers + vllm) birlikte
+dördünü (docling + qdrant-client + FlagEmbedding + vllm) birlikte
 çözümlemeye zorlamak gereksiz bir çakışma riski yaratır. `index_pdf`
 yalnızca `indexing_image`'i, `RAGInference` yalnızca `inference_image`'i
 kullanır; ikisi de aynı iki Volume'u ("rag-storage", "rag-hf-cache")
@@ -35,6 +35,7 @@ import re
 import tempfile
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import modal
@@ -43,8 +44,8 @@ if TYPE_CHECKING:
     # Yalnızca tip belirtimi için - `from __future__ import annotations` sayesinde
     # bu importlar çalışma zamanında hiç değerlendirilmez, bu yüzden bu dosya
     # (Modal dışında) hiçbir ağır bağımlılık kurulu olmadan da import edilebilir.
+    from FlagEmbedding import BGEM3FlagModel
     from qdrant_client import QdrantClient
-    from sentence_transformers import SentenceTransformer
     from vllm import LLM
 
 try:
@@ -66,7 +67,14 @@ LLM_MODEL_NAME = "Qwen/Qwen2.5-7B-Instruct"
 
 QDRANT_MOUNT_DIR = "/data"
 QDRANT_STORAGE_PATH = "/data/qdrant_db"
-QDRANT_COLLECTION_NAME = "mahir_rag_chunks"
+# 2026-08-22: hibrit (dense+sparse) aramaya geçişte YENİ bir koleksiyon adı
+# kullanılıyor - eski "mahir_rag_chunks" tek (adsız) dense vektörle
+# oluşturulmuştu, Qdrant var olan bir koleksiyona sparse vektör alanı SONRADAN
+# ekleyemiyor (şema değişikliği reindex gerektirir). Yeni ad, geri dönüşü
+# anlık kılıyor: hibrit arama canlıda regresyona uğrarsa bu sabiti eski adına
+# çevirip yeniden deploy etmek yeterli, eski (dokunulmamış) koleksiyon hâlâ
+# yerinde duruyor.
+QDRANT_COLLECTION_NAME = "mahir_rag_chunks_v2_hybrid"
 
 HF_CACHE_DIR = "/root/.cache/huggingface"
 
@@ -96,10 +104,72 @@ _NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
 # gösteren altı sorgunun ortak aralığı 0,771-0,793 çıktı; 0,78 hepsinde tam
 # kopuş noktasından kesiyor. Mutlak bir eşik bunu yapamaz: bge-m3'ün skorları
 # belgeye/sorguya göre kayıyor (aynı dizinde 0,60 ile 0,94 arası gözlendi) ve
-# önerilen 0,40 gibi bir sayı burada hiçbir şeyi elemezdi. Oranın asıl değeri
-# uyarlanabilir olması - kuyruğu düz olan iki sorguda (Sözün İnceliği) 8
-# isabetin 8'ini de koruyor.
-_RELATIVE_SCORE_FLOOR = 0.78
+# önerilen 0,40 gibi bir sayı burada hiçbir şeyi elemezdi.
+#
+# 2026-08-22 0,78 -> 0,60 DÜŞÜRÜLDÜ: bu ilk ölçüm yalnız "isabet var mı" (top_k
+# tüm parçaları mı kapsıyor) sorusunu optimize etmişti, "hangi TÜR parça"
+# sorusunu değil. Canlı incelemede görüldü ki bir kazanımın "kazanım
+# tanımlama" tablosu (SORU'daki kazanım metnine neredeyse birebir aynı metin,
+# bu yüzden hep 0,85-0,92 skorlanıyor) tek başına 8 slotu doldurup aynı
+# temanın çok daha zengin "Öğrenme-Öğretme Uygulamaları" içeriğini (konu
+# olarak alakalı ama kelime olarak farklı, bu yüzden ~0,65-0,75 skorlanıyor -
+# 0,78 eşiğinin altında) sistematik olarak dışarıda bırakıyordu; sonuç,
+# `agents/pipeline.py`nin evidenceTerms seçimi için elinde hiç iyi aday
+# kalmaması ve modelin SORU'nun kendi cümlesine kaçmasıydı. 0,60 bu tarz
+# konu-alakalı-ama-kelime-farklı içeriği de içeri alıyor; asıl alakasız kuyruk
+# (0,60'ın altı, ölçümde 0,60-0,68 civarı görülmüştü) yine elenmeye devam
+# ediyor.
+#
+# 2026-08-22 0,60 -> 0,68 (top_k=12 ile) -> 0,60'A GERİ. Ara durak (0,68):
+# top_k'yi büyütüp eşiği yükseltmek bir sorguyu düzeltirken (Sözün İnceliği)
+# başka birini bozuyordu (Anlamın Yapı Taşları, 5/5 -> 0/5) - kök sorun bir
+# SAYI ayarıyla çözülemeyen yapısal bir tekrar sorunuydu (aynı kazanımın
+# birbirine çok benzeyen "tanımlama" satırları top_k ne olursa olsun slotları
+# dolduruyordu). Asıl çözüm `_mmr_select` (Maximal Marginal Relevance) -
+# `_retrieve_for`/`_run_batch_query` artık ÇOK daha geniş bir ham havuz
+# (bkz. `_MMR_CANDIDATE_MULTIPLIER`/`_MMR_MIN_CANDIDATE_POOL`) çekip bu
+# eşikten geçirdikten SONRA MMR ile hem alakalı hem çeşitli bir alt küme
+# seçiyor - tekrar sorunu artık MMR'nin işi, bu eşiğin tek görevi ham
+# havuzdaki gerçekten alakasız kuyruğu elemek. Bu yüzden eşik tekrar
+# gevşek varsayılana (0,60) dönebildi; MMR geniş havuzdan seçim yaptığı
+# için tek başına top_k büyütmenin yarattığı "kalabalık bağlam" riski de
+# yok - MMR seçilenler arasında zaten çeşitliliği zorluyor.
+#
+# 2026-08-22 0,60 -> 0,50 DÜŞÜRÜLDÜ: bazı kazanımlar için getirim SIFIR
+# isabetle dönüyordu (`agents/pipeline.py` tarafında sessizce "kaynak-yok"
+# olarak atlanıyor, öğretmen hiçbir yorum görmüyor) - dar/az yaygın
+# kelime dağarcığı taşıyan kazanımların embedding'i o temanın en iyi
+# isabetine göre 0,60'ın altında kalabiliyor. MMR zaten çeşitliliği
+# gözettiği için eşiği gevşetmek "kalabalık bağlam" riskini geri
+# getirmiyor; yalnızca ham havuza az sayıda ek (daha zayıf ama yine de
+# konuyla ilgili) aday katıyor.
+#
+# 2026-08-22 HİBRİT ARAMAYA GEÇİŞ NOTU: bu değer, saf dense kosinüs
+# skorlarına (0-1 aralığı) göre kalibre edilmişti - RRF'e geçince (aşağıdaki
+# turda) YENİDEN kalibre edildi.
+#
+# 2026-08-22 0,50 -> 0,30 DÜŞÜRÜLDÜ (RRF kalibrasyonu, canlı ölçüm):
+# grade-9 TDE müfredatı yeni hibrit koleksiyona indekslendikten sonra
+# floor GEÇİCİ olarak 0'a çekilip (`_drop_weak_hits` devre dışı) gerçek
+# sorularla ham RRF skor dağılımı gözlendi. İki bulgu:
+# 1) RRF skoru rank tabanlı olduğundan bir parça dense VE sparse
+#    bacaklarının ikisinde de 1. sırada çıkınca skor sert bir tepe
+#    yapıyor (gözlemde 1,00) - sonraki en iyi adaylar (aynı ölçüde
+#    alakalı, farklı temalardaki "Dinleme/İzleme" kazanımları) 0,35-0,39
+#    bandında kalıyor. 0,50 oranı bu durumda ikincil adayların TAMAMINI
+#    eleyip getirimi tek isabete düşürüyordu (canlıda doğrulandı: "Dinleme
+#    becerisi kazanımlarında hangi kavramlar geçiyor?" sorusu, chunk
+#    dökümünde 4 farklı temada ayrı ayrı var olan ilgili kazanımdan
+#    yalnızca 1'ini döndürüyordu).
+# 2) Konu dışı bir kontrol sorusunda ("Fotosentez nasıl gerçekleşir?" -
+#    bu müfredatta hiç yok) ne 0,50 ne 0,30 havuzu anlamlı şekilde
+#    daraltıyor (ikisi de en iyi isabetin görece yakınında kümelenen bir
+#    isabet grubu döndürüyor) - konu dışı sorguları elemek zaten bu
+#    eşiğin işi değil, `agents/pipeline.py`deki BİREBİR terim/bağlam
+#    doğrulaması ve üretim-yeniden-deneme mekanizması bunu üstleniyor.
+# 0,30 seçildi çünkü üç sorunun ham dağılımında da "güçlü ilk katman"
+# ile "zayıf uzun kuyruk" arasındaki en tutarlı kırılma noktası burasıydı.
+_RELATIVE_SCORE_FLOOR = 0.30
 
 # MEB müfredat PDF'lerindeki hiyerarşi başlıkları - tdeogr.pdf üzerinde tüm
 # 5 sınıf düzeyi ve 20 sınıf×tema kombinasyonu için elle doğrulandı. Satırın
@@ -117,13 +187,11 @@ TEMA_HEADING_PATTERN = re.compile(r"^\s*\d+\.\s*TEMA\s*:\s*(.+?)\s*$", re.MULTIL
 # normalizeText() tüm satır sonlarını tek boşluğa indirger), bu yüzden
 # başlık/madde işareti/markdown biçimlendirmesi burada anlamsız olurdu.
 #
-# Bloom taksonomisi bilerek KALDIRILDI. Ölçüldü: sekiz yanıtın tamamı Bloom
-# cümlesiyle açılıyor, yanıt başına 2-8 kez basamak adı geçiyor, buna karşılık
-# temanın adı 0/8 yanıtta geçiyor ve yalnız 2/8 yanıt müfredattan somut bir öğe
-# anıyordu. Yani model, ona zaten SÖYLEDİĞİMİZ şeyi (düzey, oran, şiddet)
-# tekrarlıyor; yalnızca getirimin bilebileceği şeyi - o temanın müfredat metnini
-# - kullanmıyordu. Prompt'un yeni ekseni bu yüzden demirleme: teşhis, BAĞLAM'dan
-# somut bir öğe adlandırmak zorunda.
+# 2026-08-22 (2. sürüm): prompts.DIAGNOSIS_SYSTEM_PROMPT ile birebir aynı
+# tutulmalı (bkz. o dosyadaki değişiklik notu) - yapılandırılmış kanıt
+# şemasına geçildi, `{"evidenceTerms":[...]}` yerine artık her terim kendi
+# `contextSnippet`ini, `pedagogicalRole`ünü ve `gapRationale`sini taşıyan
+# bir `evidence` dizisi.
 SYSTEM_PROMPT = (
     "Sen; Öğrenme Analitiği, Veri Odaklı Ölçme-Değerlendirme ve Program Geliştirme alanlarında "
     "uzmanlaşmış kıdemli bir Eğitim Analistisin. Görevin: sana BAĞLAM olarak verilen resmî "
@@ -177,7 +245,16 @@ indexing_image = (
     # Docling'in PDF/görüntü işleme alt katmanının (OpenCV tabanlı) ihtiyaç
     # duyduğu sistem kütüphaneleri - debian_slim imajında varsayılan olarak yok.
     .apt_install("libgl1-mesa-glx", "libglib2.0-0")
-    .pip_install("qdrant-client", "sentence-transformers", "pypdf")
+    # `sentence-transformers` yerine `FlagEmbedding` (2026-08-22, hibrit
+    # dense+sparse arama): bge-m3'ün sparse ("lexical_weights") çıktısını
+    # yalnız bu paket tek `encode()` çağrısında dense'le BİRLİKTE veriyor -
+    # `sentence-transformers` yalnız dense üretiyordu. `FlagEmbedding` zaten
+    # `sentence_transformers`'ı transitive bağımlılık olarak getiriyor,
+    # ayrıca eklemeye gerek yok.
+    # qdrant-client>=1.10: hibrit arama Query API'sinin (Prefetch/FusionQuery)
+    # tanıtıldığı sürüm - önceden hiç pinlenmiyordu, bu özellik artık ona
+    # dayandığı için pin gerekli (bkz. requirements.txt'teki aynı pin notu).
+    .pip_install("qdrant-client>=1.10,<2", "FlagEmbedding", "pypdf")
     .pip_install("docling")
     .env({"HF_HOME": HF_CACHE_DIR})
 )
@@ -186,9 +263,13 @@ indexing_image = (
 inference_image = (
     modal.Image.debian_slim(python_version="3.12")
     # vLLM en kırılgan/sürüme duyarlı paket - kendi torch çözümünü önce
-    # oturtması için ayrı ve ilk pip_install katmanında kalıyor.
+    # oturtması için ayrı ve ilk pip_install katmanında kalıyor. FlagEmbedding
+    # `torch>=1.6.0`/`transformers<6.0,>=4.44.2` gibi gevşek alt sınırlar
+    # istiyor (bkz. PyPI metadata) - vLLM'in kendi çözdüğü sürümleri normalde
+    # ezmemesi beklenir, ama imaj kurulumu (`modal deploy`) ilk kez bu
+    # değişiklikle çalıştırıldığında build log'u kontrol edilmeli.
     .pip_install("vllm")
-    .pip_install("qdrant-client", "sentence-transformers")
+    .pip_install("qdrant-client>=1.10,<2", "FlagEmbedding")
     .env({
         "HF_HOME": HF_CACHE_DIR,
         # debian_slim imajında nvcc/CUDA toolkit yok. vLLM'in varsayılan
@@ -514,6 +595,154 @@ def _drop_weak_hits(hits: list, floor_ratio: float = _RELATIVE_SCORE_FLOOR) -> l
     return [hit for hit in hits if hit.score >= cutoff] or hits[:1]
 
 
+# MMR (Maximal Marginal Relevance) çeşitlilik parametresi - 1,0 saf alaka
+# (skor sıralamasıyla aynı, çeşitlilik yok), 0,0 saf çeşitlilik (skoru yok
+# sayar). Klasik literatür aralığı 0,5-0,7; 0,6 alakayı öne alan ama tekrarı
+# belirgin biçimde cezalandıran bir orta nokta.
+_MMR_LAMBDA = 0.6
+
+# MMR'nin seçeceği ham aday havuzu, çağıranın istediği nihai `k`'nin katı
+# olarak alınır - MMR'nin gerçekten çeşitlilik arasından seçim
+# yapabilmesi için skor sıralamasındaki ilk `k`'den daha geniş bir havuza
+# ihtiyacı var (bkz. `_mmr_select`).
+_MMR_CANDIDATE_MULTIPLIER = 3
+_MMR_MIN_CANDIDATE_POOL = 24
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    """İki vektörün kosinüs benzerliği. Embedder çıktıları zaten normalize
+    (`normalize_embeddings=True`) - bu yüzden yalnız iç çarpım yeterli, ayrıca
+    normlama gerekmiyor."""
+
+    return sum(x * y for x, y in zip(a, b))
+
+
+def _mmr_select(hits: list, k: int, lambda_param: float = _MMR_LAMBDA) -> list:
+    """Skor sıralı `hits`ten, hem sorguya alakalı HEM DE birbirinden farklı
+    en fazla `k` isabeti Maximal Marginal Relevance ile seçer.
+
+    Neden gerekli: aynı kazanımın "kazanım tanımlama" satırları (ör. altı
+    farklı beceri/alt-madde başlığı altında hep aynı "'X' temasında ele
+    alınan metinlerde Y" kalıbıyla yazılmış kısa tanımlar) sorguya (kazanım
+    kimliği + açıklaması) hepsi neredeyse aynı ölçüde yakın olduğundan, düz
+    "en yüksek skorlu top_k" seçimi bu tekrarlı ailenin TAMAMINI alıp aynı
+    temanın konu olarak alakalı ama kelime olarak farklı ("Öğrenme-Öğretme
+    Uygulamaları" gibi) içeriğine hiç yer bırakmıyordu. `top_k`/`floor_ratio`
+    ayarlarıyla (bkz. bu iki sabitin 2026-08-22 tarihli notları) düzeltilmeye
+    çalışıldı ama bu yalnız bir SAYI ayarıyla çözülemeyen yapısal bir tekrar
+    sorunuydu: bir sorgu için işe yarayan `top_k` diğerinde gürültü
+    yaratıyordu (ölçüldü: bir senaryo 5/5 -> 0/5). MMR, "zaten seçtiklerime
+    çok benzeyen bir sonraki en iyi aday" yerine "alakalı KALAN ama farklı"
+    adayı tercih ederek ikisini birlikte çözüyor.
+
+    Her adımda seçilecek aday, `lambda_param * sorguya_alaka - (1 -
+    lambda_param) * en_yakın_seçili_isabete_benzerlik` skorunu maksimize
+    eder. `hit.score` zaten sorgu vektörüne kosinüs benzerliği (Qdrant'ın
+    COSINE mesafe ayarı) - yeniden hesaplamaya gerek yok. Aday-seçili
+    benzerliği için `hit.vector` gerekiyor - çağıran taraf Qdrant sorgusunu
+    `with_vectors=True` ile yapmalı.
+    """
+
+    if len(hits) <= k:
+        return hits
+
+    selected = [hits[0]]
+    remaining = list(hits[1:])
+    while remaining and len(selected) < k:
+        best_index = 0
+        best_mmr = None
+        for index, candidate in enumerate(remaining):
+            redundancy = max(
+                _cosine_similarity(candidate.vector, chosen.vector) for chosen in selected
+            )
+            mmr = lambda_param * candidate.score - (1 - lambda_param) * redundancy
+            if best_mmr is None or mmr > best_mmr:
+                best_mmr = mmr
+                best_index = index
+        selected.append(remaining.pop(best_index))
+    return selected
+
+
+def _sparse_vector_from_weights(weights: dict) -> "SparseVector":  # noqa: F821 - bkz. altta yerel import
+    """bge-m3'ün `lexical_weights` çıktısını (`{token_id_str: weight}`)
+    Qdrant'ın `SparseVector`ına çevirir.
+
+    Anahtarların STRING token id olduğu `FlagEmbedding`in kaynağından
+    doğrulandı (`M3Embedder._process_token_weights`: `idx = str(idx)`) -
+    Qdrant `indices` için int istiyor, bu yüzden geri çevriliyor.
+    """
+
+    from qdrant_client.models import SparseVector
+
+    return SparseVector(indices=[int(key) for key in weights], values=list(weights.values()))
+
+
+def _dense_vector_of(hit) -> list[float]:
+    """Named-vector (dense+sparse) bir Qdrant isabetinden düz dense listesini
+    çıkarır. `with_vectors=True` named-vector koleksiyonlarda `.vector`ı
+    `{"dense": [...], "sparse": SparseVector(...)}` sözlüğü olarak döndürüyor
+    (yerel/embedded modda elle doğrulandı) - `_mmr_select`in kosinüs
+    benzerliği düz bir liste bekliyor, sözlüğü değil.
+    """
+
+    vector = hit.vector
+    return vector["dense"] if isinstance(vector, dict) else vector
+
+
+def _retrieve_hits(
+    qdrant, dense_vector, sparse_weights: dict, top_k: int, query_filter
+) -> list:
+    """`_retrieve_for` ve `_run_batch_query`nin ortak tek-öğe getirim adımı.
+
+    2026-08-22: hibrit (dense+sparse) arama - `dense_vector` (bge-m3 dense
+    gömme) ve `sparse_weights` (`lexical_weights`, bkz.
+    `_sparse_vector_from_weights`) birlikte, Qdrant'ın Reciprocal Rank
+    Fusion'ıyla (RRF) tek bir sıralı listeye birleştiriliyor. Amaç: teşhis
+    modelinin BAĞLAM'dan BİREBİR terim seçmesi gerekiyor (bkz.
+    `backend/app/agents/pipeline.py::_term_is_grounded`) - salt anlamsal
+    (dense) benzerlik, doğru terimi taşıyan ama farklı kelimelerle yazılmış
+    bir parçayı öne çıkarabiliyordu; sparse/lexical eşleşme, terimin
+    GEÇTİĞİ parçayı da güçlendiriyor.
+
+    `Prefetch`in filtre alanının adı `filter=` (dıştaki `query_points`
+    çağrısının `query_filter=`i DEĞİL) - yerel/embedded Qdrant'ta elle
+    doğrulandı (spike script, 2026-08-22).
+    """
+
+    from qdrant_client.models import Fusion, FusionQuery, Prefetch
+
+    pool_size = max(top_k * _MMR_CANDIDATE_MULTIPLIER, _MMR_MIN_CANDIDATE_POOL)
+    hits = qdrant.query_points(
+        collection_name=QDRANT_COLLECTION_NAME,
+        prefetch=[
+            Prefetch(query=dense_vector, using="dense", limit=pool_size, filter=query_filter),
+            Prefetch(
+                query=_sparse_vector_from_weights(sparse_weights),
+                using="sparse",
+                limit=pool_size,
+                filter=query_filter,
+            ),
+        ],
+        query=FusionQuery(fusion=Fusion.RRF),
+        limit=pool_size,
+        with_payload=True,
+        with_vectors=True,
+    ).points
+    if not hits:
+        return []
+    # `_drop_weak_hits`/`_mmr_select` `.score`/`.vector`e (düz liste) göre
+    # çalışıyor - RRF skoru `.score`da zaten düz bir sayı, yalnız `.vector`
+    # (named-vector sözlüğü) sarmalanmalı. `_drop_weak_hits`in oran eşiği
+    # RRF skalasına göre henüz YENİDEN KALİBRE EDİLMEDİ (bkz. modül başındaki
+    # `_RELATIVE_SCORE_FLOOR` notu) - bu, hibrit indeksleme sonrası canlı
+    # ölçümle yapılacak ayrı bir adım.
+    wrapped = [
+        SimpleNamespace(score=hit.score, vector=_dense_vector_of(hit), payload=hit.payload)
+        for hit in hits
+    ]
+    return _mmr_select(_drop_weak_hits(wrapped), top_k)
+
+
 @app.function(image=indexing_image, volumes=VOLUMES, timeout=60)
 def clear_index(program_id: str | None = None) -> tuple[bool, str]:
     """Belge dizinini temizler - `program_id` verilirse yalnızca o programa ait
@@ -547,6 +776,71 @@ def clear_index(program_id: str | None = None) -> tuple[bool, str]:
         return True, message
     finally:
         client.close()
+
+
+@app.function(image=indexing_image, volumes=VOLUMES, timeout=60)
+def list_chunks(program_id: str | None = None) -> int:
+    """Docling + HybridChunker'ın `index_pdf` içinde ürettiği parçaları (chunk)
+    inceleme amaçlı stdout'a döker - `program_id` verilirse yalnızca o
+    programa ait parçaları, yoksa tüm koleksiyonu. GPU gerektirmez, gömme/LLM
+    çağırmaz; yalnızca Qdrant'ta zaten depolanmış payload'ı okur.
+
+    `modal run rag_service.py::list_chunks --program-id tde-9-tymm` ile
+    çalıştırılır (çıktıyı bir dosyaya yönlendirmek için sonuna
+    `> chunks.txt` eklenebilir). Dönüş değeri yalnızca parça sayısıdır -
+    metin gövdeleri `modal run`'ın kendi return-value çıktısında değil,
+    aşağıdaki print'lerde görünür.
+    """
+
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+    try:
+        client = QdrantClient(path=QDRANT_STORAGE_PATH)
+    except Exception as error:  # noqa: BLE001 - "storage folder already accessed" gibi kilit hataları da dahil.
+        print(f"Belge dizinine erişilemedi (eşzamanlı kullanım olabilir): {error}")
+        return 0
+
+    try:
+        if not client.collection_exists(QDRANT_COLLECTION_NAME):
+            print("Koleksiyon henüz yok - hiç belge indekslenmemiş.")
+            return 0
+
+        scroll_filter = (
+            Filter(must=[FieldCondition(key="program_id", match=MatchValue(value=program_id))])
+            if program_id
+            else None
+        )
+        chunks: list[dict[str, object]] = []
+        offset = None
+        while True:
+            records, offset = client.scroll(
+                collection_name=QDRANT_COLLECTION_NAME,
+                scroll_filter=scroll_filter,
+                limit=100,
+                offset=offset,
+                with_payload=True,
+            )
+            chunks.extend(record.payload or {} for record in records)
+            if offset is None:
+                break
+    finally:
+        client.close()
+
+    chunks.sort(key=lambda payload: (str(payload.get("document_name")), payload.get("chunk_index") or 0))
+
+    for payload in chunks:
+        print(
+            f"--- [{payload.get('chunk_index')}] {payload.get('document_name')} | "
+            f"program={payload.get('program_id')} sınıf={payload.get('grade')} "
+            f"tema={payload.get('theme')} sayfa={payload.get('pages')} "
+            f"başlıklar={payload.get('headings')} ---"
+        )
+        print(payload.get("text"))
+        print()
+
+    print(f"Toplam {len(chunks)} parça.")
+    return len(chunks)
 
 
 @app.function(
@@ -720,17 +1014,28 @@ def index_pdf(
 
     contextualized_texts = [record[1] for record in chunk_records]
 
-    from sentence_transformers import SentenceTransformer
+    # Hibrit arama (2026-08-22): dense VE sparse ("lexical_weights") tek
+    # `encode` çağrısında birlikte üretiliyor - bkz. `_retrieve_hits`
+    # docstring'i. `sentence_transformers.SentenceTransformer` yalnız dense
+    # veriyordu, bu yüzden `FlagEmbedding.BGEM3FlagModel`e geçildi.
+    from FlagEmbedding import BGEM3FlagModel
 
     try:
-        embedder = SentenceTransformer(EMBEDDING_MODEL_NAME)
-        vectors = embedder.encode(contextualized_texts, normalize_embeddings=True).tolist()
+        embedder = BGEM3FlagModel(EMBEDDING_MODEL_NAME, normalize_embeddings=True)
+        embedded = embedder.encode(contextualized_texts, return_dense=True, return_sparse=True)
+        dense_vectors = embedded["dense_vecs"].tolist()
+        sparse_weights = embedded["lexical_weights"]
     except Exception as error:  # noqa: BLE001 - gömme de üçüncü parti bir ML çağrısı; tek
         # bir belge işi tüm fonksiyonu çökertmemeli.
         return False, f"Metin parçaları gömülemedi: {error}", None
 
     from qdrant_client import QdrantClient
-    from qdrant_client.models import Distance, PointStruct, VectorParams
+    from qdrant_client.models import (
+        Distance,
+        PointStruct,
+        SparseVectorParams,
+        VectorParams,
+    )
 
     try:
         client = QdrantClient(path=QDRANT_STORAGE_PATH)
@@ -742,13 +1047,17 @@ def index_pdf(
         if not client.collection_exists(QDRANT_COLLECTION_NAME):
             client.create_collection(
                 QDRANT_COLLECTION_NAME,
-                vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
+                vectors_config={"dense": VectorParams(size=len(dense_vectors[0]), distance=Distance.COSINE)},
+                sparse_vectors_config={"sparse": SparseVectorParams()},
             )
 
         points = [
             PointStruct(
                 id=_deterministic_point_id(program_id, document_name, index, chunk.text),
-                vector=vector,
+                vector={
+                    "dense": dense_vector,
+                    "sparse": _sparse_vector_from_weights(sparse_vector_weights),
+                },
                 payload={
                     "text": chunk.text,
                     "contextualized_text": contextualized_text,
@@ -765,9 +1074,11 @@ def index_pdf(
                     "chunk_index": index,
                 },
             )
-            for index, ((chunk, contextualized_text, grade_label, theme_name, pages), vector) in enumerate(
-                zip(chunk_records, vectors)
-            )
+            for index, (
+                (chunk, contextualized_text, grade_label, theme_name, pages),
+                dense_vector,
+                sparse_vector_weights,
+            ) in enumerate(zip(chunk_records, dense_vectors, sparse_weights))
         ]
         client.upsert(collection_name=QDRANT_COLLECTION_NAME, points=points)
 
@@ -816,7 +1127,7 @@ class RAGInference:
     # modal.com/docs/guide/parametrized-functions) - bu yüzden örnek
     # değişkenleri __init__ yerine bare sınıf-seviyeli tip belirtimiyle
     # tanımlanıp değerleri `load()` içinde (@modal.enter()) atanıyor.
-    _embedder: SentenceTransformer | None
+    _embedder: BGEM3FlagModel | None
     _qdrant: QdrantClient | None
     _llm: LLM | None
 
@@ -824,8 +1135,8 @@ class RAGInference:
     def load(self) -> None:
         """Konteyner ısınırken bir kez çalışır: modelleri ve Qdrant'ı belleğe yükler."""
 
+        from FlagEmbedding import BGEM3FlagModel
         from qdrant_client import QdrantClient
-        from sentence_transformers import SentenceTransformer
         from vllm import LLM
 
         # Başka bir konteynerin (index_pdf) bu ısınmadan sonra commit ettiği
@@ -835,8 +1146,14 @@ class RAGInference:
         # Sorgu anında tek bir kısa soru cümlesi gömülüyor - GPU'yu (zaten
         # Qwen2.5-7B'nin KV cache'iyle dolu olan A10G, 24 GB VRAM) vLLM'e
         # bırakmak için gömme modelini kasıtlı olarak CPU'da çalıştırıyoruz.
-        # (index_pdf'te toplu gömme GPU'da kalır - orada vLLM hiç yok.)
-        self._embedder = SentenceTransformer(EMBEDDING_MODEL_NAME, device="cpu")
+        # (index_pdf'te toplu gömme GPU'da kalır - orada vLLM hiç yok.) `devices`
+        # (çoğul) `BGEM3FlagModel`in kurucu parametresi - `SentenceTransformer`in
+        # `device` (tekil) parametresiyle KARIŞTIRILMAMALI (FlagEmbedding
+        # kaynağından doğrulandı, 2026-08-22). `use_fp16=False`: fp16 CPU'da
+        # ya desteklenmiyor ya da yavaş - GPU'ya özgü bir hızlandırma.
+        self._embedder = BGEM3FlagModel(
+            EMBEDDING_MODEL_NAME, normalize_embeddings=True, use_fp16=False, devices="cpu"
+        )
 
         self._llm = LLM(
             model=LLM_MODEL_NAME,
@@ -1074,6 +1391,18 @@ class RAGInference:
                 max(int(_number_or(item.get("maxTokens"), MAX_AGENT_OUTPUT_TOKENS)) for item in items),
             )
             try:
+                # 2026-08-22: 0,3 DENENDİ, 0,1'E GERİ ALINDI. Gerekçe: görev
+                # serbest paragraf yazmak değil, BAĞLAM'dan doğrulanmış İKİ
+                # terim SEÇMEK (`_compose_grounded_pedagogical_answer` katı bir
+                # JSON + birebir-alıntı sözleşmesi bekliyor). 0,3 ile gerçek
+                # sorgularla ölçüldü: önceden 5/5 güvenilir çalışan bir örnek
+                # (Anlamın Yapı Taşları/TDE1.2) 0/5'e düştü - model terimleri
+                # hafifçe değiştiriyor (ör. "kontrol listesi" yerine "bağlamanın
+                # kontrol listesi" gibi kaynakta birebir geçmeyen bir ifade
+                # uyduruyor) veya aynı terimi iki kez seçiyor. Bu görev şekli
+                # için (katı biçim/alıntı uyumu önemli, "yaratıcılık" değil)
+                # düşük sıcaklık doğru seçenekti - metin çeşitliliği artık
+                # `pipeline.py`deki kalıp havuzlarından geliyor, modelden değil.
                 outputs = self._llm.chat(
                     conversations, SamplingParams(temperature=0.1, max_tokens=max_tokens)
                 )
@@ -1128,7 +1457,13 @@ class RAGInference:
                 str((items[index].get("retrieval") or {}).get("query") or items[index].get("user") or "")
                 for index in retrieval_indexes
             ]
-            query_vectors = self._embedder.encode(query_texts, normalize_embeddings=True)
+            # Hibrit arama: dense VE sparse (`lexical_weights`) tek `encode`
+            # çağrısında birlikte üretiliyor (bkz. `_retrieve_hits`
+            # docstring'i). `normalize_embeddings` burada değil, `load()`daki
+            # `BGEM3FlagModel` kurucusunda ayarlanıyor.
+            embedded = self._embedder.encode(query_texts, return_dense=True, return_sparse=True)
+            dense_vectors = embedded["dense_vecs"]
+            sparse_weights = embedded["lexical_weights"]
         except Exception as error:  # noqa: BLE001 - gömme üçüncü parti bir ML çağrısı.
             return False, f"Getirim sorgusu gömülemedi: {error}", {}, {}
 
@@ -1186,7 +1521,6 @@ class RAGInference:
 
             if not hits:
                 continue
-            hits = _drop_weak_hits(hits)
             contexts[index] = "\n\n---\n\n".join(
                 str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
                 for hit in hits
@@ -1251,7 +1585,9 @@ class RAGInference:
                 str(item.get("retrievalQuery") or "").strip() or question
                 for item, question in zip(items, questions)
             ]
-            query_vectors = self._embedder.encode(embedded_texts, normalize_embeddings=True)
+            embedded = self._embedder.encode(embedded_texts, return_dense=True, return_sparse=True)
+            dense_vectors = embedded["dense_vecs"]
+            sparse_weights = embedded["lexical_weights"]
         except Exception as error:  # noqa: BLE001 - gömme üçüncü parti bir ML çağrısı; tek bir
             # sorgu tüm servis konteynerini çökertmemeli.
             return False, f"Soru gömülemedi: {error}", None
@@ -1299,13 +1635,13 @@ class RAGInference:
             query_filter = Filter(must=filter_conditions) if filter_conditions else None
 
             try:
-                hits = self._qdrant.query_points(
-                    collection_name=QDRANT_COLLECTION_NAME,
-                    query=query_vectors[index].tolist(),
-                    query_filter=query_filter,
-                    limit=top_k,
-                    with_payload=True,
-                ).points
+                hits = _retrieve_hits(
+                    self._qdrant,
+                    dense_vectors[index].tolist(),
+                    sparse_weights[index],
+                    top_k,
+                    query_filter,
+                )
             except Exception as error:  # noqa: BLE001 - yerel Qdrant okuması; bozuk/erişilemeyen
                 # bir depo tüm servisi çökertmemeli.
                 return False, f"Belge dizininden okunamadı: {error}", None
@@ -1314,11 +1650,8 @@ class RAGInference:
                 results[index] = _no_answer()
                 continue
 
-            # Zayıf kuyruğu at - bkz. `_drop_weak_hits` / `_RELATIVE_SCORE_FLOOR`.
-            # `sources` da kırpılmış listeden üretilir: rapordaki kaynak listesi
+            # `sources` da bu son listeden üretilir: rapordaki kaynak listesi
             # modelin gerçekten gördüğü bağlamla aynı kalmalı.
-            hits = _drop_weak_hits(hits)
-
             context_blocks = [
                 str((hit.payload or {}).get("contextualized_text") or (hit.payload or {}).get("text", ""))
                 for hit in hits
@@ -1341,6 +1674,7 @@ class RAGInference:
 
                 # Konuşma LİSTESİ veriliyor - vLLM partiyi kendi sıralayıp
                 # birlikte çözüyor ve çıktıları giriş sırasıyla döndürüyor.
+                # bkz. _run_agent_prompts'taki 2026-08-22 notu (0,3 denenip 0,1'e geri alındı).
                 outputs = self._llm.chat(conversations, SamplingParams(temperature=0.1, max_tokens=1024))
             except Exception as error:  # noqa: BLE001 - vLLM üretimi üçüncü parti bir ML çağrısı;
                 # bir sorgunun başarısız olması servis konteynerini çökertmemeli.

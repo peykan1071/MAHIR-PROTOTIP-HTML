@@ -26,7 +26,6 @@ _DEFAULT_MAHIR_RAG_REMOTE_URL = "https://hakanergul--turkish-rag-system-raginfer
 # (ör. test ortamı) işaret etmek gerekirse env var yine de bunu geçersiz kılar.
 MAHIR_RAG_REMOTE_URL = os.environ.get("MAHIR_RAG_REMOTE_URL", _DEFAULT_MAHIR_RAG_REMOTE_URL)
 _RAG_WEAK_THRESHOLD = 0.70  # assets/js/mahir-report-export-common.js:buildDevelopmentNeedsBlock ile aynı eşik
-_RAG_CRITICAL_THRESHOLD = 0.50  # aynı dosyadaki "Öncelikli" / Kritik eşiği
 _RAG_NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
 
 # ragContext'in boş kalmasının SEKİZ farklı sebebi var ve hepsi aynı boş stringi
@@ -390,27 +389,20 @@ def _build_rag_retrieval_query(outcome: dict[str, Any]) -> str:
 def _build_rag_question(outcome: dict[str, Any]) -> str:
     """LLM'e sorulan soru (getirim sorgusu değil - o `_build_rag_retrieval_query`).
 
-    Kazanımın kimliğine ek olarak gerçek başarı oranını ve şiddet etiketini
-    taşır. Kapanış emri KASITLI olarak müfredata demirlemeyi istiyor: eskiden
-    "bilişsel düzeyini bu oranla kıyaslayarak teşhis et" diyordu ve model
-    yanıtın tamamını o kıyasa harcayıp getirilen müfredat metnine hiç
-    dokunmuyordu (ölçüldü: tema adı 0/8 yanıtta geçiyordu).
-
-    Kasıtlı olarak TEŞHİS ister, asla "bu nasıl öğretilmeli" demez - MAHİR
-    etkinlik, yöntem veya telafi programı önermez (DEVELOPMENT_CHARTER.md);
-    bu kısıtın fiilen uygulandığı yer bu ifade.
+    2026-08-22: Başarı oranı ve şiddet etiketi buradan KALDIRILDI. Eskiden
+    model paragrafın kendisini yazdığı için bunlara ihtiyacı vardı; artık
+    yalnızca BAĞLAM'dan iki terim SEÇİYOR (`{"evidenceTerms":[...]}`,
+    `pipeline.py::_compose_grounded_pedagogical_answer`) ve oranı/şiddeti
+    MAHİR kendi hesaplıyor - modelin bunlara erişimi gerekmiyor. Canlı
+    ölçümde bu sayılar sorudayken model tekrar tekrar "%30 başarı oranı"
+    veya "Kritik" gibi SORU'nun kendi cümlesini "evidenceTerms" olarak
+    seçip BAĞLAM'daki gerçek müfredat metnini hiç kullanmadı - kaldırılması
+    bu tuzağı ortadan kaldırıyor.
     """
 
     parts = _outcome_identity_parts(outcome)
     if not parts:
         return ""
-    success_rate = float(outcome.get("successRate") or 0.0)
-    percent_text = f"%{round(success_rate * 100)}"
-    # Şiddet etiketi eşiğe dayalı, tamamen belirlenimci bir karar - modele
-    # bıraktığımızda %55'lik vakaların yarısına "Kritik" dediği ölçüldü.
-    # Burada hesaplayıp soruya gömüyoruz; SYSTEM_PROMPT (madde 4) bu etiketi
-    # aynen kullanmakla yükümlü.
-    severity = "Kritik" if success_rate < _RAG_CRITICAL_THRESHOLD else "Orta"
     return (
         f"{' - '.join(parts)} öğrenme çıktısında öğrenciler {percent_text} "
         f"başarı oranı gösterdi. "

@@ -388,13 +388,31 @@ class DiagnosisPromptContractTests(unittest.TestCase):
     doğrulanamaz ama sözleşmesi doğrulanabilir. Buradaki testler, ölçümle
     kazanılmış kararların bir sonraki düzenlemede sessizce geri alınmasını
     engelliyor.
+
+    2026-08-22 (2. sürüm): Görev "BAĞLAM'dan İKİ çıplak terim seç"ten "her
+    terim için `exactTerm`+`pedagogicalRole`+`gapRationale`/
+    `strengthRationale` taşıyan yapılandırılmış bir kanıt listesi döndür"e
+    geçti (kullanıcının paylaştığı prompt taslağı, `agents/prompts.py`ye
+    birebir uygulandı). ÖNEMLİ bir gözlem: bu yeni promptun metninde artık
+    ÖNCEKİ sürümdeki gibi açıkça yazılı bir "öneri/etkinlik cümlesi
+    olmasın", "kod UYDURMA" maddesi YOK - yalnızca "başarı oranını terim
+    olarak alma" ve dolaylı "spekülasyon yapma" uyarıları var. Bu KASITLI
+    bir gevşetme değil; kullanıcının prompt taslağı böyle geldi ve olduğu
+    gibi uygulandı. Charter güvencesi bu yüzden artık PROMPT METNİNDE değil
+    KOD TARAFINDA duruyor: `_compose_grounded_pedagogical_answer` her
+    gerekçeyi `charter_guard.strip_recommendation_sentences`den geçirir,
+    ardından `_answer_matches_outcome_scope` kod uydurma/beceri kayması gibi
+    kalan riskleri denetler. `test_prompt_no_longer_states_an_explicit_
+    recommendation_ban` bu boşluğu bilerek belgeliyor.
     """
 
-    PROMPT = prompts.DIAGNOSIS_SYSTEM_PROMPT
+    DIAGNOSIS_PROMPT = prompts.DIAGNOSIS_SYSTEM_PROMPT
+    STRENGTH_PROMPT = prompts.STRENGTH_SYSTEM_PROMPT
 
     def test_bloom_taxonomy_is_gone(self):
         # Kaldırma gerekçesi ölçüldü: 8/8 yanıt Bloom cümlesiyle açılıyordu,
-        # tema adı 0/8 yanıtta geçiyordu.
+        # tema adı 0/8 yanıtta geçiyordu. Yapılandırılmış kanıt seçiminde bu
+        # dile zaten yer yok ama gerileme koruması olarak kalsın.
         for term in ("Bloom", "bilişsel düzey", "basamak", "Hatırlama", "Yaratma"):
             with self.subTest(term=term):
                 self.assertNotIn(term, self.PROMPT)
@@ -439,11 +457,11 @@ class DiagnosisPromptContractTests(unittest.TestCase):
         self.assertNotIn("tema adını tırnak içinde YAZARAK başla", self.PROMPT)
 
     def test_prompt_gives_no_theme_name_as_an_example(self):
-        # BU BİR HATA KAYDIDIR. Açılış kuralı önce örnekle yazılmıştı
-        # (ör. "'Sözün İnceliği' temasında..."); model örneği KOPYALADI ve
-        # 4. Tema kazanımlarına "'Sözün İnceliği' temasında" diye başladı -
-        # yani öğretmene BAŞKA bir temanın teşhisini doğruymuş gibi gösterdi.
-        # Prompt'ta kopyalanabilir somut bir tema adı bulunmamalı.
+        # BU BİR HATA KAYDIDIR (önceki sürümden). Açılış kuralı önce
+        # örnekle yazılmıştı; model örneği KOPYALADI ve başka bir temanın
+        # teşhisini doğruymuş gibi gösterdi. Bu risk artık yapısal olarak
+        # da kapalı (tema adını model değil MAHİR'in şablonu yazıyor) ama
+        # prompt'ta yine de kopyalanabilir somut bir tema adı bulunmamalı.
         for theme in ("Sözün İnceliği", "Anlam Arayışı", "Anlamın Yapı Taşları", "Dilin Zenginliği"):
             with self.subTest(theme=theme):
                 self.assertNotIn(theme, self.PROMPT)
