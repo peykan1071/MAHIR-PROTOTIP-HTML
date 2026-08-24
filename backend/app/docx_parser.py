@@ -16,7 +16,7 @@ def parse_mahir_docx(content: bytes) -> dict[str, object]:
 
     tables = _read_tables(content)
     exam_table = _find_exam_table(tables)
-    question_table = _find_table(tables, {"soru no", "azami puan"})
+    question_table = _find_question_table(tables)
     student_table = _find_student_table(tables)
     single_student_table = _find_single_student_score_table(tables)
 
@@ -94,6 +94,7 @@ def _find_exam_table(tables: list[list[list[str]]]) -> list[list[str]] | None:
     metadata_labels = {
         "il", "ilce", "okul adi", "ders", "dersin adi", "sinif sube",
         "sinav turu", "sinav tarihi", "ogrenci okul no", "ogrencinin adi soyadi",
+        "il ilce", "okul", "egitim yili", "sinif ders",
     }
     for table in tables:
         labels = {_normalise_label(cell) for row in table for cell in row}
@@ -110,6 +111,20 @@ def _find_student_table(tables: list[list[list[str]]]) -> list[list[str]] | None
         has_number = any(label in {"okul no", "ogrenci no", "numara", "no"} for label in labels)
         has_score = any(re.match(r"^(?:s|soru) ?\d+\b", label) for label in labels)
         if has_number and has_score:
+            return table
+    return None
+
+
+def _find_question_table(tables: list[list[list[str]]]) -> list[list[str]] | None:
+    """Find both the official template and compact simulation question tables."""
+
+    number_labels = {"soru", "soru no"}
+    maximum_labels = {"azami", "azami puan"}
+    for table in tables:
+        if not table:
+            continue
+        labels = {_normalise_label(cell) for cell in table[0]}
+        if labels & number_labels and labels & maximum_labels:
             return table
     return None
 
@@ -158,15 +173,25 @@ def _read_tables(content: bytes) -> list[list[list[str]]]:
 def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
     values = _labeled_values(rows)
 
+    province = values.get("il", "")
+    district = values.get("ilce", "")
+    if not (province or district):
+        province, district = _split_combined_value(values.get("il ilce", ""))
+
+    class_section = values.get("sinif sube", "")
+    course = values.get("ders", "") or values.get("dersin adi", "")
+    if not (class_section or course):
+        class_section, course = _split_combined_value(values.get("sinif ders", ""))
+
     exam = {
-        "province": values.get("il", ""),
-        "district": values.get("ilce", ""),
-        "schoolName": values.get("okul adi", ""),
-        "academicYear": values.get("egitim ogretim yili", ""),
-        "course": values.get("ders", "") or values.get("dersin adi", ""),
-        "classSection": values.get("sinif sube", ""),
+        "province": province,
+        "district": district,
+        "schoolName": values.get("okul adi", "") or values.get("okul", ""),
+        "academicYear": values.get("egitim ogretim yili", "") or values.get("egitim yili", ""),
+        "course": course,
+        "classSection": class_section,
         "term": _selected_option(values.get("donem", "")),
-        "examType": _selected_option(values.get("sinav turu", "")),
+        "examType": _normalise_exam_type(_selected_option(values.get("sinav turu", ""))),
         "examDate": values.get("sinav tarihi", ""),
         "totalMaxScore": _number(values.get("toplam puan", "")),
         "teacherName": values.get("ogretmenin adi soyadi", ""),
@@ -205,13 +230,29 @@ def _labeled_values(rows: list[list[str]]) -> dict[str, str]:
 
 
 def _parse_questions(rows: list[list[str]]) -> list[dict[str, object]]:
+    if not rows:
+        return []
+
+    headings = [_normalise_label(cell) for cell in rows[0]]
+
+    def heading_index(*labels: str) -> int | None:
+        return next((index for index, label in enumerate(headings) if label in labels), None)
+
+    number_index = heading_index("soru", "soru no")
+    maximum_index = heading_index("azami", "azami puan")
+    code_index = heading_index("kod", "ogrenme ciktisi kodu", "cikti kodu")
+    description_index = heading_index(
+        "ogrenme ciktisi", "ogrenme ciktisi aciklamasi", "cikti aciklamasi"
+    )
     questions = []
     for row in rows[1:]:
-        padded = row + [""] * (4 - len(row))
-        number = _integer(padded[0])
-        outcome_code = padded[1].strip()
-        outcome_description = padded[2].strip()
-        max_score = _number(padded[3])
+        padded = row + [""] * max(0, len(headings) - len(row))
+        number = _integer(padded[number_index]) if number_index is not None else None
+        outcome_code = padded[code_index].strip() if code_index is not None else ""
+        outcome_description = (
+            padded[description_index].strip() if description_index is not None else ""
+        )
+        max_score = _number(padded[maximum_index]) if maximum_index is not None else None
         if not (outcome_code or outcome_description or max_score is not None):
             continue
         questions.append(
@@ -373,6 +414,9 @@ def _parse_students_flexible(rows: list[list[str]]) -> list[dict[str, object]]:
         scores = [_number(row[index]) for index in score_indexes]
         student_no = row[number_index].strip() if number_index is not None else ""
         total_score = _number(row[total_index]) if total_index is not None else None
+        first_cell = _normalise_label(row[0]) if row else ""
+        if first_cell in {"azami", "maksimum", "azami puan"}:
+            continue
         if not (student_no or any(score is not None for score in scores) or total_score is not None):
             continue
         students.append(
@@ -443,6 +487,26 @@ def _normalise_label(value: str) -> str:
 def _selected_option(value: str) -> str:
     checked = re.search(r"(?:☒|☑|■|✓)\s*([^☐☒☑■✓]+)", value)
     return checked.group(1).strip() if checked else value.strip()
+
+
+def _split_combined_value(value: str) -> tuple[str, str]:
+    parts = [part.strip() for part in value.split("/", 1)]
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    return (parts[0], "") if parts else ("", "")
+
+
+def _normalise_exam_type(value: str) -> str:
+    cleaned = re.sub(r"^\s*\d+\s*[.\-)]?\s*", "", value).strip()
+    token = _normalise_label(cleaned)
+    for canonical, candidate in (
+        ("Yazılı", "yazili"),
+        ("Dinleme", "dinleme"),
+        ("Konuşma", "konusma"),
+    ):
+        if candidate in token:
+            return canonical
+    return cleaned
 
 
 def _number(value: str) -> float | int | None:
