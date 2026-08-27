@@ -10,13 +10,71 @@ MAHİR, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması - 1. Se
 
 > **Temel ilke:** MAHİR doğrular, hesaplar, kaynaklı taslak üretir ve kanıt sunar; nihai pedagojik değerlendirme, düzeltme ve onay öğretmene aittir.
 
+## Öğretmen olmayan okuyucu için: Bir sınav kâğıdının evrak yolculuğu
+
+Bir okulda sınav kâğıdı yalnızca öğrencinin üzerine cevap yazdığı sıradan bir sayfa değildir. Öğretmen bu belgeyi öğretim programına, yıllık plana, sınav türüne, soru-puan dağılımına ve ölçme kurallarına göre hazırlar. Belge; okul ve eğitim öğretim yılı başlığını, öğrencinin sınıf/şube bilgisini, sınav türünü, soruları, azami puanları ve değerlendirme alanlarını taşır. Bu nedenle sınav kâğıdı, okulun resmî eğitim-öğretim faaliyeti içinde üretilen ve öğrenci başarısının değerlendirilmesine dayanak olan bir **eğitim evrakıdır**.
+
+### Mahir Öğretmen'in sınav haftası
+
+Mahir Öğretmen aynı sınavı birden fazla 9. sınıf şubesine uygulayacaktır. Önce sınav kâğıdını ve puan çizelgesini hazırlar; boş belge öğretmenden öğrenciye gider. Sınav sırasında her öğrenci kendi kâğıdını doldurur. Süre bittiğinde belgeler yeniden öğretmene teslim edilir. Böylece öğretmenin hazırlayıp dışarı verdiği boş belge, öğrenci cevabı ve puan kanıtıyla zenginleşmiş şekilde öğretmenin iş akışına geri döner.
+
+Öğretmen açısından asıl evrak yükü bundan sonra başlar: Her kâğıdın doğru öğrenciye ve şubeye ait olduğunu kontrol etmek, soru puanlarını kaydetmek, eksik veya hatalı alanları bulmak, sınıf sonuçlarını hesaplamak, soruları öğrenme çıktılarıyla ilişkilendirmek, her şube için analiz raporu hazırlamak ve sonucu okul yönetimine üst yazıyla sunmak gerekir. Aynı sınav farklı şubelerde uygulanmışsa ortak bilgiler tekrar tekrar girilir; yazılı, dinleme/izleme ve konuşma bileşenleri ayrıca değerlendirilir.
+
+MAHİR bu hikâyede öğretmenin yerine karar veren bir sistem değil, öğretmenin evrak işleme zincirini destekleyen çok ajanlı yardımcıdır. Öğrenciden geri dönen sınav kâğıdı veya öğretmenin oluşturduğu puan çizelgesi MAHİR'in **işleyeceği gelen eğitim evrakıdır**. MAHİR belgeyi okur, sınıflandırır, önemli alanları çıkarır, eksikleri gösterir ve öğretmen onayından sonra hesaplama ile kaynaklı analiz taslağını üretir. Öğretmenin onayladığı analiz raporu, üst yazı ve ek listesi ise okul yönetimine sunulacak **giden evrak paketini** oluşturur.
+
+```mermaid
+flowchart LR
+    A["Öğretmen sınav evrakını hazırlar"] --> B["Boş sınav kâğıdı öğrenciye sunulur"]
+    B --> C["Öğrenci cevaplandırır ve öğretmene teslim eder"]
+    C --> D["Gelen eğitim evrakı: doldurulmuş sınav / puan çizelgesi"]
+    D --> E["MAHİR: okuma, sınıflandırma, eksik bilgi ve içerik analizi"]
+    E --> F["Öğretmen doğrulaması ve onayı"]
+    F --> G["Sınıf analiz raporu"]
+    G --> H["Giden evrak: üst yazı ve rapor ekleri"]
+    H --> I["Okul/kurum müdürlüğü"]
+```
+
+### Yarışma senaryosuyla birebir eşleme
+
+| Kamu evrak sürecindeki aşama | Okuldaki somut karşılığı | MAHİR'in görevi |
+|---|---|---|
+| Kuruma/çalışana ulaşan belge | Öğrencinin cevaplandırıp öğretmene teslim ettiği sınav kâğıdı, soru bazlı puan çizelgesi veya sınav veri giriş belgesi | Belgeyi kabul eder; dosya türünü, sınıf/şubeyi, soru ve puan alanlarını yapılandırır. |
+| İlk inceleme ve sınıflandırma | Belgenin hangi sınıfa, sınav bileşenine ve öğrenci referansına ait olduğunun kontrolü | OCR/belge okuma yapar, açıkça etiketlenmiş alanları çıkarır ve belirsizlikleri öğretmene gösterir. |
+| İçerik analizi ve eksik bilgi tespiti | Soru sayısı, azami puan, öğrenci puanı, toplam, öğrenme çıktısı ve bağlam kontrolleri | Kurallı doğrulamaları çalıştırır; öğretmenin düzeltmesi gereken alanları bildirir. |
+| Dayanak ve standartlarla ilişkilendirme | Sınav sorularının TDE 9 öğretim programındaki öğrenme çıktıları ve süreç bileşenleriyle ilişkilendirilmesi | Öğretmen seçimini kayıtlı program kataloğuyla doğrular; RAG yalnız doğrulanmış resmî kaynak bağlamını getirir. |
+| Resmî yazı taslaklama | Onaylı sınıf analizinin okul yönetimine sunulması | Word/PDF analiz raporu, üst yazı ve ek listesi taslağı üretir. |
+| Birime yönlendirme | Belgenin okul/kurum müdürlüğüne bilgi ve gereği için sunulması | Demo yönlendirme ve EBYS aktarım paketi hazırlar; gerçek kayıt, paraf veya elektronik imza üretmez. |
+
+> **Önemli idarî sınır:** Buradaki “gelen evrak” ifadesi, öğrenciden öğretmene geri dönen belgenin MAHİR tarafından işlenecek girdi olmasını anlatan işlevsel senaryo eşlemesidir. Her sınav kâğıdının EBYS'de “gelen yazı” olarak kaydedildiği iddia edilmez. EBYS niteliğindeki resmî yazışma; öğretmen onayından sonra hazırlanan üst yazı ve rapor ekleri aşamasında başlar ve mevcut prototipte yalnız demo olarak gösterilir.
+
+### Temel kavramlar
+
+| Kavram | Bu projede ne anlama gelir? |
+|---|---|
+| Sınav evrakı | Öğretmenin hazırladığı, öğrencinin cevaplandırdığı ve değerlendirilmek üzere öğretmene geri sunduğu tek sınav belgesidir. Bir sınıftaki her öğrenci ayrı bir sınav evrakı üretir. |
+| Gelen eğitim evrakı | Doldurulmuş sınav kâğıdı, soru bazlı puan çizelgesi veya veri giriş belgesi gibi öğretmenin inceleme ve değerlendirme iş akışına ulaşan belgedir. Bu, MAHİR senaryosundaki işlevsel “gelen evrak” karşılığıdır. |
+| Sınıf-sınav analizi | Bir şubenin tek sınavındaki öğrenci evraklarının topluca değerlendirilmesidir. Örneğin 35 öğrenci evrakı çoğunlukla bir sınıf-sınav analiz olayına karşılık gelir. |
+| Öğrenme çıktısı | Öğrencinin öğretim süreci sonunda edinmesi beklenen bilgi, beceri veya yeterliktir. |
+| Öğrenme kanıtı | Bir öğrenme çıktısına ne ölçüde ulaşıldığını gösteren sınav, performans, gözlem veya portfolyo verisidir. |
+| Giden evrak paketi | Öğretmen tarafından onaylanan analiz raporunun üst yazı ve ek listesiyle okul/kurum müdürlüğüne sunulacak biçime getirilmesidir. |
+| Üst yazı | Analiz raporunun okul yönetimine veya başka bir resmî makama sunulmasında kullanılan resmî yazı taslağıdır. |
+| EBYS | MEB'e bağlı okul ve kurumlarda resmî belgelerin oluşturulması, paraflanması, elektronik imzalanması, gönderilmesi ve arşivlenmesi için kullanılan Elektronik Belge Yönetim Sistemidir. MEBBİS ortak ekranı erişim yollarından biridir. |
+
 ## Otomatik test güvencesi
 
 GitHub, `main` dalına gönderilen her değişiklikte ve her çekme isteğinde Python ve JavaScript testlerini yeniden çalıştırır. README'nin üstündeki rozet son çalıştırmanın güncel durumunu gösterir; rozete tıklayan okuyucu çalıştırma tarihini, test günlüklerini ve test sayılarını doğrudan GitHub üzerinden inceleyebilir.
 
-Son yerel doğrulamada **230 Python testi**, **10 JavaScript testi** ve ana tarayıcı betiğinin sözdizimi kontrolü başarıyla tamamlanmıştır. Bu sonuç, otomatik olarak tanımlanan yazılım davranışlarının doğrulandığını gösterir; gerçek kullanıcı etki araştırması veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
+En son GitHub Actions doğrulamasında **301 Python testi**, **13 JavaScript test dosyası** ve ana tarayıcı betiğinin sözdizimi kontrolü başarıyla tamamlanmıştır. Bu sonuç, kodla tanımlanan davranışların doğrulandığını gösterir; gerçek kullanıcı etki araştırması veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
 
-Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in işlediği gelen evrak; sınav puan çizelgesi, sınav veri giriş belgesi veya onaylanmış sınav analiz raporudur. Prototip, genel amaçlı bütün kamu evraklarını değil, bu tanımlı eğitim evrakı akışını uçtan uca ele alır.
+Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in giriş tarafında işlediği belgeler; doldurulmuş sınav kâğıdı, sınav puan çizelgesi ve sınav veri giriş belgesidir. Çıkış tarafında öğretmen onaylı analiz raporu, üst yazı ve ek listesi hazırlanır. Prototip, genel amaçlı bütün kamu evraklarını değil, bu tanımlı eğitim evrakı akışını uçtan uca ele alır.
+
+### Güncel prototip özeti
+
+- Aynı ders, sınıf düzeyi, sınav bileşeni, soru sayısı ve azami puan yapısındaki birden fazla şube tek çalışma içinde işlenebilir.
+- Öğretmen ortak sınavın öğrenme çıktılarını bir kez seçer; seçim yalnız aynı yapıya sahip şubelere uygulanır. Yazılı, dinleme/izleme ve konuşma sınavları birbirine karıştırılmaz.
+- Her şube için ayrı Word/PDF raporu hazırlanabilir. TDE 9 profilinde onaylı yazılı, dinleme/izleme ve konuşma raporları **%70 + %15 + %15** sabit ağırlıklarıyla genel değerlendirme raporunda birleştirilebilir.
+- İl, ilçe, okul/kurum, öğretmen ve eğitim öğretim yılı bir kez girildiğinde aynı çalışma içindeki diğer raporlara aktarılır; sınıf/şube ve sınava özgü alanlar ayrı korunur.
+- Onaylanmış birden fazla rapor, tek üst yazı ve ek listesi bulunan EBYS demo paketine dönüştürülebilir. Gerçek EBYS gönderimi ve elektronik imza kapsam dışındadır.
 
 ## Problem, kullanıcı ve potansiyel etki
 
@@ -44,17 +102,6 @@ Aşağıdaki tablo, aynı sınav analizi ve raporlama görevinin araç ve süre�
 | İnsan kontrolü | Analiz, yorum ve resmî belge sorumluluğu öğretmendedir. | Analiz, yorum ve resmî belge sorumluluğu yine öğretmendedir; MAHİR karar destek ve taslak üretim aracı olarak kalır. | MAHİR öğretmenin pedagojik veya idarî kararının yerine geçmez. |
 
 Bu karşılaştırma, MAHİR'in **hangi adımları birleştirdiğini ve hangi kontrolleri sağladığını** gösterir. Tek görev gözlemindeki süre farkının hedef kullanıcı koşullarında doğrulanması; hata oranı ve çıktı kalitesinin ölçülmesi için aynı anonim sınav verisinin MAHİR olmadan ve MAHİR ile işlendiği karşılaştırmalı pilot çalışma yapılacaktır.
-
-### Öğretmen olmayan okuyucu için temel kavramlar
-
-| Kavram | Bu projede ne anlama gelir? |
-|---|---|
-| Sınav evrakı | Bir öğrencinin cevaplandırdığı tek sınav belgesidir. 35 öğrencilik bir sınıfın bir sınavı 35 sınav evrakı üretir. |
-| Sınıf-sınav analizi | Bir şubenin tek sınavındaki sonuçların topluca değerlendirilmesidir. 35 sınav evrakı çoğunlukla bir analiz olayına karşılık gelir. |
-| Öğrenme çıktısı | Öğrencinin öğretim süreci sonunda edinmesi beklenen bilgi, beceri veya yeterliktir. |
-| Öğrenme kanıtı | Bir öğrenme çıktısına ne ölçüde ulaşıldığını gösteren sınav, performans, gözlem veya portfolyo verisidir. |
-| Üst yazı | Analiz raporunun okul yönetimine veya başka bir resmî makama sunulmasında kullanılan resmî yazı taslağıdır. |
-| EBYS | MEB'e bağlı okul ve kurumlarda resmî belgelerin oluşturulması, paraflanması, elektronik imzalanması, gönderilmesi ve arşivlenmesi için kullanılan Elektronik Belge Yönetim Sistemidir. MEBBİS ortak ekranı erişim yollarından biridir. |
 
 ## Türkiye Yüzyılı Maarif Modeli ile aynı dili konuşan analiz
 
@@ -100,7 +147,7 @@ Kaynak: [Millî Eğitim Bakanlığı, 2024-2025 Örgün Eğitim İstatistikleri]
 | Kapsam düzeyi | Ne ifade ediyor? | Ölçek | Kanıt durumu |
 |---|---|---|---|
 | Gözlenen uygulama | 35 öğrencilik geçmiş sınav verisinin analiz raporu ve üst yazı taslağına dönüştürülmesi | Yaklaşık 2,5 dakika | Tek cihazda proje gözlemi |
-| Mevcut prototip | 9. sınıf Türk Dili ve Edebiyatı yazılı sınav analizi | Çalışan prototip | Sentetik ve anonim verilerle test |
+| Mevcut prototip | 9. sınıf Türk Dili ve Edebiyatı yazılı, dinleme/izleme ve konuşma sınavlarının ayrı ve birleşik analizi | Çalışan prototip | Sentetik ve anonim verilerle test |
 | Potansiyel pilot evren | Aynı ders ve sınıf düzeyindeki teorik yıllık hacim | 3.937.560 sınav evrakı; 156.964 sınıf-sınav analizi | MEB 2024/25 verisi ve yılda dört yazılı varsayımı |
 | Genişleme vizyonu | Farklı dersler, kademeler, gelişim, risk ve idarî raporlama | Tek kesin sayı yok | Tamamlanmış özellik değildir |
 
@@ -110,7 +157,7 @@ Yaklaşık **2,5 dakikalık** gözlem, kontrollü, tekrarlı ve temsilî bir den
 
 ### Gösterim senaryosunun resmî dayanağı
 
-README'de görselleriyle sunulan uygulama, **9. sınıf Türk Dili ve Edebiyatı dersi 2025-2026 eğitim öğretim yılı ikinci dönem ikinci yazılı sınavı** bağlamında hazırlanmıştır. Soru yapısı, puan dağılımı ve öğrenme çıktısı ilişkileri; Millî Eğitim Bakanlığı tarafından yayımlanan ilgili konu-soru dağılım tablosu, sınav senaryosu ve resmî öğretim programı doğrultusunda ekip tarafından MAHİR'in veri yapısına uyarlanmıştır.
+README'de görselleriyle sunulan yazılı sınav uygulaması, **9. sınıf Türk Dili ve Edebiyatı dersi 2025-2026 eğitim öğretim yılı ikinci dönem ikinci yazılı sınavı** bağlamında hazırlanmıştır. Yazılı sınavın soru yapısı, puan dağılımı ve öğrenme çıktısı ilişkileri; Millî Eğitim Bakanlığı tarafından yayımlanan ilgili konu-soru dağılım tablosu, sınav senaryosu ve resmî öğretim programı doğrultusunda ekip tarafından MAHİR'in veri yapısına uyarlanmıştır. Dinleme/izleme ve konuşma örnekleri ise aynı sınıf düzeyindeki resmî TDE 9 program kataloğunun ilgili alan becerileri ve süreç bileşenleri kullanılarak sentetik biçimde oluşturulmuştur.
 
 Bu senaryo, resmî program dilinin ve ölçme bağlamının MAHİR'de nasıl yapılandırıldığını göstermek için kullanılır. Soru-öğrenme çıktısı ilişkileri öğretmen tarafından seçilir veya doğrulanır; sistem bu ilişkileri kendiliğinden kesin bir pedagojik eşleştirme olarak üretmez.
 
@@ -207,8 +254,8 @@ Kaynaklar:
 | Beklenen yetenek | MAHİR'de nasıl karşılanır? |
 |---|---|
 | Evrakı OCR veya doğrudan metin olarak okuyabilme | DOCX, PDF, XLSX, CSV ve görsel dosyalar kabul edilir. Görseller yetkilendirilmiş uzak OCR servisiyle okunur. |
-| Evrak türünü belirleme | Dosya türü, sınav bileşeni ve rapor bağlamı ayrıştırılır; tanımlı olmayan dosya ve bağlamlar reddedilir. |
-| Önemli bilgi unsurlarını çıkarma | Okul, öğretmen, ders, sınıf/şube, dönem, sınav tarihi, soru puanları, öğrenci puanları ve öğrenme çıktısı eşleştirmeleri yapılandırılır. |
+| Evrak türünü belirleme | Dosya türü ve rapor bağlamı ayrıştırılır. Sınav bileşeni öğretmenin Hazırlık ekranındaki seçimiyle belirlenir; OCR dosya adından veya işaret kutusundan tahmin yürütmez. |
+| Önemli bilgi unsurlarını çıkarma | Okul, öğretmen, ders, etiketli sınıf/şube hücresi, dönem, sınav tarihi, soru puanları, öğrenci puanları ve öğrenme çıktısı eşleştirmeleri yapılandırılır. |
 | Eksik bilgileri tespit etme | Zorunlu alan, puan sınırı, toplam puan, soru sayısı, ders-sınıf-program eşleşmesi ve okunamayan hücre denetimleri öğretmen onayından önce çalışır. |
 | İlgili kural ve standartları önerme | Öğretmenin soru için seçtiği öğrenme çıktısı kayıtlı resmî program kataloğuyla doğrulanır; RAG katmanı yalnız öğretmen onayından sonra resmî program bağlamını kullanır. |
 | Kısa ve öz özet oluşturma | Soru, öğrenme çıktısı, tema ve sınıf düzeyinde başarı özetleri ile kanıt bağlantıları üretilir. |
@@ -227,71 +274,100 @@ Görev 1 çıktısı, öğretmenin düzeltebildiği bir doğrulama ekranı ve ar
 | Süreç hakkında bilgilendirme | `Taslak -> Öğretmen kontrolü -> Demo aktarımı -> Paraf bekliyor -> Elektronik imza bekliyor` adımları kullanıcıya gösterilir. |
 | Eksik bilgi talebi | Okul/kurum adı, öğretmen, ders, sınıf/şube veya dönem eksikse resmî yazı oluşturulmaz; eksik alanlar kullanıcıya bildirilir. |
 
-Görev 2 çıktıları; indirilebilir Word üst yazısı, ek listesi ve JSON biçimindeki EBYS demo aktarım paketidir. **Demo gerçek EBYS sistemine belge göndermez; gerçek evrak sayısı, kayıt tarihi, paraf veya elektronik imza üretmez.** Bu alanlar yalnız yetkili kurum entegrasyonu sonrasında EBYS tarafından oluşturulabilir.
+Görev 2 çıktıları; indirilebilir Word üst yazısı, ek listesi ve JSON biçimindeki EBYS demo aktarım paketidir. Birden fazla onaylı rapor aynı üst yazının ayrı ekleri olarak paketlenebilir. **Demo gerçek EBYS sistemine belge göndermez; gerçek evrak sayısı, kayıt tarihi, paraf veya elektronik imza üretmez.** Bu alanlar yalnız yetkili kurum entegrasyonu sonrasında EBYS tarafından oluşturulabilir.
 
 ## Uçtan uca MAHİR akışı
 
 ```mermaid
 flowchart LR
-    A["Sınav evrakı"] --> B["OCR / belge okuma"]
-    B --> C["Öğretmen doğrulaması"]
-    C --> D["Kurallı ölçme ve analiz"]
-    D --> E["Program eşleştirme ve RAG"]
-    E --> F["Öğretmen onaylı rapor"]
-    F --> G["Resmî üst yazı ve yönlendirme"]
-    G --> H["EBYS aktarım demosu"]
+    A["Ders ve sınav bileşeni"] --> B["Çoklu evrak yükleme"]
+    B --> C["OCR / belge okuma ve sınıf-şube gruplama"]
+    C --> D["Öğretmen veri doğrulaması"]
+    D --> E["Ortak öğrenme çıktılarının seçimi"]
+    E --> F["Kurallı ölçme ve ajan analizi"]
+    F --> G["Şube bazlı Word / PDF raporları"]
+    G --> H["TDE genel değerlendirme: %70 + %15 + %15"]
+    G --> I["Tek üst yazı ve çoklu ek paketi"]
+    H --> I
+    I --> J["EBYS aktarım demosu"]
 ```
 
-1. Öğretmen sınav türünü ve ders bağlamını seçer.
-2. Sınav evrakı yüklenir veya veriler elle girilir.
-3. Sistem dosyayı okur; eksik, okunamayan veya çelişkili alanları bildirir.
-4. Öğretmen verileri düzeltir ve onaylar.
-5. Başarı oranları soru ve öğrenme çıktısı puanlarından deterministik olarak hesaplanır.
-6. RAG, yalnız onaylı veriler üzerinden resmî öğretim programı bağlamını getirir.
-7. Rapor öğretmen incelemesinden sonra Word ve PDF olarak üretilir.
-8. Onaylı rapordan resmî üst yazı ve kurum içi yönlendirme paketi hazırlanır.
+1. Öğretmen ders bağlamını ve yazılı, dinleme/izleme veya konuşma bileşenini seçer.
+2. Bir ya da birden fazla şubeye ait sınav evrakı yüklenir veya veriler elle girilir.
+3. Sistem dosyayı okur; yalnız açıkça etiketlenmiş sınıf/şube bilgisini kullanarak evrakları gruplar ve eksik, okunamayan veya çelişkili alanları bildirir.
+4. Öğretmen puanları, soru yapısını, öğrenci referanslarını ve sınıf/şube gruplarını düzeltir ve onaylar.
+5. Ortak sınavın öğrenme çıktıları bir kez seçilir; seçim yalnız aynı ders, sınıf düzeyi, sınav bileşeni, soru sayısı ve azami puan yapısındaki şubelere uygulanır.
+6. Başarı oranları soru ve öğrenme çıktısı puanlarından deterministik olarak hesaplanır; RAG yalnız onaylı veriler üzerinden resmî öğretim programı bağlamını getirir.
+7. Her şube için rapor öğretmen incelemesinden sonra Word ve PDF olarak üretilir.
+8. TDE 9 kapsamında onaylı üç bileşen raporu sabit **%70 yazılı + %15 dinleme/izleme + %15 konuşma** ağırlıklarıyla genel değerlendirme raporunda birleştirilebilir.
+9. İl, ilçe, okul/kurum, öğretmen ve eğitim öğretim yılı ortak rapor bağlamı olarak bir kez girilir ve çalışma içindeki raporlara aktarılır.
+10. Onaylı raporlar tek üst yazı, çoklu ek listesi ve kurum içi yönlendirme paketine dönüştürülür.
 
 ### Akışın ekran kanıtları
 
-#### 1. Eğitim bağlamı
+Görseller ayrıntılı inceleme için tıklanabilir.
 
-Öğretmen; kademe, okul türü, sınıf düzeyi, ders türü ve dersi birbirine bağlı seçim alanlarıyla belirler. Bu bağlam, raporun doğru program kataloğuyla kurulmasını sağlar.
+#### 1. Rol ve eğitim bağlamı
 
-<p align="center"><img src="assets/readme/02-hazirlik-baglami.png" alt="MAHİR hazırlık ve eğitim bağlamı ekranı" width="820"></p>
+Kullanıcı önce görev rolünü, ardından kademe, okul türü, sınıf düzeyi, ders türü ve dersi birbirine bağlı alanlardan seçer. Böylece rapor doğru öğretim programı ve görev bağlamıyla kurulur. Türk Dili ve Edebiyatı öğretmeni ekranında yüklenebilecek sınav evrakları, MAHİR'in yapacağı işlemler ve üretilebilecek raporlar ayrıca açıklanır.
 
-#### 2. Dört veri giriş yolu
+<p align="center"><a href="assets/readme/02-hazirlik-baglami.png"><img src="assets/readme/02-hazirlik-baglami.png" alt="MAHİR rol ve eğitim bağlamı seçim ekranı" width="820"></a></p>
 
-MAHİR şablonu, öğretmenin kendi Word/PDF/Excel tablosu, soru bazlı puan çizelgesi görselleri veya elle veri girişi kullanılabilir. Her yol aynı öğretmen onay ekranına bağlanır.
+<p align="center"><a href="assets/readme/03-tde-evrak-rehberi.png"><img src="assets/readme/03-tde-evrak-rehberi.png" alt="Türk Dili ve Edebiyatı öğretmenine özel evrak ve rapor rehberi" width="820"></a></p>
 
-<p align="center"><img src="assets/readme/03-veri-giris-yollari.png" alt="MAHİR veri giriş yolları" width="820"></p>
+#### 2. Veri giriş yolları ve üç bileşenli genel değerlendirme
 
-#### 3. OCR veri kabul kapısı
+Öğretmen soru bazlı puan çizelgesi görselleri, kendi Word/PDF/Excel tablosu, MAHİR şablonu veya elle veri girişi yollarından birini kullanabilir. Ayrı ayrı onaylanan yazılı, dinleme/izleme ve konuşma raporları daha sonra sabit **%70 + %15 + %15** ağırlıklarıyla genel değerlendirmede birleştirilebilir; bu adımda yeni sınav evrakı yüklenmez.
 
-Görsel OCR yolu yalnız soru numarası, azami puan ve öğrencinin aldığı puanı gösteren soru bazlı puan çizelgeleri içindir. Fotoğraf kalitesi, açı, ışık ve el yazısı sonucu etkileyebileceğinden OCR çıktısı otomatik olarak doğru kabul edilmez.
+<p align="center"><a href="assets/readme/04-veri-giris-yollari.png"><img src="assets/readme/04-veri-giris-yollari.png" alt="MAHİR veri giriş yolları ve OCR çizelge yapısı" width="700"></a></p>
 
-<p align="center"><img src="assets/readme/04-ocr-puan-cizelgesi.png" alt="OCR puan çizelgesi yükleme ekranı" width="820"></p>
+<p align="center"><a href="assets/readme/05-uc-rapor-genel-degerlendirme.png"><img src="assets/readme/05-uc-rapor-genel-degerlendirme.png" alt="Yazılı, dinleme ve konuşma raporlarını yüzde 70, yüzde 15 ve yüzde 15 ağırlıklarıyla birleştirme ekranı" width="700"></a></p>
 
-#### 4. Veri minimizasyonu ve açık öğretmen onayı
+#### 3. Toplu OCR ve kaynak izlenebilirliği
 
-Ad-soyad ve T.C. kimlik numarası analiz için kullanılmaz. Öğrenciler <code>ÖĞR-001</code> benzeri anonim referanslarla ayrıştırılır. Okunan puanlar ve toplamlar öğretmenin düzenleme ve kontrolüne sunulur; açık onay verilmeden analiz başlamaz.
+Görsel OCR yolu, her görselde tek öğrenci bulunan soru bazlı puan çizelgeleri içindir. Soru numarası, azami puan, öğrencinin aldığı puan ve açıkça etiketlenmiş sınıf/şube hücresi okunur; kaynak dosya adı korunur. Sınav bileşeni öğretmenin Hazırlık ekranındaki seçimiyle belirlenir. Boş puan hücreleri soru sırasını bozmadan korunur ve öğrenci referansları sayısal sıraya alınır. Toplu yüklemede her dosyanın ilerlemesi görünür; fotoğraf kalitesi, açı, ışık ve el yazısı sonucu etkileyebileceğinden OCR çıktısı otomatik olarak doğru kabul edilmez.
 
-<p align="center"><img src="assets/readme/05-ogretmen-veri-kontrolu.png" alt="Öğretmen veri kontrol ekranı" width="820"></p>
+<p align="center"><a href="assets/readme/06-toplu-ocr-okuma.png"><img src="assets/readme/06-toplu-ocr-okuma.png" alt="Yirmi sınav evrakının toplu OCR ile okunma ilerlemesi" width="700"></a></p>
 
-#### 5. İzlenebilir analiz ve raporlama
+#### 4. Veri minimizasyonu ve açık öğretmen kontrolü
 
-Analiz ekranı, belge anlama, program eşleştirme, ölçme-değerlendirme, pedagojik analiz ve raporlama aşamalarını ayrı ayrı gösterir. Ekrandaki süre yalnız ilgili çalıştırmanın analiz aşamasıdır; veri hazırlama, öğretmen kontrolü ve rapor incelemesini kapsayan uçtan uca süre değildir.
+Ad-soyad ve T.C. kimlik numarası analiz için kullanılmaz. Öğrenciler <code>ÖĞR-001</code> benzeri anonim referanslarla ayrıştırılır. MAHİR'in sınıf/şube bazında grupladığı puanlar, azami puanlar ve toplamlar öğretmenin düzenleme ve kontrolüne sunulur; açık onay verilmeden analiz başlamaz.
 
-<p align="center"><img src="assets/readme/06-analiz-sureci.png" alt="MAHİR analiz süreci" width="820"></p>
+<p align="center"><a href="assets/readme/07-sinif-veri-kontrolu.png"><img src="assets/readme/07-sinif-veri-kontrolu.png" alt="Sınıf ve sınav türü bazında öğretmen veri kontrol ekranı" width="700"></a></p>
 
-Soru bazındaki puanlar, azami puanlar ve öğretmenin seçtiği öğrenme çıktıları birlikte gösterilerek kanıtın hangi veriden üretildiği izlenebilir tutulur.
+#### 5. Ortak öğrenme çıktılarının güvenli aktarımı
 
-<p align="center"><img src="assets/readme/07-soru-bazinda-kanit.png" alt="Soru bazında öğrenme kanıtları" width="820"></p>
+Aynı yapıdaki ortak sınav için öğrenme çıktıları bir kez seçilir ve yalnız ders, sınıf düzeyi, sınav bileşeni, soru sayısı ve azami puan dizisi eşleşen sınıf/şubelere uygulanır. Böylece bir şubede yapılan eşleştirme diğer uygun şubelerin analizini de besler; farklı yapıdaki sınavlara taşınmaz.
 
-#### 6. Rapor, üst yazı ve EBYS demo sınırı
+<p align="center"><a href="assets/readme/08-ortak-ogrenme-ciktilari.png"><img src="assets/readme/08-ortak-ogrenme-ciktilari.png" alt="Ortak öğrenme çıktılarının aynı yapıdaki sınavlara uygulanmış hâli" width="700"></a></p>
 
-Öğretmen onaylı rapordan resmî üst yazı ve ek listesi hazırlanabilir. Prototip MEBBİS'e veya gerçek MEB EBYS'ye bağlı değildir; evrak sayısı, kayıt tarihi, paraf veya elektronik imza üretmez.
+#### 6. Altı uzman ajan ve ortak dil modeli turu
 
-<p align="center"><img src="assets/readme/08-ebys-demo.png" alt="Üst yazı ve EBYS demo ekranı" width="820"></p>
+Analiz ekranı; Belge Anlama, Program Eşleştirme, Ölçme ve Değerlendirme, Pedagojik Analiz ve Raporlama adımlarını ayrı ayrı gösterir. Yükleme öncesinde çalışan Belge Okuma ve OCR Kalite Ajanı ile birlikte mimari altı uzman görev bileşeninden oluşur. Beş analiz ajanının istemleri tek ortak dil modeli turunda çözümlenir. Ekrandaki süre yalnız ilgili çalıştırmanın analiz aşamasıdır; veri hazırlama, öğretmen kontrolü ve rapor incelemesini kapsayan uçtan uca süre değildir.
+
+<p align="center"><a href="assets/readme/14-cok-ajanli-analiz.png"><img src="assets/readme/14-cok-ajanli-analiz.png" alt="Beş analiz ajanı ve ortak dil modeli turunun izlenebilir özeti" width="700"></a></p>
+
+#### 7. Kanıta ve doğrulanmış kaynağa dayalı rapor
+
+Rapor; sınıf başarı özetini, soru bazlı gerçekleşme düzeylerini ve öğretmenin seçtiği öğrenme çıktılarının hangi puanlardan hesaplandığını birlikte gösterir. Pedagojik öneriler yalnız onaylı puanlardan ve adı, ilgili sayfası ve kullanım amacı gösterilen doğrulanmış eğitim kaynaklarından üretilir.
+
+<p align="center"><a href="assets/readme/15-ogrenme-kanitlari-raporu.png"><img src="assets/readme/15-ogrenme-kanitlari-raporu.png" alt="Soru bazlı öğrenme kanıtları ve öğrenme çıktısı analizi" width="700"></a></p>
+
+<p align="center"><a href="assets/readme/16-kaynak-temelli-oneriler.png"><img src="assets/readme/16-kaynak-temelli-oneriler.png" alt="Kaynak temelli pedagojik öneriler ve resmî dayanak tablosu" width="700"></a></p>
+
+#### 8. Öğretmen onayı, üst yazı ve EBYS demo sınırı
+
+Nihai rapor öğretmen onayından sonra Word veya PDF olarak indirilebilir. Onaylı tek ya da birden fazla rapordan resmî üst yazı ve ek listesi hazırlanabilir; tamamlanan Word üst yazısı, öğretmenin değerlendirdiği sınav evrakının kurum yönetimine sunulan giden evrak paketine dönüşmesini görünür kılar. Prototip MEBBİS'e veya gerçek MEB EBYS'ye bağlı değildir; evrak sayısı, kayıt tarihi, paraf veya elektronik imza üretmez ve gerçek sisteme belge göndermez.
+
+<p align="center"><a href="assets/readme/17-rapor-onayi-ebys-demo.png"><img src="assets/readme/17-rapor-onayi-ebys-demo.png" alt="Öğretmen rapor onayı, Word ve PDF indirme ile EBYS aktarım demosu" width="700"></a></p>
+
+<p align="center"><a href="assets/readme/18-resmi-ust-yazi.png"><img src="assets/readme/18-resmi-ust-yazi.png" alt="MAHİR tarafından hazırlanan indirilebilir resmî Word üst yazısı" width="820"></a></p>
+
+### Çoklu sınıflarda ortak sınav ve rapor bağlamı
+
+MAHİR, aynı sınavın birden fazla şubede uygulanması durumunda tekrar eden öğretmen işini azaltır. Öğrenme çıktısı seçimi; ders, sınıf düzeyi, sınav bileşeni, soru sayısı ve azami puan dizisi birlikte eşleştiğinde diğer şubelere aktarılır. Farklı sınav bileşenleri veya farklı soru yapıları arasında otomatik aktarım yapılmaz. Ortak eşleştirme sonradan değişirse eski analiz ve rapor onayı geçersizleştirilerek yeniden analiz istenir.
+
+Kurumsal rapor bilgileri de çalışma düzeyinde paylaşılır. **İl, ilçe, okul/kurum adı, öğretmenin adı soyadı ve eğitim öğretim yılı** ilk raporda doğrulandıktan sonra diğer raporlara uygulanır. **Sınıf/şube, dönem, sınav sırası ve sınav tarihi** her sınavın kendi bağlamında tutulur. Eğitim öğretim yılı yalnız `2025-2026` gibi ardışık iki yılı gösteren biçimde kabul edilir.
 
 ## Çok ajanlı mimari
 
@@ -417,9 +493,9 @@ Yetkili değerlendirmede tam erişim, ayrıca iletilen yerel yapılandırma dosy
 MAHİR'in ilk doğrulama alanı **9. sınıf Türk Dili ve Edebiyatı** dersidir. Pilot veri paketi:
 
 - dört temayı kapsayan **54 öğrenme çıktısı**,
-- resmî dönem ve senaryo tablolarıyla doğrulanan **66 süreç bileşeni**,
+- resmî programdan yapılandırılan **237 süreç bileşeni** ve **614 ayrıntılı gösterge**,
 - Dinleme/İzleme, Okuma, Konuşma ve Yazma alan becerileri,
-- tema, ders, sınıf ve sınav türü bağlamını koruyan kayıt yapısı
+- tema, ders, sınıf ve sınav bileşeni bağlamını koruyan kayıt yapısı
 
 içerir.
 
@@ -431,6 +507,7 @@ TDE kodları yalnızca **Türk Dili ve Edebiyatı + 9. sınıf** profili seçild
 - Program kodları serbest metinden uydurulmaz; tanımlı ders-sınıf kataloğundan alınır.
 - Öğrenci toplamları soru puanlarından hesaplanır; LLM'e hesap yaptırılmaz.
 - Her soru puanı tanımlı azami puanla sınırlandırılır.
+- Ortak öğrenme çıktıları yalnız aynı sınav yapısındaki şubelere aktarılır; farklı sınav bileşenleri birbirine karıştırılmaz.
 - Eksik veya okunamayan veri öğretmen tarafından düzeltilmeden analiz tamamlanmaz.
 - RAG yalnız öğretmen onayından sonraki pedagojik raporlama aşamasında kullanılır.
 - Kaynak bağlam bulunamazsa sistem içerik uydurmak yerine bu durumu açıkça bildirir.
@@ -452,12 +529,15 @@ TDE kodları yalnızca **Türk Dili ve Edebiyatı + 9. sınıf** profili seçild
 | Tek sayfalık öğretmen akışı | Çalışıyor |
 | TDE 9 program kataloğu ve ayrıntılı süreç bileşenleri | Çalışıyor |
 | DOCX, PDF, XLSX ve CSV belge okuma | Çalışıyor |
-| Çoklu görsel OCR ve grup birleştirme | Çalışıyor - uzak GPU servisiyle |
+| Çoklu görsel OCR ve etiketli sınıf/şube gruplama | Çalışıyor - uzak GPU servisiyle |
 | Öğretmen veri doğrulaması | Çalışıyor |
+| Aynı yapıdaki çoklu şubelerde ortak öğrenme çıktısı | Çalışıyor; seçim bir kez yapılır ve eşleşen şubelere uygulanır |
 | Kurallı sınav ve öğrenme çıktısı analizi | Çalışıyor |
 | Program kaynaklı RAG yorumlama | Çalışıyor - uzak GPU servisiyle |
-| Word ve PDF rapor üretimi | Çalışıyor |
-| Resmî üst yazı ve yönlendirme paketi | Çalışıyor - demo kapsamında |
+| Yazılı, dinleme/izleme ve konuşma için Word/PDF raporu | Çalışıyor |
+| TDE genel değerlendirme raporu | Çalışıyor; sabit %70 yazılı + %15 dinleme/izleme + %15 konuşma |
+| Ortak kurumsal rapor bilgilerinin yeniden kullanımı | Çalışıyor; sınava özgü alanlar ayrı korunur |
+| Tek üst yazıda birden fazla onaylı rapor eki | Çalışıyor - demo kapsamında |
 | Gerçek EBYS aktarımı ve elektronik imza | Simüle ediliyor; yetkili kurum entegrasyonu gerektirir |
 | Kalıcı ilişkisel veritabanı | Sonraki geliştirme aşaması |
 | Kurumsal kullanıcı hesabı ve yetkilendirme | Prototip sonrası |
@@ -470,7 +550,7 @@ Python doğrulamalarını çalıştırmak için:
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-Node.js kuruluysa repodaki 10 JavaScript test dosyasının tamamı ve ana tarayıcı betiğinin sözdizimi kontrolü çalıştırılabilir:
+Node.js kuruluysa repodaki 13 JavaScript test dosyasının tamamı ve ana tarayıcı betiğinin sözdizimi kontrolü çalıştırılabilir:
 
 ```bash
 node --test tests/*.test.js
@@ -488,9 +568,12 @@ MAHIR-PROTOTIP-HTML/
 |-- script.js                 # Kullanıcı akışı ve ön yüz bağlantıları
 |-- MAHIR_BASLAT.cmd          # Windows hızlı başlatıcı
 |-- assets/js/                # Program kataloğu, yedekleme ve çıktı üreticileri
+|   |-- mahir-shared-outcomes.js # Aynı yapıdaki şubeler için ortak çıktı eşleştirmesi
+|   `-- mahir-ebys-demo.js    # Tek üst yazı ve çoklu ek demo paketi
 |-- backend/app/              # Belge okuma, doğrulama ve analiz motorları
 |-- backend/app/agents/       # Öğretmen onayı sonrası beş analiz ajanı ve orkestratör
 |-- backend/app/ocr_quality_agent.py # Yükleme aşamasındaki OCR kalite ajanı
+|-- backend/app/general_report_merger.py # Üç TDE bileşen raporunu birleştirme
 |-- shared/pilot/tde9/        # TDE 9 pilot program verileri
 |-- shared/templates/         # Veri giriş ve rapor şablonları
 |-- tests/                    # Python ve JavaScript kontrolleri
