@@ -4,24 +4,45 @@
   const DEMO_NOTICE = "EBYS entegrasyonu demo ortamında simüle edilmektedir. Demo: Bu işlem gerçek EBYS sistemine belge göndermez.";
   const text = (value) => String(value ?? "").trim();
   const metadataMap = (model) => Object.fromEntries((model?.metadata || []).map((item) => [item.label, text(item.value)]));
+  const slashList = (values) => [...new Set(values.map(text).filter(Boolean))].join(" / ");
+  const normalizedExamComponent = (value) => {
+    const normalized = text(value).toLocaleLowerCase("tr-TR");
+    if (normalized.includes("dinleme")) return "dinleme";
+    if (normalized.includes("konuşma")) return "konuşma";
+    if (normalized.includes("yazılı")) return "yazılı";
+    return "";
+  };
 
-  const buildPackage = (model, filename) => {
+  const buildPackage = (model, filename, approvedReports = []) => {
     const metadata = metadataMap(model);
+    const coveredClassSections = slashList(approvedReports.map((report) => report.classSection));
     const missing = ["Okul/Kurum Adı", "Öğretmenin Adı Soyadı", "Ders", "Sınıf/Şube", "Dönem"]
-      .filter((key) => !metadata[key] || metadata[key] === "—");
+      .filter((key) => {
+        if (key === "Sınıf/Şube" && coveredClassSections) return false;
+        return !metadata[key] || metadata[key] === "—";
+      });
     const reportType = metadata["Sınav Türü"] || "Sınav Analizi";
     const course = metadata.Ders || "ders";
-    const classSection = metadata["Sınıf/Şube"] || "sınıf/şube";
+    const classSection = metadata["Sınıf/Şube"] || coveredClassSections || "sınıf/şube";
     const teacherName = metadata["Öğretmenin Adı Soyadı"] || "—";
     const schoolName = metadata["Okul/Kurum Adı"] || "—";
-    const attachments = [{ order: 1, name: filename, type: "Ana Analiz Raporu" }];
-    if (reportType === "Genel Değerlendirme") {
+    const coveredComponents = [...new Set(approvedReports.map((report) => normalizedExamComponent(report.examType)).filter(Boolean))];
+    const metadataComponent = normalizedExamComponent(reportType);
+    const isGeneralEvaluation = (!approvedReports.length && reportType === "Genel Değerlendirme")
+      || ["yazılı", "dinleme", "konuşma"].every((component) => coveredComponents.includes(component));
+    const coveredExamType = coveredComponents.length === 1 ? coveredComponents[0] : metadataComponent || "sınav";
+    const classScope = coveredClassSections || classSection;
+    const attachments = approvedReports.length
+      ? approvedReports.map((report, index) => ({ order: index + 1, name: report.filename, type: `${report.label} Analiz Raporu` }))
+      : [{ order: 1, name: filename, type: "Ana Analiz Raporu" }];
+    if (reportType === "Genel Değerlendirme" && !approvedReports.length) {
       [
         "MAHIR_Yazili_Sinav_Sonuclari_Analiz_Raporu.docx",
         "MAHIR_Dinleme_Izleme_Sinavi_Sonuclari_Analiz_Raporu.docx",
         "MAHIR_Konusma_Sinavi_Sonuclari_Analiz_Raporu.docx"
       ].forEach((name, index) => attachments.push({ order: index + 2, name, type: "Dayanak Bileşen Raporu" }));
     }
+    const reportWord = attachments.length > 1 ? "analiz raporları" : "analiz raporu";
     return {
       schema: "mahir.ebys-demo-package",
       schemaVersion: 1,
@@ -36,8 +57,12 @@
         nextStatus: "Paraf bekliyor"
       },
       coverLetter: {
-        subject: `${course} ${classSection} ${reportType} sonuçlarının değerlendirilmesi`,
-        body: `${course} dersi ${classSection} sınıf/şubesine ait ${reportType.toLocaleLowerCase("tr-TR")} sonuçları MAHİR tarafından öğretmen onaylı öğrenme kanıtları üzerinden analiz edilmiştir. İncelenmek ve gerekli kurumsal işlemlerde değerlendirilmek üzere analiz raporu ekte sunulmuştur.`,
+        subject: isGeneralEvaluation
+          ? `${course} ${classScope} yazılı, dinleme ve konuşma sınavları sonuçlarının değerlendirilmesi`
+          : `${course} ${classScope} ${coveredExamType} sınav sonuçlarının değerlendirilmesi`,
+        body: isGeneralEvaluation
+          ? `${course} dersi ${classScope} sınıf/şubesine ait yazılı, dinleme ve konuşma sınavları sonuçları MAHİR tarafından öğretmen onaylı öğrenme kanıtları üzerinden analiz edilmiştir. İncelenmek ve gerekli kurumsal işlemlerde değerlendirilmek üzere genel değerlendirme analiz raporları ekte sunulmuştur.`
+          : `${course} dersi ${classScope} sınıf/şubesine ait ${coveredExamType} sınav sonuçları MAHİR tarafından öğretmen onaylı öğrenme kanıtları üzerinden analiz edilmiştir. İncelenmek ve gerekli kurumsal işlemlerde değerlendirilmek üzere ${reportWord} ekte sunulmuştur.`,
         institutionName: schoolName,
         signatoryName: teacherName,
         signatoryRole: `${course} Öğretmeni`
@@ -70,7 +95,18 @@
       const th = document.createElement("th");
       const td = document.createElement("td");
       th.textContent = label;
-      td.textContent = value;
+      if (label === "Ekler") {
+        const attachmentList = document.createElement("div");
+        attachmentList.className = "ebys-attachment-list";
+        pkg.attachments.forEach((item) => {
+          const attachment = document.createElement("div");
+          attachment.textContent = `Ek-${item.order}: ${item.name}`;
+          attachmentList.append(attachment);
+        });
+        td.append(attachmentList);
+      } else {
+        td.textContent = value;
+      }
       row.append(th, td);
       table.append(row);
     });
@@ -98,8 +134,24 @@
     const approval = card.querySelector("[data-ebys-approval]");
     const status = card.querySelector("[data-ebys-status]");
     let currentPackage = null;
+    let approvalState = { total: 0, approved: 0, allApproved: false, reports: [] };
+
+    const applyApprovalState = (state = {}) => {
+      approvalState = { ...approvalState, ...state };
+      prepare.disabled = !approvalState.allApproved;
+      prepare.setAttribute("aria-disabled", String(prepare.disabled));
+      if (!approvalState.allApproved) {
+        status.textContent = approvalState.total
+          ? `${approvalState.approved}/${approvalState.total} sınav raporu onaylandı. Tek üst yazı için bütün raporları onaylayınız.`
+          : "Tek üst yazı hazırlanabilmesi için bütün sınav raporlarını ayrı ayrı kontrol edip onaylayınız.";
+      } else {
+        status.textContent = `${approvalState.approved} sınav raporunun tamamı onaylandı. Bu raporlar için tek üst yazı hazırlanabilir.`;
+      }
+    };
+    document.addEventListener("mahir:report-approval-state", (event) => applyApprovalState(event.detail));
 
     prepare.addEventListener("click", () => {
+      if (!approvalState.allApproved) return;
       const report = document.querySelector("#report-screen");
       const api = window.MAHIRReportExport;
       const model = api?.getReportModel?.(report);
@@ -107,7 +159,7 @@
         status.textContent = model?.validation?.message || "Raporun zorunlu kurumsal bilgileri tamamlanmalıdır.";
         return;
       }
-      currentPackage = buildPackage(model, api.getDownloadFilename("docx"));
+      currentPackage = buildPackage(model, api.getDownloadFilename("docx"), approvalState.reports);
       if (currentPackage.missingInformation.length) {
         status.textContent = `Eksik bilgiler: ${currentPackage.missingInformation.join(", ")}.`;
         return;

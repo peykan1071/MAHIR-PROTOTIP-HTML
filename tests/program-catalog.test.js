@@ -1,7 +1,33 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const catalog = require("../assets/js/mahir-program-catalog.js");
+
+const curriculum = JSON.parse(fs.readFileSync(
+  path.join(__dirname, "..", "shared", "pilot", "tde9", "learning-outcomes-template.json"),
+  "utf8"
+)).learning_outcomes;
+
+assert.equal(curriculum.length, 54);
+assert.equal(curriculum.reduce((sum, outcome) => sum + outcome.processComponents.length, 0), 237);
+assert.equal(curriculum.reduce((sum, outcome) => sum + outcome.processComponents.reduce(
+  (componentSum, component) => componentSum + component.indicators.length,
+  0
+), 0), 614);
+assert.deepEqual(
+  new Set(catalog.filterOutcomes(curriculum, "listening").map((outcome) => outcome.skill)),
+  new Set(["Dinleme/İzleme"])
+);
+assert.deepEqual(
+  new Set(catalog.filterOutcomes(curriculum, "speaking").map((outcome) => outcome.skill)),
+  new Set(["Konuşma"])
+);
+assert.deepEqual(
+  new Set(catalog.filterOutcomes(curriculum, "written").map((outcome) => outcome.skill)),
+  new Set(["Okuma", "Yazma"])
+);
 
 assert.equal(catalog.resolve("Türk Dili ve Edebiyatı", "9").id, "tde-9-tymm");
 assert.equal(catalog.resolve("Seçmeli Türk Dili ve Edebiyatı", "9. sınıf").id, "tde-9-tymm");

@@ -163,7 +163,7 @@
                   <select id="course" name="course" data-prep-field="course" required disabled>
                     <option value="">Dersin adını seçiniz</option>
                   </select>
-                  <p class="preparation-helper">Seçtiğiniz ders bütün evrak gruplarına ve ilgili RAG kaynaklarına uygulanır; OCR dersi sınıflandırmaz.</p>
+                  <p class="preparation-helper">Seçtiğiniz ders bütün sınav evraklarına ve ilgili RAG kaynaklarına uygulanır; OCR dersi sınıflandırmaz.</p>
                 </div>
 
               </div>
@@ -242,6 +242,24 @@
             <button class="secondary-button" type="button" data-target-screen="preparation-screen">Hazırlık Seçimlerine Dön</button>
           </article>
 
+          <article class="data-source-card analysis-path-card" data-analysis-path-card aria-labelledby="analysis-path-title">
+            <div>
+              <p class="data-entry-kicker">Çalışma türü</p>
+              <h3 id="analysis-path-title">Ne yapmak istiyorsunuz?</h3>
+              <p>Sınav evraklarını öğrenme kanıtlarına dayalı olarak analiz edebilir veya daha önce MAHİR'de öğretmen onayıyla oluşturulan üç bileşen raporunu bütüncül bir genel değerlendirmede birleştirebilirsiniz.</p>
+            </div>
+            <div class="data-source-options" role="radiogroup" aria-label="Çalışma türü seçimi">
+              <label>
+                <input type="radio" name="analysis-path" value="exam" data-analysis-path checked>
+                <span><strong>Sınav Evraklarını Analiz Et</strong><small>Yazılı, dinleme/izleme veya konuşma sınavına ait görsel ya da puan tablolarını yükleyin.</small></span>
+              </label>
+              <label>
+                <input type="radio" name="analysis-path" value="general" data-analysis-path>
+                <span><strong>Üç Raporla Genel Değerlendirme Oluştur</strong><small>Yalnız Türk Dili ve Edebiyatı için öğretmen onaylı üç MAHİR Word raporunu bütüncül olarak değerlendirin; yeni sınav evrakı yüklemeyin. Sabit ağırlıklar: Yazılı %70 · Dinleme/izleme %15 · Konuşma %15.</small></span>
+              </label>
+            </div>
+          </article>
+
           <article class="exam-structure-card" aria-labelledby="exam-structure-title" data-exam-structure-card hidden>
             <div class="exam-structure-heading">
               <div>
@@ -264,7 +282,7 @@
                 <input type="number" min="1" max="100" step="1" value="35" data-student-count required>
               </label>
               <label>Soru Sayısı
-                <input type="number" min="1" max="50" step="1" value="10" data-question-count required>
+                <input type="number" min="1" max="15" step="1" value="10" data-question-count required>
               </label>
             </div>
             <p class="preparation-helper" data-component-weight-note hidden></p>
@@ -283,7 +301,7 @@
               <div>
                 <p class="data-entry-kicker">Rapor birleştirme</p>
                 <h3 id="general-report-merger-title">Üç Bileşenli Genel Değerlendirme</h3>
-                <p>MAHİR tarafından oluşturulan yazılı, dinleme/izleme ve konuşma analiz raporlarını yükleyiniz. Sistem; ders, sınıf/şube, dönem ve bileşen uyumunu doğruladıktan sonra genel değerlendirmeyi oluşturur.</p>
+                <p>MAHİR tarafından öğretmen onayıyla oluşturulan yazılı, dinleme/izleme ve konuşma analiz raporlarını yükleyiniz. MAHİR; ders, sınıf/şube, dönem ve bileşen uyumunu doğrular; öğrenme kanıtlarını, öğrenme çıktılarını ve beceri gelişimini bütüncül biçimde değerlendirir.</p>
               </div>
               <p class="general-weight-badge" data-general-weight-badge>%70 · %15 · %15</p>
             </div>
@@ -310,9 +328,9 @@
             </div>
 
             <p class="notification-message general-report-status" data-general-report-status aria-live="polite">
-              Genel değerlendirme için MAHİR'den indirilen üç Word (.docx) analiz raporu gereklidir.
+              Bütüncül genel değerlendirme için öğretmen onaylı üç MAHİR Word (.docx) analiz raporu gereklidir.
             </p>
-            <p class="general-report-privacy-note"><strong>Kişisel verilerin korunması:</strong> Birleştirme işleminde öğrenci adı, okul numarası veya T.C. kimlik numarası kullanılmaz. Genel sonuç, raporlardaki sınıf düzeyi kanıtlardan oluşturulur; öğrenci bazlı e-Okul puanı hesaplanmaz.</p>
+            <p class="general-report-privacy-note"><strong>Kişisel verilerin korunması:</strong> Birleştirme işleminde öğrenci adı, okul numarası veya T.C. kimlik numarası kullanılmaz. Genel değerlendirme, raporlardaki sınıf düzeyi öğrenme kanıtlarından oluşturulur; öğrenci bazlı e-Okul puanı hesaplanmaz. Nihai değerlendirme ve eğitim kararı öğretmene aittir.</p>
             <div class="button-group general-report-actions">
               <button class="secondary-button" type="button" data-target-screen="preparation-screen">Geri</button>
               <button class="primary-button" type="button" data-merge-general-reports disabled aria-disabled="true">Raporları Doğrula ve Birleştir</button>
@@ -391,6 +409,7 @@
             <div class="upload-symbol" aria-hidden="true">↑</div>
             <h3 id="upload-title" data-upload-title>Soru bazlı puan çizelgelerini yükleyin</h3>
             <p data-upload-description>Sınav evraklarının tamamını seçin. Tek seferde en fazla 100 görsel yükleyebilirsiniz.</p>
+            <p class="notification-message" data-batch-upload-guidance>Seçtiğiniz sınıf düzeyinin bütün şubelerine ait aynı tür sınav evraklarını tek seferde yükleyebilirsiniz. Bir çalışma oturumunda en fazla 100 evrak işlenir.</p>
             <label class="primary-button file-select-button" for="exam-file" data-file-select-label>Çizelge Fotoğraflarını Seç</label>
             <input id="exam-file" class="visually-hidden-file-input" name="exam-file" type="file" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
             <p class="upload-rules" data-upload-rules>JPG, PNG veya WEBP · Tek seçimde en fazla 100 görsel · Dosya başına 20 MB</p>
@@ -401,6 +420,18 @@
           <p class="notification-message upload-status-message" data-component="Notification Message" data-upload-status data-standard-data-entry aria-live="polite">
             Belirsiz okunan alanlar analizden önce öğretmen onayına sunulacaktır.
           </p>
+
+          <section class="ocr-progress-card" data-ocr-progress data-standard-data-entry aria-live="polite" hidden>
+            <div class="ocr-progress-heading">
+              <strong data-ocr-progress-count>0 / 0 evrak okundu</strong>
+              <span data-ocr-progress-percent>%0</span>
+            </div>
+            <progress data-ocr-progress-bar max="100" value="0">%0</progress>
+            <div class="ocr-progress-time">
+              <span data-ocr-elapsed>Geçen süre: 0 sn</span>
+              <span data-ocr-remaining>Kalan süre hesaplanıyor…</span>
+            </div>
+          </section>
 
           <div class="button-group data-entry-actions" data-standard-data-entry aria-label="Veri ekleme işlemleri">
             <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="preparation-screen">Geri</button>
@@ -421,24 +452,24 @@
               <li>Rapor</li>
             </ol>
           </nav>
-          <h2 id="validation-title">Sınav Grubunu Kontrol Edin</h2>
-          <p>MAHİR'in sınıf/şube ve sınav türüne göre oluşturduğu grubu kontrol edin. Ders, Hazırlık ekranındaki seçiminizden alınır; soru sayısı ve azami puanlar evraktan otomatik getirilir.</p>
+          <h2 id="validation-title">Sınavları Kontrol Edin</h2>
+          <p>MAHİR'in yalnız açıkça etiketlenmiş sınıf/şube bilgisine göre ayırdığı sınavları kontrol edin. Ders, Hazırlık ekranındaki seçiminizden alınır; soru sayısı ve azami puanlar evraktan getirilir.</p>
         </header>
 
         <div class="data-confirmation-layout" aria-label="Veri onay katmanı">
           <article class="question-count-recovery-card" data-question-count-recovery hidden>
-            <h3>Soru Sayısı Okunamadı</h3>
-            <p>MAHİR evrakın sınıf/şube ve sınav türünü okudu; ancak soru sayısını güvenilir biçimde belirleyemedi. Bu sınav grubu için soru sayısını belirtiniz.</p>
+            <h3>Soru Sayısını Belirtin</h3>
+            <p>Soru sayısı alanı boş bırakıldı. Bu sınav için soru sayısını öğretmen olarak belirtiniz.</p>
             <div class="question-count-recovery-form">
               <label for="recovered-question-count">Soru sayısı</label>
-              <input id="recovered-question-count" type="number" min="1" max="50" step="1" data-recovered-question-count>
+              <input id="recovered-question-count" type="number" min="1" max="15" step="1" data-recovered-question-count>
               <button class="primary-button" type="button" data-apply-recovered-question-count>Soru Sütunlarını Oluştur</button>
             </div>
           </article>
 
           <article class="table-card question-map-card" data-component="Validation Card" aria-labelledby="question-map-title" hidden>
-            <h3 id="question-map-title">Sınav Yapısı Özeti</h3>
-            <p>Veri Ekleme aşamasında öğretmen tarafından belirlenen eşleştirmeler.</p>
+            <h3 id="question-map-title">Ortak Öğrenme Çıktıları</h3>
+            <p>Aynı türdeki sınavların soru bazlı öğrenme çıktıları burada bir kez seçilir ve bütün sınıf/şubelere uygulanır.</p>
             <div class="table-wrap">
               <table class="data-table">
                 <caption>Soru bazlı puan ve öğrenme çıktısı özeti</caption>
@@ -455,8 +486,8 @@
           </article>
 
           <article class="table-card student-data-card" data-component="Validation Card" data-student-review-card aria-labelledby="student-data-title">
-            <p class="data-entry-kicker">OCR tarafından oluşturulan sınav grubu</p>
-            <h3 id="student-data-title" data-current-exam-group>Sınav grubu belirleniyor</h3>
+            <p class="data-entry-kicker">OCR tarafından okunan sınav</p>
+            <h3 id="student-data-title" data-current-exam-group>Sınav belirleniyor</h3>
             <aside class="privacy-notice" aria-label="Kişisel veri koruma bilgisi">
               <strong>KVKK veri minimizasyonu:</strong> Ad-soyad ve T.C. kimlik numarası analiz için kullanılmaz. Okul numarası yalnız öğretmen kontrol ekranında tutulur; analiz ve LLM katmanına oturumluk takma öğrenci referansı aktarılır.
             </aside>
@@ -477,7 +508,7 @@
             <p class="notification-message document-read-guidance" data-document-read-guidance aria-live="polite" hidden></p>
             <div class="table-wrap">
               <table class="data-table">
-                <caption>Bu sınav grubundaki öğrenciler ve soru puanları</caption>
+                <caption>Bu sınavdaki öğrenciler ve soru puanları</caption>
                 <thead data-validation-student-head></thead>
                 <tbody data-validation-students></tbody>
               </table>
@@ -488,13 +519,9 @@
             </div>
             <div class="button-group student-save-actions" aria-label="Öğrenci verisi kayıt işlemi">
               <button class="secondary-button" data-component="Secondary Button" type="button" data-return-to-upload>Dosya Yükleme Aşamasına Dön</button>
-              <button class="primary-button" data-component="Primary Button" type="button" data-save-current-group>Bu Sınav Grubunu Kaydet</button>
+              <button class="primary-button" data-component="Primary Button" type="button" data-save-current-group>Bu Sınavı Kaydet</button>
             </div>
           </article>
-
-          <div class="button-group outcome-analysis-actions">
-            <button class="primary-button" type="button" data-confirm-final-analysis hidden>Öğrenme Çıktılarını Onayla ve Analize Devam Et</button>
-          </div>
 
           <article class="data-scope-card" data-component="Summary Card" aria-labelledby="data-scope-title">
             <h3 id="data-scope-title">Paylaşılan Veri Kapsamı</h3>
@@ -503,8 +530,8 @@
           </article>
 
           <article class="saved-groups-card" data-component="Summary Card" aria-labelledby="saved-groups-title" data-saved-groups-card hidden>
-            <h3 id="saved-groups-title">Kaydedilen Gruplar</h3>
-            <p data-saved-groups-summary>Henüz kaydedilmiş öğrenci grubu bulunmuyor.</p>
+            <h3 id="saved-groups-title">Sınavlar</h3>
+            <p data-saved-groups-summary>Henüz kaydedilmiş sınav bulunmuyor.</p>
             <div class="saved-groups-tables" data-saved-groups-list></div>
           </article>
 
@@ -513,6 +540,11 @@
             <p data-validation-errors-summary></p>
             <ol data-validation-errors></ol>
           </article>
+
+          <div class="button-group outcome-analysis-actions">
+            <button class="primary-button" type="button" data-confirm-final-analysis hidden>Sınav Analizlerine Başla</button>
+            <button class="primary-button" type="button" data-return-to-saved-reports hidden>Raporlara Geri Dön</button>
+          </div>
 
           <article class="post-save-card" data-post-save-actions aria-labelledby="post-save-title" hidden>
             <h3 id="post-save-title">Veriler Kaydedildi</h3>
@@ -524,15 +556,15 @@
           </article>
 
           <article class="final-data-review-card" data-final-data-review aria-labelledby="final-data-review-title" hidden>
-            <h3 id="final-data-review-title">Evrak Sınıflandırması</h3>
+            <h3 id="final-data-review-title">Sınavlar</h3>
             <p data-final-data-summary></p>
             <div data-classified-groups></div>
-            <p><strong>Öğrenme çıktısı eşleştirmesi sınav grubu seçildikten sonra yapılacaktır.</strong></p>
+            <p><strong>Öğrenme çıktıları ve puan tabloları aynı sayfada birlikte kontrol edilir.</strong></p>
           </article>
         </div>
 
         <p class="notification-message" data-component="Notification Message" data-approval-message aria-live="polite" tabindex="-1">
-          Bu gruptaki bütün sorunlar tek kontrolde listelenecektir.
+          Bütün sınavlardaki sorunlar tek kontrolde listelenecektir.
         </p>
 
       </section>
@@ -571,8 +603,8 @@
         </p>
 
         <div class="button-group" aria-label="Analiz ekranı işlemleri">
-          <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="validation-screen" data-return-to-approved-data>Sınav Gruplarına Dön</button>
-          <button class="primary-button" data-component="Primary Button" type="button" data-target-screen="report-screen">Raporu Görüntüle</button>
+          <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="validation-screen" data-return-to-approved-data>Sınavlara Dön</button>
+          <button class="primary-button" data-component="Primary Button" type="button" data-target-screen="report-screen">Raporları Görüntüle</button>
         </div>
       </section>
 
@@ -600,7 +632,7 @@
         </p>
 
         <div class="button-group" aria-label="Rapor ekranı geri dönüş işlemi" data-pdf-exclude>
-          <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="validation-screen" data-return-to-analysis>Sınav Gruplarına Dön</button>
+          <button class="secondary-button" data-component="Secondary Button" type="button" data-target-screen="validation-screen" data-return-to-analysis>Sınavlara Dön</button>
         </div>
 
         <article class="report-context-card" aria-labelledby="report-context-title" data-report-context-card>
@@ -608,17 +640,17 @@
             <div>
               <p class="data-entry-kicker">Rapor bilgilerini tamamlama</p>
               <h3 id="report-context-title">Sınav ve Belge Bilgileri</h3>
-              <p>MAHİR, yüklenen belgede bulunan kurumsal bilgileri otomatik olarak yerleştirir. Öğretmen yalnız doğrulanabilen eksik üstbilgileri tamamlar; analiz dayanakları ve kullanılan kaynaklar MAHİR tarafından oluşturulur.</p>
+              <p>MAHİR, yüklenen belgede bulunan kurumsal bilgileri otomatik olarak yerleştirir. İl, ilçe, okul, öğretmen ve eğitim öğretim yılı bir kez tamamlandığında bu çalışmadaki bütün sınıf raporlarına uygulanır; sınıf/şube bilgisi her sınav için ayrı korunur.</p>
             </div>
           </div>
           <p class="notification-message context-status" data-context-status aria-live="polite">Belgeden okunan bilgiler yerleştiriliyor. Yalnız eksik kalan alanları tamamlayınız.</p>
           <div class="report-context-grid" data-report-context-form>
-            <label>İl <input type="text" data-exam-field="province" data-required-context autocomplete="address-level1"></label>
-            <label>İlçe <input type="text" data-exam-field="district" data-required-context autocomplete="address-level2"></label>
-            <label>Okul/Kurum Adı <input type="text" data-exam-field="schoolName" data-required-context></label>
-            <label>Öğretmenin Adı Soyadı <input type="text" data-exam-field="teacherName" data-required-context autocomplete="name"></label>
-            <label>Eğitim Öğretim Yılı <input type="text" data-exam-field="academicYear" data-required-context placeholder="2026-2027"></label>
-            <label>Sınıf/Şube <input type="text" data-exam-field="classSection" data-required-context placeholder="9/A"></label>
+            <label>İl <input type="text" name="mahir-province" data-exam-field="province" data-required-context autocomplete="address-level1"></label>
+            <label>İlçe <input type="text" name="mahir-district" data-exam-field="district" data-required-context autocomplete="address-level2"></label>
+            <label>Okul/Kurum Adı <input type="text" name="mahir-school-name" data-exam-field="schoolName" data-required-context autocomplete="organization"></label>
+            <label>Öğretmenin Adı Soyadı <input type="text" name="mahir-teacher-name" data-exam-field="teacherName" data-required-context autocomplete="name"></label>
+            <label>Eğitim Öğretim Yılı <input type="text" name="mahir-academic-year" data-exam-field="academicYear" data-required-context placeholder="2025-2026" pattern="[0-9]{4}-[0-9]{4}" maxlength="9" autocomplete="off"></label>
+            <label>Sınıf/Şube <input type="text" name="mahir-class-section" data-exam-field="classSection" data-required-context placeholder="9/A" autocomplete="off"></label>
             <label>Dönem <select data-exam-field="term" data-required-context><option value="">Seçiniz</option><option>1. Dönem</option><option>2. Dönem</option></select></label>
             <label data-exam-sequence-field>Sınav Sırası <select data-exam-field="examSequence" data-required-context><option value="">Seçiniz</option></select></label>
             <label>Sınav Tarihi <input type="date" data-exam-field="examDate" data-required-context></label>
@@ -647,9 +679,21 @@
         </div>
 
         <section class="report-next-exam-card" data-next-exam-card data-pdf-exclude hidden>
-          <h3>Analiz Bekleyen Kayıtlı Sınavlar</h3>
+          <h3>Sınav Raporları</h3>
           <p data-next-exam-message></p>
           <div class="report-next-exam-list" data-next-exam-list></div>
+        </section>
+
+        <section class="report-context-card" data-general-evaluation-entry data-pdf-exclude aria-labelledby="general-evaluation-entry-title" hidden>
+          <div class="exam-structure-heading">
+            <div>
+              <p class="data-entry-kicker">Üç bileşenli değerlendirme</p>
+              <h3 id="general-evaluation-entry-title">Genel Değerlendirme Raporu</h3>
+              <p>Yazılı, dinleme/izleme ve konuşma sınavlarına ait öğretmen onaylı üç MAHİR Word raporunu doğrulayarak öğrenme kanıtlarını ve beceri gelişimini bütüncül bir genel değerlendirme raporunda birleştirebilirsiniz.</p>
+            </div>
+          </div>
+          <p class="notification-message">Bu seçenek yalnız Türk Dili ve Edebiyatı içindir. Genel değerlendirme için üç Word (.docx) raporu gerekir; sabit ağırlıklar Yazılı %70, Dinleme/izleme %15 ve Konuşma %15'tir. PDF raporları birleştirme girdisi olarak kullanılmaz.</p>
+          <button class="primary-button" type="button" data-open-general-evaluation>Üç Raporla Genel Değerlendirme Oluştur</button>
         </section>
 
         <section class="report-context-card ebys-demo-card" data-ebys-demo data-pdf-exclude aria-labelledby="ebys-demo-title">
@@ -662,7 +706,7 @@
           </div>
           <p class="notification-message"><strong>EBYS entegrasyonu demo ortamında simüle edilmektedir.</strong> Demo: Bu işlem gerçek EBYS sistemine belge göndermez.</p>
           <div class="button-group">
-            <button class="secondary-button" type="button" data-ebys-prepare>Resmî Yazıyı Hazırla</button>
+              <button class="secondary-button" type="button" data-ebys-prepare disabled aria-disabled="true">Resmî Yazıyı Hazırla</button>
             <button class="secondary-button" type="button" data-ebys-download-letter hidden>Üst Yazıyı Word Olarak İndir</button>
             <button class="primary-button" type="button" data-ebys-transfer disabled aria-disabled="true">EBYS Demo'ya Aktar</button>
           </div>
@@ -671,7 +715,7 @@
             <input type="checkbox" data-ebys-approval>
             Üst yazı taslağını ve ek listesini öğretmen olarak kontrol ettim.
           </label>
-          <p class="report-output-validation-message" data-ebys-status aria-live="polite"></p>
+          <p class="report-output-validation-message" data-ebys-status aria-live="polite">Tek üst yazı hazırlanabilmesi için bütün sınav raporlarını ayrı ayrı kontrol edip onaylayınız.</p>
         </section>
       </section>
     </div>
@@ -728,6 +772,7 @@
   <script src="assets/js/mahir-pdf-exporter.js"></script>
   <script src="assets/js/mahir-workspace-backup.js"></script>
   <script src="assets/js/mahir-program-catalog.js"></script>
+  <script src="assets/js/mahir-shared-outcomes.js"></script>
   <script src="assets/js/mahir-score-corrections.js"></script>
   <script src="script.js"></script>
 </body>

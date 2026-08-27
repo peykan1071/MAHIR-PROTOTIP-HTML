@@ -244,7 +244,9 @@
   const officialLetterDocumentXml = (pkg) => {
     const letter = pkg?.coverLetter || {};
     const attachments = Array.isArray(pkg?.attachments) ? pkg.attachments : [];
-    const attachmentText = attachments.map((item) => `Ek-${item.order}: ${item.name}`).join("\n") || "—";
+    const attachmentParagraphs = attachments.length
+      ? attachments.map((item) => paragraph(`Ek-${item.order}: ${item.name}`, "Normal", { after: 20 }))
+      : [paragraph("—", "Normal", { after: 20 })];
     const body = [
       paragraph("T.C.", "ReportTitle", { bold: true, align: "center", after: 30 }),
       paragraph("MİLLÎ EĞİTİM BAKANLIĞI", "ReportTitle", { bold: true, align: "center", after: 30 }),
@@ -260,7 +262,7 @@
       paragraph(letter.signatoryName || "—", "Normal", { bold: true, align: "right", after: 20 }),
       paragraph(letter.signatoryRole || "Öğretmen", "Normal", { align: "right", after: 260 }),
       paragraph("Ekler:", "Normal", { bold: true, after: 20 }),
-      paragraph(attachmentText, "Normal", { after: 180 })
+      ...attachmentParagraphs
     ].join("");
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${WORD_NS}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body}<w:sectPr><w:footerReference w:type="default" r:id="rId1"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="900" w:right="1100" w:bottom="850" w:left="1100" w:header="480" w:footer="480"/></w:sectPr></w:body></w:document>`;
   };

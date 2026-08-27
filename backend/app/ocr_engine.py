@@ -30,7 +30,6 @@ import os
 import re
 import tempfile
 import time
-from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
 from pathlib import Path
@@ -116,16 +115,11 @@ def read_exam_document(image_bytes: bytes, extension: str) -> dict[str, object]:
 
     html_text = _run_ocr(image_bytes, extension)
     rows = _extract_table_rows(html_text)
-    document = _parse_exam_rows(rows)
-    exam = document.get("exam") or {}
-    # Tablo OCR'si boş kutuları zaman zaman işaretliymiş gibi metne döküyor.
-    # Şablondaki mavi işaret doğrudan pikselden güvenle okunabiliyorsa metin
-    # tahmininden daha güçlü kanıttır ve yanlış bir "Konuşma" sonucunu düzeltir.
-    visually_marked_exam_type = _detect_marked_exam_type(image_bytes)
-    if visually_marked_exam_type:
-        exam["examType"] = visually_marked_exam_type
-        exam["examTypeSource"] = "visual-checkbox"
-    return document
+    # Yetkili MAHİR şablonunda sınav türü onay kutusuyla değil, doğrudan
+    # "Sınav Türü" hücresine yazılır. Piksel konumuna veya kutu görüntüsüne
+    # dayanarak tür tahmin etmek yanlış bir Konuşma/Dinleme sınavı üretebildiği
+    # için tek kanıt etiketli hücrenin açık metnidir.
+    return _parse_exam_rows(rows)
 
 
 def _normalize_label(value: str) -> str:
@@ -145,6 +139,12 @@ def _row_has(row: list[str], *needles: str) -> bool:
 def _numbers_after_label(row: list[str]) -> list[float | int]:
     values = [_parse_number(cell) for cell in row[1:]]
     return [value for value in values if value is not None]
+
+
+def _positional_numbers_after_label(row: list[str], count: int) -> list[float | int | None]:
+    """Preserve empty OCR cells so a missing S3 value cannot shift S4 into S3."""
+
+    return [_parse_number(cell) for cell in row[1:1 + max(0, count)]]
 
 
 def _without_repeated_total(values: list[float | int]) -> list[float | int]:
@@ -197,12 +197,11 @@ def _extract_class_section(rows: list[list[str]]) -> str:
     labelled_candidates.extend(
         cell for row in rows if _row_has(row, "sınıf/şube", "sinif/sube", "sınıf şube") for cell in row
     )
-    all_candidates = [cell for row in rows for cell in row]
     # Handwriting OCR may keep the separator (``9-A``), replace it with a
     # space (``9 A``), or split grade and section into neighbouring cells.
-    pattern = r"(?<!\d)(1[0-2]|[1-9])\s*(?:[-/]|\s)\s*([A-Za-zÇĞİÖŞÜçğıöşü])(?![A-Za-z])"
-    for candidate in [*labelled_candidates, *all_candidates]:
-        exact = re.fullmatch(r"\s*(1[0-2]|[1-9])\s*(?:[-/]|\s)\s*([A-Za-zÇĞİÖŞÜçğıöşü])\s*", candidate)
+    pattern = r"(?<!\d)(1[0-2]|[1-9])\s*(?:[-/]\s*|\s+)?([A-Za-zÇĞİÖŞÜçğıöşü])(?![A-Za-z])"
+    for candidate in labelled_candidates:
+        exact = re.fullmatch(r"\s*(1[0-2]|[1-9])\s*(?:[-/]\s*|\s+)?([A-Za-zÇĞİÖŞÜçğıöşü])\s*", candidate)
         if exact:
             return f"{exact.group(1)}-{exact.group(2).upper()}"
     for row in rows:
@@ -219,56 +218,12 @@ def _extract_class_section(rows: list[list[str]]) -> str:
     return ""
 
 
-def _detect_marked_exam_type(image_bytes: bytes) -> str:
-    """Recover a blue check mark when table OCR omits checkbox state."""
-
-    try:
-        from PIL import Image
-
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
-    except Exception:  # noqa: BLE001 - best-effort OCR fallback
-        return ""
-
-    width, height = image.size
-    regions = (
-        ("Yazılı", 0.615, 0.700),
-        ("Dinleme", 0.700, 0.785),
-        ("Konuşma", 0.785, 0.900),
-    )
-    scores: list[tuple[int, str]] = []
-    for label, left, right in regions:
-        crop = image.crop((int(width * left), int(height * 0.335), int(width * right), int(height * 0.405)))
-        blue_pixels = sum(
-            1
-            for red, green, blue in crop.getdata()
-            if blue > 90 and blue > red * 1.25 and blue > green * 1.08
-        )
-        scores.append((blue_pixels, label))
-    best_score, best_label = max(scores)
-    return best_label if best_score >= 20 else ""
-
-
 def _normalize_exam_type(value: str, rows: list[list[str]]) -> str:
-    """Interpret the marked option instead of returning the whole checkbox row."""
-
-    labelled_rows = [row for row in rows if _row_has(row, "sınav türü", "sinav turu")]
-    text = " ".join([value, *(cell for row in labelled_rows for cell in row)])
-    checked = r"(?:☑|☒|✓|✔|■|▣|\[\s*[xX]\s*\])"
-    match = re.search(
-        rf"{checked}\s*(?:[12]\s*[.\-]?\s*)?(Yazılı|Dinleme|Konuşma)",
-        text,
-        flags=re.IGNORECASE,
-    )
-    if match:
-        return match.group(1).capitalize()
+    """Accept only an explicit value written in the labelled exam-type cell."""
 
     normalized = _normalize_label(value)
-    found = [
-        canonical
-        for canonical, token in (("Yazılı", "yazili"), ("Dinleme", "dinleme"), ("Konuşma", "konusma"))
-        if re.search(rf"\b{token}\b", normalized)
-    ]
-    return found[0] if len(found) == 1 else ""
+    accepted = {"yazili": "Yazılı", "dinleme": "Dinleme", "konusma": "Konuşma"}
+    return accepted.get(normalized, "")
 
 
 def _parse_exam_rows(rows: list[list[str]]) -> dict[str, object]:
@@ -323,12 +278,23 @@ def _parse_exam_rows(rows: list[list[str]]) -> dict[str, object]:
             "requiresQuestionCount": True,
         }
 
-    max_scores = _without_repeated_total(_numbers_after_label(max_row))
-    student_values = _numbers_after_label(score_row)
-    student_scores = student_values[:len(max_scores)]
-    total_score = student_values[len(max_scores)] if len(student_values) > len(max_scores) else None
-    if total_score is None and student_scores:
-        total_score = round(sum(student_scores), 2)
+    question_header = next((row for row in rows if _row_has(row, "sorular")), None)
+    header_question_count = sum(
+        1 for cell in (question_header or [])[1:]
+        if re.fullmatch(r"s\s*\d{1,2}", _normalize_label(cell).replace(" ", ""))
+    )
+    if header_question_count:
+        question_count = min(15, header_question_count)
+        max_scores = _positional_numbers_after_label(max_row, question_count)
+        student_scores = _positional_numbers_after_label(score_row, question_count)
+        total_score = _parse_number(score_row[question_count + 1]) if len(score_row) > question_count + 1 else None
+    else:
+        readable_max_scores = _without_repeated_total(_numbers_after_label(max_row))
+        question_count = min(15, len(readable_max_scores))
+        max_scores = readable_max_scores[:question_count]
+        raw_student_values = [_parse_number(cell) for cell in score_row[1:]]
+        student_scores = raw_student_values[:question_count]
+        total_score = raw_student_values[question_count] if len(raw_student_values) > question_count else None
     if not max_scores:
         raise ValueError("Soruların azami puanları okunamadı.")
 
