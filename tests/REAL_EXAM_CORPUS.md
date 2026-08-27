@@ -37,3 +37,16 @@ python tools/anonymize_real_exam_corpus.py `
 
 Kabul testleri standart test komutuyla ve CI ortamında ek dosya gerektirmeden
 çalışır.
+
+## Öğretmen görüşleriyle saha doğrulaması
+
+MAHİR'in demo videosu; beş Türk Dili ve Edebiyatı öğretmeniyle paylaşılmış,
+beş sınıfa ait anonim not çizelgeleri ve bu verilerden elde edilen örnek analiz
+raporları öğretmenlere gösterilmiştir. Yapılan incelemelerde öğretmenlerden
+olumlu geri bildirimler alınmıştır.
+
+Bu çalışma bir kullanıcı deneyimi doğrulaması niteliğindedir; bilimsel etkililik
+araştırması veya genellenebilir bir başarı ölçümü olarak değerlendirilmez.
+MAHİR'in gelecek vizyonunda, öğretmenlerin sınıf içi deneyimlerinden ve düzenli
+geri bildirimlerinden yararlanılarak sistemin işlevlerinin, raporlarının ve
+kullanım deneyiminin sürekli geliştirilmesi amaçlanmaktadır.
