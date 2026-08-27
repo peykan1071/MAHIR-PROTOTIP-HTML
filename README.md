@@ -8,6 +8,41 @@
 [![Vector DB](https://img.shields.io/badge/Vector_DB-Qdrant_Hybrid-red?logo=qdrant)](.)
 [![Deploy](https://img.shields.io/badge/Cloud-Modal_(Scale--to--Zero)-purple)](.)
 
+## Mimarî Genel Bakış
+
+```mermaid
+flowchart TD
+    subgraph Client["İstemci & Giriş Katmanı"]
+        UI["Tek Sayfa UI (Vanilla JS / Mermaid / Export)"]
+        DOCS["Giriş: Görsel / PDF / DOCX / XLSX / CSV"]
+    end
+
+    subgraph ModalOCR["Modal: mahir-ocr-worker (T4 GPU)"]
+        Layout["PP-DocLayoutV3 (Tablo / Meta Ayrımı)"]
+        VL["PaddleOCR-VL 0.9B (HTML Tablo Çıkarımı)"]
+    end
+
+    subgraph Backend["Uygulama Katmanı (Python 3.10)"]
+        SRV["Hafif HTTP Sunucusu (http.server)"]
+        CED["CED Veri Sözleşmesi & Doğrulama"]
+        Agents["Orkestratör + 6 Uzman Ajan"]
+    end
+
+    subgraph ModalRAG["Modal: turkish-rag-system (T4 GPU)"]
+        QDRANT[("Qdrant Embedded: mahir_rag_chunks_v2_hybrid\n(BGE-M3 Dense + Sparse)")]
+        RRF["Prefetch Hybrid Arama -> RRF"]
+        FILTER["Filtreleme: Relatif Eşik (0.30) + MMR (λ=0.6)"]
+        VLLM["vLLM Motoru (max_model_len=8192)"]
+        QWEN["Qwen2.5-7B-Instruct (Batch Prompts)"]
+    end
+
+    DOCS -->|Görsel| Layout --> VL --> CED
+    DOCS -->|Tablo / Metin| SRV --> CED
+    CED --> Agents
+    Agents <-->|Hibrit Getirim| QDRANT
+    QDRANT --> RRF --> FILTER --> VLLM
+    VLLM --> QWEN -->|Teşhis & Rapor| Agents
+    Agents --> SRV --> UI
 > Öğretmen kontrolünü merkeze alan; eğitim evraklarını sınıflandırma, doğrulama, öğrenme kanıtlarıyla ilişkilendirme, raporlama ve kurum içi resmî yazışmaya hazırlama amacı taşıyan Türkçe çok ajanlı karar destek sistemi. Çalışan prototip, bu geniş vizyonu 9. sınıf Türk Dili ve Edebiyatı sınav evrakları üzerinden doğrular.
 
 MAHİR, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması - 1. Senaryo: Kamu Evrak ve Yazışma Süreçleri İçin Akıllı Ajan Destek Sistemi** kapsamında geliştirilmiştir.
