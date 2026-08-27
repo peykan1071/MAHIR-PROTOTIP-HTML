@@ -2964,9 +2964,9 @@ const fileUploadBridge = (() => {
         .toLocaleLowerCase("tr-TR")
         .replace(/\s+/g, " ")
         .trim();
-      if (normalized === "dinleme") return "listening";
-      if (normalized === "konuşma" || normalized === "konusma") return "speaking";
-      if (normalized === "yazılı" || normalized === "yazili") return "written";
+      if (normalized.includes("dinleme")) return "listening";
+      if (normalized.includes("konuşma") || normalized.includes("konusma")) return "speaking";
+      if (normalized.includes("yazılı") || normalized.includes("yazili")) return "written";
       return "";
     };
     const normalizedExamTypeLabel = (examTypeKey, fallback = "") => ({
@@ -2975,6 +2975,42 @@ const fileUploadBridge = (() => {
       written: "Yazılı",
       general: "Genel Değerlendirme"
     })[examTypeKey] || fallback;
+    const componentTypeFromExam = (exam = {}) => {
+      const explicit = String(exam.componentType || "").trim();
+      if (["written", "listening", "speaking"].includes(explicit)) return explicit;
+      return normalizeExamType(exam.examType) || "";
+    };
+    const normalizeDetectedQuestionStructure = (group = {}) => {
+      const questions = Array.isArray(group.questions) ? group.questions : [];
+      const students = Array.isArray(group.students) ? group.students : [];
+      if (!questions.length) return group;
+      const indexesWithMaximum = questions
+        .map((question, index) => Number(question.maxScore ?? question.max_score) > 0 ? index : -1)
+        .filter((index) => index >= 0);
+      const indexesWithScores = questions
+        .map((_, index) => students.some((student) => {
+          const value = student.scores?.[index];
+          return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+        }) ? index : -1)
+        .filter((index) => index >= 0);
+      const activeIndexes = indexesWithMaximum.length ? indexesWithMaximum : indexesWithScores;
+      if (!activeIndexes.length || activeIndexes.length === questions.length) return group;
+      const activeQuestions = activeIndexes.map((index) => ({ ...questions[index] }));
+      const activeStudents = students.map((student) => ({
+        ...student,
+        scores: activeIndexes.map((index) => student.scores?.[index] ?? null)
+      }));
+      return {
+        ...group,
+        questions: activeQuestions,
+        students: activeStudents,
+        summary: {
+          ...(group.summary || {}),
+          questionCount: activeQuestions.length,
+          studentCount: activeStudents.length
+        }
+      };
+    };
     const isPrototypeScopeEnabled = () => (
       currentRole() === "Branş Öğretmeni"
       && currentStage() === "Lise"
@@ -4481,8 +4517,7 @@ const fileUploadBridge = (() => {
       });
       head.append(headerRow);
       const body = document.createElement("tbody");
-      const examType = String(group.exam?.examType || "").toLocaleLowerCase("tr-TR");
-      const component = examType.includes("dinleme") ? "listening" : examType.includes("konuşma") ? "speaking" : "written";
+      const component = componentTypeFromExam(group.exam) || "written";
       const availableOutcomes = window.MAHIRProgramCatalog?.filterOutcomes(programLearningOutcomes, component) || [];
       (group.questions || []).forEach((question, questionIndex) => {
         const row = document.createElement("tr");
@@ -5626,7 +5661,7 @@ const fileUploadBridge = (() => {
           successfulFiles.forEach((file) => processedDocumentKeys.add(`${file.name}|${file.size}|${file.lastModified}`));
           retryOcrFiles = failedFiles;
           pendingOcrGroups = [];
-          const detectedGroups = mergedData.documents.length
+          const detectedGroups = (mergedData.documents.length
             ? mergedData.documents.map((document) => ({
                 exam: document.exam || {},
                 questions: document.questions || [],
@@ -5637,13 +5672,17 @@ const fileUploadBridge = (() => {
               }))
             : (mergedData.groups.length
                 ? mergedData.groups.map((group) => ({ ...group, warnings: mergedData.warnings, summary: { questionCount: group.questions?.length || 0, studentCount: group.students?.length || 0 } }))
-                : [{ ...mergedData }]);
+                : [{ ...mergedData }]))
+            .map(normalizeDetectedQuestionStructure);
           const consolidatedGroupMap = new Map();
           detectedGroups.forEach((group) => {
             const exam = group.exam || {};
             const questionShape = (group.questions || []).map((question) => `${question.number}:${Number(question.maxScore || 0)}`).join("|");
             const normalizedClassSection = normalizeClassSection(exam.classSection);
-            const normalizedExamType = normalizeExamType(exam.examType);
+            const selectedComponent = ["written", "listening", "speaking"].includes(assessmentComponent?.value)
+              ? assessmentComponent.value
+              : "written";
+            const normalizedExamType = componentTypeFromExam(exam) || selectedComponent;
             // OCR sonuçları yalnız sınıf/şubeye göre birleştirilir. Sınav
             // türü kullanıcı bağlamıdır; sınıflandırma anahtarı değildir.
             const key = normalizedClassSection;
@@ -5656,7 +5695,8 @@ const fileUploadBridge = (() => {
                   course: currentCourseName() || exam.course,
                   courseName: currentCourseName() || exam.courseName || exam.course,
                   classSection: normalizedClassSection || exam.classSection,
-                  examType: normalizedExamTypeLabel(normalizedExamType, exam.examType)
+                  examType: normalizedExamTypeLabel(normalizedExamType, exam.examType),
+                  componentType: normalizedExamType
                 },
                 students: [...(group.students || [])],
                 documents: [...(group.documents || [])],

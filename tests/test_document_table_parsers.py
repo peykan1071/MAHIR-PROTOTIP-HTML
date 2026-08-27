@@ -107,6 +107,20 @@ class DocumentTableParserTests(unittest.TestCase):
         self.assertEqual(result["students"][0]["studentNo"], "9999")
         self.assertEqual(result["students"][0]["scores"], [20, 15])
 
+    def test_maximum_row_limits_fixed_question_columns_for_excel_and_pdf(self):
+        rows = [
+            ["Sıra", "Okul No", *[f"Soru {index}" for index in range(1, 11)], "Toplam"],
+            ["AZAMİ", "AZAMİ", 25, 25, 25, 25, "-", "-", "-", "-", "-", "-", 100],
+            [1, "1001", 22, 20, 15, 16, "-", "-", "-", "-", "-", "-", 73],
+        ]
+
+        result = parse_tabular_document([rows], source_label="Deneme")
+
+        self.assertEqual(result["summary"]["questionCount"], 4)
+        self.assertEqual([question["maxScore"] for question in result["questions"]], [25] * 4)
+        self.assertEqual(result["students"][0]["scores"], [22, 20, 15, 16])
+        self.assertEqual(result["students"][0]["calculatedTotal"], 73)
+
 
 if __name__ == "__main__":
     unittest.main()

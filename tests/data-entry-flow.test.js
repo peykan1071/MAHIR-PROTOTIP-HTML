@@ -69,6 +69,10 @@ assert.match(html, /max="15"[^>]*data-recovered-question-count/);
 assert.match(html, /data-question-count required/);
 
 assert.match(script, /const studentReferenceSortKey =/);
+assert.match(script, /const normalizeDetectedQuestionStructure =/);
+assert.match(script, /const componentTypeFromExam =/);
+assert.match(script, /\.map\(normalizeDetectedQuestionStructure\)/);
+assert.match(script, /componentType: normalizedExamType/);
 assert.match(script, /const sortStudentsByReference =/);
 assert.match(script, /sourceFile: usefulValue\(student\.sourceFile\)/);
 assert.match(script, /sourceLink\.textContent = value/);

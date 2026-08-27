@@ -171,7 +171,14 @@ def _read_tables(content: bytes) -> list[list[list[str]]]:
                     text = "".join(node.text or "" for node in paragraph.findall(".//w:t", WORD_NAMESPACE))
                     if text.strip():
                         paragraphs.append(text.strip())
-                cells.append(" ".join(paragraphs).strip())
+                cell_text = " ".join(paragraphs).strip()
+                grid_span = cell.find("./w:tcPr/w:gridSpan", WORD_NAMESPACE)
+                span_value = grid_span.get(f"{{{WORD_NAMESPACE['w']}}}val", "1") if grid_span is not None else "1"
+                try:
+                    span = max(1, int(span_value))
+                except (TypeError, ValueError):
+                    span = 1
+                cells.extend([cell_text] * span)
             rows.append(cells)
         tables.append(rows)
 
@@ -275,23 +282,50 @@ def _parse_questions(rows: list[list[str]]) -> list[dict[str, object]]:
 
 
 def _questions_from_student_headings(rows: list[list[str]]) -> list[dict[str, object]]:
-    """Create a question skeleton from Soru 1..N columns without inventing outcomes."""
+    """Create questions from score headings and an optional AZAMİ row.
+
+    Some official score sheets keep fixed Soru 1..10 headings even when the
+    assessment uses fewer questions.  In those documents the AZAMİ row marks
+    unused columns with ``-``.  When that row is present, only columns with a
+    positive numeric maximum are real questions; without it, preserving every
+    heading remains the safest teacher-reviewable fallback.
+    """
 
     if not rows:
         return []
+    maximum_row = next(
+        (
+            row
+            for row in rows[1:]
+            if any(
+                _normalise_label(cell) in {"azami", "azami puan", "maksimum"}
+                for cell in row[:2]
+            )
+        ),
+        None,
+    )
+    active_maxima: dict[int, float | int] = {}
+    if maximum_row is not None:
+        for index, value in enumerate(maximum_row):
+            maximum = _number(value)
+            if maximum is not None and maximum > 0:
+                active_maxima[index] = maximum
+
     questions = []
-    for cell in rows[0]:
+    for index, cell in enumerate(rows[0]):
         label = _normalise_label(cell)
         number = _question_number(label)
         if number is None:
+            continue
+        if maximum_row is not None and index not in active_maxima:
             continue
         questions.append(
             {
                 "number": number,
                 "outcomeCode": "",
                 "outcomeDescription": "",
-                "maxScore": None,
-                "source": "score-column-heading",
+                "maxScore": active_maxima.get(index),
+                "source": "score-maximum-row" if maximum_row is not None else "score-column-heading",
             }
         )
     return questions

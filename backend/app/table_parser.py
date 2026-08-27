@@ -71,6 +71,27 @@ def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[st
     if number_index is None or not score_columns:
         return None
 
+    maximum_row = next(
+        (
+            row
+            for row in rows[1:]
+            if any(
+                _normalise_label(cell) in {"azami", "azami puan", "maksimum"}
+                for cell in row[:2]
+            )
+        ),
+        None,
+    )
+    if maximum_row is not None:
+        active_score_columns = []
+        for number, index, heading_maximum in score_columns:
+            row_maximum = _number(maximum_row[index]) if index < len(maximum_row) else None
+            maximum = row_maximum if row_maximum is not None and row_maximum > 0 else heading_maximum
+            if maximum is not None and maximum > 0:
+                active_score_columns.append((number, index, maximum))
+        if active_score_columns:
+            score_columns = active_score_columns
+
     questions = [
         {"number": number, "outcomeCode": "", "outcomeDescription": "", "maxScore": max_score}
         for number, _, max_score in score_columns
@@ -78,6 +99,11 @@ def _parse_student_table(rows: list[list[str]], *, source_label: str) -> dict[st
     students = []
     for source_row in rows[1:]:
         row = source_row + [""] * max(0, len(headings) - len(source_row))
+        if any(
+            _normalise_label(cell) in {"azami", "azami puan", "maksimum"}
+            for cell in row[:2]
+        ):
+            continue
         student_no = row[number_index].strip()
         scores = [_number(row[index]) for _, index, _ in score_columns]
         total_score = _number(row[total_index]) if total_index is not None else None

@@ -75,6 +75,48 @@ class OfficialDocxTemplateTests(unittest.TestCase):
         self.assertEqual(result["students"][0]["scores"], [10] * 10)
         self.assertEqual(result["students"][0]["calculatedTotal"], 100)
 
+    def test_fixed_ten_question_headings_use_only_active_maximum_columns(self):
+        document = Document()
+        metadata = document.add_table(rows=2, cols=4)
+        for cell, value in zip(
+            metadata.rows[0].cells,
+            ["Sınıf/Şube", "9-A", "Dersin Adı", "Türk Dili ve Edebiyatı"],
+        ):
+            cell.text = value
+        for cell, value in zip(
+            metadata.rows[1].cells,
+            ["Sınav Türü", "☒ 2. Dinleme", "Eğitim Öğretim Yılı", "2025-2026"],
+        ):
+            cell.text = value
+
+        scores = document.add_table(rows=3, cols=13)
+        for cell, value in zip(
+            scores.rows[0].cells,
+            ["Sıra", "Okul No", *[f"Soru {index}" for index in range(1, 11)], "Toplam"],
+        ):
+            cell.text = value
+        for cell, value in zip(
+            scores.rows[1].cells,
+            ["AZAMİ", "AZAMİ", "25", "25", "25", "25", "-", "-", "-", "-", "-", "-", "100"],
+        ):
+            cell.text = value
+        maximum_label = scores.rows[1].cells[0].merge(scores.rows[1].cells[1])
+        maximum_label.text = "AZAMİ"
+        for cell, value in zip(
+            scores.rows[2].cells,
+            ["1", "1001", "22", "20", "15", "16", "-", "-", "-", "-", "-", "-", "73"],
+        ):
+            cell.text = value
+
+        output = io.BytesIO()
+        document.save(output)
+        result = parse_mahir_docx(output.getvalue())
+
+        self.assertEqual(result["summary"]["questionCount"], 4)
+        self.assertEqual([question["maxScore"] for question in result["questions"]], [25] * 4)
+        self.assertEqual(result["students"][0]["scores"], [22, 20, 15, 16])
+        self.assertEqual(result["students"][0]["calculatedTotal"], 73)
+
     def test_filled_single_student_sheet_omits_name_and_reads_scores(self):
         def fill(document: Document) -> None:
             metadata = document.tables[0]
