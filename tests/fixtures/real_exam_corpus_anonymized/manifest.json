@@ -1,0 +1,675 @@
+{
+  "privacy": "All identities and document metadata are synthetic.",
+  "counts": {
+    "png": 85,
+    "jpeg": 25,
+    "docx": 22
+  },
+  "generalEvaluationWeights": {
+    "written": 70,
+    "listening": 15,
+    "speaking": 15
+  },
+  "files": [
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-001.jpeg",
+      "sha256": "0350f85eac3b87fd2d5a8190b794857bbe4bd59594331904229dd982d87b63ce",
+      "bytes": 62096
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-002.jpeg",
+      "sha256": "69a916ffd94acda7f2c2038e779c72529a0f829d5de6c26d01fb654a1998ff77",
+      "bytes": 57090
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-003.jpeg",
+      "sha256": "ea8fa3457a6275315b5985509cfb050368d699e68a4d8e5c5d58051779b634b5",
+      "bytes": 56365
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-004.jpeg",
+      "sha256": "88c644570e26f58cce061e1ac9fc0a2934582426f100ecc89c972b608d1891af",
+      "bytes": 63881
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-005.jpeg",
+      "sha256": "4c5f0bf9be7a7f80556206f28c3fb57ea7cb6d90ee56fbc20e73a1a5a62dfea3",
+      "bytes": 59814
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-006.jpeg",
+      "sha256": "e44494511f5b566b53aa4f52decac5c5bdf9af86c072177329efd32891b8adb3",
+      "bytes": 60306
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-007.jpeg",
+      "sha256": "9facb186a90121273134af036213589e73c47515360463fe8a908a9f2e2a194f",
+      "bytes": 59457
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-008.jpeg",
+      "sha256": "eca5e5e30321c6e18be0eb2f3fe8c67295b7dcc27427e56f605e34c0538c7614",
+      "bytes": 54558
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-009.jpeg",
+      "sha256": "9ab052f0b2d29ffbf4db0d8e176f20b9a580052eef581b429443a349c4ef8fd4",
+      "bytes": 61943
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-010.jpeg",
+      "sha256": "4f09534f9e900942ba6570b930fc35f08341064e6fadf53334a69d20aa0bfbf8",
+      "bytes": 52395
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-011.jpeg",
+      "sha256": "2585e4832f77ddfe0c3e35c1657888e84ffa95e3aef607c0114af604e6375d75",
+      "bytes": 60688
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-012.jpeg",
+      "sha256": "33e9a6d91caa7c8685f7321ea334b60a337d219a46efd35bd3f2bf949972a683",
+      "bytes": 51105
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-013.jpeg",
+      "sha256": "ec04df273d52cfa53e38cac6fde9368036cd54d2d8e8fa9c815f2836c3646601",
+      "bytes": 51861
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-014.jpeg",
+      "sha256": "8c6d2a5ae2fbce7c6c27e5ad65602a6a8e7ee8b3eceab8e3387d731a57691b70",
+      "bytes": 47304
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-015.jpeg",
+      "sha256": "68d2f684551f6e270aba1860e670d4d71f4f6bcb31e02e9bc4207124b0251269",
+      "bytes": 45851
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-016.jpeg",
+      "sha256": "49cef5479aa624afc47500a8658ecc6e3213d2e23f257bee09fee59b1c114392",
+      "bytes": 41359
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-017.jpeg",
+      "sha256": "618ad6c279951f48cb982b27795f3cd4c05788d611f7c98bc63c7b5748992711",
+      "bytes": 46696
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-018.jpeg",
+      "sha256": "f39a63a00ccfa160929168db29e0af808124b43a2c3c38209472fa7ca39f4e49",
+      "bytes": 48967
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-019.jpeg",
+      "sha256": "bda5780f0a1abacdb313ac8390832069921d06efd98c2554ed87002dae1541bc",
+      "bytes": 44381
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-020.jpeg",
+      "sha256": "fb34dcbc12cf829f7aaae42258077f9aed1bf0ed67ec36c925083e05f32a9c84",
+      "bytes": 57088
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-021.jpeg",
+      "sha256": "50d1b98472e263e76ce901d7aa7bf54071cdbb09ddd5fd259ef89518ab82eb58",
+      "bytes": 43701
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-022.jpeg",
+      "sha256": "7d029f68d270c72ec1e856a6baf27a313b6dbcaf59b07e834822d866d54fa97e",
+      "bytes": 44217
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-023.jpeg",
+      "sha256": "961d2a370011402cbd82a0f1724f2c34881586277f3efa6f18bfa079ec7e2e0f",
+      "bytes": 48680
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-024.jpeg",
+      "sha256": "c53582afeada9a92ba6aef3c7c85f3c7553bd13bd648cb8591dc7fbba38f4cde",
+      "bytes": 73830
+    },
+    {
+      "path": "images/9A-ocr-word-comparison-25/exam-025.jpeg",
+      "sha256": "efc7413c96091c3c6e4fc5863d269c30ee45babfc44bb4c83fa305a0cfa6bcae",
+      "bytes": 56386
+    },
+    {
+      "path": "images/9A-written-25/exam-001.png",
+      "sha256": "1b1fdbafbc80f8d34cb6f37a6a1a2624169461041d86e943cca0cb1e0ca3611a",
+      "bytes": 871016
+    },
+    {
+      "path": "images/9A-written-25/exam-002.png",
+      "sha256": "dcab752d1f2626ac374a9c821f3e30f15810f2475e6736a97af23c43f600b247",
+      "bytes": 893367
+    },
+    {
+      "path": "images/9A-written-25/exam-003.png",
+      "sha256": "d9f871abe65c845c0904b6ed2dfb445195e6d8827d5c5a2c35bd5907d459d354",
+      "bytes": 893921
+    },
+    {
+      "path": "images/9A-written-25/exam-004.png",
+      "sha256": "5e33121334c2f99fb17f7e0c503fe63780310a93696a8309e3c9bf38ce435f85",
+      "bytes": 978105
+    },
+    {
+      "path": "images/9A-written-25/exam-005.png",
+      "sha256": "4c6523979e966507c4a715dd8d0576f2e75f84da1fb6e258c57dc4361dbeec4b",
+      "bytes": 888458
+    },
+    {
+      "path": "images/9A-written-25/exam-006.png",
+      "sha256": "fbcbcd909c6bf33885d80e3f87ff1d30c5cab7f56526b999876d00ca343b2166",
+      "bytes": 864211
+    },
+    {
+      "path": "images/9A-written-25/exam-007.png",
+      "sha256": "214c2b829d0856fba4a65839d601a54dc20ebe64e69371067a425beee078042a",
+      "bytes": 925710
+    },
+    {
+      "path": "images/9A-written-25/exam-008.png",
+      "sha256": "b43cba88b2b1f8bf55a83ec7a3aec578337105bdc034e8c5d569af25e1f8e62e",
+      "bytes": 884821
+    },
+    {
+      "path": "images/9A-written-25/exam-009.png",
+      "sha256": "db91763eef03049c852e3b40945727c11e2e419720e23dd9075c31b02dc6c8df",
+      "bytes": 872740
+    },
+    {
+      "path": "images/9A-written-25/exam-010.png",
+      "sha256": "5222d8e659e49aca5123311a929505e02f8bee977919c3763f55c041d34da269",
+      "bytes": 893553
+    },
+    {
+      "path": "images/9A-written-25/exam-011.png",
+      "sha256": "17a655ffeb8e526c073f86e36cae2e4186c3fc9b24be3db63bb26bcbef5c266a",
+      "bytes": 907411
+    },
+    {
+      "path": "images/9A-written-25/exam-012.png",
+      "sha256": "971742220c3885cd7c86d91c5f4df66185601f115e49de1dbbb67734705e7eb7",
+      "bytes": 862393
+    },
+    {
+      "path": "images/9A-written-25/exam-013.png",
+      "sha256": "6da5ecbe386921f21621fe1fa3ac5d83a64673d57b269b6b5b3b2c977a85a984",
+      "bytes": 847580
+    },
+    {
+      "path": "images/9A-written-25/exam-014.png",
+      "sha256": "57dcdbc619f3f2fd388134a0db103f3b13fea67c17bb87b78b0a916317ac8756",
+      "bytes": 784574
+    },
+    {
+      "path": "images/9A-written-25/exam-015.png",
+      "sha256": "2d2db28472198ca789e0f10c110a8be69fd68cd65c675e57ab6bb43298db74ba",
+      "bytes": 773564
+    },
+    {
+      "path": "images/9A-written-25/exam-016.png",
+      "sha256": "032a8bbc7548a495f3ab9b691c24658547ca74cde632238170f9a4f30a96340f",
+      "bytes": 779376
+    },
+    {
+      "path": "images/9A-written-25/exam-017.png",
+      "sha256": "acf61739795dbc6301b4ee167bacb67bc8416379b66496816f6ddd19635ceb69",
+      "bytes": 788259
+    },
+    {
+      "path": "images/9A-written-25/exam-018.png",
+      "sha256": "a7ad614db9c988b444d0388a0eaf0db59f3bc78afa9476152743a44398bad725",
+      "bytes": 885008
+    },
+    {
+      "path": "images/9A-written-25/exam-019.png",
+      "sha256": "d3f942f7d408fda7afd1433da3e9150c45265e07a838737b8297ca1bb01af35b",
+      "bytes": 892620
+    },
+    {
+      "path": "images/9A-written-25/exam-020.png",
+      "sha256": "902ae244253a9b77ef1cdf4488d3efc01476d93073cf18f8cda8ed194ee61ce5",
+      "bytes": 886074
+    },
+    {
+      "path": "images/9A-written-25/exam-021.png",
+      "sha256": "add895dddc2178a5a6039df19e15c051ae4cd7c817ae2625aeb787cf11dd43cb",
+      "bytes": 892692
+    },
+    {
+      "path": "images/9A-written-25/exam-022.png",
+      "sha256": "e688528ab52be27846befd30f8be4647c5e250b71d4bbcb67daddd5a0d7c45b5",
+      "bytes": 879497
+    },
+    {
+      "path": "images/9A-written-25/exam-023.png",
+      "sha256": "8e9998b079f3fb1b79ed85c45cf7401681975123a70814176768cdd4987b305d",
+      "bytes": 874078
+    },
+    {
+      "path": "images/9A-written-25/exam-024.png",
+      "sha256": "dde1f22ac4a1a0c941fd3f9e1e2cffea6d2b8049e1764a0a28d870350d5202e4",
+      "bytes": 889208
+    },
+    {
+      "path": "images/9A-written-25/exam-025.png",
+      "sha256": "ae4fbe47219f73281f42df69f99bfab1b5642dc2d33a70817a2651d29ab40abe",
+      "bytes": 883083
+    },
+    {
+      "path": "images/9B-listening-20/exam-001.png",
+      "sha256": "2dc0d64d9918110afb2a2cd8f7c14a39d3f00508feb5c0f077becf153524e22d",
+      "bytes": 854262
+    },
+    {
+      "path": "images/9B-listening-20/exam-002.png",
+      "sha256": "d48338f840802643e8bb5e454558a497b873262c4f6f0f807d504a0d0baedb56",
+      "bytes": 885434
+    },
+    {
+      "path": "images/9B-listening-20/exam-003.png",
+      "sha256": "bc17750951094bdf7175c7c00728467099c37fa440794c92de8d246d1bf1debd",
+      "bytes": 860934
+    },
+    {
+      "path": "images/9B-listening-20/exam-004.png",
+      "sha256": "c818d3cfaa76cf6a6c11e60095dd09ead6f0200d63575a53ab6dd892516e4846",
+      "bytes": 882572
+    },
+    {
+      "path": "images/9B-listening-20/exam-005.png",
+      "sha256": "7d91837c99f59aed2da5e5d605227374b67a26d9c4e7513afd6eaab39d149b57",
+      "bytes": 864728
+    },
+    {
+      "path": "images/9B-listening-20/exam-006.png",
+      "sha256": "748dd10e4c5133242060c84e557c7f3ba45a63df808190bc9553f94c10453a0a",
+      "bytes": 863295
+    },
+    {
+      "path": "images/9B-listening-20/exam-007.png",
+      "sha256": "2a63765bb7d050bd64f79986af08ba95cd58c8224f58b8ad6bdde39fc3a590fe",
+      "bytes": 868939
+    },
+    {
+      "path": "images/9B-listening-20/exam-008.png",
+      "sha256": "8f23f5d894b5144097790f4931cc6cfb12edfbe87a5a46d5961aa89800eaf420",
+      "bytes": 868061
+    },
+    {
+      "path": "images/9B-listening-20/exam-009.png",
+      "sha256": "e363c6473772e33f8195196984cb574d1d0f7c0eb4cdd9ee458969c2657c9889",
+      "bytes": 870052
+    },
+    {
+      "path": "images/9B-listening-20/exam-010.png",
+      "sha256": "c4c1f497bb2273e7985a1787e51375d2d039bbfc6b887eb2d57c1c839d1e6041",
+      "bytes": 869383
+    },
+    {
+      "path": "images/9B-listening-20/exam-011.png",
+      "sha256": "32a5fb1939b6fba925379cbc51032b139eb9750c58fb576d7392d6b651181f97",
+      "bytes": 861162
+    },
+    {
+      "path": "images/9B-listening-20/exam-012.png",
+      "sha256": "672aacca892584153014c5d2ef5bfd96cdaa36f5d63d019412b6396c478e3431",
+      "bytes": 851710
+    },
+    {
+      "path": "images/9B-listening-20/exam-013.png",
+      "sha256": "a7f10f0a126f8f1dfc77d7a36b3503644ba68172dc84b365807a6a6ab64038be",
+      "bytes": 853327
+    },
+    {
+      "path": "images/9B-listening-20/exam-014.png",
+      "sha256": "7cb7a5b797b36fc73ae2f3ea6e753f230ab1af7d626cdace7ca42e350e1428f1",
+      "bytes": 851156
+    },
+    {
+      "path": "images/9B-listening-20/exam-015.png",
+      "sha256": "424cae5faa575f13a0b4b15a55b46eef5d4a123e641a44494199df791bdcf5dd",
+      "bytes": 866458
+    },
+    {
+      "path": "images/9B-listening-20/exam-016.png",
+      "sha256": "dd66b2e5e6651cbb89c2c5c7ff4ec508fed0826a8d7519df6fcd39a5bb20085e",
+      "bytes": 859640
+    },
+    {
+      "path": "images/9B-listening-20/exam-017.png",
+      "sha256": "24748d1f6f9103e0dc366ac3f07e56f9a0dd7c0ec7574089f31d864dd2f41c32",
+      "bytes": 883521
+    },
+    {
+      "path": "images/9B-listening-20/exam-018.png",
+      "sha256": "97ab04feeaa6d249198a4db2fabaa1b259b06a6b41bbfbc11a0a48b8c07297ba",
+      "bytes": 864061
+    },
+    {
+      "path": "images/9B-listening-20/exam-019.png",
+      "sha256": "07e2dbe10d47efef210fd8c900442c042c294d9d2430de5a1c547a69d8729b5e",
+      "bytes": 857911
+    },
+    {
+      "path": "images/9B-listening-20/exam-020.png",
+      "sha256": "d572d720f0624b84b44404ff0124ded50ba5d7b60ad0460258647eebb35fe4e9",
+      "bytes": 853571
+    },
+    {
+      "path": "images/9B-speaking-20/exam-001.png",
+      "sha256": "c50ff58efbd257e645a338011bc4bc780616aa50c4dafb4ed7ec84c37ab64a1b",
+      "bytes": 864248
+    },
+    {
+      "path": "images/9B-speaking-20/exam-002.png",
+      "sha256": "f49bd68768c4c31887b6fe36e6e3856a6adcb1e3c6bf65d1565dc6ce9b711625",
+      "bytes": 870711
+    },
+    {
+      "path": "images/9B-speaking-20/exam-003.png",
+      "sha256": "b46a362f0c67530e78bd676ae7d7a1f503f38c8ea6f7a3a94278c8e6f62abb7b",
+      "bytes": 864121
+    },
+    {
+      "path": "images/9B-speaking-20/exam-004.png",
+      "sha256": "348ce1d35beb7a605add5fbaeb8ce7ddb9c2582947aa6a6f6f26a2933787e708",
+      "bytes": 840035
+    },
+    {
+      "path": "images/9B-speaking-20/exam-005.png",
+      "sha256": "757b8ca5bcfe38e9aa8e2c1c4ef438320d19c28148fd47ec56cf53d5e59e14b6",
+      "bytes": 851278
+    },
+    {
+      "path": "images/9B-speaking-20/exam-006.png",
+      "sha256": "000edcd7b03c995e523546d9bf3726bfbb7c0b49913efe6e7a88b86a89f941b7",
+      "bytes": 837406
+    },
+    {
+      "path": "images/9B-speaking-20/exam-007.png",
+      "sha256": "268d6115d16c208307ab95a9c0eb5f0c94d50afd779d84d90b3b1d5f22b80481",
+      "bytes": 831664
+    },
+    {
+      "path": "images/9B-speaking-20/exam-008.png",
+      "sha256": "067c94f91a5f202b6889a5de8809b9605a6824304a5c6dd711ac2e8dcb9ea0c3",
+      "bytes": 843450
+    },
+    {
+      "path": "images/9B-speaking-20/exam-009.png",
+      "sha256": "fd56a9bfd7340d71ce97759152a2f4dddfc6d904129bab404bf36f0a53b7cd94",
+      "bytes": 841832
+    },
+    {
+      "path": "images/9B-speaking-20/exam-010.png",
+      "sha256": "2f6198888bdef4c6b3d41a8bc7a253f53482fb3450249a18129dd99e7fc4aadb",
+      "bytes": 846586
+    },
+    {
+      "path": "images/9B-speaking-20/exam-011.png",
+      "sha256": "7a540ce98d2373829d4c37de9fcae60c630da4a6653ef70d3dd7d2a3c2ef3c0f",
+      "bytes": 855094
+    },
+    {
+      "path": "images/9B-speaking-20/exam-012.png",
+      "sha256": "31e7527c872b777c54881f53e01d77520eee6cbf7b1c2fa5f9921e8f441eab49",
+      "bytes": 860796
+    },
+    {
+      "path": "images/9B-speaking-20/exam-013.png",
+      "sha256": "467ec31ad4b0399f446b9162b40edd00c110cfb2a079a47945ea648908f9d7d3",
+      "bytes": 878280
+    },
+    {
+      "path": "images/9B-speaking-20/exam-014.png",
+      "sha256": "26d21edda1af12a9a349ef61737a428a0cd1f0b8251ed09680212e64f7a9af78",
+      "bytes": 871022
+    },
+    {
+      "path": "images/9B-speaking-20/exam-015.png",
+      "sha256": "52daaf278f7def7751835d5947774b2022c758998f4b56177ed6975956f9ffc2",
+      "bytes": 867207
+    },
+    {
+      "path": "images/9B-speaking-20/exam-016.png",
+      "sha256": "b428a6d5a8c491884860a8c7e181f288b01796a5840b7223f39512e12c67da64",
+      "bytes": 882302
+    },
+    {
+      "path": "images/9B-speaking-20/exam-017.png",
+      "sha256": "11e786afdc18f60f5d9a3734e1d8a8df394b587d193ba4d4c8c624b1ff72615f",
+      "bytes": 875213
+    },
+    {
+      "path": "images/9B-speaking-20/exam-018.png",
+      "sha256": "8c0162d4266a3194e71b3c978fc9191e534e2164f4da339a1281292ec81817b7",
+      "bytes": 880404
+    },
+    {
+      "path": "images/9B-speaking-20/exam-019.png",
+      "sha256": "92c202d8930d2a197fde25868b7e22162b69f729aad907799a400bde26ab9ecb",
+      "bytes": 881380
+    },
+    {
+      "path": "images/9B-speaking-20/exam-020.png",
+      "sha256": "17d1e0385e7ac871d739d2620d4c894d10ca17e51b0b8c59688815ceeb8fd5a9",
+      "bytes": 876449
+    },
+    {
+      "path": "images/9B-written-20/exam-001.png",
+      "sha256": "c5a75cee751c5a6d7b2b0eb51bb1c8cd5248a6e6f1a170e7499ae5e79029a5fa",
+      "bytes": 904506
+    },
+    {
+      "path": "images/9B-written-20/exam-002.png",
+      "sha256": "b73b7dcae5dd0065d3e21741921a0667064ebb3eeb5d2dab1f1ea4e437e33200",
+      "bytes": 886443
+    },
+    {
+      "path": "images/9B-written-20/exam-003.png",
+      "sha256": "4b3dad4fd20c42377754ee4c24a5fce0e6179a613f0f5398f2779c56a703219b",
+      "bytes": 850617
+    },
+    {
+      "path": "images/9B-written-20/exam-004.png",
+      "sha256": "f8e41899594d2d995c3fcc539e1cabc9bbdc5b443103623d5ccd1495d594947f",
+      "bytes": 859872
+    },
+    {
+      "path": "images/9B-written-20/exam-005.png",
+      "sha256": "e255608f86e53721a0b1e8366a9a89d2d2ddd27ee48f9d401edefe209baa3d05",
+      "bytes": 870661
+    },
+    {
+      "path": "images/9B-written-20/exam-006.png",
+      "sha256": "a9b5ed4d7e0c3299a47488dbc457da2cae61c11f2998123ec6af10f15121b373",
+      "bytes": 828806
+    },
+    {
+      "path": "images/9B-written-20/exam-007.png",
+      "sha256": "a4722966657c0cbf8d46479bef0f61c5c656e97672859868799183fbe4ac4760",
+      "bytes": 838534
+    },
+    {
+      "path": "images/9B-written-20/exam-008.png",
+      "sha256": "648b11109773bd8bad3ef583f06dab1121f30a6ec2a0d54c45c3fb4fb22dfb25",
+      "bytes": 777789
+    },
+    {
+      "path": "images/9B-written-20/exam-009.png",
+      "sha256": "1195f195ea43c014049c14d2c65eb3379ac98cadb4538fb3d954bd791627fa8e",
+      "bytes": 1064927
+    },
+    {
+      "path": "images/9B-written-20/exam-010.png",
+      "sha256": "2b02aeb339531e85c51e2b8b3dde9b87dae6b4d50aaa1176121e3e01c0dbdeb3",
+      "bytes": 760217
+    },
+    {
+      "path": "images/9B-written-20/exam-011.png",
+      "sha256": "7e1203d6992dae019e8f2672567721f6f0b5bd6397af02336ef479089518d1de",
+      "bytes": 888493
+    },
+    {
+      "path": "images/9B-written-20/exam-012.png",
+      "sha256": "84bd9abcaddf7bcfee0344e92dfcd1f1e2a1d88f1bc3168ec774cde4c6b02ed9",
+      "bytes": 811796
+    },
+    {
+      "path": "images/9B-written-20/exam-013.png",
+      "sha256": "1f95b037bced85309f7c91d65a1110fe21055ee4512f5469da9c4a3ee572f9b7",
+      "bytes": 865556
+    },
+    {
+      "path": "images/9B-written-20/exam-014.png",
+      "sha256": "ec8d020c2338caf76b12a71c06d2967940a18b3c54730e869f009e83eefe685d",
+      "bytes": 888680
+    },
+    {
+      "path": "images/9B-written-20/exam-015.png",
+      "sha256": "4c6384662815846ea0b47ddf7c4c2180ac466dbb9b954934c65785bf748c77d9",
+      "bytes": 883347
+    },
+    {
+      "path": "images/9B-written-20/exam-016.png",
+      "sha256": "b4e8d7e67f335f92cc431a3dce2ec60169f4fa3e5f36c3e138f5fc5d035a8243",
+      "bytes": 863749
+    },
+    {
+      "path": "images/9B-written-20/exam-017.png",
+      "sha256": "b67dacef6297ea84195754609ba6def1cf2988e37456c1a4a65aca0fa61c8b93",
+      "bytes": 857699
+    },
+    {
+      "path": "images/9B-written-20/exam-018.png",
+      "sha256": "236d200d23d8145898843538dcc6c79c7cbf64fb748787bd54ddf97f1c229cf8",
+      "bytes": 884651
+    },
+    {
+      "path": "images/9B-written-20/exam-019.png",
+      "sha256": "a37da4056ccaf4effeadd453650d8e6e86c2b199abb3ac9b58ae9d096e32f225",
+      "bytes": 888796
+    },
+    {
+      "path": "images/9B-written-20/exam-020.png",
+      "sha256": "089b378461db8fa3ed248f3e8a7d5cef621c4446bc972718665ff5087d1a68ee",
+      "bytes": 935608
+    },
+    {
+      "path": "word/five-classes-listening/MAHIR_2025_2026_9A_TDE_2_Donem_2_Dinleme_Puan_Cizelgesi.docx",
+      "sha256": "8d36d312aae0fc2dc5f72c4a96e11b2c085d8ce7be2f5dbc5b8c17c35b22e3f8",
+      "bytes": 35680
+    },
+    {
+      "path": "word/five-classes-listening/MAHIR_2025_2026_9B_TDE_2_Donem_2_Dinleme_Puan_Cizelgesi.docx",
+      "sha256": "5ce06b49f47788bd90d24a18c15cce5577ec3655ef0d17da9bbf04832f5a7400",
+      "bytes": 35721
+    },
+    {
+      "path": "word/five-classes-listening/MAHIR_2025_2026_9C_TDE_2_Donem_2_Dinleme_Puan_Cizelgesi.docx",
+      "sha256": "fbcd640bfbd302be23499fa6fba10e4afd4b293d635468640ad140c217686958",
+      "bytes": 35595
+    },
+    {
+      "path": "word/five-classes-listening/MAHIR_2025_2026_9D_TDE_2_Donem_2_Dinleme_Puan_Cizelgesi.docx",
+      "sha256": "8b8c2189a69ce64bfcadb758af57712283cafc94bd6a58611d30db86381d6dc8",
+      "bytes": 35370
+    },
+    {
+      "path": "word/five-classes-listening/MAHIR_2025_2026_9E_TDE_2_Donem_2_Dinleme_Puan_Cizelgesi.docx",
+      "sha256": "2535ac17464965782fe856d4a8e3d147e8cbbb2b667843374e33ab2c48013d49",
+      "bytes": 35656
+    },
+    {
+      "path": "word/five-classes-speaking/MAHIR_2025_2026_9A_TDE_2_Donem_2_Konusma_Puan_Cizelgesi.docx",
+      "sha256": "c6c1eb7e20de423c6d616c203935c4babe0fb0add47fe89b7747dff8208cf778",
+      "bytes": 35667
+    },
+    {
+      "path": "word/five-classes-speaking/MAHIR_2025_2026_9B_TDE_2_Donem_2_Konusma_Puan_Cizelgesi.docx",
+      "sha256": "abd0c2752ba1cf408e4bc7c732ea7047610884c9179c62b68f6a3f032b078697",
+      "bytes": 35727
+    },
+    {
+      "path": "word/five-classes-speaking/MAHIR_2025_2026_9C_TDE_2_Donem_2_Konusma_Puan_Cizelgesi.docx",
+      "sha256": "fbcfda1e175fa1a5553a94706fe39d2682ae26aad44e929035ff49f4e0baecc2",
+      "bytes": 35586
+    },
+    {
+      "path": "word/five-classes-speaking/MAHIR_2025_2026_9D_TDE_2_Donem_2_Konusma_Puan_Cizelgesi.docx",
+      "sha256": "1e65d02ce947fe848b00692f75caf1463042bb83e0dd0f8e48b3fde037be15d3",
+      "bytes": 35465
+    },
+    {
+      "path": "word/five-classes-speaking/MAHIR_2025_2026_9E_TDE_2_Donem_2_Konusma_Puan_Cizelgesi.docx",
+      "sha256": "64e39314e4c1ac3b2c398ee0ddad9dc111916890b6c57c3a931583bff92fc9f8",
+      "bytes": 35666
+    },
+    {
+      "path": "word/five-classes-written/MAHIR_2025_2026_9A_TDE_2_Donem_2_Yazili_Puan_Cizelgesi.docx",
+      "sha256": "b9bcb1ba9d2ec77b750197bd66faa58a1cdb326d33d732c1f6636fd65cf37ccb",
+      "bytes": 35757
+    },
+    {
+      "path": "word/five-classes-written/MAHIR_2025_2026_9B_TDE_2_Donem_2_Yazili_Puan_Cizelgesi.docx",
+      "sha256": "7183cf9b1a96a849bd665bb064813ba5bd01ce6ba400c04598497ebae89df668",
+      "bytes": 35906
+    },
+    {
+      "path": "word/five-classes-written/MAHIR_2025_2026_9C_TDE_2_Donem_2_Yazili_Puan_Cizelgesi.docx",
+      "sha256": "1f2f7bd777c647f89365cceeeb4a72f1ad17141a6fcdf1c38268bcc24ec5b7d4",
+      "bytes": 35691
+    },
+    {
+      "path": "word/five-classes-written/MAHIR_2025_2026_9D_TDE_2_Donem_2_Yazili_Puan_Cizelgesi.docx",
+      "sha256": "3ca429d7f6f4278d63e446639b401f15e43b10f7e12cb634c622ac1b90f15255",
+      "bytes": 35585
+    },
+    {
+      "path": "word/five-classes-written/MAHIR_2025_2026_9E_TDE_2_Donem_2_Yazili_Puan_Cizelgesi.docx",
+      "sha256": "c38832e11fb9da538b4c31d2df7a1aef9ac14af1c7a898b0de89095ab5f53aa9",
+      "bytes": 35787
+    },
+    {
+      "path": "word/ocr-word-comparison/MAHIR_2025_2026_9A_TDE_2_Donem_2_Yazili_Puan_Cizelgesi.docx",
+      "sha256": "948beea3137c5a1fd3bc7fdd63bb51d7422081a56b27bc16bbc3c8a1b369fe71",
+      "bytes": 35757
+    },
+    {
+      "path": "word/ocr-word-comparison/MAHIR_ANADOLU_LISESI_2025_2026_9_Sinif_TDE_2_Donem_2_Yazili.docx",
+      "sha256": "f30a6cec043e3ebeeb8cc79c502c04b110e1b6fd893d00a987286f9fcf322ba6",
+      "bytes": 33111
+    },
+    {
+      "path": "word/ocr-word-comparison/MAHIR_Veri_Giris_Sablonu_final.docx",
+      "sha256": "9a49a1738b3f94b08fdd51555a4db5ccf077eaca0412827547d9055d35426efb",
+      "bytes": 34438
+    },
+    {
+      "path": "word/shared-learning-outcomes/MAHIR_2025_2026_Dinleme_Sinavi_Ogrenme_Ciktilari.docx",
+      "sha256": "ed46fa0d5fecb94128c87638aea394f6a37d7ac0de9020311a2ee37ec4b79d2a",
+      "bytes": 41008
+    },
+    {
+      "path": "word/shared-learning-outcomes/MAHIR_2025_2026_Konusma_Sinavi_Ogrenme_Ciktilari.docx",
+      "sha256": "51913bb707d6d3f1015a15da0bb45b6b27fc25a304fd92e024fc3d93808e88da",
+      "bytes": 40988
+    },
+    {
+      "path": "word/shared-learning-outcomes/MAHIR_2025_2026_Yazili_Sinavi_Ogrenme_Ciktilari.docx",
+      "sha256": "a88ee59d3469571826816c85f6c30bc96e83b762f51bb6ec81450ee85ca78f4e",
+      "bytes": 41306
+    },
+    {
+      "path": "word/templates/Ornek_Sinav_Kagidi_Soru_Bazli_Puan_Cizelgesi_final.docx",
+      "sha256": "46fea0c25582e8587d397422c10b324cbab62a66fc73338a9b4ab0f0d434157f",
+      "bytes": 27207
+    }
+  ]
+}
