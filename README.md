@@ -6,32 +6,6 @@
 
 MAHİR, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması - 1. Senaryo: Kamu Evrak ve Yazışma Süreçleri İçin Akıllı Ajan Destek Sistemi** kapsamında geliştirilmiştir.
 
-## İçindekiler
-
-1. [18 milyon öğrenci, 1,19 milyon öğretmen, milyar ölçekli resmî evrak akışı](#18-milyon-öğrenci-119-milyon-öğretmen-milyar-ölçekli-resmî-evrak-akışı)
-2. [Eğitim-Öğretim Sürecinde Karşılaşılan Problem](#eğitim-öğretim-sürecinde-karşılaşılan-problem)
-3. [Öğretmen olmayan okuyucu için: Okuldaki resmî evrak zinciri](#öğretmen-olmayan-okuyucu-için-okuldaki-resmî-evrak-zinciri)
-4. [Prototipe konu olan dersin öğretmeninin gözünden süreç](#şimdi-bu-sürece-prototipe-konu-olan-dersin-öğretmeninin-gözünden-bakalım)
-5. [Öğretmen tecrübesiyle geliştirilen MAHİR](#ogretmen-tecrubesiyle-gelistirilen-mahir)
-6. [Otomatik test güvencesi ve demo videoları](#otomatik-test-güvencesi)
-7. [Türkiye Yüzyılı Maarif Modeli ile aynı dili konuşan analiz](#türkiye-yüzyılı-maarif-modeli-ile-aynı-dili-konuşan-analiz)
-8. [Ulusal ölçek modeli ve genişleme vizyonu](#ulusal-ölçek-modeli-ve-genişleme-vizyonu)
-9. [İhtiyacın resmî dayanağı ve öğretmen deneyimleriyle doğrulama](#ihtiyacin-resmi-dayanagi-ve-ogretmen-deneyimleriyle-dogrulama)
-10. [Yarışma görevlerinin tamamlanma durumu](#yarışma-görevlerinin-tamamlanma-durumu)
-11. [Uçtan uca MAHİR akışı](#uctan-uca-mahir-akisi)
-12. [Çok ajanlı mimari](#çok-ajanlı-mimari)
-13. [Projeyi inceleme rehberi](#projeyi-inceleme-rehberi)
-14. [OCR ve RAG demo erişimi](#ocr-ve-rag-demo-erişimi)
-15. [9. sınıf Türk Dili ve Edebiyatı pilotu](#9-sınıf-türk-dili-ve-edebiyatı-pilotu)
-16. [Doğruluk ve halüsinasyon kontrolü](#doğruluk-ve-halüsinasyon-kontrolü)
-17. [Veri güvenliği ve etik sınırlar](#veri-güvenliği-ve-etik-sınırlar)
-18. [Çalışan özellikler ve prototip sınırları](#çalışan-özellikler-ve-prototip-sınırları)
-19. [Testler](#testler)
-20. [Proje yapısı](#proje-yapısı)
-21. [Teknik belgeler ve kaynaklar](#teknik-belgeler-ve-kaynaklar)
-22. [Sonraki geliştirme adımları](#sonraki-geliştirme-adımları)
-23. [Ekip](#ekip)
-
 ## 18 milyon öğrenci, 1,19 milyon öğretmen, milyar ölçekli resmî evrak akışı
 
 Millî Eğitim Bakanlığının yayımladığı 2024–2025 örgün eğitim istatistikleri, MAHİR'in çözmeyi hedeflediği sorunun ölçeğini gösterir:
@@ -56,7 +30,32 @@ Kaynaklar: [Millî Eğitim Bakanlığı, 2024–2025 Örgün Eğitim İstatistik
 
 **Temel ilke: MAHİR okur, sınıflandırır, doğrular, hesaplar, analiz eder, eğitim-öğretim programlarının ilgili maddelerine atıf destekli rapor üretir; nihai pedagojik değerlendirme, düzeltme ve onay öğretmene aittir.**
 
-## Eğitim-Öğretim Sürecinde Karşılaşılan Problem
+## İçindekiler
+
+1. [Eğitim-Öğretim Sürecinde Karşılaşılan Sorun](#eğitim-öğretim-sürecinde-karşılaşılan-sorun)
+2. [Öğretmen olmayan okuyucu için: Okuldaki resmî evrak zinciri](#öğretmen-olmayan-okuyucu-için-okuldaki-resmî-evrak-zinciri)
+3. [Prototipe konu olan dersin öğretmeninin gözünden süreç](#şimdi-bu-sürece-prototipe-konu-olan-dersin-öğretmeninin-gözünden-bakalım)
+4. [Öğretmen tecrübesiyle geliştirilen MAHİR](#ogretmen-tecrubesiyle-gelistirilen-mahir)
+5. [Otomatik test güvencesi ve demo videoları](#otomatik-test-güvencesi)
+6. [Türkiye Yüzyılı Maarif Modeli ile aynı dili konuşan analiz](#türkiye-yüzyılı-maarif-modeli-ile-aynı-dili-konuşan-analiz)
+7. [Ulusal ölçek modeli ve genişleme vizyonu](#ulusal-ölçek-modeli-ve-genişleme-vizyonu)
+8. [İhtiyacın resmî dayanağı ve öğretmen deneyimleriyle doğrulama](#ihtiyacin-resmi-dayanagi-ve-ogretmen-deneyimleriyle-dogrulama)
+9. [Yarışma görevlerinin tamamlanma durumu](#yarışma-görevlerinin-tamamlanma-durumu)
+10. [Uçtan uca MAHİR akışı](#uctan-uca-mahir-akisi)
+11. [Çok ajanlı mimari](#çok-ajanlı-mimari)
+12. [Projeyi inceleme rehberi](#projeyi-inceleme-rehberi)
+13. [OCR ve RAG demo erişimi](#ocr-ve-rag-demo-erişimi)
+14. [9. sınıf Türk Dili ve Edebiyatı pilotu](#9-sınıf-türk-dili-ve-edebiyatı-pilotu)
+15. [Doğruluk ve halüsinasyon kontrolü](#doğruluk-ve-halüsinasyon-kontrolü)
+16. [Veri güvenliği ve etik sınırlar](#veri-güvenliği-ve-etik-sınırlar)
+17. [Çalışan özellikler ve prototip sınırları](#çalışan-özellikler-ve-prototip-sınırları)
+18. [Testler](#testler)
+19. [Proje yapısı](#proje-yapısı)
+20. [Teknik belgeler ve kaynaklar](#teknik-belgeler-ve-kaynaklar)
+21. [Sonraki geliştirme adımları](#sonraki-geliştirme-adımları)
+22. [Ekip](#ekip)
+
+## Eğitim-Öğretim Sürecinde Karşılaşılan Sorun
 
 **Okullarda eğitim-öğretim süreci boyunca öğrenciye ilişkin çok sayıda veri elde edilir. Bu veriler, öğrencinin öğrenme sürecini ve gelişimini değerlendirmek için nicelik bakımından yetersiz değildir; temel sorun bu verilerin eğitim kurumlarında işlenen farklı resmî evraklarda dağınık ve birbirinden kopuk hâlde bulunmaları ve bunları bir araya getirip anlamlı bir bütün oluşturacak kullanışlı bir mekanizmanın bulunmayışıdır.**
 
