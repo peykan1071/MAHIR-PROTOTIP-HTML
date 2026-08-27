@@ -1,6 +1,12 @@
 # MAHİR
 
 [![MAHİR Otomatik Testleri](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml)
+[![CI](https://img.shields.io/badge/CI-GitHub_Actions-blue?logo=github-actions)](.)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](.)
+[![Inference](https://img.shields.io/badge/LLM-vLLM_%7C_Qwen2.5--7B-green)](.)
+[![OCR](https://img.shields.io/badge/OCR-PaddleOCR--VL-orange)](.)
+[![Vector DB](https://img.shields.io/badge/Vector_DB-Qdrant_Hybrid-red?logo=qdrant)](.)
+[![Deploy](https://img.shields.io/badge/Cloud-Modal_(Scale--to--Zero)-purple)](.)
 
 > Öğretmen kontrolünü merkeze alan; eğitim evraklarını sınıflandırma, doğrulama, öğrenme kanıtlarıyla ilişkilendirme, raporlama ve kurum içi resmî yazışmaya hazırlama amacı taşıyan Türkçe çok ajanlı karar destek sistemi. Çalışan prototip, bu geniş vizyonu 9. sınıf Türk Dili ve Edebiyatı sınav evrakları üzerinden doğrular.
 
