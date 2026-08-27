@@ -14,6 +14,7 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import ocr_engine
@@ -25,7 +26,10 @@ from .file_receiver import (
     extract_uploaded_files,
     validate_file_name,
 )
-from .ocr_protocol import SHARED_SECRET_HEADER, UPLOAD_PATH, WARMUP_PATH
+
+UPLOAD_PATH = "/mahir-upload"
+WARMUP_PATH = "/mahir-warmup"
+SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
 
 
 class OCRWorkerHandler(BaseHTTPRequestHandler):
@@ -100,8 +104,7 @@ class OCRWorkerHandler(BaseHTTPRequestHandler):
             return
         oversized = next((f for f in uploaded_files if len(f.content) > MAX_UPLOAD_SIZE), None)
         if oversized is not None:
-            limit_mb = MAX_UPLOAD_SIZE // (1024 * 1024)
-            self._send_json(413, {"ok": False, "message": f"Dosya {limit_mb} MB sınırını aşıyor."})
+            self._send_json(413, {"ok": False, "message": "Dosya 20 MB sınırını aşıyor."})
             return
 
         ok, message, structured_data = _run_image_group_ocr(uploaded_files, checks)
@@ -126,12 +129,15 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
     warnings: list[str] = []
 
     for uploaded_file, file_check in zip(uploaded_files, file_checks):
-        document_ref = f"Belge-{len(documents) + 1:03d}"
+        # Kaynak görsel adı öğretmenin yüklediği gerçek dosya adıdır. Bu ad
+        # yalnız izlenebilirlik içindir; hiçbir OCR veya sınıflandırma kararına
+        # katılmaz.
+        document_ref = uploaded_file.file_name
         try:
             document = ocr_engine.read_exam_document(uploaded_file.content, file_check.extension)
         except Exception as error:  # noqa: BLE001 - OCR is a third-party ML pipeline; one bad/unreadable
             # image must not drop the whole batch or crash the request thread.
-            warnings.append(f"{document_ref}: Evrak okunamadı; görseli kontrol edip yeniden yükleyiniz.")
+            warnings.append(f"{document_ref}: Alanlar boş bırakıldı; görseli kontrol ederek manuel doldurunuz.")
             document = {
                 "exam": {}, "questions": [],
                 "student": {"studentNo": "", "scores": [], "totalScore": None, "calculatedTotal": 0, "control": ""},
@@ -151,14 +157,22 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
         student["sourceFile"] = document_ref
         documents.append({**document, "student": student, "documentRef": document_ref})
 
-    def group_key(document: dict[str, object]) -> tuple[object, ...]:
-        exam = document.get("exam") or {}
-        return (
-            str(exam.get("classSection") or "").casefold().replace(" ", ""),
-            str(exam.get("examType") or "").casefold().strip(),
-        )
+    def normalize_class_section(value: object) -> str:
+        match = re.search(r"(?<!\d)(1[0-2]|[1-9])\s*(?:[-/]\s*|\s+)?([A-Za-zÇĞİÖŞÜçğıöşü])(?![A-Za-z])", str(value or ""))
+        return f"{int(match.group(1))}-{match.group(2).upper()}" if match else ""
 
-    grouped: dict[tuple[object, ...], dict[str, object]] = {}
+    def student_sort_key(student: dict[str, object]) -> tuple[object, ...]:
+        reference = str(student.get("studentNo") or "").strip()
+        numbers = re.findall(r"\d+", reference)
+        return (0, int(numbers[-1]), reference.casefold()) if numbers else (1, 0, reference.casefold())
+
+    def group_key(document: dict[str, object]) -> str:
+        exam = document.get("exam") or {}
+        # OCR sınıflandırmasının tek anahtarı açık etiketli Sınıf/Şube
+        # hücresidir. Sınav türü okunmuş olsa bile ayrı grup oluşturmaz.
+        return normalize_class_section(exam.get("classSection"))
+
+    grouped: dict[str, dict[str, object]] = {}
     for document in documents:
         key = group_key(document)
         group = grouped.setdefault(key, {
@@ -172,6 +186,12 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
         group["requiresQuestionCount"] = not bool(group.get("questions"))
         group["students"].append(document["student"])
         group["documentRefs"].append(document["documentRef"])
+
+    for group in grouped.values():
+        group["students"].sort(key=student_sort_key)
+        for row_number, student in enumerate(group["students"], start=1):
+            student["rowNumber"] = row_number
+            student["technicalId"] = f"Ö-{row_number:03d}"
 
     groups = list(grouped.values())
     first = groups[0] if len(groups) == 1 else {"exam": {}, "questions": [], "students": []}
@@ -194,17 +214,6 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
             },
         },
     )
-
-
-def _translate_privacy_findings(findings: set[str]) -> list[str]:
-    """OCR sınırındaki gizlilik bulgu kodlarını öğretmene gösterilecek Türkçe etikete çevir."""
-
-    labels = []
-    if "TCKN" in findings:
-        labels.append("T.C. kimlik numarası")
-    if "AD_SOYAD" in findings:
-        labels.append("ad-soyad")
-    return labels
 
 
 def create_server(host: str = "0.0.0.0", port: int = 8000) -> ThreadingHTTPServer:

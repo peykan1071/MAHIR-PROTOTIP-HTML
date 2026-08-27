@@ -102,8 +102,8 @@ def _analyze_and_trace(
     if course_profile is None and component_type != WRITTEN:
         raise ValueError("Dinleme/izleme ve konuşma sınavları yalnız dil dersi profilinde kullanılabilir.")
     if component_type == GENERAL:
-        if course_profile is None:
-            raise ValueError("Genel dil değerlendirmesi yalnız dil dersi profilinde kullanılabilir.")
+        if course_profile is None or course_profile.id != "tde-70-15-15":
+            raise ValueError("Genel değerlendirme yalnız Türk Dili ve Edebiyatı dersi için kullanılabilir.")
         component_analyses = payload.get("componentAnalyses")
         if not isinstance(component_analyses, dict):
             raise ValueError(

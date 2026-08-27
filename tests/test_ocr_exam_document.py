@@ -8,12 +8,9 @@ from backend.app.ocr_quality_agent import OCRDecision, assess_result
 
 
 class ExamDocumentParserTests(unittest.TestCase):
-    @patch("backend.app.ocr_engine._detect_marked_exam_type", return_value="Dinleme")
     @patch("backend.app.ocr_engine._extract_table_rows")
     @patch("backend.app.ocr_engine._run_ocr", return_value="<table></table>")
-    def test_visual_checkbox_overrides_wrong_nonempty_table_ocr(
-        self, _run_ocr, extract_rows, _detect_marked_exam_type
-    ):
+    def test_explicit_exam_type_cell_is_the_only_exam_type_evidence(self, _run_ocr, extract_rows):
         extract_rows.return_value = [
             ["Öğrencinin Adı-Soyadı", "ÖĞRENCİ-001", "Sınav Türü", "Konuşma"],
             ["Öğrenci Okul No", "OGR-001"],
@@ -24,8 +21,7 @@ class ExamDocumentParserTests(unittest.TestCase):
 
         result = read_exam_document(b"image", ".png")
 
-        self.assertEqual(result["exam"]["examType"], "Dinleme")
-        self.assertEqual(result["exam"]["examTypeSource"], "visual-checkbox")
+        self.assertEqual(result["exam"]["examType"], "Konuşma")
 
     def test_class_section_accepts_ocr_space_separator(self):
         rows = [["Sınıf/Şube", "9", "A"]]
@@ -33,6 +29,17 @@ class ExamDocumentParserTests(unittest.TestCase):
         result = _parse_exam_rows(rows)
 
         self.assertEqual(result["exam"]["classSection"], "9-A")
+
+    def test_all_supported_class_section_spellings_are_one_class(self):
+        variants = ["9/a", "9/A", "9-a", "9-A", "9 A", "9a", "9 a", "9A"]
+        for variant in variants:
+            with self.subTest(variant=variant):
+                result = _parse_exam_rows([["Sınıf/Şube", variant]])
+                self.assertEqual(result["exam"]["classSection"], "9-A")
+
+    def test_unlabelled_class_like_text_is_not_used(self):
+        result = _parse_exam_rows([["Açıklama", "9-A"], ["Sınav Türü", "Yazılı"]])
+        self.assertEqual(result["exam"]["classSection"], "")
 
     def test_one_image_becomes_one_student_document(self):
         rows = [
@@ -84,19 +91,19 @@ class ExamDocumentParserTests(unittest.TestCase):
         parsed = _parse_exam_rows(rows)
 
         self.assertEqual(parsed["exam"]["classSection"], "9-A")
-        self.assertEqual(parsed["exam"]["examType"], "Dinleme")
+        self.assertEqual(parsed["exam"]["examType"], "")
         self.assertEqual(parsed["student"]["studentNo"], "OGR-009")
 
     def test_written_and_listening_documents_keep_references_and_separate_shapes(self):
         written = _parse_exam_rows([
-            ["Öğrencinin Adı-Soyadı", "ÖĞRENCİ-003", "Sınav Türü", "☑ Yazılı □ 2. Dinleme □ Konuşma"],
+            ["Öğrencinin Adı-Soyadı", "ÖĞRENCİ-003", "Sınav Türü", "Yazılı"],
             ["Öğrenci Okul No", "OGR - 003"],
             ["Sınıf/Şube", "9-A"],
             ["Azami Puan", "12", "12", "14", "12", "14", "12", "24", "100"],
             ["Öğrencinin Aldığı Puan", "4", "3", "0", "4", "0", "4", "6", "21"],
         ])
         listening = _parse_exam_rows([
-            ["Öğrencinin Adı-Soyadı", "ÖĞRENCİ-009", "Sınav Türü", "□ Yazılı ☑ 2. Dinleme □ Konuşma"],
+            ["Öğrencinin Adı-Soyadı", "ÖĞRENCİ-009", "Sınav Türü", "Dinleme"],
             ["Öğrenci Okul No", "OGR-009"],
             ["Sınıf/Şube", "9-A"],
             ["Azami Puan", "10", "10", "10", "10", "10", "10", "10", "10", "10", "10", "100"],
@@ -112,6 +119,17 @@ class ExamDocumentParserTests(unittest.TestCase):
         self.assertEqual(listening["exam"]["examType"], "Dinleme")
         self.assertEqual(len(listening["questions"]), 10)
         self.assertEqual(listening["student"]["scores"], [3, 3, 2, 2, 2, 2, 3, 3, 3, 2])
+
+    def test_blank_score_cell_keeps_its_question_position_and_total_stays_blank(self):
+        parsed = _parse_exam_rows([
+            ["Sınav Türü", "Yazılı"],
+            ["Sınıf/Şube", "9-A"],
+            ["Sorular", "S1", "S2", "S3", "Toplam"],
+            ["Azami Puan", "30", "30", "40", "100"],
+            ["Öğrencinin Aldığı Puan", "20", "", "35", ""],
+        ])
+        self.assertEqual(parsed["student"]["scores"], [20, None, 35])
+        self.assertIsNone(parsed["student"]["totalScore"])
 
     def test_isolated_class_value_beats_incidental_question_fragment(self):
         rows = [
@@ -185,10 +203,31 @@ class ExamDocumentParserTests(unittest.TestCase):
             [student["studentNo"] for student in structured["groups"][0]["students"]],
             ["OGR-003", "OGR-022"],
         )
+        self.assertEqual(
+            [student["sourceFile"] for student in structured["groups"][0]["students"]],
+            ["a.png", "b.png"],
+        )
 
     @patch("backend.app.ocr_worker.ocr_engine.ensure_available")
     @patch("backend.app.ocr_worker.ocr_engine.read_exam_document")
-    def test_listening_document_is_a_separate_exam_group(self, read_exam_document, ensure_available):
+    def test_students_are_sorted_numerically_by_reference_not_upload_order(self, read_exam_document, ensure_available):
+        ensure_available.return_value = None
+        read_exam_document.side_effect = [
+            {"exam": {"classSection": "9/A", "examType": "Yazılı"}, "questions": [{"number": 1, "maxScore": 100}], "student": {"studentNo": "OGR-21", "scores": [80], "totalScore": 80}},
+            {"exam": {"classSection": "9a", "examType": "Yazılı"}, "questions": [{"number": 1, "maxScore": 100}], "student": {"studentNo": "OGR-2", "scores": [70], "totalScore": 70}},
+        ]
+        files = [UploadedFile("21-y.jpg", b"a"), UploadedFile("2-y.jpg", b"b")]
+        checks = [FileCheckResult("21-y.jpg", ".jpg", True), FileCheckResult("2-y.jpg", ".jpg", True)]
+
+        ok, _, structured = _run_image_group_ocr(files, checks)
+
+        self.assertTrue(ok)
+        self.assertEqual([student["studentNo"] for student in structured["groups"][0]["students"]], ["OGR-2", "OGR-21"])
+        self.assertEqual([student["sourceFile"] for student in structured["groups"][0]["students"]], ["2-y.jpg", "21-y.jpg"])
+
+    @patch("backend.app.ocr_worker.ocr_engine.ensure_available")
+    @patch("backend.app.ocr_worker.ocr_engine.read_exam_document")
+    def test_exam_type_does_not_create_a_separate_ocr_group(self, read_exam_document, ensure_available):
         ensure_available.return_value = None
         read_exam_document.side_effect = [
             {"exam": {"classSection": "9-A", "examType": "Yazılı"}, "questions": [{"number": 1, "maxScore": 12}], "student": {"studentNo": "OGR-003", "scores": [4], "totalScore": 4}},
@@ -200,11 +239,10 @@ class ExamDocumentParserTests(unittest.TestCase):
         ok, _, structured = _run_image_group_ocr(files, checks)
 
         self.assertTrue(ok)
-        self.assertEqual(structured["summary"]["groupCount"], 2)
-        groups = {(group["exam"]["classSection"], group["exam"]["examType"]): group for group in structured["groups"]}
-        self.assertEqual(groups[("9-A", "Yazılı")]["students"][0]["studentNo"], "OGR-003")
-        self.assertEqual(groups[("9-A", "Dinleme")]["students"][0]["studentNo"], "OGR-009")
-        self.assertEqual(len(groups[("9-A", "Dinleme")]["questions"]), 2)
+        self.assertEqual(structured["summary"]["groupCount"], 1)
+        group = structured["groups"][0]
+        self.assertEqual(group["exam"]["classSection"], "9-A")
+        self.assertEqual([student["studentNo"] for student in group["students"]], ["OGR-003", "OGR-009"])
 
 
 if __name__ == "__main__":

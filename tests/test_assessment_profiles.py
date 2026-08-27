@@ -114,6 +114,19 @@ class AssessmentProfileTests(unittest.TestCase):
         self.assertEqual(result["studentScores"], {"Ö-001": 80.0})
         self.assertEqual(len(result["componentEvidence"]), 3)
 
+    def test_general_evaluation_is_rejected_for_other_language_courses(self):
+        with self.assertRaisesRegex(ValueError, "yalnız Türk Dili ve Edebiyatı"):
+            analyze_approved_data(
+                {
+                    "exam": {
+                        "courseName": "İngilizce",
+                        "componentType": "general",
+                        "weightingProfileId": "language-50-25-25",
+                    },
+                    "componentAnalyses": {},
+                }
+            )
+
     def test_identity_bearing_student_fields_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "okul numarası.*ad-soyad"):
             analyze_approved_data(
