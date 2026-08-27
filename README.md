@@ -133,7 +133,7 @@ Anonim test evrakları, dosya bütünlük kayıtları ve tekrarlanabilir kabul t
 MAHİR'in iki ayrı demo videosu bulunmaktadır:
 
 1. **45 evrakla iki şubeli OCR ve raporlama demosu — 10 dakika:** Aynı okuldaki iki farklı 9. sınıf şubesine ait 20 + 25, toplam 45 öğrencinin sınav not çizelgesi görselleri OCR ile okunur. Sınavlar sınıf/şubelerine göre ayrılır ve öğretmen kontrolüne sunulur. Soru bazlı azami puanlar ile öğrenme çıktıları doğrulandıktan sonra iki şube ayrı ayrı analiz edilir ve bulgular kaynak temelli iki rapora dönüştürülür. Son aşamada iki rapor tek üst yazı ve ek listesi altında birleştirilerek EBYS demo akışıyla okul idaresine sevke hazır hâle getirilir.
-2. **Beş sınıflı yazılı sınav analizi demosu — 4 dakika:** Aynı türde yazılı sınav uygulanan beş farklı 9. sınıf şubesine ait puan çizelgeleri birlikte işlenir. Sınıflar ayrı sınav kayıtları olarak korunur; soru sayıları, azami puanlar ve öğrenci puanları öğretmen kontrolüne sunulur. Her sınıf için ayrı analiz ve rapor oluşturulabilen çoklu sınıf akışı gösterilir.
+2. **Beş sınıflı yazılı sınav analizi ve EBYS demo paketi — 4 dakika:** Aynı türde yazılı sınav uygulanan beş farklı 9. sınıf şubesine ait puan çizelgeleri birlikte işlenir. Sınıflar ayrı sınav kayıtları olarak korunur; soru sayıları, azami puanlar ve öğrenci puanları öğretmen kontrolüne sunulur. Her sınıf için ayrı analiz raporu oluşturulur. Onaylanan beş sınıf raporu tek bir üst yazının ekleri olarak sıralanır ve EBYS demo akışıyla okul idaresine gönderime hazır bir evrak paketine dönüştürülür.
 
 Bu videolar toplam **14 dakikalık** bir demo anlatımı oluşturur. Prototip gerçek EBYS'ye gönderim, evrak numarası, paraf veya elektronik imza işlemi yapmaz.
 
