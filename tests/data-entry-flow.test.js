@@ -55,6 +55,9 @@ assert.match(script, /mahir:report-approval-state/);
 assert.match(html, /data-ebys-prepare disabled aria-disabled="true"/);
 assert.doesNotMatch(script, /typeSelect\.dataset\.inlineExamField = "examType"/);
 assert.doesNotMatch(script, /questionMapCard\.append\(outcomeActions\)/);
+assert.match(html, /<tr><th>Sınıf\/Şube<\/th><td colspan="5">9-A<\/td><\/tr>/);
+assert.doesNotMatch(html, /<tr><th>Sınav Türü<\/th><td colspan="5">Yazılı<\/td><\/tr>/);
+assert.match(html, /Sınıf\/şube \(ör\. 9-A\) açıkça belirtilmelidir/);
 
 assert.match(script, /questions\.length < 1 \|\| questions\.length > 15/);
 assert.match(script, /Azami puanların toplamı tam olarak 100 olmalıdır/);
