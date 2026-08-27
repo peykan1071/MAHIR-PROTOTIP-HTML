@@ -6,6 +6,32 @@
 
 MAHİR, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması - 1. Senaryo: Kamu Evrak ve Yazışma Süreçleri İçin Akıllı Ajan Destek Sistemi** kapsamında geliştirilmiştir.
 
+## İçindekiler
+
+1. [18 milyon öğrenci, 1,19 milyon öğretmen, milyar ölçekli resmî evrak akışı](#18-milyon-öğrenci-119-milyon-öğretmen-milyar-ölçekli-resmî-evrak-akışı)
+2. [Eğitim-Öğretim Sürecinde Karşılaşılan Problem](#eğitim-öğretim-sürecinde-karşılaşılan-problem)
+3. [Öğretmen olmayan okuyucu için: Okuldaki resmî evrak zinciri](#öğretmen-olmayan-okuyucu-için-okuldaki-resmî-evrak-zinciri)
+4. [Prototipe konu olan dersin öğretmeninin gözünden süreç](#şimdi-bu-sürece-prototipe-konu-olan-dersin-öğretmeninin-gözünden-bakalım)
+5. [Öğretmen tecrübesiyle geliştirilen MAHİR](#ogretmen-tecrubesiyle-gelistirilen-mahir)
+6. [Otomatik test güvencesi ve demo videoları](#otomatik-test-güvencesi)
+7. [Türkiye Yüzyılı Maarif Modeli ile aynı dili konuşan analiz](#türkiye-yüzyılı-maarif-modeli-ile-aynı-dili-konuşan-analiz)
+8. [Ulusal ölçek modeli ve genişleme vizyonu](#ulusal-ölçek-modeli-ve-genişleme-vizyonu)
+9. [İhtiyacın resmî dayanağı ve öğretmen deneyimleriyle doğrulama](#ihtiyacin-resmi-dayanagi-ve-ogretmen-deneyimleriyle-dogrulama)
+10. [Yarışma görevlerinin tamamlanma durumu](#yarışma-görevlerinin-tamamlanma-durumu)
+11. [Uçtan uca MAHİR akışı](#uctan-uca-mahir-akisi)
+12. [Çok ajanlı mimari](#çok-ajanlı-mimari)
+13. [Projeyi inceleme rehberi](#projeyi-inceleme-rehberi)
+14. [OCR ve RAG demo erişimi](#ocr-ve-rag-demo-erişimi)
+15. [9. sınıf Türk Dili ve Edebiyatı pilotu](#9-sınıf-türk-dili-ve-edebiyatı-pilotu)
+16. [Doğruluk ve halüsinasyon kontrolü](#doğruluk-ve-halüsinasyon-kontrolü)
+17. [Veri güvenliği ve etik sınırlar](#veri-güvenliği-ve-etik-sınırlar)
+18. [Çalışan özellikler ve prototip sınırları](#çalışan-özellikler-ve-prototip-sınırları)
+19. [Testler](#testler)
+20. [Proje yapısı](#proje-yapısı)
+21. [Teknik belgeler ve kaynaklar](#teknik-belgeler-ve-kaynaklar)
+22. [Sonraki geliştirme adımları](#sonraki-geliştirme-adımları)
+23. [Ekip](#ekip)
+
 ## 18 milyon öğrenci, 1,19 milyon öğretmen, milyar ölçekli resmî evrak akışı
 
 Millî Eğitim Bakanlığının yayımladığı 2024–2025 örgün eğitim istatistikleri, MAHİR'in çözmeyi hedeflediği sorunun ölçeğini gösterir:
@@ -105,6 +131,7 @@ flowchart LR
 | Üst yazı | Analiz raporunun okul yönetimine veya başka bir resmî makama sunulmasında kullanılan resmî yazı taslağıdır. |
 | EBYS | MEBBİS ortak ekranındaki EBYS simgesi üzerinden erişilen ve Millî Eğitim Bakanlığında resmî evrakın oluşturulması, paraflanması, elektronik imzalanması, gönderilmesi ve arşivlenmesi için kullanılan Elektronik Belge Yönetim Sistemidir. e-Okul ve EBA gibi Bakanlığın dijital uygulamalarından biridir. [MEBBİS ortak giriş ekranı](https://mebbisyd.meb.gov.tr/) |
 
+<a id="ogretmen-tecrubesiyle-gelistirilen-mahir"></a>
 ## Öğretmen tecrübesiyle geliştirilen MAHİR
 
 MAHİR, öğretmen tecrübesiyle geliştirilmektedir. MAHİR ekibinde yer alan dört öğretmen prototipi farklı sınav evrakları, veri giriş yolları ve analiz senaryolarıyla ayrıntılı biçimde deneyerek geliştirme sürecine doğrudan katkı sunmuştur. Ayrıca beş Türk Dili ve Edebiyatı öğretmenine demo videosu izletilmiş; beş sınıfa ait anonim not çizelgeleri ve bu verilerden elde edilen örnek raporlar gösterilmiştir. Öğretmenlerden olumlu geri bildirimler alınmıştır. Böylece MAHİR, toplam dokuz öğretmenin deneyim ve değerlendirmeleriyle şekillenmiştir.
@@ -265,13 +292,14 @@ Gelecekteki rehberlik desteği; bireyi tanıma, görüşme/izleme, yönlendirme,
 - mahrem verileri genel amaçlı LLM/RAG katmanına göndermez,
 - yalnız yetkili rol, açık amaç, veri minimizasyonu ve insan onayı bulunan süreçlerde kullanılabilir.
 
+<a id="ihtiyacin-resmi-dayanagi-ve-ogretmen-deneyimleriyle-dogrulama"></a>
 ## İhtiyacın resmî dayanağı ve öğretmen deneyimleriyle doğrulama
 
 Millî Eğitim Bakanlığı **Yazılı ve Uygulamalı Sınavlar Yönergesi**, sınav sonuçlarının ilgili ders öğretmeni tarafından sisteme girilmesini; sınavların şube ve sınıf bazında analiz edilmesini ve belirlenen konu veya kazanım eksiklikleri için iyileştirici önlemler alınmasını öngörür. Bu yükümlülük, MAHİR'in desteklediği sınav analizi ve sonuçların raporlanması iş akışının kurumsal dayanağını oluşturur.
 
 MAHİR; öğretmenin yürüttüğü bu süreci veri doğrulama, kurallı hesaplama, öğrenme çıktısı düzeyinde inceleme, rapor oluşturma ve kurum içi yazışma taslağı hazırlama adımlarıyla desteklemek amacıyla geliştirilmiştir. Projenin ihtiyaç gerekçesi, mevzuat ve resmî kaynak incelemesinin yanı sıra öğretmenlerin doğrudan uygulama deneyimleri ve gözlemci değerlendirmeleriyle birlikte ele alınmaktadır.
 
-MEB tarafından öğretmen görüşlerine dayalı izleme-değerlendirme çalışmaları ve ölçme-değerlendirme süreçlerine yönelik ihtiyaç belirleme çalıştayları yürütülmektedir. Bu çalışmalar alanın geliştirilmesine yönelik kurumsal ilgiyi gösterir. MAHİR'in kendi geliştirme sürecinde ise öğretmen tecrübesi doğrudan merkeze alınmıştır. Dört ekip öğretmeninin uygulama deneyimi, beş Türk Dili ve Edebiyatı öğretmeninin gözlemci değerlendirmesi ve iki demo videosunun ayrıntıları yukarıdaki [Öğretmen tecrübesiyle geliştirilen MAHİR](#öğretmen-tecrübesiyle-geliştirilen-mahir) bölümünde tek yerde açıklanmaktadır.
+MEB tarafından öğretmen görüşlerine dayalı izleme-değerlendirme çalışmaları ve ölçme-değerlendirme süreçlerine yönelik ihtiyaç belirleme çalıştayları yürütülmektedir. Bu çalışmalar alanın geliştirilmesine yönelik kurumsal ilgiyi gösterir. MAHİR'in kendi geliştirme sürecinde ise öğretmen tecrübesi doğrudan merkeze alınmıştır. Dört ekip öğretmeninin uygulama deneyimi, beş Türk Dili ve Edebiyatı öğretmeninin gözlemci değerlendirmesi ve iki demo videosunun ayrıntıları yukarıdaki [Öğretmen tecrübesiyle geliştirilen MAHİR](#ogretmen-tecrubesiyle-gelistirilen-mahir) bölümünde tek yerde açıklanmaktadır.
 
 Gelecek geliştirme sürecinde ayrı form veya anket uygulamaları yerine; öğretmenlerin prototipi gerçek görev akışları içinde kullanması, karşılaştıkları ihtiyaçları doğrudan aktarması ve oluşan çıktıların birlikte değerlendirilmesi esas alınacaktır.
 
@@ -319,6 +347,7 @@ Görev 1 çıktısı, öğretmenin düzeltebildiği bir doğrulama ekranı ve ar
 
 Görev 2 çıktıları; indirilebilir Word üst yazısı, ek listesi ve JSON biçimindeki EBYS demo aktarım paketidir. Birden fazla onaylı rapor aynı üst yazının ayrı ekleri olarak paketlenebilir. **Demo gerçek EBYS sistemine belge göndermez; gerçek evrak sayısı, kayıt tarihi, paraf veya elektronik imza üretmez.** Bu alanlar yalnız yetkili kurum entegrasyonu sonrasında EBYS tarafından oluşturulabilir.
 
+<a id="uctan-uca-mahir-akisi"></a>
 ## Uçtan uca MAHİR akışı
 
 ```mermaid
