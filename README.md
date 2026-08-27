@@ -2,13 +2,13 @@
 
 [![MAHİR Otomatik Testleri](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml)
 
-> Öğretmen kontrolünü merkeze alan; eğitim evraklarını sınıflandırma, doğrulama, öğrenme kanıtlarıyla ilişkilendirme, raporlama ve kurum içi resmî yazışmaya hazırlama amacı taşıyan Türkçe çok ajanlı karar destek sistemi. Çalışan prototip, bu geniş vizyonu 9. sınıf Türk Dili ve Edebiyatı sınav evrakları üzerinden doğrular.
+> MAHİR, öğretmen denetimini merkezde tutan Türkçe çok ajanlı bir karar destek sistemidir. Eğitim-öğretim yılı boyunca eğitim kurumlarında işlenen resmî evrakı sınıflandırır ve doğrular; bu evrakın içerdiği verileri öğrenme kanıtlarıyla ilişkilendirir; analiz eder, rapor ve kurum içi resmî yazışma taslaklarına dönüştürür. Çalışan prototip, bu geniş vizyonu 9. sınıf Türk Dili ve Edebiyatı sınav evrakı üzerinden gösterir.
 
 MAHİR, **TEKNOFEST 2026 Türkçe Yapay Zekâ Dil Ajanları Yarışması - 1. Senaryo: Kamu Evrak ve Yazışma Süreçleri İçin Akıllı Ajan Destek Sistemi** kapsamında geliştirilmiştir.
 
-## 18 milyon öğrenci, 1,19 milyon öğretmen, milyar ölçekli evrak akışı
+## 18 milyon öğrenci, 1,19 milyon öğretmen, milyar ölçekli resmî evrak akışı
 
-Millî Eğitim Bakanlığının yayımladığı 2024–2025 örgün eğitim istatistikleri, MAHİR'in ele aldığı kamusal ölçeği görünür kılar:
+Millî Eğitim Bakanlığının yayımladığı 2024–2025 örgün eğitim istatistikleri, MAHİR'in çözmeyi hedeflediği sorunun ölçeğini gösterir:
 
 | Türkiye'de örgün eğitimin ölçeği | Resmî sayı |
 |---|---:|
@@ -16,11 +16,11 @@ Millî Eğitim Bakanlığının yayımladığı 2024–2025 örgün eğitim ista
 | Öğretmen | **1.187.409** |
 | Okul | **74.040** |
 
-Bu rakamlar yalnızca insan ve kurum sayısını gösterir. Her öğrencinin çevresinde yıl boyunca sınav kâğıtları, cevap ve puan çizelgeleri, gelişim gözlemleri, rehberlik ve risk formları, öz değerlendirmeler, meslek seçimi anketleri, veli formları, kurul tutanakları, analiz raporları ve resmî yazışmalar oluşur. Türkiye genelinde işlenen eğitim evrakının toplamını gösteren yayımlanmış tek bir resmî envanter bulunmadığından MAHİR, bu büyüklüğü ölçülmüş resmî veri gibi değil **açık varsayımlı bir ölçek modeliyle** ifade eder:
+Bu sayılar yalnızca öğrenci, öğretmen ve okul sayısını gösterir. Oysa bir öğretmen her bir öğrencisi için yıl boyunca sınav kâğıtları, gelişim gözlem formları, rehberlik ve risk analiz formları, meslek seçimi anketleri ve çeşitli amaçlarla kullanılan veli anketleri hazırlar; bunların öğrenci veya veliler tarafından doldurulmasını sağlar. Bunlara kurul ve zümre tutanakları, analiz raporları ile çeşitli resmî yazışmalar da eklenir. Türkiye'de eğitim kurumlarında bir yılda işlenen resmî evrakın toplamını gösteren yayımlanmış bir envanter bulunmamaktadır. Bununla birlikte evrak çeşitliliği ve yukarıdaki resmî istatistikler, dayanağı açıkça belirtilen varsayımsal bir ölçek hesabı yapılmasına imkân verir:
 
-> Öğrenci başına bir eğitim yılında ortalama 60 sınav ve ölçme-değerlendirme evrakı varsayımı, **17.956.523 × 60 = 1.077.391.380 evrak** demektir. Rehberlik, gelişim, veli, kurul ve yönetim belgeleri de eklendiğinde eğitim kurumlarındaki toplam belge akışı milyarlar ölçeğine ulaşır.
+> Bir öğrenci için bir eğitim yılında ortalama 60 sınav ve ölçme-değerlendirme evrakı düzenlendiği varsayıldığında **17.956.523 × 60 = 1.077.391.380 evrak** ortaya çıkar. Bu sayı yalnızca öğrencilerin sınav temelli ölçme-değerlendirme evrakını kapsar. Farklı branş öğretmenlerinin kendi alanları kapsamında her öğrenci için hazırladığı, doldurulmasını sağladığı ve işlediği diğer resmî evrak da hesaba katıldığında eğitim kurumlarındaki resmî evrak akışı milyarlar ölçeğine ulaşabilir.
 
-**MAHİR'in ölçek vizyonu; 1 milyarı aşkın sınav ve ölçme-değerlendirme evrakı ile milyarlarca diğer eğitim belgesini sınıflandırabilen, doğrulayabilen, değerlendirebilen ve insan onayıyla raporlayabilen bir belge zekâsı katmanı oluşturmaktır.** Amaç yalnızca evrakı daha hızlı işlemek değil; belgelerde dağınık kalan kanıtı eğitim sürecine ölçülebilir, izlenebilir ve güvenilir katkıya dönüştürmektir.
+**Yukarıdaki varsayımsal ölçek hesabından hareketle MAHİR'in uzun vadeli vizyonu; yılda 1 milyarı aşabilecek sınav ve ölçme-değerlendirme evrakının yanı sıra eğitim kurumlarında işlenen milyarlar ölçeğindeki diğer resmî evrakın sınıflandırılması, doğrulanması, ilişkilendirilmesi ve yetkili insan denetiminde raporlanması için ortak bir resmî evrak işleme ve karar destek altyapısı oluşturmaktır.** MAHİR'in amacı yalnızca resmî evrak işleme süresini kısaltmak değil; bu evrakta dağınık hâlde bulunan veri ve kanıtları, öğretmenlerin ve eğitim yöneticilerinin karar süreçlerinde kullanabileceği ölçülebilir, izlenebilir, kaynaklandırılmış ve güvenilir bilgiye dönüştürmektir.
 
 Kaynak: [Millî Eğitim Bakanlığı, 2024–2025 Örgün Eğitim İstatistikleri](https://www.meb.gov.tr/2024-2025-orgun-egitim-istatistikleri-aciklandi//haber/38473/tr)
 
@@ -28,35 +28,42 @@ Kaynak: [Millî Eğitim Bakanlığı, 2024–2025 Örgün Eğitim İstatistikler
 
 > **Temel ilke:** MAHİR doğrular, hesaplar, kaynaklı taslak üretir ve kanıt sunar; nihai pedagojik değerlendirme, düzeltme ve onay öğretmene aittir.
 
-## Sorun: Eğitim verisi var, karar üretmeye hazır değil
+## Eğitim-Öğretim Sürecinde Karşılaşılan Problem
 
-> **Okullarda veri eksik değildir; veri, farklı eğitim evraklarının içinde dağınık ve birbirinden kopuktur.**
+> **Okullarda eğitim-öğretim süreci boyunca öğrenciye ilişkin çok sayıda veri elde edilir. Bu veriler, öğrencinin öğrenme sürecini ve gelişimini değerlendirmek için nicelik bakımından yetersiz değildir; temel sorun, eğitim kurumlarında işlenen farklı resmî evrakta dağınık ve birbirinden kopuk hâlde bulunmalarıdır.**
 
-Öğretmenler sınav kâğıtları, puan çizelgeleri, gelişim gözlemleri, değerlendirme formları, rehberlik kayıtları ve kurul/zümre belgeleri arasında aynı bilgileri tekrar tekrar okur, doğrular, sınıflandırır ve rapora dönüştürür. Belgeler arttıkça asıl mesele belge üretmek değil; doğru bilgiyi doğru öğrenci, sınıf, öğrenme çıktısı ve resmî süreçle güvenilir biçimde ilişkilendirmektir.
-
-Bu parçalı iş akışı, öğretmenin pedagojik değerlendirmeye ayıracağı zamanı mekanik evrak işlemlerine aktarır; hata ve tutarsızlık riskini yükseltir; eldeki kanıtların izlenebilir raporlara ve kurumsal kararlara dönüşmesini zorlaştırır. **MAHİR, eğitim evrakı ile güvenilir karar arasındaki bu boşluğa odaklanır.**
+Öğretmenler bir eğitim-öğretim yılı boyunca sınav kâğıtları, gelişim ve gözlem envanterleri, öğrenci performans değerlendirme formları, rehberlik hizmetlerine ilişkin resmî evrak ile kurul ve zümre belgelerinde yer alan bilgileri tekrar tekrar okur, doğrular, sınıflandırır ve rapora dönüştürür.  Evrak sayısı arttıkça doğru bilgiyi ilgili öğrenci, sınıf, öğrenme çıktısı ve resmî süreçle güvenilir biçimde ilişkilendirmek güçleşir. Öğretmenin bu verileri elle işleyebilmesi saatler süren yoğun bir emek gerektirir. Ve bu döngü her eğitim-öğretim yılında devam eder. 
+Bu parçalı iş akışı, öğretmenin pedagojik değerlendirmeye ayırabileceği zamanı mekanik evrak işlemlerine yönlendirir; hata ve tutarsızlık riskini artırır; eldeki kanıtların izlenebilir raporlara ve kurumsal kararlara dönüşmesini zorlaştırır.  Bu parçalı iş akışı aynı zamanda bir öğrencinin gelişim sürecinin gerçekçi bir şekilde takibini tam anlamıyla ortaya koyamaz. 
+**MAHİR, resmî evrakta dağınık hâlde bulunan veri ile kanıta dayalı, izlenebilir ve güvenilir karar arasındaki boşluğu kapatmaya odaklanır.**
 
 ## Öğretmen olmayan okuyucu için: Okuldaki resmî evrak zinciri
 
-Bir okulda sınav kâğıdı, öğrencinin üzerine cevap yazdığı sıradan ve geçici bir sayfa değildir. Öğretmen bu belgeyi öğretim programına, yıllık plana, sınav türüne, soru-puan dağılımına ve ölçme kurallarına göre hazırlar; öğrenci belgeyi doldurur ve yeniden öğretmene teslim eder. Sonuçların kaydedilmesi, sınavın incelenmesi, öğrenme eksiklerinin belirlenmesi, itirazların değerlendirilmesi ve okul yönetimine sunulacak raporların hazırlanması bu belgeye dayanır. Bu nedenle sınav kâğıdı, okulun resmî eğitim-öğretim faaliyeti içinde üretilen bir **ölçme aracı, kanıt ve resmî evraktır**.
+Bir okulda sınav kâğıdı, öğrencinin cevap yazdığı sıradan ve geçici bir evrak değildir. Öğretmen bu belgeyi öğretim programına, yıllık plana, sınav türüne, soru-puan dağılımına ve ölçme kurallarına göre hazırlar. Öğrenci cevaplarını yazar ve sınav sonunda kâğıdı öğretmenine teslim eder. Sonuçların kaydedilmesi, öğrenme eksiklerinin belirlenmesi, sınavın yeniden incelenmesi, itirazların değerlendirilmesi ve okul yönetimine sunulacak raporların hazırlanması bu belgeye dayanır. Bu nedenle sınav kâğıdı, okulun resmî eğitim-öğretim faaliyeti kapsamında üretilen bir **ölçme aracı, kanıt ve resmî evrak niteliğindedir..
 
-Bu nitelik yalnızca kavramsal değildir. Ortak yazılı sınav uygulamalarında sınav evrakı okul idaresine teslim edilir ve ilgili uygulama esaslarına göre arşivlenir; cevap kâğıtları için iki yıllık saklama süresi öngören resmî düzenlemeler bulunmaktadır. Öğrenci ve velinin sınav evrakını yeniden inceletme ve sonuca yazılı olarak itiraz etme mekanizması vardır. Dolayısıyla sınav kâğıdı, gerektiğinde yeniden incelenebilen ve idarî işleme dayanak oluşturan izlenebilir bir kamu belgesidir.
+Bu tanım yalnızca kavramsal bir benzetmeye dayanmaz. Yazılı sınavlarda kullanılan bu evrak okul idaresine teslim edilir ve ilgili uygulama esaslarına göre arşivlenir. Bazı resmî düzenlemelerde öğrencilerin cevap kâğıtları için iki yıllık saklama süresi öngörülür. Öğrenci sınav evrakını yeniden inceleyebilir; veli ise mevzuatta belirtilen süre ve yöntemle sınav sonucuna yazılı olarak itiraz edebilir. Dolayısıyla sınav kâğıdı, gerektiğinde yeniden incelenebilen ve idari işlemlere dayanak oluşturan izlenebilir bir kamu belgesidir.
 
-Üstelik okuldaki resmî evrak akışı sınavlarla sınırlı değildir. Rehber öğretmenin öğrenciye uyguladığı risk analizi formu, meslek seçimi anketi, öğrencinin öz değerlendirme formu, gelişim ve gözlem kayıtları ile velilere doldurtulan ihtiyaç belirleme, görüş ve değerlendirme formları da okulun hizmet süreçlerinde üretilen veya kuruma geri dönen belgelerdir. Bu belgeler bir öğrenci, sınıf ya da hizmet hakkında değerlendirme, yönlendirme, izleme veya raporlama işlemine dayanak olduğunda kurumsal kayıt düzeninin parçası hâline gelir; kendi amaçlarına göre mahremiyet, saklama, doğrulama ve yetkili onayı gerektirir.
+Okuldaki resmî evrak akışı sınavlarla sınırlı değildir. Rehber öğretmenin öğrenciye uyguladığı risk analizi formu, meslek seçimi anketi, öğrencinin öz değerlendirme formu, gelişim ve gözlem kayıtları ile velilerin doldurduğu ihtiyaç belirleme, görüş ve değerlendirme formları da okulun hizmet süreçlerinde üretilen veya kuruma geri dönen belgelerdir. Bu belgeler; değerlendirme, yönlendirme, izleme veya raporlama işlemine dayanak olduğunda kurumsal kayıt düzeninin parçası hâline gelir. Belgenin niteliğine ve kullanım amacına göre kişisel verilerin korunması, doğrulama, saklama ve yetkili onayı gerekir.
 
-Yarışmanın **kamu evrak ve yazışma süreçleri** bağlamında MAHİR'in vizyonu tam olarak budur: Okuldaki farklı belge türlerini tanımak, içlerindeki veriyi güvenilir biçimde yapılandırmak, ilgili eğitim kanıtlarıyla ilişkilendirmek ve insan onayından sonra rapor ile resmî yazışma taslağına dönüştürmek. Sınav evrakı, bu geniş vizyonun çalışan prototipte uçtan uca gösterilen ilk örneğidir.
+MAHİR'in **kamu evrak ve yazışma süreçleri** bağlamındaki vizyonu tam olarak budur: Okuldaki farklı belge türlerini tanımak, içerdikleri verileri güvenilir biçimde yapılandırmak, ilgili eğitim kanıtlarıyla ilişkilendirmek ve öğretmen onayından sonra rapor ile resmî yazışma taslaklarına dönüştürmektir.  Sınav evrakı, bu geniş vizyonun çalışan prototipte uçtan uca gösterilen ilk örneğidir.
 
 > **Mevzuat notu:** Saklama süresi ve itiraz usulü belgenin ve sınavın türüne göre değişebilir. Buradaki iki yıllık süre, ortak yazılı sınav evrakına ilişkin uygulama düzenlemeleri esas alınarak belirtilmiştir. Bkz. [MEB Ortaöğretim Kurumları Yönetmeliği, md. 49](https://ogm.meb.gov.tr/meb_iys_dosyalar/2019_07/16134512_yonetmelik.pdf) ve [Mersin İl Millî Eğitim Müdürlüğü Ortak Sınav Uygulama Yönergesi, md. 12](https://mersinodm.meb.gov.tr/meb_iys_dosyalar/2024_10/22104642_mersinilmilliegitimmudurluguortaksinavuygulamayonergesi2024.pdf).
 
-> **Bu büyük evrak yükünün öğretmenin günlük çalışma hayatında neye karşılık geldiğini görmek için gelin, şimdi bir Türk Dili ve Edebiyatı öğretmenimizin gözünden bakalım.**
+## Şimdi bu sürece bir Türk Dili ve Edebiyatı öğretmeninin gözünden bakalım
 
 ### Mahir Öğretmen'in sınav haftası
 
-Mahir Öğretmen aynı sınavı birden fazla 9. sınıf şubesine uygulayacaktır. Önce sınav kâğıdını ve puan çizelgesini hazırlar; boş belge öğretmenden öğrenciye gider. Sınav sırasında her öğrenci kendi kâğıdını doldurur. Süre bittiğinde belgeler yeniden öğretmene teslim edilir. Böylece öğretmenin hazırlayıp dışarı verdiği boş belge, öğrenci cevabı ve puan kanıtıyla zenginleşmiş şekilde öğretmenin iş akışına geri döner.
+Türk Dili ve Edebiyatı öğretmeni olan Mahir Öğretmen aynı yazılı sınavı birden fazla 9. sınıf şubesinde uygulayacaktır. Ancak sınav hazırlığına doğrudan soru yazmakla başlamaz. İlgili öğretim programının esaslarını, Millî Eğitim Bakanlığı tarafından yayımlanan konu-soru dağılım tablolarını ve örnek senaryoları inceler. İl sınıf/alan zümresince seçilen senaryoda belirtilen öğrenme çıktıları doğrultusunda sınavın soru sayısını, konu dağılımını ve soru-puan yapısını belirler. Bu çerçeveye uygun sınav kâğıdını ve puan çizelgesini hazırladıktan sonra sınav kâğıtlarını öğrencilerine dağıtır. Her öğrenci kendi kâğıdını cevaplandırır ve sınav bitiminde öğretmenine teslim eder. Böylece öğretmenin hazırladığı boş sınav belgesi, öğrenci cevapları ve puanlamaya esas verilerle tamamlanmış bir resmî evrak olarak öğretmenin iş akışına geri döner.
 
-Öğretmen açısından asıl evrak yükü bundan sonra başlar: Her kâğıdın doğru öğrenciye ve şubeye ait olduğunu kontrol etmek, soru puanlarını kaydetmek, eksik veya hatalı alanları bulmak, sınav sonuçlarını hesaplamak, soruları öğrenme çıktılarıyla ilişkilendirmek, her şube için analiz raporu hazırlamak ve sonucu okul yönetimine üst yazıyla sunmak gerekir. Aynı sınav farklı şubelerde uygulanmışsa ortak bilgiler tekrar tekrar girilir; yazılı, dinleme/izleme ve konuşma bileşenleri ayrıca değerlendirilir.
+Sınavın hazırlanması ve uygulanması için harcanan emeğe, sınav sonrasında ayrıntılı evrak işleme ve değerlendirme görevleri eklenir. Her kâğıdın doğru öğrenci ve şubeyle eşleştirilmesi, soru puanlarının kaydedilmesi, eksik veya hatalı alanların belirlenmesi, sınav sonuçlarının hesaplanması ve soruların öğrenme çıktılarıyla ilişkilendirilmesi gerekir. Ayrıca her şube için, soru bazlı sınav sonuçları analiz raporu hazırlanmalı ve raporlar okul yönetimine sunulmalıdır.  Bu dikkatle Mahir öğretmen her bir şube için aynı evrak işleyişini yürütmelidir. Ayrıca Türk Dili ve Edebiyatı dersinin tek bir sınavı 3 aşamalı sınavdan oluşur. Yükdelik etkileri de farklıdır. Hesaplamalarını bu bilgiler ışığında yapmalıdır. Mahir Öğretmen için bu ciddi bir zaman kaybı demektir. 
 
-MAHİR bu hikâyede öğretmenin yerine karar veren bir sistem değil, öğretmenin evrak işleme zincirini destekleyen çok ajanlı yardımcıdır. Öğrenciden geri dönen sınav kâğıdı veya öğretmenin oluşturduğu puan çizelgesi MAHİR'in **işleyeceği gelen resmî evraktır**. MAHİR belgeyi okur, sınıflandırır, önemli alanları çıkarır, eksikleri gösterir ve öğretmen onayından sonra hesaplama ile kaynaklı analiz taslağını üretir. Öğretmenin onayladığı analiz raporu, üst yazı ve ek listesi ise okul yönetimine sunulacak **giden evrak paketini** oluşturur.
+### MAHİR'in bu süreçteki rolü
+
+> **Yetki sınırı:** Pedagojik karar, düzeltme ve nihai onay öğretmene aittir. MAHİR öğretmenin yerine karar vermez; öğretmen denetimindeki resmî evrak işleme sürecini destekler.
+
+- **Girdi:** Öğrenciden dönen sınav kâğıdı veya öğretmenin hazırladığı puan çizelgesi, MAHİR'in işleyeceği **gelen resmî evrakı** oluşturur.
+- **İşlem:** MAHİR evrakı okur, sınıflandırır, ilgili alanları çıkarır ve eksik ya da belirsiz bilgileri öğretmene gösterir.
+- **Öğretmen kontrolü:** Hesaplamalar ve kaynaklara dayalı analiz taslağı yalnızca öğretmenin verileri doğrulamasından sonra hazırlanır.
+- **Çıktı:** Öğretmenin onayladığı analiz raporu, üst yazı ve ek listesiyle birlikte okul yönetimine sunulacak **giden evrak paketine** dönüşür.
 
 ```mermaid
 flowchart LR
@@ -65,36 +72,36 @@ flowchart LR
     C --> D["Gelen resmî evrak: doldurulmuş sınav / puan çizelgesi"]
     D --> E["MAHİR: okuma, sınıflandırma, eksik bilgi ve içerik analizi"]
     E --> F["Öğretmen doğrulaması ve onayı"]
-    F --> G["Sınıf analiz raporu"]
+    F --> G["Sınav analiz raporu"]
     G --> H["Giden evrak: üst yazı ve rapor ekleri"]
     H --> I["Okul/kurum müdürlüğü"]
 ```
 
 ### Yarışma senaryosuyla birebir eşleme
 
-| Kamu evrak sürecindeki aşama | Okuldaki somut karşılığı | MAHİR'in görevi |
+| Kamu evrak sürecindeki aşama | Okulda bu aşamada yapılan işlem | MAHİR'in görevi |
 |---|---|---|
 | Kuruma/çalışana ulaşan belge | Öğrencinin cevaplandırıp öğretmene teslim ettiği sınav kâğıdı, soru bazlı puan çizelgesi veya sınav veri giriş belgesi | Belgeyi kabul eder; dosya türünü, sınıf/şubeyi, soru ve puan alanlarını yapılandırır. |
-| İlk inceleme ve sınıflandırma | Belgenin hangi sınıfa/şubeye, sınav bileşenine ve öğrenciye ait olduğunun; öğrencinin kimlik bilgileri yerine kullanılan anonim bir kodla (ör. `OGR-001`) doğrulanması | OCR/belge okuma yapar, açıkça etiketlenmiş alanları çıkarır ve belirsizlikleri öğretmene gösterir. |
+| İlk inceleme ve sınıflandırma | Öğrenci sınav evrakına adını, soyadını ve okul numarasını yazar; öğretmen evrakın sınıf/şube ve sınav bileşeni bilgilerini kontrol eder. | OCR, açıkça etiketlenmiş alanları tanımlanan kurallara göre okur. Ad-soyad bilgisini işlemez ve analiz akışına almaz; evrakta yazılı okul numarasını **öğrenci referans numarası** olarak aktarır. Sınıf/şube, sınav bileşeni ve diğer alanlardaki belirsizlikleri öğretmene gösterir. |
 | İçerik analizi ve eksik bilgi tespiti | Soru sayısı, azami puan, öğrenci puanı, toplam, öğrenme çıktısı ve bağlam kontrolleri | Kurallı doğrulamaları çalıştırır; öğretmenin düzeltmesi gereken alanları bildirir. |
 | Dayanak ve standartlarla ilişkilendirme | Sınav sorularının 9. sınıf Türk Dili ve Edebiyatı öğretim programındaki öğrenme çıktıları ve süreç bileşenleriyle ilişkilendirilmesi | Öğretmen seçimini kayıtlı program kataloğuyla doğrular; RAG yalnız doğrulanmış resmî kaynak bağlamını getirir. |
-| Resmî yazı taslaklama | Onaylı sınıf analizinin okul yönetimine sunulması | Word/PDF analiz raporu, üst yazı ve ek listesi taslağı üretir. |
-| Birime yönlendirme | Belgenin okul/kurum müdürlüğüne bilgi ve gereği için sunulması | Demo yönlendirme ve EBYS aktarım paketi hazırlar; gerçek kayıt, paraf veya elektronik imza üretmez. |
+| Resmî yazı taslaklama | Onaylanmış sınav analizinin okul yönetimine sunulması | Word/PDF analiz raporu, üst yazı ve ek listesi taslağı üretir. |
+| Birime yönlendirme | Onaylanmış rapor ve eklerinin bilgi ve gereği için okul/kurum müdürlüğüne sunulması | Demo yönlendirme ve EBYS aktarım paketi hazırlar; gerçek kayıt, paraf veya elektronik imza üretmez. |
 
-> **Önemli idarî sınır:** Buradaki “gelen evrak” ifadesi, öğrenciden öğretmene geri dönen belgenin MAHİR tarafından işlenecek girdi olmasını anlatan işlevsel senaryo eşlemesidir. Her sınav kâğıdının EBYS'de “gelen yazı” olarak kaydedildiği iddia edilmez. EBYS niteliğindeki resmî yazışma; öğretmen onayından sonra hazırlanan üst yazı ve rapor ekleri aşamasında başlar ve mevcut prototipte yalnız demo olarak gösterilir.
+> **Önemli idari sınır:** Bu README'deki “gelen resmî evrak” ifadesi, öğrenciden öğretmene dönen belgenin MAHİR'in iş akışına girdi olmasını anlatır; her sınav kâğıdının EBYS'de “gelen yazı” olarak kaydedildiği anlamına gelmez. Mevcut prototip gerçek EBYS'ye kayıt veya gönderim yapmaz. Öğrenci veya veli tarafından yapılan itiraz ve resmî talepler, mevcut uygulamada ıslak imzalı dilekçeyle okul yönetimine sunulur. MAHİR'in hazırladığı analiz raporu, üst yazı ve ek listesi ise önce öğretmenin kontrolüne ve onayına açılır; ardından kurumun yürürlükteki resmî usullerine göre işleme alınır. Prototip, EBYS aktarımını demo ortamında gösterir ve çıktıları yetkili bir EBYS bağlantısına uyarlanabilecek biçimde yapılandırır. Kurum tarafından gerekli bağlantı, yetki ve onaylar sağlandığında doğrulanmış evrak verileri EBYS'ye otomatik aktarılabilir ve işlem süresi kısaltılabilir. Hukuki kayıt, yönlendirme ve elektronik imza yetkisi ilgili kuruma aittir.
 
 ### Temel kavramlar
 
 | Kavram | Bu projede ne anlama gelir? |
 |---|---|
-| Sınav evrakı | Öğretmenin hazırladığı, öğrencinin cevaplandırdığı ve değerlendirilmek üzere öğretmene geri sunduğu tek sınav belgesidir. Bir sınıftaki her öğrenci ayrı bir sınav evrakı üretir. |
-| Gelen eğitim evrakı | Doldurulmuş sınav kâğıdı, soru bazlı puan çizelgesi veya veri giriş belgesi gibi öğretmenin inceleme ve değerlendirme iş akışına ulaşan belgedir. Bu, MAHİR senaryosundaki işlevsel “gelen evrak” karşılığıdır. |
+| Sınav evrakı | Öğretmenin hazırladığı, öğrencinin cevaplandırdığı ve değerlendirilmek üzere öğretmenine teslim ettiği sınav kâğıdıdır. Bir sınıftaki her öğrenci için ayrı bir sınav evrakı oluşur. |
+| Gelen resmî evrak | Doldurulmuş sınav kâğıdı, soru bazlı puan çizelgesi veya sınav veri giriş belgesi gibi öğretmenin inceleme ve değerlendirme iş akışına ulaşan belgedir. Bu ifade, MAHİR senaryosundaki işlevsel “gelen evrak” karşılığıdır. |
 | Sınıf-sınav analizi | Bir şubenin tek sınavındaki öğrenci evraklarının topluca değerlendirilmesidir. Örneğin 35 öğrenci evrakı çoğunlukla bir sınıf-sınav analiz olayına karşılık gelir. |
 | Öğrenme çıktısı | Öğrencinin öğretim süreci sonunda edinmesi beklenen bilgi, beceri veya yeterliktir. |
 | Öğrenme kanıtı | Bir öğrenme çıktısına ne ölçüde ulaşıldığını gösteren sınav, performans, gözlem veya portfolyo verisidir. |
 | Giden evrak paketi | Öğretmen tarafından onaylanan analiz raporunun üst yazı ve ek listesiyle okul/kurum müdürlüğüne sunulacak biçime getirilmesidir. |
 | Üst yazı | Analiz raporunun okul yönetimine veya başka bir resmî makama sunulmasında kullanılan resmî yazı taslağıdır. |
-| EBYS | MEB'e bağlı okul ve kurumlarda resmî belgelerin oluşturulması, paraflanması, elektronik imzalanması, gönderilmesi ve arşivlenmesi için kullanılan Elektronik Belge Yönetim Sistemidir. MEBBİS ortak ekranı erişim yollarından biridir. |
+| EBYS | MEBBİS ortak ekranındaki EBYS simgesi üzerinden erişilen ve Millî Eğitim Bakanlığında resmî evrakın oluşturulması, paraflanması, elektronik imzalanması, gönderilmesi ve arşivlenmesi için kullanılan Elektronik Belge Yönetim Sistemidir. e-Okul ve EBA gibi Bakanlığın dijital uygulamalarından biridir. [MEBBİS ortak giriş ekranı](https://mebbisyd.meb.gov.tr/) |
 
 ## Otomatik test güvencesi
 
@@ -102,12 +109,12 @@ GitHub, `main` dalına gönderilen her değişiklikte ve her çekme isteğinde P
 
 En son GitHub Actions doğrulamasında **301 Python testi**, **13 JavaScript test dosyası** ve ana tarayıcı betiğinin sözdizimi kontrolü başarıyla tamamlanmıştır. Bu sonuç, kodla tanımlanan davranışların doğrulandığını gösterir; gerçek kullanıcı etki araştırması veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
 
-Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in giriş tarafında işlediği belgeler; doldurulmuş sınav kâğıdı, sınav puan çizelgesi ve sınav veri giriş belgesidir. Çıkış tarafında öğretmen onaylı analiz raporu, üst yazı ve ek listesi hazırlanır. Prototip, genel amaçlı bütün kamu evraklarını değil, bu tanımlı eğitim evrakı akışını uçtan uca ele alır.
+Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in giriş tarafında işlediği resmî evrak; doldurulmuş sınav kâğıdı, sınav puan çizelgesi ve sınav veri giriş formudur. Çıkış tarafında öğretmen onaylı analiz raporu, üst yazı ve ek listesi hazırlanır. Prototip, genel amaçlı bütün kamu evrakını değil, eğitim kurumları için tanımlanan bu resmî evrak akışını uçtan uca ele alır.
 
 ### Güncel prototip özeti
 
 - Aynı ders, sınıf düzeyi, sınav bileşeni, soru sayısı ve azami puan yapısındaki birden fazla şube tek çalışma içinde işlenebilir.
-- Öğretmen ortak sınavın öğrenme çıktılarını bir kez seçer; seçim yalnız aynı yapıya sahip şubelere uygulanır. Yazılı, dinleme/izleme ve konuşma sınavları birbirine karıştırılmaz.
+- Öğretmen ortak sınavın öğrenme çıktılarını bir kez seçer; seçim yalnız aynı eğitim-öğretim kademesine sahip şubelere uygulanır. Yazılı, dinleme/izleme ve konuşma sınavları birbirine karıştırılmaz.
 - Her şube için ayrı Word/PDF raporu hazırlanabilir. 9. sınıf Türk Dili ve Edebiyatı pilot profilinde onaylı yazılı, dinleme/izleme ve konuşma raporları **%70 + %15 + %15** sabit ağırlıklarıyla genel değerlendirme raporunda birleştirilebilir.
 - İl, ilçe, okul/kurum, öğretmen ve eğitim öğretim yılı bir kez girildiğinde aynı çalışma içindeki diğer raporlara aktarılır; sınıf/şube ve sınava özgü alanlar ayrı korunur.
 - Onaylanmış birden fazla rapor, tek üst yazı ve ek listesi bulunan EBYS demo paketine dönüştürülebilir. Gerçek EBYS gönderimi ve elektronik imza kapsam dışındadır.
