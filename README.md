@@ -105,11 +105,37 @@ flowchart LR
 | Üst yazı | Analiz raporunun okul yönetimine veya başka bir resmî makama sunulmasında kullanılan resmî yazı taslağıdır. |
 | EBYS | MEBBİS ortak ekranındaki EBYS simgesi üzerinden erişilen ve Millî Eğitim Bakanlığında resmî evrakın oluşturulması, paraflanması, elektronik imzalanması, gönderilmesi ve arşivlenmesi için kullanılan Elektronik Belge Yönetim Sistemidir. e-Okul ve EBA gibi Bakanlığın dijital uygulamalarından biridir. [MEBBİS ortak giriş ekranı](https://mebbisyd.meb.gov.tr/) |
 
+## Öğretmen tecrübesiyle geliştirilen MAHİR
+
+MAHİR, öğretmen tecrübesiyle geliştirilmektedir. MAHİR ekibinde yer alan dört öğretmen prototipi farklı sınav evrakları, veri giriş yolları ve analiz senaryolarıyla ayrıntılı biçimde deneyerek geliştirme sürecine doğrudan katkı sunmuştur. Ayrıca beş Türk Dili ve Edebiyatı öğretmenine demo videosu izletilmiş; beş sınıfa ait anonim not çizelgeleri ve bu verilerden elde edilen örnek raporlar gösterilmiştir. Öğretmenlerden olumlu geri bildirimler alınmıştır. Böylece MAHİR, toplam dokuz öğretmenin deneyim ve değerlendirmeleriyle şekillenmiştir.
+
+Gelecek vizyonumuzda da MAHİR'i öğretmenlerin sınıf içi tecrübeleri, ihtiyaçları ve geri bildirimleri doğrultusunda geliştirmeye devam etmek amaçlanmaktadır.
+
 ## Otomatik test güvencesi
 
 GitHub, `main` dalına gönderilen her değişiklikte ve her çekme isteğinde Python ve JavaScript testlerini yeniden çalıştırır. README'nin üstündeki rozet son çalıştırmanın güncel durumunu gösterir; rozete tıklayan okuyucu çalıştırma tarihini, test günlüklerini ve test sayılarını doğrudan GitHub üzerinden inceleyebilir.
 
 En son GitHub Actions doğrulamasında **301 Python testi**, **13 JavaScript test dosyası** ve ana tarayıcı betiğinin sözdizimi kontrolü başarıyla tamamlanmıştır. Bu sonuç, kodla tanımlanan davranışların doğrulandığını gösterir; gerçek kullanıcı etki araştırması veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
+
+### Anonim gerçek evrak kabul testleri
+
+MAHİR yalnız sentetik örneklerle değil, uygulama sırasında kullanılan evrakların kişisel verilerden arındırılmış kopyalarıyla da sınanmaktadır. GitHub'da yer alan anonim kabul veri kümesi aşağıdaki senaryoları içerir:
+
+- Aynı okuldaki iki farklı 9. sınıf şubesine ait, 20 + 25 olmak üzere toplam 45 öğrencinin not çizelgesi görselinin OCR ile okunması, sınıf/şubelerine göre ayrılması ve doğrulanması.
+- Aynı tür sınavın beş farklı sınıfa ait Word puan çizelgelerinin soru sayısı, azami puan yapısı ve öğrenci kayıtları korunarak okunması.
+- Aynı 25 kişilik sınavın OCR görselleri ve Word puan çizelgesi üzerinden işlenerek sonuçlarının karşılaştırılması.
+- Aynı 20 kişilik sınıfın yazılı, dinleme/izleme ve konuşma sınavlarının ayrı ayrı analiz edilmesi; üç raporun **Yazılı %70 + Dinleme/İzleme %15 + Konuşma %15** ağırlıklarıyla genel değerlendirme raporunda birleştirilmesi.
+
+Anonim test evrakları, dosya bütünlük kayıtları ve tekrarlanabilir kabul testleri [`tests/fixtures/real_exam_corpus_anonymized`](tests/fixtures/real_exam_corpus_anonymized) klasöründe; senaryoların açıklaması ise [`tests/REAL_EXAM_CORPUS.md`](tests/REAL_EXAM_CORPUS.md) belgesinde yer alır. Özgün kimlik bilgileri ve kişisel veri içeren kaynak arşiv GitHub'a eklenmez.
+
+### Demo videolarıyla gösterilen uçtan uca evrak akışları
+
+MAHİR'in iki ayrı demo videosu bulunmaktadır:
+
+1. **45 evrakla iki şubeli OCR ve raporlama demosu — 10 dakika:** Aynı okuldaki iki farklı 9. sınıf şubesine ait 20 + 25, toplam 45 öğrencinin sınav not çizelgesi görselleri OCR ile okunur. Sınavlar sınıf/şubelerine göre ayrılır ve öğretmen kontrolüne sunulur. Soru bazlı azami puanlar ile öğrenme çıktıları doğrulandıktan sonra iki şube ayrı ayrı analiz edilir ve bulgular kaynak temelli iki rapora dönüştürülür. Son aşamada iki rapor tek üst yazı ve ek listesi altında birleştirilerek EBYS demo akışıyla okul idaresine sevke hazır hâle getirilir.
+2. **Beş sınıflı yazılı sınav analizi demosu — 4 dakika:** Aynı türde yazılı sınav uygulanan beş farklı 9. sınıf şubesine ait puan çizelgeleri birlikte işlenir. Sınıflar ayrı sınav kayıtları olarak korunur; soru sayıları, azami puanlar ve öğrenci puanları öğretmen kontrolüne sunulur. Her sınıf için ayrı analiz ve rapor oluşturulabilen çoklu sınıf akışı gösterilir.
+
+Bu videolar toplam **14 dakikalık** bir demo anlatımı oluşturur. Prototip gerçek EBYS'ye gönderim, evrak numarası, paraf veya elektronik imza işlemi yapmaz.
 
 Sistem, yarışma senaryosunu eğitim kurumlarına uyarlamaktadır. MAHİR'in giriş tarafında işlediği resmî evrak; doldurulmuş sınav kâğıdı, sınav puan çizelgesi ve sınav veri giriş formudur. Çıkış tarafında öğretmen onaylı analiz raporu, üst yazı ve ek listesi hazırlanır. Prototip, genel amaçlı bütün kamu evrakını değil, eğitim kurumları için tanımlanan bu resmî evrak akışını uçtan uca ele alır.
 
@@ -135,12 +161,12 @@ Aşağıdaki tablo, aynı sınav analizi ve raporlama görevinin araç ve süre�
 | Rapor hazırlama | Hesaplanan sonuçlar öğretmen tarafından rapor şablonuna aktarılır ve metin düzenlenir. | Doğrulanmış bulgular, düzenlenebilir Word ve PDF analiz raporuna dönüştürülür. | Üretilen rapor taslaktır; öğretmen incelemesi ve onayı olmadan nihai kabul edilmez. |
 | Üst yazı | Rapor bilgileri ayrı bir resmî yazı şablonuna aktarılır. | Onaylı rapordan üst yazı ve ek listesi taslağı hazırlanır. | Gerçek EBYS aktarımı, evrak numarası, paraf ve elektronik imza üretilmez. |
 | İşlem bütünlüğü | Veri, hesap, yorum, rapor ve yazışma birden fazla araç ve dosyada yürütülebilir. | Adımlar tek öğretmen akışı ve ortak veri sözleşmesi içinde birbirine bağlanır. | Prototip, genel amaçlı tüm kamu evraklarını veya bütün dersleri kapsamaz. |
-| Uygulama doğrulaması | Referans iş akışındaki adımlar belge, hesap tablosu ve metin düzenleyici gibi ayrı araçlar üzerinden yürütülür. | Görsel, DOCX, PDF, XLSX, CSV ve elle veri girişi; toplu OCR; çoklu şube; yazılı, dinleme/izleme ve konuşma sınavları; ortak öğrenme çıktıları; ayrı ve birleşik raporlar ile üst yazı üretimi farklı senaryolar hâlinde ayrı ayrı denenmiştir. | Proje ekibindeki dört öğretmen senaryoları doğrudan uygulayarak çıktıları kontrol etmiştir. İlgili yazılım davranışları ayrıca her push ve çekme isteğinde GitHub Actions üzerinde tekrarlanabilir testlerle doğrulanmaktadır. |
+| Uygulama doğrulaması | Referans iş akışındaki adımlar belge, hesap tablosu ve metin düzenleyici gibi ayrı araçlar üzerinden yürütülür. | Görsel, DOCX, PDF, XLSX, CSV ve elle veri girişi; toplu OCR; çoklu şube; yazılı, dinleme/izleme ve konuşma sınavları; ortak öğrenme çıktıları; ayrı ve birleşik raporlar ile üst yazı üretimi farklı senaryolar hâlinde ayrı ayrı denenmiştir. | MAHİR ekibindeki dört öğretmen senaryoları doğrudan uygulayarak çıktıları kontrol etmiş; beş Türk Dili ve Edebiyatı öğretmeni demo ve örnek raporlar üzerinden gözlemci değerlendirmesinde bulunmuştur. İlgili yazılım davranışları ayrıca her push ve çekme isteğinde GitHub Actions üzerinde tekrarlanabilir testlerle doğrulanmaktadır. |
 | Çıktı kalitesi | Kalite; öğretmenin kullandığı şablona, formüllere, kontrol adımlarına ve ayırdığı zamana bağlıdır. | Standart veri kontrolleri, program kataloğu, kaynak sınırları ve ortak rapor yapısı daha tutarlı çıktı üretmeyi hedefler. | Gerçek kullanıcı belgeleri uzmanlarca puanlanmadığı için kalite artışı henüz kanıtlanmış değildir. |
 | Hata riski | Tekrar eden veri aktarımı ve elle kurulan formüller hata olasılığı oluşturabilir. | Tekrarlı hesap ve aktarım adımları azaltılır; tanımlı doğrulama kontrolleri uygulanır. | Hata oranında azalma henüz karşılaştırmalı kullanıcı çalışmasıyla ölçülmemiştir. |
 | İnsan kontrolü | Analiz, yorum ve resmî belge sorumluluğu öğretmendedir. | Analiz, yorum ve resmî belge sorumluluğu yine öğretmendedir; MAHİR karar destek ve taslak üretim aracı olarak kalır. | MAHİR öğretmenin pedagojik veya idarî kararının yerine geçmez. |
 
-Bu karşılaştırma, MAHİR'in **hangi adımları birleştirdiğini ve hangi kontrolleri sağladığını** gösterir. Dört öğretmenin farklı senaryoları doğrudan uygulaması ve çıktıları incelemesi nitel uygulayıcı doğrulaması; GitHub Actions kayıtları ise tekrarlanabilir yazılım doğrulaması sağlar. Bu kanıtlar prototipin tanımlı iş akışlarını gerçekleştirdiğini gösterir; süre tasarrufu, hata oranı ve çıktı kalitesine ilişkin nicel etkiyi kanıtlamaz. Bu etkilerin ölçülmesi için temsilî bir kullanıcı örneklemiyle, aynı anonim verinin MAHİR olmadan ve MAHİR ile işlendiği kontrollü karşılaştırmalı pilot çalışma yapılacaktır.
+Bu karşılaştırma, MAHİR'in **hangi adımları birleştirdiğini ve hangi kontrolleri sağladığını** gösterir. MAHİR ekibindeki dört öğretmenin doğrudan uygulama deneyimi ile beş Türk Dili ve Edebiyatı öğretmeninin gözlemci değerlendirmesi, öğretmen tecrübesinin geliştirme sürecine aktarılmasını sağlar. GitHub Actions kayıtları ise tekrarlanabilir yazılım doğrulamasını gösterir. Bu çalışmalar prototipin tanımlı iş akışlarını gerçekleştirdiğini ortaya koyar; süre tasarrufu, hata oranı ve çıktı kalitesine ilişkin karşılaştırmalı ölçümler gelecekteki pilot çalışmaların konusudur.
 
 ## Türkiye Yüzyılı Maarif Modeli ile aynı dili konuşan analiz
 
@@ -165,7 +191,7 @@ Bu değişim yalnızca eski terimlerin yenileriyle değiştirilmesi değildir. D
 
 | Doğrulama düzeyi | Doğrulanan kapsam | Ölçek | Kanıt durumu |
 |---|---|---|---|
-| Uygulama senaryoları | Görsel, DOCX, PDF, XLSX, CSV ve elle veri girişi; toplu OCR; çoklu şube; yazılı, dinleme/izleme ve konuşma bileşenleri; ortak öğrenme çıktıları; ayrı ve birleşik rapor ile üst yazı üretimi | Birden fazla uçtan uca sentetik senaryo | Projede yer alan dört öğretmenin doğrudan uygulama denemeleri ve çıktı kontrolleri |
+| Uygulama senaryoları | Görsel, DOCX, PDF, XLSX, CSV ve elle veri girişi; toplu OCR; çoklu şube; yazılı, dinleme/izleme ve konuşma bileşenleri; ortak öğrenme çıktıları; ayrı ve birleşik rapor ile üst yazı üretimi | Birden fazla uçtan uca sentetik ve anonim gerçek evrak senaryosu | MAHİR ekibindeki dört öğretmenin doğrudan uygulama ve çıktı kontrolleri; beş Türk Dili ve Edebiyatı öğretmeninin demo ve örnek rapor değerlendirmeleri |
 | Otomatik yazılım doğrulaması | Veri okuma, sınav gruplama, puan ve bağlam kontrolleri, ajan akışı, raporlama ve güvenlik sınırları | 301 Python testi, 13 JavaScript test dosyası ve ana tarayıcı betiğinin sözdizimi kontrolü | Her push ve çekme isteğinde GitHub Actions; incelenebilir test günlükleri |
 | Çalışan pilot profil | 9. sınıf Türk Dili ve Edebiyatı yazılı, dinleme/izleme ve konuşma sınavlarının ayrı ve birleşik analizi | Çalışan prototip | Sentetik ve anonim veri setleriyle uygulama ve kod doğrulaması |
 | Teorik yıllık ölçek | Aynı ders ve sınıf düzeyindeki potansiyel yıllık işlem hacmi | 3.937.560 sınav evrakı; 156.964 sınıf-sınav analiz raporu | MEB 2024–2025 verisi ve yılda dört yazılı sınav varsayımı |
@@ -173,7 +199,7 @@ Bu değişim yalnızca eski terimlerin yenileriyle değiştirilmesi değildir. D
 
 ![9. sınıf Türk Dili ve Edebiyatı için öğrenme kanıtlarına dayalı teorik yıllık ölçek](assets/readme/10-prototip-kapsami-v2.png)
 
-Bu doğrulama yapısı tek bir cihaz gözlemine veya tek bir sınıf senaryosuna dayanmamaktadır. Dört öğretmenin ayrı ayrı yürüttüğü uygulama denemeleri nitel uygulayıcı doğrulaması; [GitHub Actions test kayıtları](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml) ise tekrarlanabilir yazılım doğrulaması sağlar. Bu iki kanıt türü prototipin tanımlı iş akışlarındaki davranışlarını gösterir; ancak temsilî bir kullanıcı örneklemiyle yürütülmüş nicel etki araştırmasının yerine geçmez. Bu nedenle Türkiye geneline yönelik süre tasarrufu, doğruluk artışı veya eğitimsel etki çıkarımı yapılmaz.
+Bu doğrulama yapısı tek bir cihaz gözlemine veya tek bir sınıf senaryosuna dayanmamaktadır. MAHİR ekibindeki dört öğretmenin uygulama denemeleri ve beş Türk Dili ve Edebiyatı öğretmeninin gözlemci değerlendirmeleri, prototipin öğretmen tecrübesiyle geliştirilmesini sağlar. [GitHub Actions test kayıtları](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml) ise yazılım davranışlarının tekrarlanabilir biçimde doğrulandığını gösterir.
 
 ### Doğrulanan gösterim senaryoları ve resmî dayanakları
 
