@@ -2984,18 +2984,33 @@ const fileUploadBridge = (() => {
       const questions = Array.isArray(group.questions) ? group.questions : [];
       const students = Array.isArray(group.students) ? group.students : [];
       if (!questions.length) return group;
-      const indexesWithMaximum = questions
-        .map((question, index) => Number(question.maxScore ?? question.max_score) > 0 ? index : -1)
+      const groupMaximums = group.maxScores || group.maximumScores || group.exam?.maxScores || [];
+      const normalizedQuestions = questions.map((question, index) => {
+        const maximum = Number(
+          question.maxScore
+          ?? question.max_score
+          ?? question.maximumScore
+          ?? question.maximum_score
+          ?? groupMaximums[index]
+        );
+        return {
+          ...question,
+          number: Number(question.number ?? question.questionNumber ?? question.question_number) || index + 1,
+          maxScore: Number.isFinite(maximum) && maximum > 0 ? maximum : null
+        };
+      });
+      const indexesWithMaximum = normalizedQuestions
+        .map((question, index) => Number(question.maxScore) > 0 ? index : -1)
         .filter((index) => index >= 0);
-      const indexesWithScores = questions
+      const indexesWithScores = normalizedQuestions
         .map((_, index) => students.some((student) => {
           const value = student.scores?.[index];
           return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
         }) ? index : -1)
         .filter((index) => index >= 0);
       const activeIndexes = indexesWithMaximum.length ? indexesWithMaximum : indexesWithScores;
-      if (!activeIndexes.length || activeIndexes.length === questions.length) return group;
-      const activeQuestions = activeIndexes.map((index) => ({ ...questions[index] }));
+      if (!activeIndexes.length) return { ...group, questions: normalizedQuestions };
+      const activeQuestions = activeIndexes.map((index) => ({ ...normalizedQuestions[index] }));
       const activeStudents = students.map((student) => ({
         ...student,
         scores: activeIndexes.map((index) => student.scores?.[index] ?? null)

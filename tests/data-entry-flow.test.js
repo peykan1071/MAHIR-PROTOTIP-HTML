@@ -70,6 +70,8 @@ assert.match(html, /data-question-count required/);
 
 assert.match(script, /const studentReferenceSortKey =/);
 assert.match(script, /const normalizeDetectedQuestionStructure =/);
+assert.match(script, /question\.maximumScore/);
+assert.match(script, /groupMaximums\[index\]/);
 assert.match(script, /const componentTypeFromExam =/);
 assert.match(script, /\.map\(normalizeDetectedQuestionStructure\)/);
 assert.match(script, /componentType: normalizedExamType/);

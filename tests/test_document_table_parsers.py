@@ -46,6 +46,8 @@ class DocumentTableParserTests(unittest.TestCase):
         self.assertEqual([group["exam"]["examType"] for group in structured["groups"]], ["Yazılı", "Dinleme"])
         self.assertEqual(structured["summary"]["studentCount"], 2)
         self.assertEqual(structured["groups"][0]["sourceFileName"], "yazili.docx")
+        self.assertEqual(structured["groups"][0]["students"][0]["sourceFile"], "yazili.docx")
+        self.assertEqual(structured["groups"][1]["students"][0]["sourceFile"], "dinleme.docx")
 
     def test_teacher_columns_are_mapped_by_heading_and_identity_is_removed(self):
         result = parse_tabular_document([SAMPLE_ROWS], source_label="Deneme")
@@ -81,6 +83,7 @@ class DocumentTableParserTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertIn("Excel tablosu okundu", message)
         self.assertEqual(structured["students"][0]["scores"], [20, 15])
+        self.assertEqual(structured["students"][0]["sourceFile"], "sinav.xlsx")
 
     def test_text_pdf_tables_use_the_same_heading_mapping_without_ocr(self):
         class FakePage:

@@ -506,6 +506,13 @@ def run_existing_backend_flow(
         parser, noun, fallback_message = parser_entry
         try:
             structured_data = parser(uploaded_file.content)
+            # Görsel OCR akışında her öğrenci satırı kaynak görsel adını taşır.
+            # Word/PDF/Excel ve MAHİR şablonlarında da aynı öğretmen kontrolü
+            # deneyimini korumak için kaynak belge adını eksik satırlara ekle.
+            for student in structured_data.get("students") or []:
+                if isinstance(student, dict) and not student.get("sourceFile"):
+                    student["sourceFile"] = uploaded_file.file_name
+            structured_data.setdefault("sourceFileName", uploaded_file.file_name)
             summary = structured_data["summary"]
             return (
                 True,
