@@ -265,20 +265,22 @@ Gelecekteki rehberlik desteği; bireyi tanıma, görüşme/izleme, yönlendirme,
 - mahrem verileri genel amaçlı LLM/RAG katmanına göndermez,
 - yalnız yetkili rol, açık amaç, veri minimizasyonu ve insan onayı bulunan süreçlerde kullanılabilir.
 
-## İhtiyacın resmî dayanağı ve kullanıcı doğrulama planı
+## İhtiyacın resmî dayanağı ve öğretmen deneyimleriyle doğrulama
 
 Millî Eğitim Bakanlığı **Yazılı ve Uygulamalı Sınavlar Yönergesi**, sınav sonuçlarının ilgili ders öğretmeni tarafından sisteme girilmesini; sınavların şube ve sınıf bazında analiz edilmesini ve belirlenen konu veya kazanım eksiklikleri için iyileştirici önlemler alınmasını öngörür. Bu yükümlülük, MAHİR'in desteklediği sınav analizi ve sonuçların raporlanması iş akışının kurumsal dayanağını oluşturur.
 
-MAHİR; öğretmenin yürüttüğü bu süreci veri doğrulama, kurallı hesaplama, öğrenme çıktısı düzeyinde inceleme, rapor oluşturma ve kurum içi yazışma taslağı hazırlama adımlarıyla desteklemek amacıyla geliştirilmiştir. Projenin ihtiyaç gerekçesi, bu aşamada mevzuat ve resmî kaynak incelemesine dayanmaktadır; henüz tamamlanmış bir saha ihtiyaç araştırması veya gerçek kullanıcı etki çalışması bulunduğu iddia edilmemektedir.
+MAHİR; öğretmenin yürüttüğü bu süreci veri doğrulama, kurallı hesaplama, öğrenme çıktısı düzeyinde inceleme, rapor oluşturma ve kurum içi yazışma taslağı hazırlama adımlarıyla desteklemek amacıyla geliştirilmiştir. Projenin ihtiyaç gerekçesi, mevzuat ve resmî kaynak incelemesinin yanı sıra öğretmenlerin doğrudan uygulama deneyimleri ve gözlemci değerlendirmeleriyle birlikte ele alınmaktadır.
 
-MEB tarafından öğretmen görüşlerine dayalı izleme-değerlendirme çalışmaları ve ölçme-değerlendirme süreçlerine yönelik ihtiyaç belirleme çalıştayları yürütülmektedir. Bu çalışmalar alanın geliştirilmesine yönelik kurumsal ilgiyi gösterir; ancak MAHİR'in otomatik analiz, raporlama ve üst yazı oluşturma işlevlerine duyulan ihtiyacı tek başına doğrulamaz.
+MEB tarafından öğretmen görüşlerine dayalı izleme-değerlendirme çalışmaları ve ölçme-değerlendirme süreçlerine yönelik ihtiyaç belirleme çalıştayları yürütülmektedir. Bu çalışmalar alanın geliştirilmesine yönelik kurumsal ilgiyi gösterir. MAHİR'in kendi geliştirme sürecinde ise öğretmen tecrübesi doğrudan merkeze alınmıştır.
 
-Sonraki geliştirme aşamasında hedef kullanıcılarla iki ayrı çalışma planlanmaktadır:
+MAHİR ekibinde yer alan dört öğretmen prototipi farklı veri giriş, sınav analizi ve raporlama senaryolarıyla ayrıntılı biçimde deneyerek geliştirme sürecine doğrudan katkı sunmuştur. Bunun yanında beş Türk Dili ve Edebiyatı öğretmeni iki demo akışını, anonim not çizelgelerini ve elde edilen raporları inceleyerek gözlemci değerlendirmesinde bulunmuştur. Böylece MAHİR, toplam dokuz öğretmenin deneyim ve değerlendirmeleriyle şekillenmiştir.
 
-1. **İhtiyaç analizi:** Türk Dili ve Edebiyatı öğretmenlerinin mevcut sınav değerlendirme yöntemleri, süreçte harcadıkları zaman, karşılaştıkları güçlükler ve otomatik raporlamadan beklentileri incelenecektir.
-2. **Pilot kullanıcı testi:** Öğretmenlerin MAHİR'i müdahalesiz biçimde kullanması gözlemlenecek; görev tamamlama durumu, işlem süreleri, yardım ihtiyacı, teknik sorunlar ve kullanım sonrası değerlendirmeleri kaydedilecektir.
+Öğretmenlerle paylaşılan demo kapsamı şunlardır:
 
-Çalışmalar tamamlandığında örneklem özellikleri, soru ve görev metinleri, analiz yöntemi ve bulgular açık biçimde raporlanacaktır. Temsilî örneklem ve yeterli ölçüm bulunmadan zaman tasarrufu, memnuniyet, başarı artışı veya ülke geneline genellenebilir etki iddiasında bulunulmayacaktır.
+- **10 dakikalık OCR ve raporlama demosu:** Aynı okuldaki iki farklı 9. sınıf şubesine ait toplam 45 sınav evrakının okunması, sınıflandırılması, doğrulanması, öğrenme çıktıları ve azami puanlarla ilişkilendirilmesi, iki kaynak temelli rapora ve tek üst yazılı EBYS demo paketine dönüştürülmesi.
+- **4 dakikalık beş sınıf demosu:** Beş farklı 9. sınıf şubesinin yazılı sınav puan çizelgelerinin birlikte işlenmesi, her sınıf için ayrı rapor hazırlanması ve beş raporun tek üst yazının ekleri olarak EBYS demo paketinde birleştirilmesi.
+
+Gelecek geliştirme sürecinde ayrı form veya anket uygulamaları yerine; öğretmenlerin prototipi gerçek görev akışları içinde kullanması, karşılaştıkları ihtiyaçları doğrudan aktarması ve oluşan çıktıların birlikte değerlendirilmesi esas alınacaktır. MAHİR, öğretmenlerin sınıf içi tecrübeleri ve geri bildirimleri doğrultusunda geliştirilmeye devam edecektir.
 
 Kaynaklar:
 
