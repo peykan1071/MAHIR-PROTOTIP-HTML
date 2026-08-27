@@ -115,7 +115,7 @@ Gelecek vizyonumuzda da MAHİR'i öğretmenlerin sınıf içi tecrübeleri, ihti
 
 GitHub, `main` dalına gönderilen her değişiklikte ve her çekme isteğinde Python ve JavaScript testlerini yeniden çalıştırır. README'nin üstündeki rozet son çalıştırmanın güncel durumunu gösterir; rozete tıklayan okuyucu çalıştırma tarihini, test günlüklerini ve test sayılarını doğrudan GitHub üzerinden inceleyebilir.
 
-En son GitHub Actions doğrulamasında **301 Python testi**, **13 JavaScript test dosyası** ve ana tarayıcı betiğinin sözdizimi kontrolü başarıyla tamamlanmıştır. Bu sonuç, kodla tanımlanan davranışların doğrulandığını gösterir; gerçek kullanıcı etki araştırması veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
+Python testleri, JavaScript test dosyaları ve ana tarayıcı betiğinin sözdizimi kontrolü GitHub Actions üzerinde birlikte çalıştırılır. Test paketi geliştikçe test sayısı değiştiği için güncel sayı ve sonuçlar README'nin üstündeki canlı rozet üzerinden açılan [GitHub Actions kayıtlarında](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml) izlenir. Bu kayıtlar kodla tanımlanan davranışların doğrulanma durumunu gösterir; gerçek kullanıcı etkisi veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
 
 ### Anonim gerçek evrak kabul testleri
 
@@ -194,7 +194,7 @@ Bu değişim yalnızca eski terimlerin yenileriyle değiştirilmesi değildir. D
 | Doğrulama düzeyi | Doğrulanan kapsam | Ölçek | Kanıt durumu |
 |---|---|---|---|
 | Uygulama senaryoları | Görsel, DOCX, PDF, XLSX, CSV ve elle veri girişi; toplu OCR; çoklu şube; yazılı, dinleme/izleme ve konuşma bileşenleri; ortak öğrenme çıktıları; ayrı ve birleşik rapor ile üst yazı üretimi | Birden fazla uçtan uca sentetik ve anonim gerçek evrak senaryosu | MAHİR ekibindeki dört öğretmenin doğrudan uygulama ve çıktı kontrolleri; beş Türk Dili ve Edebiyatı öğretmeninin demo ve örnek rapor değerlendirmeleri |
-| Otomatik yazılım doğrulaması | Veri okuma, sınav gruplama, puan ve bağlam kontrolleri, ajan akışı, raporlama ve güvenlik sınırları | 301 Python testi, 13 JavaScript test dosyası ve ana tarayıcı betiğinin sözdizimi kontrolü | Her push ve çekme isteğinde GitHub Actions; incelenebilir test günlükleri |
+| Otomatik yazılım doğrulaması | Veri okuma, sınav gruplama, puan ve bağlam kontrolleri, ajan akışı, raporlama ve güvenlik sınırları | Gelişen Python ve JavaScript test paketi ile ana tarayıcı betiğinin sözdizimi kontrolü | Her push ve çekme isteğinde GitHub Actions; güncel test sayısı ve sonuçları incelenebilir test günlüklerinde yer alır |
 | Çalışan pilot profil | 9. sınıf Türk Dili ve Edebiyatı yazılı, dinleme/izleme ve konuşma sınavlarının ayrı ve birleşik analizi | Çalışan prototip | Sentetik ve anonim veri setleriyle uygulama ve kod doğrulaması |
 | Teorik yıllık ölçek | Aynı ders ve sınıf düzeyindeki potansiyel yıllık işlem hacmi | 3.937.560 sınav evrakı; 156.964 sınıf-sınav analiz raporu | MEB 2024–2025 verisi ve yılda dört yazılı sınav varsayımı |
 | Genişleme vizyonu | Farklı dersler, kademeler, gelişim, risk ve idarî raporlama | Tek kesin sayı yok | Tamamlanmış özellik değildir |
@@ -271,16 +271,9 @@ Millî Eğitim Bakanlığı **Yazılı ve Uygulamalı Sınavlar Yönergesi**, s�
 
 MAHİR; öğretmenin yürüttüğü bu süreci veri doğrulama, kurallı hesaplama, öğrenme çıktısı düzeyinde inceleme, rapor oluşturma ve kurum içi yazışma taslağı hazırlama adımlarıyla desteklemek amacıyla geliştirilmiştir. Projenin ihtiyaç gerekçesi, mevzuat ve resmî kaynak incelemesinin yanı sıra öğretmenlerin doğrudan uygulama deneyimleri ve gözlemci değerlendirmeleriyle birlikte ele alınmaktadır.
 
-MEB tarafından öğretmen görüşlerine dayalı izleme-değerlendirme çalışmaları ve ölçme-değerlendirme süreçlerine yönelik ihtiyaç belirleme çalıştayları yürütülmektedir. Bu çalışmalar alanın geliştirilmesine yönelik kurumsal ilgiyi gösterir. MAHİR'in kendi geliştirme sürecinde ise öğretmen tecrübesi doğrudan merkeze alınmıştır.
+MEB tarafından öğretmen görüşlerine dayalı izleme-değerlendirme çalışmaları ve ölçme-değerlendirme süreçlerine yönelik ihtiyaç belirleme çalıştayları yürütülmektedir. Bu çalışmalar alanın geliştirilmesine yönelik kurumsal ilgiyi gösterir. MAHİR'in kendi geliştirme sürecinde ise öğretmen tecrübesi doğrudan merkeze alınmıştır. Dört ekip öğretmeninin uygulama deneyimi, beş Türk Dili ve Edebiyatı öğretmeninin gözlemci değerlendirmesi ve iki demo videosunun ayrıntıları yukarıdaki [Öğretmen tecrübesiyle geliştirilen MAHİR](#öğretmen-tecrübesiyle-geliştirilen-mahir) bölümünde tek yerde açıklanmaktadır.
 
-MAHİR ekibinde yer alan dört öğretmen prototipi farklı veri giriş, sınav analizi ve raporlama senaryolarıyla ayrıntılı biçimde deneyerek geliştirme sürecine doğrudan katkı sunmuştur. Bunun yanında beş Türk Dili ve Edebiyatı öğretmeni iki demo akışını, anonim not çizelgelerini ve elde edilen raporları inceleyerek gözlemci değerlendirmesinde bulunmuştur. Böylece MAHİR, toplam dokuz öğretmenin deneyim ve değerlendirmeleriyle şekillenmiştir.
-
-Öğretmenlerle paylaşılan demo kapsamı şunlardır:
-
-- **10 dakikalık OCR ve raporlama demosu:** Aynı okuldaki iki farklı 9. sınıf şubesine ait toplam 45 sınav evrakının okunması, sınıflandırılması, doğrulanması, öğrenme çıktıları ve azami puanlarla ilişkilendirilmesi, iki kaynak temelli rapora ve tek üst yazılı EBYS demo paketine dönüştürülmesi.
-- **4 dakikalık beş sınıf demosu:** Beş farklı 9. sınıf şubesinin yazılı sınav puan çizelgelerinin birlikte işlenmesi, her sınıf için ayrı rapor hazırlanması ve beş raporun tek üst yazının ekleri olarak EBYS demo paketinde birleştirilmesi.
-
-Gelecek geliştirme sürecinde ayrı form veya anket uygulamaları yerine; öğretmenlerin prototipi gerçek görev akışları içinde kullanması, karşılaştıkları ihtiyaçları doğrudan aktarması ve oluşan çıktıların birlikte değerlendirilmesi esas alınacaktır. MAHİR, öğretmenlerin sınıf içi tecrübeleri ve geri bildirimleri doğrultusunda geliştirilmeye devam edecektir.
+Gelecek geliştirme sürecinde ayrı form veya anket uygulamaları yerine; öğretmenlerin prototipi gerçek görev akışları içinde kullanması, karşılaştıkları ihtiyaçları doğrudan aktarması ve oluşan çıktıların birlikte değerlendirilmesi esas alınacaktır.
 
 Kaynaklar:
 
