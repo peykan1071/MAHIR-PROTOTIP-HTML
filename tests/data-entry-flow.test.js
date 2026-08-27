@@ -24,8 +24,8 @@ assert.match(html, /Soru Sütunlarını Oluştur/);
 assert.match(html, /Öğrenme çıktısı eşleştirmesi sınav grubu seçildikten sonra yapılacaktır/);
 assert.match(html, /KVKK veri minimizasyonu:/);
 assert.match(html, /<tr><th>Sınıf\/Şube<\/th><td colspan="5">9-A<\/td><\/tr>/);
-assert.match(html, /<tr><th>Sınav Türü<\/th><td colspan="5">Yazılı<\/td><\/tr>/);
-assert.match(html, /Sınıf\/şube \(ör\. 9-A\) ile sınav türü \(Yazılı, Dinleme veya Konuşma\) açıkça belirtilmelidir/);
+assert.doesNotMatch(html, /<tr><th>Sınav Türü<\/th><td colspan="5">Yazılı<\/td><\/tr>/);
+assert.match(html, /Sınıf\/şube \(ör\. 9-A\) açıkça belirtilmelidir/);
 
 assert.match(script, /const detectedGroups = mergedData\.documents\.length/);
 assert.doesNotMatch(script, /hasFileNameExamEvidence/);
