@@ -291,6 +291,16 @@ MAHİR'in çalışan prototipi, sınav evrakının analizi ve raporlanması üze
 | Okul öncesi ve ilkokul gelişim takibi | Gözlem formları, gelişim raporları, beceri kontrol listeleri ve veli bilgilendirme formları | Sınav puanı yerine gelişim kanıtlarını öğretmen onayıyla yapılandırma |
 | İdari raporlama | Stratejik plan göstergeleri, faaliyet ve dönem raporları ile resmî yazışma ekleri | Yetkili kullanıcı tarafından doğrulanan verileri, kaynağı izlenebilen bir kurumsal rapor taslağında birleştirme |
 
+### Kurumsal entegrasyon vizyonu
+
+MAHİR'in gelecek vizyonunda, gerekli kurumsal izinler, güvenlik değerlendirmeleri ve teknik entegrasyonlar tamamlandıktan sonra öğretmenlerin mevcut MEBBİS çalışma ortamından erişebileceği bütünleşik bir hizmet hâline gelmesi hedeflenmektedir. Aşağıdaki görsel bu hedefi anlatmak amacıyla hazırlanmış kavramsal bir arayüz çalışmasıdır.
+
+<p align="center">
+  <img src="assets/readme/14-mebbis-kurumsal-entegrasyon-vizyonu.png" alt="MAHİR'in MEBBİS çalışma ortamındaki olası konumunu gösteren kavramsal entegrasyon görseli" width="900">
+</p>
+
+> **Kavramsal entegrasyon görselleştirmesi:** MAHİR hâlen MEBBİS'e bağlı resmî bir hizmet değildir. Görsel, Millî Eğitim Bakanlığının onayını veya tamamlanmış bir entegrasyonu ifade etmez. Gerçek entegrasyon; Bakanlık onayı, kurumsal kimlik doğrulama, yetkilendirme, bilgi güvenliği ve kişisel verilerin korunmasına ilişkin süreçlerin tamamlanmasını gerektirir.
+
 ### Rehberlik ve psikolojik danışma sınırı
 
 Gelecekte MAHİR'in rehberlik alanındaki destek kapsamı, bireyi tanıma çalışmaları, görüşme ve izleme süreçleri, yönlendirme ve etkinlik kayıtları ile e-Rehberlik verileri gibi kurumsal alanları içerebilir. Ancak sistem:
