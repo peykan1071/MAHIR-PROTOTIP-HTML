@@ -1,6 +1,11 @@
 # MAHİR
 
 [![MAHİR Otomatik Testleri](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![LLM: vLLM ve Qwen2.5-7B](https://img.shields.io/badge/LLM-vLLM%20%7C%20Qwen2.5--7B-2E8B57)](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct)
+[![OCR: PaddleOCR-VL](https://img.shields.io/badge/OCR-PaddleOCR--VL-E67E22)](https://github.com/PaddlePaddle/PaddleOCR)
+[![Vektör veritabanı: Qdrant Hybrid](https://img.shields.io/badge/Vector_DB-Qdrant%20Hybrid-DC244C?logo=qdrant&logoColor=white)](https://qdrant.tech/documentation/concepts/hybrid-queries/)
+[![Bulut: Modal](https://img.shields.io/badge/Cloud-Modal%20Scale--to--Zero-6F42C1)](https://modal.com/)
 
 **MAHİR, öğretmen denetimini merkezde tutan Türkçe çok ajanlı bir karar destek sistemidir. Eğitim-öğretim yılı boyunca eğitim kurumlarında işlenen resmî evrakı sınıflandırır ve doğrular; bu evrakın içerdiği verileri öğrenme kanıtlarıyla ilişkilendirir; analiz eder, rapor ve kurum içi resmî yazışma taslaklarına dönüştürür. Çalışan prototip, bu geniş vizyonu 9. sınıf Türk Dili ve Edebiyatı sınav evrakı üzerinden gösterir.**
 
