@@ -7,7 +7,7 @@ original attempt and that retry (the process had already restarted onto the
 fixed code), showing this local network path can drop more than one attempt
 in a row. `_post_to_worker_with_retry` now backs off across
 `_CONNECTION_RETRY_DELAYS_SECONDS` (2s, 5s) for up to 3 total attempts.
-HTTP-level errors (401, 500, ...) are a real answer from the server and must
+HTTP-level errors (500, 4xx, ...) are a real answer from the server and must
 NOT be retried.
 """
 
@@ -90,10 +90,10 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
     def test_http_error_is_not_retried(self):
         http_error = urllib.error.HTTPError(
             url=_FAKE_URL,
-            code=401,
-            msg="Unauthorized",
+            code=500,
+            msg="Internal Server Error",
             hdrs=None,
-            fp=io.BytesIO(json.dumps({"ok": False, "message": "yetkisiz"}).encode("utf-8")),
+            fp=io.BytesIO(json.dumps({"ok": False, "message": "sunucu hatası"}).encode("utf-8")),
         )
         with patch(
             "backend.app.remote_ocr_client.urllib.request.urlopen",
@@ -102,12 +102,12 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
             ok, message, data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
 
         self.assertFalse(ok)
-        self.assertEqual(message, "yetkisiz")
+        self.assertEqual(message, "sunucu hatası")
         self.assertIsNone(data)
         mock_urlopen.assert_called_once()
         self.mock_sleep.assert_not_called()
 
-    def test_truncated_401_body_reports_authorization_without_crashing(self):
+    def test_truncated_error_body_is_reported_without_crashing(self):
         class _TruncatedBody:
             def read(self):
                 raise http.client.IncompleteRead(b"", 43)
@@ -117,8 +117,8 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
 
         http_error = urllib.error.HTTPError(
             url=_FAKE_URL,
-            code=401,
-            msg="Unauthorized",
+            code=500,
+            msg="Internal Server Error",
             hdrs=None,
             fp=_TruncatedBody(),
         )
@@ -129,7 +129,7 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
             ok, message, data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
 
         self.assertFalse(ok)
-        self.assertIn("yetkilendirmesi başarısız", message)
+        self.assertIn("Uzak OCR sunucusuna ulaşılamadı", message)
         self.assertIsNone(data)
         mock_urlopen.assert_called_once()
         self.mock_sleep.assert_not_called()

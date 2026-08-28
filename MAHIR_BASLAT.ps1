@@ -2,30 +2,9 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $serverScript = Join-Path $projectRoot "backend\run_file_receiver.py"
-$secretsFile = Join-Path $projectRoot "secrets.local.txt"
 
 if (-not (Test-Path -LiteralPath $serverScript -PathType Leaf)) {
     throw "MAHİR sunucu dosyası bulunamadı: $serverScript"
-}
-
-# Yerel OCR/RAG anahtarlarını yalnız bu süreç için yükler. Değerler ekrana
-# yazdırılmaz ve yalnızca beklenen iki değişkene izin verilir.
-if (Test-Path -LiteralPath $secretsFile -PathType Leaf) {
-    $allowedSecrets = @("MAHIR_OCR_SHARED_SECRET", "MAHIR_RAG_SHARED_SECRET")
-    foreach ($line in Get-Content -LiteralPath $secretsFile) {
-        $trimmed = $line.Trim()
-        if (-not $trimmed -or $trimmed.StartsWith("#")) { continue }
-        $separator = $trimmed.IndexOf("=")
-        if ($separator -lt 1) {
-            throw "secrets.local.txt içinde geçersiz bir satır var."
-        }
-        $name = $trimmed.Substring(0, $separator).Trim()
-        $value = $trimmed.Substring($separator + 1).Trim()
-        if ($name -notin $allowedSecrets) {
-            throw "secrets.local.txt içinde izin verilmeyen değişken var: $name"
-        }
-        [Environment]::SetEnvironmentVariable($name, $value, "Process")
-    }
 }
 
 $listener = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue |

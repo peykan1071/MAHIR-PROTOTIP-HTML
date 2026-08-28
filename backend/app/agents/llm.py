@@ -63,9 +63,9 @@ def run_agent_prompts(
     if len(items) > MAX_PROMPTS_PER_REQUEST:
         return False, f"Tek istekte en çok {MAX_PROMPTS_PER_REQUEST} prompt gönderilebilir.", None
 
-    # `rag_client._post` yeniden kullanılıyor: paylaşılan parola başlığını,
-    # HTTPError gövdesinden Türkçe mesaj çıkarmayı ve zaman aşımını zaten
-    # doğru yapıyor. İkinci bir HTTP istemcisi yazmak bunu kopyalamak olurdu.
+    # `rag_client._post` yeniden kullanılıyor: HTTPError gövdesinden Türkçe
+    # mesaj çıkarmayı ve zaman aşımını zaten doğru yapıyor. İkinci bir HTTP
+    # istemcisi yazmak bunu kopyalamak olurdu.
     from ..rag_client import _post
 
     wire = [{key: item[key] for key in _WIRE_KEYS if key in item} for item in items]

@@ -28,9 +28,7 @@ ve `RAGInference.close` içindeki yorumlar.
 
 from __future__ import annotations
 
-import hmac
 import io
-import os
 import re
 import tempfile
 import uuid
@@ -83,10 +81,10 @@ DEFAULT_TOP_K = 5
 MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024  # backend/app/file_receiver.py ile aynı sınır
 
 # --- Genel ajan uç noktasının sınırları ---
-# Bu uç nokta, çağıranın gönderdiği prompt'u bu GPU'da çalıştırır. Paylaşılan
-# parola KÖTÜ NİYETLİYİ engelliyor; aşağıdaki sınırlar HATAYI engelliyor -
-# döngüye giren ya da yanlışlıkla devasa bağlam gönderen bir ajan sessizce GPU
-# dakikası yakmasın. Değerler `max_model_len=8192` ile uyumlu seçildi.
+# Bu uç nokta, çağıranın gönderdiği prompt'u bu GPU'da çalıştırır ve kimlik
+# doğrulaması YOK - aşağıdaki sınırlar HATAYI engelliyor: döngüye giren ya da
+# yanlışlıkla devasa bağlam gönderen bir ajan sessizce GPU dakikası yakmasın.
+# Değerler `max_model_len=8192` ile uyumlu seçildi.
 MAX_AGENT_PROMPTS = 16
 MAX_AGENT_PROMPT_CHARS = 8000
 MAX_AGENT_OUTPUT_TOKENS = 1024
@@ -284,12 +282,6 @@ inference_image = (
 )
 
 app = modal.App(APP_NAME)
-
-_SHARED_SECRET_HEADER = "X-MAHIR-RAG-Key"
-
-_shared_secret = modal.Secret.from_dict(
-    {"MAHIR_RAG_SHARED_SECRET": os.environ.get("MAHIR_RAG_SHARED_SECRET", "")}
-)
 
 
 def _slice_pdf_pages(pdf_bytes: bytes, start_page: int, end_page: int) -> bytes:
@@ -1115,7 +1107,6 @@ def index_pdf(
     volumes=VOLUMES,
     scaledown_window=300,  # GPU soğuk başlangıcının sık tetiklenmesini (churn) önler.
     timeout=300,
-    secrets=[_shared_secret],
 )
 class RAGInference:
     """bge-m3, Qdrant ve vLLM/Qwen2.5-7B-Instruct'ı bir arada bellekte tutan
@@ -1213,13 +1204,10 @@ class RAGInference:
         `@modal.fastapi_endpoint` metoduna TEK, TAM bir URL üretir (path
         eklenecek bir taban değil) - `remote_ocr_client.py`'nin
         "+ /mahir-upload" deseni burada yok.
-        """
 
-        expected_secret = os.environ.get("MAHIR_RAG_SHARED_SECRET", "")
-        if expected_secret and not hmac.compare_digest(
-            request.headers.get(_SHARED_SECRET_HEADER, ""), expected_secret
-        ):
-            return JSONResponse({"ok": False, "message": "Yetkisiz istek."}, status_code=401)
+        Kimlik doğrulaması yok: uç nokta herkese açık. Yanlış kullanıma karşı
+        tek koruma `_reject_agent_prompts`/`MAX_AGENT_*` sınırlarıdır.
+        """
 
         try:
             body = await request.json()

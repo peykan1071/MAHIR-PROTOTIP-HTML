@@ -19,7 +19,6 @@ bağımsızdır (Cloud Run'da da aynen kullanılıyordu) - burada sadece
 
 from __future__ import annotations
 
-import os
 import subprocess
 
 import modal
@@ -60,20 +59,12 @@ image = (
     .run_function(_warm_up_pipeline, gpu="T4")
 )
 
-if modal.is_local():
-    _shared_secret = modal.Secret.from_dict(
-        {"MAHIR_OCR_SHARED_SECRET": os.environ.get("MAHIR_OCR_SHARED_SECRET", "")}
-    )
-else:
-    _shared_secret = modal.Secret.from_dict({})
-
 
 @app.function(
     image=image,
     gpu="T4",
     cpu=4.0,
     memory=8192,
-    secrets=[_shared_secret],
     timeout=900,
 )
 @modal.web_server(8000, startup_timeout=300)

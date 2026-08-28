@@ -1,5 +1,5 @@
 """`ocr_worker.py` (sunucu) ile `remote_ocr_client.py` (istemci) arasında
-paylaşılan yol/başlık sabitleri.
+paylaşılan yol sabitleri.
 
 `remote_ocr_client.py`, `ocr_worker.py`'yi doğrudan import edemez: o modül
 PaddleOCR bağımlılığını yükler ve istemci öğretmenin makinesinde (yerel
@@ -13,4 +13,3 @@ from __future__ import annotations
 
 UPLOAD_PATH = "/mahir-upload"
 WARMUP_PATH = "/mahir-warmup"
-SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
