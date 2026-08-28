@@ -2,6 +2,16 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Uzak Servislerdeki Paylaşılan Parola Tamamen Kaldırıldı - 2026-08-28
+
+- **Karar:** OCR ve RAG uzak Modal servislerini koruyan `X-MAHIR-OCR-Key` / `X-MAHIR-RAG-Key` paylaşılan parola katmanı tümüyle kaldırıldı; iki uç nokta artık kalıcı olarak herkese açık.
+- Kaldırılan kod: `rag_service.py` ve `modal_app.py`'deki `modal.Secret` tanımları + `secrets=[...]` bağlamaları, `ocr_worker.py` ve `rag_service.web_query`'deki `hmac.compare_digest` doğrulama blokları (`401 "Yetkisiz istek."` yanıtı dahil), `ocr_protocol.SHARED_SECRET_HEADER`, `rag_client.py` / `remote_ocr_client.py`'deki istek başlığı enjeksiyonu ve `remote_ocr_client.py`'deki 401'e özgü hata mesajı.
+- Kaldırılan yapılandırma: `MAHIR_BASLAT.ps1`'in `secrets.local.txt` yükleme bloğu, `.gitignore`'daki `secrets.local.txt` kuralı.
+- Güncellenen doküman: `README.md` "OCR ve RAG demo erişimi" bölümü (artık kurulum gerektirmiyor, yalnız isteğe bağlı `MAHIR_*_REMOTE_URL`); `CHANGELOG` içindeki geçmiş kayıtlar korundu. `benchmarks/` ölçüm paketindeki `load_secrets` de aynı yönde temizlendi (ayrı, henüz takip edilmeyen dizin).
+- Güncellenen test: `tests/test_remote_ocr_client.py`'deki iki 401 senaryosu 500'e çevrildi (mekanizma değil, "HTTP hatası yeniden denenmez" davranışı sınanıyor).
+- **Yanlış kullanıma karşı kalan tek yapısal koruma:** `rag_service.py` içindeki `MAX_AGENT_PROMPTS` / `MAX_AGENT_PROMPT_CHARS` / `MAX_AGENT_OUTPUT_TOKENS` sınırları. Üretim ortamına geçişte kurumsal kimlik doğrulama ayrıca eklenmelidir.
+- **Dağıtım gerekli:** parola gömülü olduğu için `modal deploy rag_service.py` ve `modal deploy modal_app.py` yeniden çalıştırılmalı; aksi halde canlı uçlarda eski parola hâlâ zorunlu kalır.
+
 ## Charter'ın Öneri/Nedensellik Yasağı Kaldırıldı - 2026-08-24
 
 - **Bulgu:** `run_diagnosis_test.py` ile tekrarlı testlerde bir örüntü ortaya çıktı - model aynı iyi içeriği ("Mekânları karşılaştıran bir sunum hazırlayabilme eksikliği") defalarca üretiyor ama HER SEFERİNDE aynı tek cümle içinde yasaklı bir bağlaçla ("nedeniyle", "kaynaklanmaktadır") bitiriyordu. Cümle düzeyinde çalışan kırpma, tek cümlelik yanıtlarda iyi içerikle birlikte cümlenin TAMAMINI siliyor, öğretmen hiçbir teşhis görmüyordu.

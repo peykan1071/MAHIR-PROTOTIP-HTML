@@ -8,8 +8,7 @@ __pycache__/
 # yerel makineye özgü çalışma zamanı çıktısı, depoya girmemeli.
 backend/logs/
 
-# Yerel paylaşılan parolalar - uzak servislerin (OCR/RAG) X-MAHIR-*-Key
-# doğrulaması bu değerlerle çalışır ve ASLA depoya girmemelidir.
-secrets.local.txt
+# Yerel ortam değişkeni dosyaları - depoya girmemeli.
 .env
 .env.*
+secrets.local.txt

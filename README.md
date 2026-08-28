@@ -147,7 +147,7 @@ MAHİR'i öğretmenlerin sınıf içi deneyimleri, ihtiyaçları ve geri bildiri
 
 GitHub Actions, `main` dalına gönderilen her değişiklikte ve her çekme isteğinde Python ve JavaScript testlerini yeniden çalıştırır. README'nin üst bölümündeki rozet, son çalıştırmanın güncel durumunu gösterir; rozete tıklayan okuyucu çalıştırma tarihini, test günlüklerini ve test sayılarını doğrudan GitHub üzerinden inceleyebilir.
 
-Python testleri, JavaScript test dosyaları ve ana tarayıcı betiğinin sözdizimi kontrolü GitHub Actions üzerinde birlikte çalıştırılır. Test paketi geliştikçe test sayısı değiştiği için güncel sayı ve sonuçlar README'nin üstündeki canlı rozet üzerinden açılan [GitHub Actions kayıtlarında](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml) izlenir. Bu kayıtlar kodla tanımlanan davranışların doğrulanma durumunu gösterir; gerçek kullanıcı etkisi veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis anahtarları test hattına eklenmez; uzak servis senaryoları güvenli taklitlerle sınanır.
+Python testleri, JavaScript test dosyaları ve ana tarayıcı betiğinin sözdizimi kontrolü GitHub Actions üzerinde birlikte çalıştırılır. Test paketi geliştikçe test sayısı değiştiği için güncel sayı ve sonuçlar README'nin üstündeki canlı rozet üzerinden açılan [GitHub Actions kayıtlarında](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml) izlenir. Bu kayıtlar kodla tanımlanan davranışların doğrulanma durumunu gösterir; gerçek kullanıcı etkisi veya her belge türünde kusursuzluk iddiası değildir. Uzak OCR ve RAG servis senaryoları test hattında güvenli taklitlerle sınanır; gerçek uç noktalara istek atılmaz.
 
 ### Anonim gerçek evrak kabul testleri
 
@@ -333,7 +333,7 @@ Kaynaklar:
 
 | Beklenen yetenek | MAHİR'de nasıl karşılanır? |
 |---|---|
-| Evrakı OCR veya doğrudan metin olarak okuyabilme | DOCX, PDF, XLSX, CSV ve görsel dosyalar kabul edilir. Görseller yetkilendirilmiş uzak OCR servisiyle okunur. |
+| Evrakı OCR veya doğrudan metin olarak okuyabilme | DOCX, PDF, XLSX, CSV ve görsel dosyalar kabul edilir. Görseller uzak OCR servisiyle okunur. |
 | Evrak türünü belirleme | Dosya türü ile raporun bağlı olduğu sınav bağlamı ayrı ayrı belirlenir. Sınav bileşeni öğretmenin Hazırlık ekranındaki seçimiyle belirlenir; OCR dosya adından veya işaret kutusundan tahmin yürütmez. |
 | Önemli bilgi unsurlarını çıkarma | Okul, öğretmen, ders, etiketli sınıf/şube hücresi, dönem, sınav tarihi, soru puanları, öğrenci puanları ve öğrenme çıktısı eşleştirmeleri yapılandırılır. |
 | Eksik bilgileri tespit etme | Zorunlu alan, puan sınırı, toplam puan, soru sayısı, ders-sınıf-program eşleşmesi ve okunamayan hücre denetimleri öğretmen onayından önce çalışır. |
@@ -549,25 +549,18 @@ py backend/run_file_receiver.py
 
 ## OCR ve RAG demo erişimi
 
-Depo tek başına indirildiğinde arayüz, belge doğrulama ve yerel analiz akışı çalıştırılabilir. Yetkilendirilmiş uzak **OCR ve RAG** servislerini kullanabilmek için proje sahibinin ayrıca sağladığı `secrets.local.txt` dosyasını proje ana klasörüne yerleştiriniz:
+Depo tek başına indirildiğinde arayüz, belge doğrulama ve yerel analiz akışı çalıştırılabilir. Uzak **OCR ve RAG** servisleri için ayrı bir kurulum gerekmez: her iki uç noktanın Modal adresi `backend/app/` içinde varsayılan olarak tanımlıdır ve uç noktalar herkese açıktır (kimlik doğrulaması yoktur).
+
+Farklı bir dağıtıma yönelmek isterseniz şu ortam değişkenleri kullanılabilir:
 
 ```text
-MAHIR_OCR_SHARED_SECRET=<ayrıca sağlanan erişim anahtarı>
-MAHIR_RAG_SHARED_SECRET=<ayrıca sağlanan erişim anahtarı>
+MAHIR_OCR_REMOTE_URL=<modal deploy modal_app.py çıktısındaki URL>
+MAHIR_RAG_REMOTE_URL=<modal deploy rag_service.py çıktısındaki URL>
 ```
 
-Erişim anahtarı olmadan ücretli uzak servisler kullanılamaz. Uzak GPU servisleri kullanılmadığında sıfıra ölçeklenir; bu nedenle ilk OCR veya RAG isteği normalden daha uzun sürebilir.
+Uzak GPU servisleri kullanılmadığında sıfıra ölçeklenir; bu nedenle ilk OCR veya RAG isteği normalden daha uzun sürebilir.
 
-### Erişim anahtarları neden depoda bulunmuyor?
-
-Bu durum bir kurulum eksikliği değil; bilinçli bir güvenlik ve maliyet kontrolü kararıdır.
-
-- Git deposuna eklenen bir erişim anahtarı, daha sonra silinse bile depo geçmişinde ve çatallarda kalabilir.
-- Herkese açık anahtarlar, ücretli GPU servislerinin yetkisiz kullanılmasına neden olabilir.
-- Gerçek servis kimlik bilgilerinin koddan ayrı tutulması, kontrollü erişim ve veri minimizasyonu yaklaşımının gereğidir.
-- `.gitignore`, `secrets.local.txt` dosyasının yanlışlıkla Git geçmişine eklenmesini engeller.
-
-Yetkili değerlendirme sırasında tam erişim, ayrıca iletilen yerel yapılandırma dosyasıyla veya süre ve kota sınırı bulunan değerlendirme erişimi üzerinden sağlanır.
+> **Not:** Uç noktalarda kimlik doğrulaması bulunmadığından, yanlış kullanıma karşı tek yapısal koruma sunucu tarafındaki istem sayısı/uzunluğu sınırlarıdır (`rag_service.py` içindeki `MAX_AGENT_*`). Üretim ortamına geçişte kurumsal kimlik doğrulama ve yetkilendirme ayrıca eklenmelidir.
 
 ## 9. sınıf Türk Dili ve Edebiyatı pilotu
 

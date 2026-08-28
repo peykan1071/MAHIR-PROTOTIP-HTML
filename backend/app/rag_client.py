@@ -16,12 +16,10 @@ generates one full URL per method, and that URL's root *is* the route.
 from __future__ import annotations
 
 import json
-import os
 import urllib.error
 import urllib.request
 
 _REMOTE_TIMEOUT_SECONDS = 300
-_SHARED_SECRET_HEADER = "X-MAHIR-RAG-Key"
 # Parçalar 512 token ve getirim zaten tek bir temaya (≈8-9 PDF sayfası)
 # kısıtlı olduğundan, daha büyük bir k konu dışına çıkma riski getirmeden
 # modele kazanımın kendi metninden daha fazlasını verir.
@@ -130,9 +128,6 @@ def _post(remote_url: str, body_payload: dict[str, object]) -> tuple[bool, str, 
 
     body = json.dumps(body_payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
-    shared_secret = os.environ.get("MAHIR_RAG_SHARED_SECRET", "")
-    if shared_secret:
-        headers[_SHARED_SECRET_HEADER] = shared_secret
     request = urllib.request.Request(remote_url.rstrip("/"), data=body, method="POST", headers=headers)
 
     try:

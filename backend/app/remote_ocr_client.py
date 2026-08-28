@@ -11,14 +11,13 @@ from __future__ import annotations
 import json
 import http.client
 import mimetypes
-import os
 import time
 import urllib.error
 import urllib.request
 import uuid
 
 from .file_receiver import UploadedFile
-from .ocr_protocol import SHARED_SECRET_HEADER, UPLOAD_PATH, WARMUP_PATH
+from .ocr_protocol import UPLOAD_PATH, WARMUP_PATH
 from .timing import stage
 
 _REMOTE_TIMEOUT_SECONDS = 300
@@ -28,7 +27,6 @@ _REMOTE_TIMEOUT_SECONDS = 300
 # beklemeyle 2 yeniden deneme (toplam 3 deneme, ~7 sn ek bekleme) bu tür
 # kesintilere tek seferlik bir denemeden daha dayanıklı.
 _CONNECTION_RETRY_DELAYS_SECONDS = (2, 5)
-_SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
 # `ocr_worker.WARMUP_PATH` ile aynı olmalı - burada elle tekrarlanıyor çünkü bu
 # modül öğretmenin makinesinde çalışıyor ve PaddleOCR bağımlısı `ocr_worker`i
 # import edemez (modül docstring'i).
@@ -70,9 +68,6 @@ def run_remote_image_group_ocr(
     boundary = uuid.uuid4().hex
     body = _build_multipart_body(uploaded_files, boundary)
     headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
-    shared_secret = os.environ.get("MAHIR_OCR_SHARED_SECRET", "")
-    if shared_secret:
-        headers[SHARED_SECRET_HEADER] = shared_secret
     request = urllib.request.Request(
         remote_url.rstrip("/") + UPLOAD_PATH,
         data=body,
@@ -97,12 +92,6 @@ def run_remote_image_group_ocr(
             payload = json.loads(error.read().decode("utf-8"))
             return False, str(payload.get("message") or error), None
         except (ValueError, UnicodeDecodeError, http.client.IncompleteRead):
-            if error.code == 401:
-                return (
-                    False,
-                    "Uzak OCR yetkilendirmesi başarısız. Yerel ve Modal OCR anahtarlarını eşitleyiniz.",
-                    None,
-                )
             return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as error:
         return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None
