@@ -2964,9 +2964,12 @@ const fileUploadBridge = (() => {
         .toLocaleLowerCase("tr-TR")
         .replace(/\s+/g, " ")
         .trim();
-      if (normalized.includes("dinleme")) return "listening";
-      if (normalized.includes("konuşma") || normalized.includes("konusma")) return "speaking";
-      if (normalized.includes("yazılı") || normalized.includes("yazili")) return "written";
+      const detectedTypes = [
+        normalized.includes("dinleme") ? "listening" : "",
+        normalized.includes("konuşma") || normalized.includes("konusma") ? "speaking" : "",
+        normalized.includes("yazılı") || normalized.includes("yazili") ? "written" : ""
+      ].filter(Boolean);
+      if (detectedTypes.length === 1) return detectedTypes[0];
       return "";
     };
     const normalizedExamTypeLabel = (examTypeKey, fallback = "") => ({
@@ -3064,9 +3067,11 @@ const fileUploadBridge = (() => {
       return `${match[1]}-${match[2]}`;
     };
 
-    const normalizedContextValue = (field, value) => (
-      field === "academicYear" ? normalizeAcademicYear(value) : usefulValue(value)
-    );
+    const normalizedContextValue = (field, value) => {
+      if (field === "academicYear") return normalizeAcademicYear(value);
+      if (field === "examDate") return normalizeDateInputValue(value);
+      return usefulValue(value);
+    };
 
     const looksLikeTckn = (value) => {
       const digits = String(value || "").replace(/\D/g, "");
@@ -3093,7 +3098,8 @@ const fileUploadBridge = (() => {
       "classSection", "teachingProgram"
     ]);
     const sharedReportContextFieldNames = new Set([
-      "province", "district", "schoolName", "teacherName", "academicYear"
+      "province", "district", "schoolName", "teacherName", "academicYear",
+      "term", "examSequence", "examDate", "teachingProgram"
     ]);
     const normalizeSharedReportContext = (source = {}) => Object.fromEntries(
       Array.from(sharedReportContextFieldNames)
@@ -3172,6 +3178,8 @@ const fileUploadBridge = (() => {
     };
 
     const populateContextFields = (exam = {}) => {
+      const detectedComponent = componentTypeFromExam(exam);
+      if (detectedComponent) updateExamSequenceOptions(detectedComponent);
       const automaticDefaults = {
         classSection: currentGrade(),
         teachingProgram: currentProgram()?.title || (activeProgramId ? `${currentCourseName()} ${currentGrade()} Öğretim Programı` : "")
@@ -5183,13 +5191,22 @@ const fileUploadBridge = (() => {
         const button = document.createElement("button");
         button.type = "button";
         const isAnalyzed = group.workflowStatus === "analyzed";
+        const isReadyForAnalysis = group.workflowStatus === "outcomes-complete";
         const isCurrent = isAnalyzed && index === outcomeSelectionGroupIndex;
         button.className = isCurrent ? "secondary-button" : "primary-button";
-        button.disabled = !isAnalyzed || isCurrent;
+        button.disabled = isCurrent || (!isAnalyzed && !isReadyForAnalysis);
         button.setAttribute("aria-disabled", String(button.disabled));
         if (isAnalyzed) button.dataset.viewSavedReport = String(index);
+        if (isReadyForAnalysis) button.dataset.analyzeNextGroup = String(index);
         const approvalLabel = group.reportApproved ? "Onaylandı" : "Öğretmen onayı bekliyor";
-        button.textContent = `${examGroupLabel(group.exam)} — ${group.students.length} öğrenci — ${isCurrent ? `Rapor görüntüleniyor · ${approvalLabel}` : isAnalyzed ? `Raporu Görüntüle · ${approvalLabel}` : "Analiz bekliyor"}`;
+        const actionLabel = isCurrent
+          ? `Rapor görüntüleniyor · ${approvalLabel}`
+          : isAnalyzed
+            ? `Raporu Görüntüle · ${approvalLabel}`
+            : isReadyForAnalysis
+              ? "Analizi Başlat"
+              : "Analiz için veri onayı bekliyor";
+        button.textContent = `${examGroupLabel(group.exam)} — ${group.students.length} öğrenci — ${actionLabel}`;
         list.append(button);
       });
       const analyzedGroups = savedGroups.filter((group) => group.workflowStatus === "analyzed");
@@ -5997,7 +6014,9 @@ const fileUploadBridge = (() => {
       button.disabled = true;
       button.classList.add("analysis-loading");
       button.textContent = "Analiz başlatılıyor…";
-      analyzeNextReadyGroup(Number(button.dataset.analyzeNextGroup));
+      analyzeNextReadyGroup(Number(button.dataset.analyzeNextGroup)).then((completed) => {
+        if (!completed) refreshNextExamAction();
+      });
     });
     document.querySelector('[data-target-screen="report-screen"]')?.addEventListener("click", refreshNextExamAction);
     document.querySelector("[data-open-general-evaluation]")?.addEventListener("click", () => {

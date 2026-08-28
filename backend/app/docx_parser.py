@@ -198,6 +198,13 @@ def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
     if not (class_section or course):
         class_section, course = _split_combined_value(values.get("sinif ders", ""))
 
+    exam_type = _normalise_exam_type(_selected_option(values.get("sinav turu", "")))
+    term = _normalise_term(_selected_option(values.get("donem", ""))) or _checked_term(rows)
+    exam_sequence = (
+        _normalise_exam_sequence(values.get("sinav sirasi", ""), exam_type)
+        or _checked_exam_sequence(rows, exam_type)
+    )
+
     exam = {
         "province": province,
         "district": district,
@@ -205,8 +212,9 @@ def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
         "academicYear": values.get("egitim ogretim yili", "") or values.get("egitim yili", ""),
         "course": course,
         "classSection": class_section,
-        "term": _selected_option(values.get("donem", "")),
-        "examType": _normalise_exam_type(_selected_option(values.get("sinav turu", ""))),
+        "term": term,
+        "examType": exam_type,
+        "examSequence": exam_sequence,
         "examDate": values.get("sinav tarihi", ""),
         "totalMaxScore": _number(values.get("toplam puan", "")),
         "teacherName": values.get("ogretmenin adi soyadi", ""),
@@ -227,6 +235,13 @@ def _parse_exam(rows: list[list[str]]) -> dict[str, object]:
     exam["verifiedMetadataFields"] = [
         field for field, label in verified_labels.items() if values.get(label, "").strip()
     ]
+    for field, value in (
+        ("examType", exam_type),
+        ("term", term),
+        ("examSequence", exam_sequence),
+    ):
+        if value and field not in exam["verifiedMetadataFields"]:
+            exam["verifiedMetadataFields"].append(field)
     if exam["verifiedMetadataFields"]:
         exam["metadataSource"] = "labeled-template"
     return exam
@@ -537,6 +552,58 @@ def _build_warnings(
 def _selected_option(value: str) -> str:
     checked = re.search(r"(?:☒|☑|■|✓)\s*([^☐☒☑■✓]+)", value)
     return checked.group(1).strip() if checked else value.strip()
+
+
+def _checked_values(rows: list[list[str]]) -> list[str]:
+    """Return selections explicitly marked in MAHIR template cells."""
+
+    selected: list[str] = []
+    for row in rows:
+        for cell in row:
+            if re.search(r"(?:☒|☑|■|✓)", cell):
+                value = _selected_option(cell)
+                if value and value not in selected:
+                    selected.append(value)
+    return selected
+
+
+def _normalise_term(value: str) -> str:
+    match = re.search(r"\b([12])\s*[.]?\s*d[oö]nem\b", value, re.IGNORECASE)
+    return f"{match.group(1)}. Dönem" if match else ""
+
+
+def _checked_term(rows: list[list[str]]) -> str:
+    return next(
+        (term for value in _checked_values(rows) if (term := _normalise_term(value))),
+        "",
+    )
+
+
+def _normalise_exam_sequence(value: str, exam_type: str) -> str:
+    selected = _selected_option(value)
+    match = re.search(r"\b([12])\s*[.]?\s*(yaz[iı]l[iı]|dinleme|konu[sş]ma)\b", selected, re.IGNORECASE)
+    if not match:
+        return ""
+    sequence_type = _normalise_exam_type(match.group(2))
+    if exam_type and sequence_type != exam_type:
+        return ""
+    suffix = {
+        "Yazılı": "Yazılı Sınav",
+        "Dinleme": "Dinleme/İzleme Sınavı",
+        "Konuşma": "Konuşma Sınavı",
+    }.get(sequence_type)
+    return f"{match.group(1)}. {suffix}" if suffix else ""
+
+
+def _checked_exam_sequence(rows: list[list[str]], exam_type: str) -> str:
+    return next(
+        (
+            sequence
+            for value in _checked_values(rows)
+            if (sequence := _normalise_exam_sequence(value, exam_type))
+        ),
+        "",
+    )
 
 
 def _split_combined_value(value: str) -> tuple[str, str]:

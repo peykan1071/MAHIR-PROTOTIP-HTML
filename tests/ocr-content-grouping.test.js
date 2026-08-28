@@ -34,8 +34,8 @@ const normalizeExamType = extractArrowFunction("normalizeExamType");
 assert.equal(normalizeClassSection("9-B"), "9-B");
 
 assert.equal(normalizeExamType("Dinleme"), "listening");
-assert.equal(normalizeExamType("Dinleme/İzleme Sınavı"), "");
-assert.equal(normalizeExamType("Yazılı Sınav"), "");
+assert.equal(normalizeExamType("Dinleme/İzleme Sınavı"), "listening");
+assert.equal(normalizeExamType("Yazılı Sınav"), "written");
 assert.equal(normalizeExamType("YAZILI"), "written");
 assert.equal(normalizeExamType("Konuşma"), "speaking");
 assert.equal(normalizeExamType("□ Yazılı □ Dinleme □ Konuşma"), "");

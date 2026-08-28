@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from backend.app.docx_parser import parse_mahir_docx
+from backend.app.file_receiver import UploadedFile, run_existing_backend_flow, validate_file_name
 
 
 CORPUS = Path(__file__).parent / "fixtures" / "real_exam_corpus_anonymized"
@@ -40,9 +41,35 @@ class RealExamCorpusAcceptanceTests(unittest.TestCase):
         parsed = [parse_mahir_docx(path.read_bytes()) for path in sheets]
         self.assertEqual([item["exam"]["classSection"] for item in parsed], ["9-A", "9-B", "9-C", "9-D", "9-E"])
         self.assertEqual([item["summary"]["studentCount"] for item in parsed], [25, 28, 22, 20, 25])
+        for field in ("province", "district", "schoolName", "academicYear", "teacherName"):
+            values = {item["exam"][field] for item in parsed}
+            self.assertEqual(len(values), 1, field)
+            self.assertTrue(next(iter(values)), field)
         for item in parsed:
             self.assertEqual(item["summary"]["questionCount"], 7)
             self.assertEqual([question["maxScore"] for question in item["questions"]], [12, 12, 14, 12, 14, 12, 24])
+            self.assertEqual(item["exam"]["academicYear"], "2025-2026")
+            self.assertEqual(item["exam"]["term"], "2. Dönem")
+            self.assertEqual(item["exam"]["examSequence"], "2. Yazılı Sınav")
+
+    def test_five_written_score_sheets_are_accepted_in_one_upload(self):
+        sheets = self._files("word/five-classes-written", ".docx")
+        files = [UploadedFile(path.name, path.read_bytes()) for path in sheets]
+        checks = [validate_file_name(uploaded.file_name) for uploaded in files]
+
+        ok, message, structured = run_existing_backend_flow(files, checks)
+
+        self.assertTrue(ok)
+        self.assertIn("5 veri belgesi ayrı sınav grupları olarak okundu", message)
+        self.assertEqual(len(structured["groups"]), 5)
+        self.assertEqual(
+            [group["exam"]["classSection"] for group in structured["groups"]],
+            ["9-A", "9-B", "9-C", "9-D", "9-E"],
+        )
+        self.assertTrue(all(group["exam"]["term"] == "2. Dönem" for group in structured["groups"]))
+        self.assertTrue(
+            all(group["exam"]["examSequence"] == "2. Yazılı Sınav" for group in structured["groups"])
+        )
 
     def test_25_student_exam_has_both_ocr_and_word_comparison_sources(self):
         images = self._files("images/9A-ocr-word-comparison-25", ".jpeg")
