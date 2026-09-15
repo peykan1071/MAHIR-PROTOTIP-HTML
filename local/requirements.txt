@@ -1,0 +1,79 @@
+# MAHİR yerel RAG hattı - Python bağımlılıkları (Windows 11, NVIDIA RTX 4050 6 GB, CUDA 12.6).
+# Her şey yerel: Qdrant (Docker), PaddleOCR-VL (GPU), bge-m3 + reranker (CPU),
+# Qwen2.5-7B-Instruct Q4_K_M (llama-server, GPU) - dışarıya hiçbir istek çıkmaz.
+#
+# ÖNKOŞULLAR (hedef dizüstü):
+#   * Python 3.12 veya 3.13 (64-bit). paddlepaddle-gpu'nun Windows wheel'i cp39-cp313
+#     için var; torch cu126 wheel'i cp312/cp313 için doğrulandı.
+#   * NVIDIA sürücüsü + CUDA Toolkit 12.6 + cuDNN 9 SİSTEMDE kurulu olmalı. Linux'un
+#     aksine paddlepaddle-gpu'nun Windows wheel'i CUDA kütüphanelerini kendisi
+#     taşımaz (torch taşır). Kurulum sonrası `nvcc --version` 12.6 göstermeli.
+#   * Sanal ortam kullanın:  python -m venv .venv ; .\.venv\Scripts\Activate.ps1
+#
+# KURULUM:
+#   python -m pip install --upgrade pip
+#   python -m pip install -r local/requirements.txt
+#
+# DOĞRULAMA:
+#   python -c "import torch; print(torch.__version__, torch.cuda.is_available())"   # True
+#   python -c "import paddle; paddle.utils.run_check()"   # "PaddlePaddle is installed successfully!"
+#   python -c "import docling, sentence_transformers, qdrant_client, openai, cv2; print('ok')"
+#
+# GPU'SUZ MAKİNEDE (yalnız CPU yollarını denemek için): aşağıdaki dört GPU satırını
+# (torch/torchvision +cu126, paddlepaddle-gpu, paddleocr/paddlex) yorumlayıp torch'u
+# PyPI'ın CPU wheel'inden kurun - 2026-09-15'te bu birleşim Python 3.13'te doğrulandı:
+#   python -m pip install torch==2.8.0 torchvision==0.23.0
+#   python -m pip install -r local/requirements.txt      # (GPU satırları yorumlu hâliyle)
+# ingestion_pipeline.py `--no-ocr` ile paddle'ı hiç import etmez; rag_service.py
+# reranker'ı CPU'da çalıştırır (RERANKER_DEVICE=auto -> cpu).
+#
+# BİLİNEN NOKTALAR:
+#   * transformers: docling 5.0-5.3 ve 5.9-5.15 serilerini dışlar; sentence-transformers 6
+#     ve PaddleOCR-VL-1.6'nın transformers motoru >=5 ister. pip kesişimde (5.4-5.8 ya
+#     da 5.16+) çözer - elle daraltmayın.
+#   * cv2: paddlex `opencv-contrib-python==4.10.0.84` pinler, docling'in rapidocr'ı
+#     `opencv-python` getirir. İkisi aynı `cv2` modülünü yazar (contrib üst küme).
+#     `import cv2` hata verirse: pip install --force-reinstall opencv-contrib-python==4.10.0.84
+#   * PaddleOCR-VL transformers motoru Windows'ta Triton isterse:
+#     pip install "triton-windows<3.5"   (torch 2.8 -> triton 3.4 serisi)
+#     ya da .env'de OCR_ENGINE=paddle_dynamic.
+
+--extra-index-url https://download.pytorch.org/whl/cu126
+--extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/
+
+# --- GPU çerçeveleri (CUDA 12.6) ---
+# paddlex'in kendi test ettiği torch serisi (bkz. paddlex[genai-*] pinleri).
+torch==2.8.0+cu126
+torchvision==0.23.0+cu126
+# PyPI'daki paddlepaddle-gpu 2.6'da kalmış; 3.3.1 yalnız Paddle'ın cu126 indeksinde.
+paddlepaddle-gpu==3.3.1
+
+# --- OCR / görsel anlama: PaddleOCR-VL 1.6 (modal_app.py ile aynı pinler) ---
+paddleocr[doc-parser]==3.7.0
+paddlex==3.7.2
+
+# --- PDF ayrıştırma + hiyerarşik parçalama (CPU) ---
+docling>=2.127,<3
+docling-core[chunking]>=2.94,<3
+pypdf>=5,<7
+
+# --- Gömme + reranker (CPU / isteğe bağlı GPU) ---
+transformers>=5.4,<6
+sentence-transformers>=6.0,<7
+
+# --- Vektör veritabanı istemcisi (docker-compose.yml'deki sunucuyla aynı minor) ---
+qdrant-client>=1.19,<2
+
+# --- LLM istemcisi (OpenAI uyumlu; yerel llama-server'a konuşur) ---
+# LLM'in kendisi pip paketi DEĞİL: llama.cpp'nin resmî Windows CUDA binary'si
+# (bkz. .env.example LLAMA_SERVER_EXE notu) + Qwen2.5-7B-Instruct GGUF Q4_K_M.
+openai>=1.63,<4
+
+# --- HTTP servisi ---
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pydantic>=2,<3
+
+# --- Yardımcılar ---
+python-dotenv>=1,<2
+pillow>=10,<13

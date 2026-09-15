@@ -1,0 +1,62 @@
+# MAHİR yerel RAG hattı - Qdrant vektör veritabanı.
+# (Yerel LLM burada DEĞİL: llama-server GPU'ya doğrudan erişsin diye Windows'ta
+# yerel süreç olarak `local/llm_server.ps1` ile başlatılır.)
+#
+# Kullanım (bu dizinden ya da repo kökünden `-f local/docker-compose.yml` ile):
+#   docker compose up -d          # başlat (ilk seferde imajı indirir)
+#   docker compose ps             # STATUS sütununda "healthy" görünmeli
+#   docker compose logs -f qdrant
+#   docker compose down           # durdur (veri named volume'da kalır)
+#   docker compose down -v        # durdur VE veriyi sil (koleksiyon sıfırlanır)
+#
+# `ingestion_pipeline.py` ve `rag_service.py` bu servise `QDRANT_HOST`/
+# `QDRANT_PORT` (.env, varsayılan 127.0.0.1:6333 - "localhost" değil, bkz.
+# .env.example'daki IPv6 notu) ile bağlanır. Sürüm
+# `requirements.txt`'teki `qdrant-client` ile aynı minor'da tutulmalı
+# (istemci ve sunucu arasında en fazla bir minor fark önerilir).
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.19.1
+    container_name: mahir-qdrant
+    restart: unless-stopped
+    # Yalnızca loopback'e bağlanır: dizüstü kablosuz ağa açıkken bile Qdrant
+    # dışarıdan erişilemez. Kimlik doğrulama gerekiyorsa aşağıdaki API key
+    # satırının yorumunu kaldırıp .env'e QDRANT_API_KEY yazın.
+    ports:
+      - "127.0.0.1:6333:6333" # REST
+      - "127.0.0.1:6334:6334" # gRPC (qdrant-client prefer_grpc=True için)
+    volumes:
+      # Named volume: Docker Desktop/WSL2'de host klasörüne bind mount'tan
+      # belirgin şekilde hızlı ve dosya izni sorunu yok. Veriyi host'ta
+      # görmek istenirse yerine `./qdrant_storage:/qdrant/storage` yazılabilir
+      # (o klasörü .gitignore'a eklemeyi unutmayın).
+      - mahir_qdrant_storage:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: "6333"
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+      QDRANT__LOG_LEVEL: INFO
+      # QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+    # Qdrant imajında curl/wget yok ama bash var: /dev/tcp ile ham HTTP isteği
+    # atıp /readyz'den "200 OK" bekliyoruz. /readyz, koleksiyonlar yüklenip
+    # sunucu gerçekten istek kabul edene kadar 503 döner - /healthz'den daha
+    # doğru bir "hazır" sinyali.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333
+          && printf "GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3
+          && grep -q "200 OK" <&3'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    # 6 GB VRAM'li dizüstünde RAM da kısıtlı (16 GB): Qdrant'ın host belleğini
+    # kontrolsüz büyütmesini engeller. Birkaç yüz bin 1024-d vektör için
+    # fazlasıyla yeterli; daha büyük dizinlerde artırın.
+    mem_limit: 2g
+
+volumes:
+  mahir_qdrant_storage:
+    name: mahir_qdrant_storage
