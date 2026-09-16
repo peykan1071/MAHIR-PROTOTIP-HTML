@@ -48,7 +48,7 @@ torchvision==0.23.0+cu126
 # PyPI'daki paddlepaddle-gpu 2.6'da kalmış; 3.3.1 yalnız Paddle'ın cu126 indeksinde.
 paddlepaddle-gpu==3.3.1
 
-# --- OCR / görsel anlama: PaddleOCR-VL 1.6 (modal_app.py ile aynı pinler) ---
+# --- OCR / görsel anlama: PaddleOCR-VL 1.6 (backend/app/ocr_engine.py ile aynı sürüm) ---
 paddleocr[doc-parser]==3.7.0
 paddlex==3.7.2
 

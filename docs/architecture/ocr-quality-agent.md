@@ -23,4 +23,4 @@ Belge Okuma ve OCR Kalite Ajanı, yüklenen dosyanın metin tabanlı mı yoksa g
 
 ## Prototip sınırı
 
-Görsel dosyalar uzak OCR servisine yönlendirilir. Metin katmanı bulunmayan taranmış PDF tespit edilir; ancak PDF sayfalarını otomatik olarak görsele dönüştürüp OCR'a gönderme özelliği bu prototipte henüz bulunmadığından öğretmen kontrolü ve elle tamamlama istenir. Bu sınırlama sessizce geçilmez.
+Görsel dosyalar yerel OCR işçisine (`backend/run_ocr_worker.py`, PaddleOCR-VL) yönlendirilir. Metin katmanı bulunmayan taranmış PDF tespit edilir; ancak PDF sayfalarını otomatik olarak görsele dönüştürüp OCR'a gönderme özelliği bu prototipte henüz bulunmadığından öğretmen kontrolü ve elle tamamlama istenir. Bu sınırlama sessizce geçilmez.

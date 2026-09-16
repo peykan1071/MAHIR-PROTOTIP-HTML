@@ -68,20 +68,13 @@ def build_anomaly_prompt(question_results: list[dict[str, Any]]) -> dict[str, An
     }
 
 
-# Pedagojik Analiz Ajanı'nın teşhis prompt'u. `rag_service.SYSTEM_PROMPT`ten
-# BİREBİR kopyalandı (programatik olarak, transkripsiyon hatası olmasın diye).
+# Pedagojik Analiz Ajanı'nın teşhis prompt'u - TEK kopya burada.
 #
-# Neden istemci tarafında: birleşik `agents` uç noktasında system prompt'u
-# çağıran gönderiyor. Prompt'un ajanın yanında durması zaten doğrusu - bir
-# ajanı tanımlayan şey büyük ölçüde kendi prompt'u. Sunucudaki kopya, eski
-# `queries` biçimi için duruyor ve o biçim kaldırıldığında silinecek.
-#
-# CANLI YOL BURASI: teşhis kalitesini değiştirmek için `modal deploy`
-# GEREKMEZ - istemci prompt'u kendi gönderiyor. Sunucudaki kopya yalnızca
-# hizada kalsın diye güncelleniyor.
-#
-# İkisi AYRIŞMAMALI: `tests/test_agent_llm_round.py::PromptDriftTests`
-# bunu kontrol ediyor.
+# Neden istemci tarafında: `agents` uç noktasında (`local/rag_service.py`)
+# system prompt'u çağıran gönderiyor; servis kendi prompt'unu dayatmaz. Prompt'un
+# ajanın yanında durması zaten doğrusu - bir ajanı tanımlayan şey büyük ölçüde
+# kendi prompt'u. Teşhis kalitesini değiştirmek için yalnız bu dosya değişir,
+# servisin yeniden başlatılması gerekmez.
 DIAGNOSIS_SYSTEM_PROMPT = (
     "Sen; Öğrenme Analitiği, Veri Odaklı Ölçme-Değerlendirme ve Program Geliştirme alanlarında "
     "uzmanlaşmış kıdemli bir Eğitim Analistisin. Görevin: sana BAĞLAM olarak verilen resmî "

@@ -1,12 +1,12 @@
 """Ajanların paylaştığı LLM katmanı.
 
-Bir turda kaç ajan LLM'e ihtiyaç duyarsa duysun, hepsinin prompt'u TEK istekte
-ve TEK vLLM partisinde gider. Sebep ölçüldü: vLLM'de N dizinin birlikte
-çözülmesi neredeyse tek dizi kadar sürüyor (darboğaz GPU'nun bellek bant
-genişliği, hesap gücü değil). Mevcut prototipte Ölçme ve Pedagojik Analiz
-ajanlarının istemleri bu ortak turda birleştirilir. Katman daha fazla uzman
-rolü aynı turda taşıyabilecek biçimde kurulmuştur; bu, bütün ajanların LLM
-kullandığı anlamına gelmez.
+Bir turda kaç ajan LLM'e ihtiyaç duyarsa duysun, hepsinin prompt'u TEK
+istekte yerel RAG servisine (`local/rag_service.py`, `/agents`) gider; servis
+getirimi yapar ve yanıtları llama-server'dan ardışık üretip giriş sırasıyla
+döndürür. Tek istek: bir tur = bir ağ çağrısı, bir hata noktası, bir iz kaydı.
+Mevcut prototipte Ölçme ve Pedagojik Analiz ajanlarının istemleri bu ortak
+turda birleştirilir. Katman daha fazla uzman rolü aynı turda taşıyabilecek
+biçimde kurulmuştur; bu, bütün ajanların LLM kullandığı anlamına gelmez.
 
 Bu modül `rag_client` ile aynı sözleşmeyi taşır: **asla istisna fırlatmaz**.
 LLM arızası isteğe bağlı bir ajanı düşürür, öğretmenin analizini değil
@@ -18,7 +18,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-# Uzak uç noktanın sınırlarıyla aynı olmalı (bkz. rag_service.py MAX_AGENT_*).
+# Servisin sınırlarıyla aynı olmalı (bkz. local/rag_service.py MAX_AGENT_*).
 # Burada da kontrol ediliyor ki ağ turu boşa harcanmasın ve hata mesajı
 # çağırana yakın yerde üretilsin.
 MAX_PROMPTS_PER_REQUEST = 16

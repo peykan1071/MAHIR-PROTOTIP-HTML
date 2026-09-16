@@ -4,9 +4,9 @@ The receiver detects that a file reached the Python backend and validates its
 filename extension. Word, PDF and image documents are accepted by the
 prototype and forwarded to the teacher-validation step; DOCX/PDF/XLSX tables
 are parsed when their headings can be recognised, and image groups are OCR'd
-by a remote MAHIR backend (see `remote_ocr_client.py`) when
-`MAHIR_OCR_REMOTE_URL` is set - no OCR pipeline runs on this machine. A fixed
-MAHIR template is never required.
+by the separate OCR worker process (`run_ocr_worker.py`, reached through
+`remote_ocr_client.py`) when `MAHIR_OCR_REMOTE_URL` is set - no OCR model is
+loaded into this process. A fixed MAHIR template is never required.
 """
 
 from __future__ import annotations
@@ -56,14 +56,13 @@ ALLOWED_EXTENSIONS = {
     ".xlsx",
 }
 IMAGE_EXTENSIONS = {".gif", ".jpeg", ".jpg", ".png", ".webp"}
-_DEFAULT_MAHIR_OCR_REMOTE_URL = "https://hakanergul--mahir-ocr-worker-ocr-worker.modal.run"
-# Dağıtılmış OCR işçisinin adresi koda gömülü - `approved_data_analyzer.py`'deki
-# `MAHIR_RAG_REMOTE_URL` ile aynı desen. Modal'ın ürettiği URL bir daha dağıtım
-# yapılana kadar değişmiyor, bu yüzden sunucuyu her başlatışta aynı pencerede
-# env değişkeni ayarlamaya gerek yok - unutulduğunda sunucu hata vermeden
-# OCR'sız "pass-through" moduna düşüyordu (bkz. README'deki uyarı). Farklı bir
-# dağıtıma (ör. test ortamı) işaret etmek gerekirse env var yine geçersiz kılar;
-# boş string vermek OCR'ı bilinçli olarak kapatır.
+# OCR işçisinin (`backend/run_ocr_worker.py`, ayrı süreç, 127.0.0.1:8002) adresi
+# koda gömülü - `approved_data_analyzer.py`'deki `MAHIR_RAG_REMOTE_URL` ile aynı
+# desen: sunucuyu her başlatışta env değişkeni ayarlamaya gerek yok;
+# unutulduğunda sunucu hata vermeden OCR'sız "pass-through" moduna düşüyordu.
+# Başka bir porta işaret etmek gerekirse env var geçersiz kılar; boş string
+# vermek OCR'ı bilinçli olarak kapatır.
+_DEFAULT_MAHIR_OCR_REMOTE_URL = "http://127.0.0.1:8002"
 MAHIR_OCR_REMOTE_URL = os.environ.get("MAHIR_OCR_REMOTE_URL", _DEFAULT_MAHIR_OCR_REMOTE_URL)
 
 
@@ -111,10 +110,10 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         """Serve the prototype, but intercept the warm-up pings first.
 
-        The browser can't call the remote services itself (it never learns
+        The browser can't call the OCR/RAG services itself (it never learns
         their URLs, and they are on another origin), so both pings are proxied
-        here. They must return *immediately*: a remote call blocks for 30-110 s
-        while a cold container loads its models, and the teacher is meanwhile
+        here. They must return *immediately*: a warm-up call blocks for tens of
+        seconds while a service loads its models, and the teacher is meanwhile
         picking files or reviewing scores - nothing may wait on it.
         """
 

@@ -1,5 +1,13 @@
-"""Run the MAHIR OCR worker (PaddleOCR-VL) - meant for a GPU machine, see
-`modal_app.py`.
+"""Run the MAHİR OCR worker (PaddleOCR-VL, GPU) as its own local process.
+
+The web backend (`run_file_receiver.py`, :8000) forwards image uploads here
+through `app/remote_ocr_client.py`; the default address on both sides is
+`http://127.0.0.1:8002` (`MAHIR_OCR_WORKER_PORT` / `MAHIR_OCR_REMOTE_URL`).
+Kept separate so the teacher-facing server never loads paddle/torch and a
+model crash cannot take the web UI down. Needs the `local/requirements.txt`
+environment (paddlepaddle-gpu + CUDA 12.6 / cuDNN 9 on the machine).
+
+    cd backend ; python run_ocr_worker.py
 """
 
 from __future__ import annotations
@@ -11,16 +19,15 @@ from app.ocr_worker import UPLOAD_PATH, create_server
 
 
 def main() -> None:
-    host = "0.0.0.0"
-    port = int(os.environ.get("PORT", 8000))
+    host = "127.0.0.1"
+    port = int(os.environ.get("MAHIR_OCR_WORKER_PORT", 8002))
     server = create_server(host=host, port=port)
 
-    print(f"MAHİR OCR sunucusu çalışıyor: http://{host}:{port}", flush=True)
+    print(f"MAHİR OCR işçisi çalışıyor: http://{host}:{port}", flush=True)
     print(f"OCR yolu: http://{host}:{port}{UPLOAD_PATH}", flush=True)
 
-    # Pipeline'ı burada, sunucu istek almadan önce kuruyoruz (model yükleme birkaç
-    # dakika sürebilir) - aksi halde platformun soğuk başlangıç zaman aşımını
-    # aşıp ilk istek başarısız olabilir.
+    # Pipeline'ı burada, sunucu istek almadan önce kuruyoruz (ilk model yükleme
+    # birkaç dakika sürebilir) - aksi hâlde öğretmenin ilk yüklemesi o süreyi bekler.
     print("PaddleOCR-VL pipeline'ı ısıtılıyor (ilk model yükleme birkaç dakika sürebilir)...", flush=True)
     try:
         ocr_engine.ensure_available()
@@ -33,7 +40,7 @@ def main() -> None:
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("MAHİR OCR sunucusu durduruldu.", flush=True)
+        print("MAHİR OCR işçisi durduruldu.", flush=True)
     finally:
         server.server_close()
 

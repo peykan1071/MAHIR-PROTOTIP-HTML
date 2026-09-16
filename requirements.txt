@@ -1,11 +1,7 @@
 pdfplumber>=0.11,<1
 openpyxl>=3.1,<4
 python-docx>=1.1,<2
-# rag_service.py'nin ağır ML bağımlılıkları (docling/FlagEmbedding/vllm) kasıtlı
-# olarak burada YOK - yalnız Modal konteynerinde kurulu, yerel testler onları
-# hiç import etmez (bkz. tests/test_rag_service_indexing.py docstring'i).
-# qdrant-client istisna: saf istemci kütüphanesi (grpcio/httpx/pydantic - ML
-# çerçevesi yok), hibrit arama (Prefetch/FusionQuery/SparseVector) sorgu
-# kurulumunu GERÇEK tiplerle test edebilmek için eklendi. >=1.10: Query API
-# (Prefetch/FusionQuery) bu sürümde tanıtıldı.
-qdrant-client>=1.10,<2
+# Web backend (backend/run_file_receiver.py) ve testler yalnız bunları ister.
+# Yapay zekâ katmanının (Qdrant, bge-m3, reranker, PaddleOCR-VL, llama-server
+# istemcisi) bağımlılıkları local/requirements.txt'te - ayrı ortam, testler
+# onları hiç import etmez (local/ modülleri ağır paketleri tembel yükler).

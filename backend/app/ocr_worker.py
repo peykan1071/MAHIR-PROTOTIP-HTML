@@ -1,8 +1,7 @@
-"""Dedicated OCR worker server - meant to run where a real GPU is available
-(e.g. a Google Colab notebook, see `colab/mahir_ocr_colab.ipynb`), separate
-from the local MAHIR file receiver (`file_receiver.py`), which has no
-PaddleOCR dependency and simply forwards image groups here over HTTP (see
-`remote_ocr_client.py`).
+"""Dedicated OCR worker server (PaddleOCR-VL on the local GPU), run as its own
+process by `backend/run_ocr_worker.py` on 127.0.0.1:8002 - separate from the
+MAHIR file receiver (`file_receiver.py`), which has no PaddleOCR dependency
+and simply forwards image groups here over HTTP (see `remote_ocr_client.py`).
 
 Speaks the same request/response shape as `file_receiver.py`'s
 `/mahir-upload` (`{"ok", "message", "structuredData"}`) so `remote_ocr_client.py`
@@ -24,9 +23,7 @@ from .file_receiver import (
     extract_uploaded_files,
     validate_file_name,
 )
-
-UPLOAD_PATH = "/mahir-upload"
-WARMUP_PATH = "/mahir-warmup"
+from .ocr_protocol import UPLOAD_PATH, WARMUP_PATH
 
 
 class OCRWorkerHandler(BaseHTTPRequestHandler):
@@ -43,15 +40,14 @@ class OCRWorkerHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:
-        """Ön-ısıtma: konteyneri ayağa kaldırıp modelleri GPU'ya yükletir.
+        """Ön-ısıtma: modelleri GPU'ya yükletir, hiç predict çalıştırmaz.
 
-        Ölçüldü (bkz. `modal app logs mahir-ocr-worker`): bir isteğin 50-57
-        saniyesinin 30-50'si konteyner açılışı + model yükleme, yalnızca 7-12
-        saniyesi gerçek OCR. Bu uç nokta o hazırlığı, öğretmen daha dosyalarını
-        seçerken tetiklemek için var - hiç predict çalıştırmaz.
+        Ölçüldü: bir isteğin 50-57 saniyesinin 30-50'si model yükleme, yalnızca
+        7-12 saniyesi gerçek OCR. Bu uç nokta o hazırlığı, öğretmen daha
+        dosyalarını seçerken tetiklemek için var.
 
         `ensure_available()` idempotenttir (`ocr_engine._get_pipeline` tek
-        seferlik kurulum yapar), bu yüzden sıcak bir konteynerde anında döner.
+        seferlik kurulum yapar), bu yüzden model yüklüyken anında döner.
         """
 
         if self.path != WARMUP_PATH:
@@ -203,5 +199,7 @@ def _run_image_group_ocr(uploaded_files, file_checks) -> tuple[bool, str, dict[s
     )
 
 
-def create_server(host: str = "0.0.0.0", port: int = 8000) -> ThreadingHTTPServer:
+def create_server(host: str = "127.0.0.1", port: int = 8002) -> ThreadingHTTPServer:
+    """Yalnız loopback, 8002: web backend 8000'de aynı makinede koşuyor."""
+
     return ThreadingHTTPServer((host, port), OCRWorkerHandler)

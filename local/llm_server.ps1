@@ -56,6 +56,9 @@ function Get-Setting([string]$Name, [string]$Default) {
 # --- llama-server.exe ---
 $Exe = Get-Setting "LLAMA_SERVER_EXE" ""
 if ($Exe -eq "") { $Exe = Join-Path $LocalDir "llama.cpp/llama-server.exe" }
+# Göreli yol (.env'de "local/llama.cpp/...") repo köküne göre çözülür - betiğin
+# hangi dizinden çağrıldığı fark etmez.
+if (-not [System.IO.Path]::IsPathRooted($Exe)) { $Exe = Join-Path (Split-Path -Parent $LocalDir) $Exe }
 if (-not (Test-Path $Exe)) {
     Write-Error @"
 llama-server.exe bulunamadı: $Exe

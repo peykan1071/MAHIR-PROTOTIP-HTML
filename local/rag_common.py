@@ -33,12 +33,12 @@ DEFAULT_DOTENV_PATH = LOCAL_DIR / ".env"
 
 # Getirim hiçbir şey bulamadığında ya da model bağlamda yanıt bulamadığında
 # dönen metin. `backend/app/approved_data_analyzer.py::_RAG_NO_ANSWER_TEXT`
-# ve Modal'daki `rag_service.py::_NO_ANSWER_TEXT` ile birebir aynı tutulmalı.
+# ile birebir aynı tutulmalı (backend bu cümleyi tanıyıp teşhisi eliyor).
 NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
 
-# uuid5 ad alanı - Modal'daki `rag_service._POINT_ID_NAMESPACE` ile AYNI string.
-# Aynı (program, belge, sıra, metin) dörtlüsü her iki hatta da aynı nokta
-# kimliğini üretir; değeri değiştirmek kalıcı şemayı bozar.
+# uuid5 ad alanı. Aynı (program, belge, sıra, metin) dörtlüsü her zaman aynı
+# nokta kimliğini üretir (bkz. tests/test_rag_service_indexing.py'deki altın
+# değer); değeri değiştirmek kalıcı şemayı bozar.
 _POINT_ID_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "mahir-rag-chunk")
 
 logger = logging.getLogger("mahir.local")
@@ -341,8 +341,7 @@ class Hit:
 def deterministic_point_id(program_id: str, document_name: str, chunk_index: int, text: str) -> str:
     """Aynı içerik -> aynı Qdrant nokta kimliği (uuid5, içerik adresli).
 
-    Modal'daki `rag_service._deterministic_point_id` ile aynı şema: aynı PDF'i
-    yeniden indekslemek parçaları ikizlemez, `upsert` üzerine yazar.
+    Aynı PDF'i yeniden indekslemek parçaları ikizlemez, `upsert` üzerine yazar.
     `chunk_index` anahtarın parçası çünkü HybridChunker tekrarlanan tablo
     başlıkları yüzünden aynı metinli iki parça üretebilir.
     """
@@ -354,7 +353,7 @@ def drop_weak_hits(hits: Sequence[Hit], floor_ratio: float) -> list[Hit]:
     """En iyi isabetin `floor_ratio` katının altında kalanları atar; en az bir isabet bırakır.
 
     Mutlak bir kosinüs eşiği yerine göreli eşik: bge-m3 skorları belgeye/sorguya
-    göre kayıyor (Modal ölçümlerinde aynı dizinde 0,60-0,94). Skora göre azalan
+    göre kayıyor (canlı ölçümlerde aynı dizinde 0,60-0,94). Skora göre azalan
     sıra beklenir (Qdrant öyle döndürür).
     """
 
@@ -643,17 +642,26 @@ def check_qdrant_ready(client: "QdrantClient", collection: str) -> tuple[bool, s
     return True, f"Qdrant hazır; '{collection}' koleksiyonu henüz yok (ilk indekslemede oluşturulur).", info
 
 
+# Filtrelenen payload alanları: `program_id`/`document_name`/`source_kind` genel,
+# `grade`/`theme_key`/`skill_key` müfredat belgelerine özgü (bkz. curriculum.py;
+# rag_service.py `retrieve()` bu anahtarlarla `must`/`must_not` kurar).
+PAYLOAD_INDEX_FIELDS = ("program_id", "document_name", "source_kind", "grade", "theme_key", "skill_key")
+
+
 def ensure_collection(client: "QdrantClient", collection: str, dimension: int) -> bool:
-    """Koleksiyon yoksa (dense, cosine) oluşturur ve filtre alanlarına indeks açar.
+    """Koleksiyon yoksa (dense, cosine) oluşturur; filtre alanlarına indeks açar.
 
     Varsa vektör boyutunu doğrular: farklı boyutlu bir gömme modeliyle var olan
     koleksiyona yazmak Qdrant'ta sessizce başarısız olmaz ama noktalar
     karışır - burada açık hata veriyoruz (çözüm: yeni `QDRANT_COLLECTION` adı).
-    Dönüş: yeni oluşturulduysa True.
+    Payload indeksleri her çağrıda yeniden istenir (idempotent) ki sonradan
+    eklenen alanlar eski koleksiyonlarda da indekslensin. Dönüş: yeni
+    oluşturulduysa True.
     """
 
     from qdrant_client.models import Distance, PayloadSchemaType, VectorParams  # noqa: PLC0415
 
+    created = False
     if client.collection_exists(collection):
         existing = client.get_collection(collection).config.params.vectors
         size = getattr(existing, "size", None)
@@ -662,15 +670,16 @@ def ensure_collection(client: "QdrantClient", collection: str, dimension: int) -
                 f"'{collection}' koleksiyonu {size} boyutlu vektörler için oluşturulmuş, gömme modeli "
                 f"{dimension} üretiyor. Yeni bir QDRANT_COLLECTION adı verin ya da eski koleksiyonu silin."
             )
-        return False
+    else:
+        client.create_collection(
+            collection_name=collection,
+            vectors_config=VectorParams(size=dimension, distance=Distance.COSINE),
+        )
+        logger.info("Koleksiyon oluşturuldu: %s (%d-d, cosine)", collection, dimension)
+        created = True
 
-    client.create_collection(
-        collection_name=collection,
-        vectors_config=VectorParams(size=dimension, distance=Distance.COSINE),
-    )
-    for field_name in ("program_id", "document_name", "source_kind"):
+    for field_name in PAYLOAD_INDEX_FIELDS:
         client.create_payload_index(
             collection_name=collection, field_name=field_name, field_schema=PayloadSchemaType.KEYWORD
         )
-    logger.info("Koleksiyon oluşturuldu: %s (%d-d, cosine)", collection, dimension)
-    return True
+    return created

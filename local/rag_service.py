@@ -17,14 +17,21 @@
 
 HTTP (FastAPI):   python local/rag_service.py            -> http://127.0.0.1:8001
     GET  /health                       - Qdrant/koleksiyon/model/LLM (llama-server erişilebilir mi) durumu
-    POST /retrieve  {question, top_k?, program_id?, document_name?, rerank?}
+    POST /retrieve  {question, top_k?, program_id?, document_name?, grade?, theme?, skill?, rerank?}
                                        - yalnız getirim (LLM sunucusu kapalıyken de çalışır)
     POST /query     {aynı alanlar}     - getirim + LLM yanıtı
+    POST /agents    {"agents": [...]}  - web backend'in ajan turu (aşağıda); {"warmup": true} ısıtma
 Terminal:         python local/rag_service.py --ask "Soru" [--program-id X] [--retrieve-only] [--no-rerank]
 
-Bu servis Modal'daki `rag_service.py`'nin `web_query` sözleşmesini TAŞIMAZ
-(agents/queries/warmup biçimleri, sınıf/tema/beceri filtreleri yok) - kullanıcı
-kararıyla spec'teki sade sözleşme uygulanır; backend'e bağlanmaz.
+`/agents`, `backend/app/agents/llm.py`'nin sözleşmesidir (varsayılan
+`MAHIR_RAG_REMOTE_URL=http://127.0.0.1:8001/agents`): her öğe `{name, system,
+user, maxTokens?, retrieval?: {programId, grade, theme, skill, query, topK}}`
+taşır; `retrieval` taşıyanlar için müfredat bağlamı Qdrant'tan (sınıf/tema
+`must`, yanlış beceri `must_not` - bkz. `curriculum.py`) getirilip user
+mesajının başına eklenir, isabetsiz öğe LLM'e hiç gitmez ve
+"Bu bilgi belgede bulunmuyor." alır. Yanıt zarfı `{"ok", "message",
+"structuredData": {"results": [{name, answer, sources}]}}`, giriş sırasıyla.
+Sözleşmenin davranış testleri: `tests/test_agents_contract.py`.
 
 NOT: Bu modülde `from __future__ import annotations` KASITLI olarak yok. FastAPI
 uç noktalarının imzaları (`request: Request`, `body: QueryRequest`) `create_app`
@@ -46,7 +53,8 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from rag_common import (  # noqa: E402 - sys.path yukarıda ayarlandı
+from curriculum import excluded_skill_keys, theme_match_key  # noqa: E402 - sys.path yukarıda ayarlandı
+from rag_common import (  # noqa: E402
     NO_ANSWER_TEXT,
     CpuEmbedder,
     CrossEncoderReranker,
@@ -77,9 +85,16 @@ MAX_QUESTION_CHARS = 2000
 FALLBACK_CONTEXT_CHARS = 16_000
 EXCERPT_CHARS = 300
 
-# Katı, bağlama demirli sistem promptu. Modal'daki teşhis promptundan farklı:
-# bu servis genel belge-temelli soru-yanıt verir, JSON değil düz Türkçe metin
-# üretir. NO_ANSWER_TEXT cümlesi backend'in tanıdığı cümleyle aynı.
+# `/agents` sınırları. `backend/app/agents/llm.py::MAX_PROMPTS_PER_REQUEST` ile
+# aynı (16); istemci de kontrol ediyor ki ağ turu boşa gitmesin. Çıktı tavanı
+# GPU'yu korur: çağıran daha büyük `maxTokens` isterse sessizce kırpılır.
+MAX_AGENT_PROMPTS = 16
+MAX_AGENT_PROMPT_CHARS = 8000
+MAX_AGENT_OUTPUT_TOKENS = 1024
+
+# Katı, bağlama demirli sistem promptu - `/query` için. `/agents` bu promptu
+# KULLANMAZ: orada system/user çağırandan (backend `agents/prompts.py`) gelir.
+# NO_ANSWER_TEXT cümlesi backend'in tanıdığı cümleyle aynı.
 SYSTEM_PROMPT = (
     "Sen MAHİR'in belge temelli soru-yanıt asistanısın. Görevin, sana BAĞLAM olarak verilen "
     "belge parçalarına dayanarak SORU'yu Türkçe yanıtlamaktır.\n\n"
@@ -178,6 +193,80 @@ def build_context(hits: Sequence[Hit], max_chars: int = FALLBACK_CONTEXT_CHARS) 
         blocks.append(block)
         total += len(block)
     return "\n\n".join(blocks), len(blocks)
+
+
+# --- `/agents` yardımcıları (saf; tests/test_agents_contract.py) ---------------------------
+
+
+def reject_agent_prompts(items: list[object]) -> str:
+    """Geçersizse Türkçe ret sebebi, geçerliyse boş string döndürür.
+
+    Doğrulama ile üretim ayrı: geçersiz istek çağıranın hatası (400), üretim
+    arızası servisin hatası. İkisini tek dönüş değerinden ayırt etmeye
+    çalışmak mesaj metnine bakmak demek olurdu.
+    """
+
+    if len(items) > MAX_AGENT_PROMPTS:
+        return f"Tek istekte en çok {MAX_AGENT_PROMPTS} ajan prompt'u gönderilebilir."
+    for index, item in enumerate(items, 1):
+        if not isinstance(item, dict):
+            return f"{index}. ajan prompt'u geçersiz."
+        system = str(item.get("system") or "").strip()
+        user = str(item.get("user") or "").strip()
+        if not system or not user:
+            return f"{index}. ajan prompt'unda system ve user alanları zorunludur."
+        if len(system) + len(user) > MAX_AGENT_PROMPT_CHARS:
+            return f"{index}. ajan prompt'u {MAX_AGENT_PROMPT_CHARS} karakter sınırını aşıyor."
+    return ""
+
+
+def build_agent_sources(hits: Sequence[Hit]) -> list[dict[str, Any]]:
+    """İsabetleri backend'in beklediği camelCase `sources` şemasına çevirir.
+
+    `backend/app/agents/pipeline.py::_merge_rag_sources` `documentName`/`pages`
+    okur; `score` reranker açıkken reranker skoru, değilse kosinüs benzerliği.
+    """
+
+    return [
+        {
+            "documentName": hit.payload.get("document_name"),
+            "grade": hit.payload.get("grade"),
+            "theme": hit.payload.get("theme"),
+            "pages": list(hit.payload.get("pages") or []),
+            "headings": list(hit.payload.get("headings") or []),
+            "excerpt": hit.text[:EXCERPT_CHARS],
+            "score": hit.final_score,
+        }
+        for hit in hits
+    ]
+
+
+def build_agent_context(hits: Sequence[Hit], max_chars: int) -> tuple[str, int]:
+    """Ajan bağlamı: parçalar `---` ile ayrılmış düz metin, numarasız.
+
+    Teşhis promptu (`backend/app/agents/prompts.py`) bağlamdaki müfredat
+    sözcüklerinin BİREBİR alıntılanmasını ister ve `pipeline.py` bunu doğrular;
+    `build_context`'in `[n] (Belge: ...)` başlıkları burada gürültü olurdu.
+    `max_chars` aşılırsa sondaki parçalar atılır; dönüş `(bağlam, kullanılan)`.
+    """
+
+    blocks: list[str] = []
+    total = 0
+    for index, hit in enumerate(hits, start=1):
+        block = hit.contextualized_text.strip()
+        if total + len(block) > max_chars and blocks:
+            logger.warning("Ajan bağlamı %d karakter bütçesini aştı; %d. parçadan itibaren kırpıldı.", max_chars, index)
+            break
+        blocks.append(block)
+        total += len(block)
+    return "\n\n---\n\n".join(blocks), len(blocks)
+
+
+def _int_or(value: object, default: int) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
 
 
 # --- Servis çekirdeği -------------------------------------------------------------------
@@ -320,10 +409,20 @@ class RAGService:
         program_id: str | None = None,
         document_name: str | None = None,
         rerank: bool | None = None,
+        grade: str | None = None,
+        theme: str | None = None,
+        skill: str | None = None,
     ) -> RetrievalResult:
-        """Gömme -> Qdrant aday havuzu -> (reranker | göreli eşik) -> ilk `top_k`."""
+        """Gömme -> Qdrant aday havuzu -> (reranker | göreli eşik) -> ilk `top_k`.
 
-        from qdrant_client.models import FieldCondition, Filter, MatchValue  # noqa: PLC0415
+        `grade`/`theme` `must` filtresidir (payload `grade`, `theme_key`);
+        `skill` ise `must_not`: yalnız YANLIŞ beceriye ait olduğu belgeden
+        okunan parçalar elenir, beceri başlığı taşımayan parçalar (tema
+        tanıtımı vb.) her beceri için geçerli kanıt olarak korunur
+        (bkz. `curriculum.excluded_skill_keys`).
+        """
+
+        from qdrant_client.models import FieldCondition, Filter, MatchAny, MatchValue  # noqa: PLC0415
 
         assert self._qdrant is not None, "start() çağrılmadı"
         question = question.strip()
@@ -348,7 +447,17 @@ class RAGService:
             conditions.append(FieldCondition(key="program_id", match=MatchValue(value=program_id)))
         if document_name:
             conditions.append(FieldCondition(key="document_name", match=MatchValue(value=document_name)))
-        query_filter = Filter(must=conditions) if conditions else None
+        if grade:
+            conditions.append(FieldCondition(key="grade", match=MatchValue(value=str(grade))))
+        if theme:
+            conditions.append(FieldCondition(key="theme_key", match=MatchValue(value=theme_match_key(str(theme)))))
+        exclusions = []
+        excluded = excluded_skill_keys(skill)
+        if excluded:
+            exclusions.append(FieldCondition(key="skill_key", match=MatchAny(any=sorted(excluded))))
+        query_filter = (
+            Filter(must=conditions or None, must_not=exclusions or None) if conditions or exclusions else None
+        )
 
         started = time.monotonic()
         try:
@@ -397,18 +506,8 @@ class RAGService:
         parçalar `sources`'tan da düşer.
         """
 
-        if self._llm is None:
-            raise LlmFailure("LLM istemcisi kurulmadı (start() çağrılmadı).", http_status=503)
         if not hits:
             return NO_ANSWER_TEXT, []
-
-        from openai import (  # noqa: PLC0415
-            APIConnectionError,
-            APIStatusError,
-            APITimeoutError,
-            AuthenticationError,
-            RateLimitError,
-        )
 
         context, used_count = build_context(hits, self._settings.context_char_budget())
         used_hits = list(hits[:used_count])
@@ -419,12 +518,32 @@ class RAGService:
                 "content": f"BAĞLAM:\n{context}\n\nSORU: {question}\n\nYalnızca yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla.",
             },
         ]
+        return self._chat(messages, self._settings.llm_max_tokens), used_hits
+
+    def _chat(self, messages: list[dict[str, str]], max_tokens: int) -> str:
+        """Tek sohbet tamamlama çağrısı; SDK hatalarını `LlmFailure`'a çevirir.
+
+        `answer()` ve `run_agent_prompts()` bu tek yolu paylaşır; testler
+        burayı yamalayarak LLM'siz koşar.
+        """
+
+        if self._llm is None:
+            raise LlmFailure("LLM istemcisi kurulmadı (start() çağrılmadı).", http_status=503)
+
+        from openai import (  # noqa: PLC0415
+            APIConnectionError,
+            APIStatusError,
+            APITimeoutError,
+            AuthenticationError,
+            RateLimitError,
+        )
+
         try:
             response = self._llm.chat.completions.create(
                 model=self._settings.model_name,
                 messages=messages,  # type: ignore[arg-type]
                 temperature=self._settings.llm_temperature,
-                max_tokens=self._settings.llm_max_tokens,
+                max_tokens=max_tokens,
             )
         except AuthenticationError as error:
             raise LlmFailure("LLM sunucusu anahtarı reddetti (401). local/.env'deki LLM_API_KEY'i kontrol edin.") from error
@@ -455,7 +574,7 @@ class RAGService:
         text = (response.choices[0].message.content or "").strip() if response.choices else ""
         if not text:
             raise LlmFailure("Model boş yanıt döndürdü.")
-        return text, used_hits
+        return text
 
     def query(
         self,
@@ -464,8 +583,11 @@ class RAGService:
         program_id: str | None = None,
         document_name: str | None = None,
         rerank: bool | None = None,
+        grade: str | None = None,
+        theme: str | None = None,
+        skill: str | None = None,
     ) -> QueryResult:
-        retrieval = self.retrieve(question, top_k, program_id, document_name, rerank)
+        retrieval = self.retrieve(question, top_k, program_id, document_name, rerank, grade, theme, skill)
         timings = dict(retrieval.timings_ms)
         if not retrieval.hits:
             return QueryResult(NO_ANSWER_TEXT, [], retrieval.reranked, None, llm_called=False, timings_ms=timings)
@@ -473,6 +595,93 @@ class RAGService:
         answer, used_hits = self.answer(question.strip(), retrieval.hits)
         timings["llm_ms"] = round((time.monotonic() - started) * 1000, 1)
         return QueryResult(answer, used_hits, retrieval.reranked, self._settings.model_name, llm_called=True, timings_ms=timings)
+
+    # --- ajan turu (`/agents`) ---
+
+    def warm_up(self) -> None:
+        """Modelleri belleğe alır (idempotent); web backend'in `/mahir-rag-warmup` pingi buraya düşer."""
+
+        self._embedder.load()
+        self._load_reranker()
+
+    def run_agent_prompts(
+        self, items: list[dict[str, Any]]
+    ) -> tuple[bool, str, list[dict[str, Any]] | None]:
+        """Bir analiz turunun TÜM ajan prompt'larını çalıştırır; sonuçlar giriş sırasıyla.
+
+        `retrieval` taşıyan öğeler için bağlam Qdrant'tan getirilip user
+        mesajının başına `BAĞLAM:` ile eklenir ve sonuca `sources` yazılır;
+        isabeti boş çıkan öğe LLM'e HİÇ gitmez, `NO_ANSWER_TEXT` alır.
+        `retrieval` taşımayanlar düz prompt olarak gider. Getirim arızası tüm
+        turu düşürür (hiçbir öğe üretilmez); üretim arızası da öyle - yarım
+        tur, yanlış ajana yanlış yanıt bağlanmasından daha kötü olurdu.
+
+        Üretim ardışıktır (llama-server `--parallel 1`): N prompt ≈ N × tek
+        prompt süresi. Dönüş `(ok, mesaj, sonuçlar | None)`.
+        """
+
+        contexts: dict[int, str] = {}
+        sources: dict[int, list[dict[str, Any]]] = {}
+        for index, item in enumerate(items):
+            spec = item.get("retrieval")
+            if not isinstance(spec, dict):
+                continue
+            query_text = str(spec.get("query") or item.get("user") or "").strip()[:MAX_QUESTION_CHARS]
+            top_k = min(max(_int_or(spec.get("topK"), self._settings.default_top_k), 1), self._settings.max_top_k)
+            try:
+                retrieval = self.retrieve(
+                    query_text,
+                    top_k=top_k,
+                    program_id=str(spec.get("programId") or "") or None,
+                    grade=str(spec.get("grade") or "") or None,
+                    theme=str(spec.get("theme") or "") or None,
+                    skill=str(spec.get("skill") or "") or None,
+                )
+            except (RetrievalError, ValueError) as error:
+                return False, str(error), None
+            if not retrieval.hits:
+                logger.info("Ajan %r: getirim boş (program=%s sınıf=%s tema=%s).", item.get("name"), spec.get("programId"), spec.get("grade"), spec.get("theme"))
+                continue
+            budget = max(
+                self._settings.context_char_budget() - len(str(item.get("system") or "")) - len(str(item.get("user") or "")),
+                1000,
+            )
+            context, used_count = build_agent_context(retrieval.hits, budget)
+            contexts[index] = context
+            sources[index] = build_agent_sources(retrieval.hits[:used_count])
+            logger.info(
+                "Ajan %r: %d/%d parça bağlama girdi (%s).", item.get("name"), used_count, len(retrieval.hits),
+                ", ".join(f"{key}={value}" for key, value in retrieval.timings_ms.items()),
+            )
+
+        answers: dict[int, str] = {}
+        for index, item in enumerate(items):
+            if isinstance(item.get("retrieval"), dict) and index not in contexts:
+                continue  # isabetsiz: üretecek bağlamı yok, "belgede bulunmuyor" doğru yanıt
+            user = str(item.get("user") or "")
+            messages = [
+                {"role": "system", "content": str(item.get("system") or "")},
+                {"role": "user", "content": f"BAĞLAM:\n{contexts[index]}\n\n{user}" if index in contexts else user},
+            ]
+            requested = _int_or(item.get("maxTokens"), MAX_AGENT_OUTPUT_TOKENS)
+            if requested <= 0:
+                requested = MAX_AGENT_OUTPUT_TOKENS
+            max_tokens = min(MAX_AGENT_OUTPUT_TOKENS, requested, self._settings.llm_max_tokens)
+            started = time.monotonic()
+            try:
+                answers[index] = self._chat(messages, max_tokens).strip()
+            except Exception as error:  # noqa: BLE001 - LlmFailure dâhil; bir tur düşer, servis düşmez
+                return False, f"Ajan yanıtları üretilemedi: {error}", None
+            logger.info("Ajan %r: LLM %.0f ms, %d karakter.", item.get("name"), (time.monotonic() - started) * 1000, len(answers[index]))
+
+        return True, "Ajan yanıtları üretildi.", [
+            {
+                "name": str(item.get("name") or ""),
+                "answer": answers.get(index, NO_ANSWER_TEXT),
+                "sources": sources.get(index, []),
+            }
+            for index, item in enumerate(items)
+        ]
 
 
 # --- FastAPI ------------------------------------------------------------------------------
@@ -482,6 +691,7 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
     """Uygulamayı kurar; `settings` verilmezse `local/.env`'den okunur (uvicorn factory uyumlu)."""
 
     from fastapi import FastAPI, Request  # noqa: PLC0415
+    from fastapi.concurrency import run_in_threadpool  # noqa: PLC0415
     from fastapi.responses import JSONResponse  # noqa: PLC0415
     from pydantic import BaseModel, Field  # noqa: PLC0415
 
@@ -492,6 +702,9 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
         top_k: int | None = Field(default=None, ge=1, le=resolved.max_top_k)
         program_id: str | None = Field(default=None, max_length=200)
         document_name: str | None = Field(default=None, max_length=500)
+        grade: str | None = Field(default=None, max_length=20, description="payload `grade` (ör. \"9\")")
+        theme: str | None = Field(default=None, max_length=200, description="tema adı; `theme_key` ile eşlenir")
+        skill: str | None = Field(default=None, max_length=50, description="Dinleme/İzleme|Konuşma|Okuma|Yazma")
         rerank: bool | None = Field(default=None, description="None -> RERANKER_ENABLED ayarı")
 
     @asynccontextmanager
@@ -527,7 +740,9 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
     @app.post("/retrieve")
     def retrieve(body: QueryRequest, request: Request) -> dict[str, Any]:
         service: RAGService = request.app.state.rag
-        result = service.retrieve(body.question, body.top_k, body.program_id, body.document_name, body.rerank)
+        result = service.retrieve(
+            body.question, body.top_k, body.program_id, body.document_name, body.rerank, body.grade, body.theme, body.skill
+        )
         return {
             "ok": True,
             "message": "İsabetler getirildi." if result.hits else NO_ANSWER_TEXT,
@@ -540,7 +755,9 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
     @app.post("/query")
     def query(body: QueryRequest, request: Request) -> dict[str, Any]:
         service: RAGService = request.app.state.rag
-        result = service.query(body.question, body.top_k, body.program_id, body.document_name, body.rerank)
+        result = service.query(
+            body.question, body.top_k, body.program_id, body.document_name, body.rerank, body.grade, body.theme, body.skill
+        )
         return {
             "ok": True,
             "message": "Yanıt üretildi." if result.found else NO_ANSWER_TEXT,
@@ -552,7 +769,50 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
             "timings_ms": result.timings_ms,
         }
 
+    # Web backend'in ajan turu. Async: gövde okunur, ağır iş thread-pool'a
+    # verilir ki uzun bir tur diğer istekleri (/health) kilitlemesin. Zarf
+    # mantığı `handle_agents_request`'te (FastAPI'siz test edilir).
+    @app.post("/agents")
+    async def agents(request: Request) -> JSONResponse:
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 - okunamayan gövde 500'e değil 400'e düşmeli
+            body = None
+        status, payload = await run_in_threadpool(handle_agents_request, request.app.state.rag, body)
+        return JSONResponse(payload, status_code=status)
+
     return app
+
+
+def handle_agents_request(service: RAGService, body: object) -> tuple[int, dict[str, Any]]:
+    """`POST /agents` gövdesini HTTP zarfına çevirir: `(durum_kodu, JSON)`.
+
+    Gövde Pydantic'le değil elle doğrulanır: sözleşme `backend/app/agents/llm.py`'ye
+    ait ve oradaki `_WIRE_KEYS` dışı alanlar burada sessizce yok sayılmalı
+    (422 değil). Geçersiz istek 400 (çağıranın hatası), getirim/üretim arızası
+    500 (servisin hatası); `ok` alanı her iki durumda da gövdede.
+    """
+
+    if not isinstance(body, dict):
+        return 400, {"ok": False, "message": "İstek gövdesi okunamadı."}
+
+    if body.get("warmup"):
+        service.warm_up()
+        return 200, {"ok": True, "message": "RAG hattı hazır.", "structuredData": {"ready": True}}
+
+    raw_agents = body.get("agents")
+    if not isinstance(raw_agents, list) or not raw_agents:
+        return 400, {"ok": False, "message": "İstek gövdesi 'agents' listesi taşımalı."}
+    rejection = reject_agent_prompts(raw_agents)
+    if rejection:
+        return 400, {"ok": False, "message": rejection}
+
+    ok, message, results = service.run_agent_prompts(raw_agents)
+    return (200 if ok else 500), {
+        "ok": ok,
+        "message": message,
+        "structuredData": {"results": results} if ok else None,
+    }
 
 
 # --- CLI ----------------------------------------------------------------------------------------

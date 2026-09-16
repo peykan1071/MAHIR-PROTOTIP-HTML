@@ -38,18 +38,17 @@ from .prompts import DIAGNOSIS_SYSTEM_PROMPT, STRENGTH_SYSTEM_PROMPT, build_anom
 # gürültüden başka bir şey olmaz.
 _NO_ANOMALY_TEXT = "Belirgin bir tutarsızlık görülmedi"
 
-# Getirimde MODELE gönderilecek NİHAİ parça sayısı - bu, `rag_service.py`nin
-# Qdrant'tan çektiği HAM aday sayısı DEĞİL (bkz. orada `_MMR_CANDIDATE_
-# MULTIPLIER`/`_MMR_MIN_CANDIDATE_POOL`, o çok daha geniş bir havuz çekip
-# `_mmr_select` ile bu sayıya iner). 2026-08-22 önce 8 -> 16 -> 12 arası
-# gidip geldi (bkz. git geçmişi): aynı kazanımın birbirine çok benzeyen
-# "kazanım tanımlama" satırları düz "en yüksek skorlu top_k" seçiminde tek
-# başına tüm slotları doldurup temanın asıl zengin içeriğini dışarıda
-# bırakıyordu, ama `top_k`yi büyütmek BAŞKA bir sorguda kalabalık/tekrarlı
-# bağlamın modelin dikkatini dağıtmasına yol açtı (ölçüldü: 5/5 -> 0/5).
-# Kök sorun bir SAYI ayarıyla çözülemeyen yapısal bir tekrar sorunuydu; asıl
-# çözüm `rag_service.py`ye eklenen MMR (Maximal Marginal Relevance)
-# yeniden-sıralaması - o artık alaka VE çeşitliliği birlikte gözetiyor, bu
+# Getirimde MODELE gönderilecek NİHAİ parça sayısı - bu, `local/rag_service.py`nin
+# Qdrant'tan çektiği HAM aday sayısı DEĞİL (bkz. orada `candidate_pool_size`,
+# çok daha geniş bir havuz çekip reranker ile bu sayıya iner). 2026-08-22
+# önce 8 -> 16 -> 12 arası gidip geldi (bkz. git geçmişi): aynı kazanımın
+# birbirine çok benzeyen "kazanım tanımlama" satırları düz "en yüksek skorlu
+# top_k" seçiminde tek başına tüm slotları doldurup temanın asıl zengin
+# içeriğini dışarıda bırakıyordu, ama `top_k`yi büyütmek BAŞKA bir sorguda
+# kalabalık/tekrarlı bağlamın modelin dikkatini dağıtmasına yol açtı (ölçüldü:
+# 5/5 -> 0/5). Kök sorun bir SAYI ayarıyla çözülemeyen yapısal bir tekrar
+# sorunuydu; çözüm sunucu tarafındaki yeniden sıralama (önce MMR, yerel hatta
+# cross-encoder reranker) - o alaka VE çeşitliliği birlikte gözetiyor, bu
 # yüzden nihai sayı tekrar makul/küçük bir değere (8) çekilebildi.
 _DIAGNOSIS_TOP_K = 8
 
@@ -863,8 +862,8 @@ def _merge_rag_sources(sources: Any) -> list[dict[str, Any]]:
     öğretmenin ihtiyacı "hangi belgenin hangi sayfası", kaç parça çekildiği
     değil.
 
-    Sayfa numaraları ORİJİNAL PDF'e göre (bkz. rag_service.py
-    `_extract_original_pages`): müfredat PDF'i sınıf/tema aralıklarına
+    Sayfa numaraları ORİJİNAL PDF'e göre (bkz. local/ingestion_pipeline.py
+    `CurriculumSection.page_offset`): müfredat PDF'i sınıf/tema aralıklarına
     bölünerek indeksleniyor ve o düzeltme yapılmasa numaralar her dilimde
     1'den başlardı.
     """

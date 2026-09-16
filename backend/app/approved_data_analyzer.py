@@ -20,10 +20,12 @@ from .assessment_profiles import (
 # ölçme toplamları `measurement_engine`e, program eşleştirme ise
 # `agents/pipeline.py::ProgramMappingAgent`a taşındı.
 
-_DEFAULT_MAHIR_RAG_REMOTE_URL = "https://hakanergul--turkish-rag-system-raginference-web-query.modal.run"
-# Varsayılan, deploy edilmiş RAG servisinin adresi olarak koda gömülü - terminalde
-# her seferinde MAHIR_RAG_REMOTE_URL ayarlamaya gerek yok. Farklı bir deploy'a
-# (ör. test ortamı) işaret etmek gerekirse env var yine de bunu geçersiz kılar.
+# Yerel RAG servisinin (`local/rag_service.py`, `/agents` ucu) adresi. "REMOTE":
+# servis bu sürecin dışında, HTTP üzerinden - aynı makinede olsa da. Varsayılan
+# koda gömülü ki terminalde her seferinde ayarlamaya gerek olmasın; başka bir
+# porta/makineye işaret etmek gerekirse env var geçersiz kılar, boş string
+# LLM turunu bilinçli olarak kapatır (analiz kurallı ajanlarla devam eder).
+_DEFAULT_MAHIR_RAG_REMOTE_URL = "http://127.0.0.1:8001/agents"
 MAHIR_RAG_REMOTE_URL = os.environ.get("MAHIR_RAG_REMOTE_URL", _DEFAULT_MAHIR_RAG_REMOTE_URL)
 _RAG_WEAK_THRESHOLD = 0.70  # assets/js/mahir-report-export-common.js:buildDevelopmentNeedsBlock ile aynı eşik
 _RAG_NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
@@ -321,7 +323,7 @@ def _decision(rate: float) -> str:
 
 
 # Standart Unicode .upper() Türkçe 'i'/'ı' ayrımını kaybediyor (ikisi de düz
-# "I"ya dönüşüyor) - rag_service.py'nin PDF'ten çıkardığı tema etiketleri
+# "I"ya dönüşüyor) - indekslemenin PDF'ten çıkardığı tema etiketleri
 # (ör. "SÖZÜN İNCELİĞİ") zaten belgedeki doğru büyük/küçük harfle saklanıyor,
 # bu yüzden yalnızca burada, sınavın karışık-case "outcomeTheme" alanını o
 # etikete eşleştirmek için Türkçe-doğru büyütme uygulanıyor.
@@ -329,10 +331,10 @@ _TURKISH_UPPER_MAP = str.maketrans({"i": "İ", "ı": "I"})
 
 
 def _normalize_theme_for_rag(raw_theme: str) -> str:
-    """`"1. Tema: Sözün İnceliği"` -> `"SÖZÜN İNCELİĞİ"` - rag_service.py'nin
-    `index_pdf`'in PDF'ten çıkardığı ham tema etiketiyle (bkz. `_run_query`'nin
-    `theme` filtresi) eşleşmesi için "N. Tema:" önekini atıp Türkçe-doğru
-    büyük harfe çevirir."""
+    """`"1. Tema: Sözün İnceliği"` -> `"SÖZÜN İNCELİĞİ"` - `local/ingestion_pipeline.py`'nin
+    PDF'ten çıkardığı ham tema etiketiyle (servis tarafında `curriculum.theme_match_key`
+    ile boşluksuz anahtara çevrilir) eşleşmesi için "N. Tema:" önekini atıp
+    Türkçe-doğru büyük harfe çevirir."""
 
     without_prefix = re.sub(r"^\s*\d+\.\s*Tema\s*:\s*", "", raw_theme, flags=re.IGNORECASE).strip()
     return without_prefix.translate(_TURKISH_UPPER_MAP).upper()
@@ -373,7 +375,7 @@ def _outcome_identity_parts(outcome: dict[str, Any]) -> list[str]:
 # adı geçiyor, buna karşılık temanın adı 0/8 yanıtta geçiyor ve yalnız 2/8
 # yanıt müfredattan somut bir öğe anıyordu. Model, ona zaten söylediğimiz şeyi
 # tekrarlamaya harcanıyordu. Teşhisin yeni ekseni müfredata demirleme
-# (bkz. rag_service.py::SYSTEM_PROMPT madde 2).
+# (bkz. agents/prompts.py::DIAGNOSIS_SYSTEM_PROMPT madde 2).
 
 
 def _build_rag_retrieval_query(outcome: dict[str, Any]) -> str:

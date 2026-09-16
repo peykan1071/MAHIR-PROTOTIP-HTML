@@ -1,10 +1,10 @@
 """Read a single-student exam score table from a photographed image via PaddleOCR-VL.
 
-This module only runs on the remote OCR worker (see `ocr_worker.py`, meant to
-be started on a machine with a real GPU - see `modal_app.py`). The local
-MAHIR file receiver never imports this module; it forwards image uploads
-over HTTP instead (see `remote_ocr_client.py`), so a teacher's machine
-never needs PaddleOCR installed.
+This module only runs inside the OCR worker process (see `ocr_worker.py`,
+started by `backend/run_ocr_worker.py` on the local GPU). The MAHIR file
+receiver never imports this module; it forwards image uploads over HTTP
+instead (see `remote_ocr_client.py`), so the web server process never loads
+paddle/torch.
 
 Each uploaded image is expected to show one handwritten score table per the
 MAHIR paper template: a student-number column, one column per question, and

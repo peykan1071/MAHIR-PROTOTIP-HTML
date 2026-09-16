@@ -9,7 +9,6 @@ büyür ve kimse fark etmez.
 import unittest
 from unittest.mock import patch
 
-import rag_service
 from backend.app.agents import prompts
 from backend.app.agents.pipeline import _sanitize_anomaly_finding
 from backend.app.approved_data_analyzer import (
@@ -371,14 +370,6 @@ class AnomalyAgentTests(unittest.TestCase):
 
     def test_short_exams_never_queue_an_anomaly_prompt(self):
         self.assertIsNone(prompts.build_anomaly_prompt([{"number": 1}, {"number": 2}]))
-
-
-class PromptDriftTests(unittest.TestCase):
-    def test_diagnosis_prompt_matches_the_server_copy(self):
-        # Teşhis prompt'u iki yerde: istemcide (birleşik `agents` biçimi system
-        # prompt'u çağırandan alıyor) ve sunucuda (eski `queries` biçimi için).
-        # Ayrışırlarsa iki yol sessizce farklı teşhisler üretmeye başlar.
-        self.assertEqual(prompts.DIAGNOSIS_SYSTEM_PROMPT, rag_service.SYSTEM_PROMPT)
 
 
 class DiagnosisPromptContractTests(unittest.TestCase):

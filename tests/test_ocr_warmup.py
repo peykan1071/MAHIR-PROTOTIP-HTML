@@ -1,8 +1,8 @@
 """Tests for the OCR warm-up path added to cut the measured cold-start wait.
 
-A cold Modal container spends 30-50 s booting and loading PaddleOCR-VL onto the
-GPU against only 7-12 s of actual OCR, so the browser pings the local receiver
-the moment files are picked and the receiver forwards that to the remote worker.
+The OCR worker spends 30-50 s loading PaddleOCR-VL onto the GPU against only
+7-12 s of actual OCR, so the browser pings the local receiver the moment files
+are picked and the receiver forwards that to the worker process.
 The one property that must never regress: that ping is fire-and-forget - if it
 ever blocked, it would add the whole cold start to the teacher's file-selection
 click instead of removing it from the upload.

@@ -820,8 +820,7 @@ class RagBatchingTests(unittest.TestCase):
         with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts",
                       side_effect=_llm_reply(*[(r["answer"], r["sources"]) for r in canned[2]])) as mock_batch:
-                with patch("backend.app.rag_client.query_rag_context") as mock_single:
-                    result = analyze_approved_data(_two_weak_outcomes_payload())
+                result = analyze_approved_data(_two_weak_outcomes_payload())
 
         mock_batch.assert_called_once()
         self.assertEqual(len(_diagnosis_prompts(mock_batch)), 2)
@@ -1033,7 +1032,7 @@ class NormalizeThemeForRagTests(unittest.TestCase):
 
     def test_turkish_dotted_and_dotless_i_both_uppercase_correctly(self):
         # Standart Unicode .upper() Türkçe 'i'/'ı' ayrımını kaybediyor (ikisi de
-        # düz "I"ya dönüşür) - rag_service.py'nin PDF'ten çıkardığı tema
+        # düz "I"ya dönüşür) - indekslemenin (local/ingestion_pipeline.py) PDF'ten çıkardığı tema
         # etiketleriyle eşleşmesi için 'i' -> 'İ', 'ı' -> 'I' olmalı.
         self.assertEqual(_normalize_theme_for_rag("Dilin Zenginliği"), "DİLİN ZENGİNLİĞİ")
         self.assertEqual(_normalize_theme_for_rag("Anlamın Yapı Taşları"), "ANLAMIN YAPI TAŞLARI")

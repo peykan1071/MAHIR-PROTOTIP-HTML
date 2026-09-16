@@ -13,7 +13,6 @@ backend/logs/
 .env.*
 # Şablon dosyası anahtar taşımaz; `.env.*` deseninin istisnası (local/.env.example).
 !.env.example
-secrets.local.txt
 
 # Yerel LLM çalışma dosyaları (local/llm_server.ps1): llama.cpp binary'leri ve
 # GGUF model dosyaları - GB boyutunda, depoya girmemeli.

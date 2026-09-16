@@ -3,7 +3,7 @@
 Neden var: iki uzun işlem (OCR ve analiz) sessizdi - öğretmen butona basıyor,
 bir süre bekliyor, sonucu görüyordu; ne kadar beklediği hiçbir yere
 yazılmıyordu. Ölçüm KIRILIMLI olmalı, çünkü tek bir toplam sayı asıl soruyu
-yanıtlamıyor: canlı ölçümde aynı iş soğuk konteynerde 160 sn, sıcakta 15,7 sn
+yanıtlamıyor: canlı ölçümde aynı iş modeller soğukken 160 sn, sıcakken 15,7 sn
 sürdü. "Neden 45 sn sürdü"nün cevabı neredeyse her zaman hangi katmanda
 geçtiğidir.
 

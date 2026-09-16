@@ -3,9 +3,11 @@
 eder.
 
 Üretim kodunu KOPYALAMAZ, doğrudan çağırır - `agents/pipeline.py`'nin gerçekte
-kurduğu prompt'u, gerçek Modal uç noktasına gönderir ve öğretmenin göreceği
-metni üreten aynı doğrulama fonksiyonlarından geçirir. Böylece bu script'in
-sonucu her zaman canlı davranışla birebir aynı kalır.
+kurduğu prompt'u, çalışan yerel RAG servisine (`MAHIR_RAG_REMOTE_URL`, varsayılan
+`http://127.0.0.1:8001/agents`) gönderir ve öğretmenin göreceği metni üreten
+aynı doğrulama fonksiyonlarından geçirir. Böylece bu script'in sonucu her
+zaman canlı davranışla birebir aynı kalır. Önce Qdrant, llama-server ve
+`python local/rag_service.py` açık olmalı (bkz. README "Yerel çalıştırma").
 
 Kullanım (backend/ dizininden) - yalnız kazanım kodu ve başarı yüzdesi:
     python run_diagnosis_test.py --outcome-code TDE1.2 --rate 35

@@ -1,9 +1,10 @@
-"""Forward an image group to a remote MAHIR OCR worker instead of running
-PaddleOCR-VL locally.
+"""Forward an image group to the MAHIR OCR worker process instead of loading
+PaddleOCR-VL into the web backend.
 
-The remote side is expected to be `ocr_worker.py` (see `modal_app.py` for
-how it's deployed). It speaks the same `/mahir-upload` request/response
-shape as the local file receiver.
+The other side is `ocr_worker.py` started by `backend/run_ocr_worker.py`
+(default `http://127.0.0.1:8002`, configured through
+`file_receiver.MAHIR_OCR_REMOTE_URL`). It speaks the same `/mahir-upload`
+request/response shape as the local file receiver.
 """
 
 from __future__ import annotations
@@ -23,14 +24,10 @@ from .timing import stage
 _REMOTE_TIMEOUT_SECONDS = 300
 # Canlıda ölçüldü: WinError 10053 tek bir anlık blip değil, aynı yükleme
 # içinde birden fazla denemeyi arka arkaya vurabilen tekrarlayan bir yerel
-# ağ/rota kesintisi olabiliyor (bkz. `_post_to_worker_with_retry`). Artan
-# beklemeyle 2 yeniden deneme (toplam 3 deneme, ~7 sn ek bekleme) bu tür
-# kesintilere tek seferlik bir denemeden daha dayanıklı.
+# ağ/rota kesintisi olabiliyor (bkz. `_post_to_worker_with_retry`). Yerel
+# işçide de aynı yeniden deneme işe yarar: işçi modeli yüklerken bağlantı
+# reddedilebilir. Artan beklemeyle 2 yeniden deneme (toplam 3 deneme, ~7 sn).
 _CONNECTION_RETRY_DELAYS_SECONDS = (2, 5)
-# `ocr_worker.WARMUP_PATH` ile aynı olmalı - burada elle tekrarlanıyor çünkü bu
-# modül öğretmenin makinesinde çalışıyor ve PaddleOCR bağımlısı `ocr_worker`i
-# import edemez (modül docstring'i).
-WARMUP_PATH = "/mahir-warmup"
 
 
 def _post_to_worker(request: urllib.request.Request) -> dict[str, object]:
@@ -75,10 +72,10 @@ def run_remote_image_group_ocr(
         headers=headers,
     )
 
-    # Uzak çağrının kendi süresi ayrı ölçülüyor: yerel toplamla arasındaki fark
-    # yerel ayrıştırma, buradaki büyük süre ise uzak konteynerin soğuk
-    # başlangıcı (ölçülen 30-50 sn, gerçek OCR yalnız 7-12 sn). Süreyi dönüş
-    # tipine eklemek yerine burada basmak kasıtlı: 3'lü demet
+    # İşçi çağrısının kendi süresi ayrı ölçülüyor: yerel toplamla arasındaki
+    # fark yerel ayrıştırma, buradaki büyük süre ise işçinin model yüklemesi
+    # (ilk istekte) + gerçek OCR. Süreyi dönüş tipine eklemek yerine burada
+    # basmak kasıtlı: 3'lü demet
     # `run_image_group_ocr` -> `run_existing_backend_flow` -> `do_POST` boyunca
     # akıyor ve testler ona bağlı; her katmanın kendi satırını basması
     # `ocr_engine`in bugün yaptığının aynısı.
@@ -104,12 +101,11 @@ def run_remote_image_group_ocr(
 
 
 def warm_up_remote_ocr(remote_url: str) -> bool:
-    """Ask the remote worker to load its models now, before any real upload.
+    """Ask the OCR worker to load its models now, before any real upload.
 
-    A cold Modal container spends 30-50 s booting and loading PaddleOCR-VL onto
-    the GPU, against only 7-12 s of actual OCR (measured, see `modal app logs
-    mahir-ocr-worker`). Calling this the moment the teacher picks files moves
-    that preparation off the wait that follows "Verileri Oku ve Kontrol Et".
+    Loading PaddleOCR-VL onto the GPU takes tens of seconds against only
+    7-12 s of actual OCR. Calling this the moment the teacher picks files
+    moves that preparation off the wait that follows "Verileri Oku ve Kontrol Et".
 
     Never raises: a warm-up is best-effort by definition, and a failed one must
     stay invisible - the upload that follows works exactly as before, just

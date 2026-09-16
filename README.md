@@ -2,10 +2,10 @@
 
 [![MAHİR Otomatik Testleri](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![LLM: vLLM ve Qwen2.5-7B](https://img.shields.io/badge/LLM-vLLM%20%7C%20Qwen2.5--7B-2E8B57)](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct)
+[![LLM: llama.cpp ve Qwen2.5-7B](https://img.shields.io/badge/LLM-llama.cpp%20%7C%20Qwen2.5--7B%20Q4__K__M-2E8B57)](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF)
 [![OCR: PaddleOCR-VL](https://img.shields.io/badge/OCR-PaddleOCR--VL-E67E22)](https://github.com/PaddlePaddle/PaddleOCR)
-[![Vektör veritabanı: Qdrant Hybrid](https://img.shields.io/badge/Vector_DB-Qdrant%20Hybrid-DC244C?logo=qdrant&logoColor=white)](https://qdrant.tech/documentation/concepts/hybrid-queries/)
-[![Bulut: Modal](https://img.shields.io/badge/Cloud-Modal%20Scale--to--Zero-6F42C1)](https://modal.com/)
+[![Vektör veritabanı: Qdrant](https://img.shields.io/badge/Vector_DB-Qdrant-DC244C?logo=qdrant&logoColor=white)](https://qdrant.tech/)
+[![Çalışma: tamamen yerel](https://img.shields.io/badge/%C3%87al%C4%B1%C5%9Fma-tamamen%20yerel%20%7C%20RTX%204050-6F42C1)](#yerel-çalıştırma)
 
 **MAHİR, öğretmen denetimini merkezde tutan Türkçe çok ajanlı bir karar destek sistemidir. Eğitim-öğretim yılı boyunca eğitim kurumlarında işlenen resmî evrakı sınıflandırıp doğrular. İçerdiği verileri öğrenme kanıtlarıyla ilişkilendirerek analiz eder; raporlara ve kurum içi resmî yazışma taslaklarına dönüştürür. Çalışan prototip, bu geniş vizyonu 9. sınıf Türk Dili ve Edebiyatı sınav evrakı üzerinden gösterir.**
 
@@ -51,7 +51,7 @@ Kaynaklar: [Millî Eğitim Bakanlığı, 2024–2025 Örgün Eğitim İstatistik
 10. [Uçtan uca MAHİR akışı](#uctan-uca-mahir-akisi)
 11. [Çok ajanlı mimari](#çok-ajanlı-mimari)
 12. [Projeyi inceleme rehberi](#projeyi-inceleme-rehberi)
-13. [OCR ve RAG demo erişimi](#ocr-ve-rag-demo-erişimi)
+13. [Yerel çalıştırma: OCR, RAG ve LLM](#yerel-çalıştırma)
 14. [9. sınıf Türk Dili ve Edebiyatı pilotu](#9-sınıf-türk-dili-ve-edebiyatı-pilotu)
 15. [Doğruluk ve halüsinasyon kontrolü](#doğruluk-ve-halüsinasyon-kontrolü)
 16. [Veri güvenliği ve etik sınırlar](#veri-güvenliği-ve-etik-sınırlar)
@@ -149,7 +149,7 @@ MAHİR'i öğretmenlerin sınıf içi deneyimleri, ihtiyaçları ve geri bildiri
 
 GitHub Actions, `main` dalına gönderilen her değişiklikte ve her çekme isteğinde Python ve JavaScript testlerini yeniden çalıştırır. README'nin üst bölümündeki rozet, son çalıştırmanın güncel durumunu gösterir; rozete tıklayan okuyucu çalıştırma tarihini, test günlüklerini ve test sayılarını doğrudan GitHub üzerinden inceleyebilir.
 
-Python testleri, JavaScript test dosyaları ve ana tarayıcı betiğinin sözdizimi kontrolü GitHub Actions üzerinde birlikte çalıştırılır. Test paketi geliştikçe test sayısı değiştiği için güncel sayı ve sonuçlar README'nin üstündeki canlı rozet üzerinden açılan [GitHub Actions kayıtlarında](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml) izlenir. Bu kayıtlar kodla tanımlanan davranışların doğrulanma durumunu gösterir; gerçek kullanıcı etkisi veya her belge türünde kusursuzluk iddiası değildir. Uzak OCR ve RAG servis senaryoları test hattında güvenli taklitlerle sınanır; gerçek uç noktalara istek atılmaz.
+Python testleri, JavaScript test dosyaları ve ana tarayıcı betiğinin sözdizimi kontrolü GitHub Actions üzerinde birlikte çalıştırılır. Test paketi geliştikçe test sayısı değiştiği için güncel sayı ve sonuçlar README'nin üstündeki canlı rozet üzerinden açılan [GitHub Actions kayıtlarında](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml) izlenir. Bu kayıtlar kodla tanımlanan davranışların doğrulanma durumunu gösterir; gerçek kullanıcı etkisi veya her belge türünde kusursuzluk iddiası değildir. OCR ve RAG servis senaryoları test hattında güvenli taklitlerle sınanır; testler çalışan bir servise ya da internete istek atmaz.
 
 ### Anonim gerçek evrak kabul testleri
 
@@ -345,7 +345,7 @@ Kaynaklar:
 
 | Beklenen yetenek | MAHİR'de nasıl karşılanır? |
 |---|---|
-| Evrakı OCR veya doğrudan metin olarak okuyabilme | DOCX, PDF, XLSX, CSV ve görsel dosyalar kabul edilir. Görseller uzak OCR servisiyle okunur. |
+| Evrakı OCR veya doğrudan metin olarak okuyabilme | DOCX, PDF, XLSX, CSV ve görsel dosyalar kabul edilir. Görseller yerel OCR işçisiyle (PaddleOCR-VL) okunur. |
 | Evrak türünü belirleme | Dosya türü ile raporun bağlı olduğu sınav bağlamı ayrı ayrı belirlenir. Sınav bileşeni öğretmenin Hazırlık ekranındaki seçimiyle belirlenir; OCR dosya adından veya işaret kutusundan tahmin yürütmez. |
 | Önemli bilgi unsurlarını çıkarma | Okul, öğretmen, ders, etiketli sınıf/şube hücresi, dönem, sınav tarihi, soru puanları, öğrenci puanları ve öğrenme çıktısı eşleştirmeleri yapılandırılır. |
 | Eksik bilgileri tespit etme | Zorunlu alan, puan sınırı, toplam puan, soru sayısı, ders-sınıf-program eşleşmesi ve okunamayan hücre denetimleri öğretmen onayından önce çalışır. |
@@ -559,20 +559,36 @@ Windows'ta `python` komutu tanınmıyorsa aşağıdaki komutu kullanınız:
 py backend/run_file_receiver.py
 ```
 
-## OCR ve RAG demo erişimi
+## Yerel çalıştırma
 
-Depo tek başına indirildiğinde arayüz, belge doğrulama ve yerel analiz akışı çalıştırılabilir. Uzak **OCR ve RAG** servisleri için ayrı bir kurulum gerekmez: her iki uç noktanın Modal adresi `backend/app/` içinde varsayılan olarak tanımlıdır ve uç noktalar herkese açıktır (kimlik doğrulaması yoktur).
-
-Farklı bir dağıtıma yönelmek isterseniz şu ortam değişkenleri kullanılabilir:
+MAHİR tamamen yerel çalışır: hiçbir bulut servisi, API anahtarı ya da (modeller bir kez indikten sonra) internet bağlantısı gerekmez. Arayüz ve belge doğrulama akışı için yalnız `MAHIR_BASLAT.cmd` yeterlidir; **görsel OCR** ve **program kaynaklı RAG/LLM yorumlama** için aşağıdaki yerel servisler ayrıca başlatılır. Hedef donanım: 6 GB VRAM'li bir dizüstü (RTX 4050) - kurulum ve ayarlar [`local/requirements.txt`](local/requirements.txt) ile [`local/.env.example`](local/.env.example) içinde açıklanmıştır.
 
 ```text
-MAHIR_OCR_REMOTE_URL=<modal deploy modal_app.py çıktısındaki URL>
-MAHIR_RAG_REMOTE_URL=<modal deploy rag_service.py çıktısındaki URL>
+Tarayıcı -> :8000 web backend (MAHIR_BASLAT.cmd, yalnız standart kütüphane)
+              |-- MAHIR_RAG_REMOTE_URL = http://127.0.0.1:8001/agents -> :8001 local/rag_service.py -> :8080 llama-server (Qwen2.5-7B Q4_K_M, GPU)
+              |                                                                                      `-> :6333 Qdrant (Docker)
+              `-- MAHIR_OCR_REMOTE_URL = http://127.0.0.1:8002        -> :8002 backend/run_ocr_worker.py (PaddleOCR-VL, GPU)
 ```
 
-Uzak GPU servisleri kullanılmadığında sıfıra ölçeklenir; bu nedenle ilk OCR veya RAG isteği normalden daha uzun sürebilir.
+Başlatma sırası (her satır ayrı bir terminal penceresi; `local/.env` bir kez `local/.env.example`'dan kopyalanır):
 
-> **Not:** Uç noktalarda kimlik doğrulaması bulunmadığından, yanlış kullanıma karşı tek yapısal koruma sunucu tarafındaki istem sayısı/uzunluğu sınırlarıdır (`rag_service.py` içindeki `MAX_AGENT_*`). Üretim ortamına geçişte kurumsal kimlik doğrulama ve yetkilendirme ayrıca eklenmelidir.
+```powershell
+docker compose -f local/docker-compose.yml up -d                  # 1) Qdrant
+powershell -ExecutionPolicy Bypass -File local/llm_server.ps1     # 2) llama-server (ilk seferde ~4,7 GB GGUF iner)
+python local/rag_service.py                                       # 3) RAG servisi (/agents, /query, /health)
+python backend/run_ocr_worker.py                                  # 4) OCR işçisi (isteğe bağlı; yalnız görsel yüklemeler için)
+.\MAHIR_BASLAT.cmd                                                # 5) web arayüzü
+```
+
+Referans belge bir kez indekslenir (kayıtlı program için belge adı otomatik çözülür):
+
+```powershell
+python local/ingestion_pipeline.py --pdf <MEB TDE 9 öğretim programı PDF'i> --program-id tde-9-tymm --replace
+```
+
+Web backend servis adreslerini koda gömülü varsayılanlardan alır; farklı bir port kullanılacaksa `MAHIR_RAG_REMOTE_URL` / `MAHIR_OCR_REMOTE_URL` ortam değişkenleri geçersiz kılar, boş string ilgili özelliği bilinçli olarak kapatır (analiz kurallı ajanlarla, görseller OCR'sız öğretmen kontrolüyle devam eder).
+
+> **Süre ve bellek notları.** llama-server bir analiz turunun teşhis istemlerini ardışık çözer: sekiz zayıf öğrenme çıktısı için yaklaşık 1,5 dakika (`RERANKER_ENABLED=false`) ile 4 dakika (reranker CPU'da açık). llama-server (~4,6 GB) ile PaddleOCR-VL (~2-3 GB) 6 GB VRAM'e aynı anda sığmaz; OCR işçisi GPU'da çalışacaksa `LLM_GPU_LAYERS` düşürülmeli ya da görsel yükleme aşamasında llama-server kapalı tutulmalıdır. Uzun teşhis istemleri 8k pencereyi zorlarsa `LLM_CONTEXT_WINDOW=12288` (yaklaşık +120 MB KV önbelleği) denenebilir. Servislerde kimlik doğrulaması yoktur ve hepsi yalnız `127.0.0.1`'e bağlanır; yanlış kullanıma karşı yapısal koruma `local/rag_service.py` içindeki istem sayısı/uzunluğu sınırlarıdır (`MAX_AGENT_*`).
 
 ## 9. sınıf Türk Dili ve Edebiyatı pilotu
 
@@ -615,11 +631,11 @@ Türk Dili ve Edebiyatı (TDE) kodları yalnızca **Türk Dili ve Edebiyatı + 9
 | Tek sayfalık öğretmen akışı | Çalışıyor |
 | 9. sınıf Türk Dili ve Edebiyatı program kataloğu ve ayrıntılı süreç bileşenleri | Çalışıyor |
 | DOCX, PDF, XLSX ve CSV belge okuma | Çalışıyor |
-| Çoklu görsel OCR ve etiketli sınıf/şube gruplama | Çalışıyor - uzak GPU servisiyle |
+| Çoklu görsel OCR ve etiketli sınıf/şube gruplama | Çalışıyor - yerel OCR işçisiyle (bkz. [Yerel çalıştırma](#yerel-çalıştırma)) |
 | Öğretmen veri doğrulaması | Çalışıyor |
 | Aynı yapıdaki çoklu şubelerde ortak öğrenme çıktısı | Çalışıyor; seçim bir kez yapılır ve eşleşen şubelere uygulanır |
 | Kurallı sınav ve öğrenme çıktısı analizi | Çalışıyor |
-| Program kaynaklı RAG yorumlama | Çalışıyor - uzak GPU servisiyle |
+| Program kaynaklı RAG yorumlama | Çalışıyor - yerel RAG servisi ve llama-server ile (bkz. [Yerel çalıştırma](#yerel-çalıştırma)) |
 | Yazılı, dinleme/izleme ve konuşma için Word/PDF raporu | Çalışıyor |
 | Türk Dili ve Edebiyatı genel değerlendirme raporu | Çalışıyor; sabit %70 yazılı + %15 dinleme/izleme + %15 konuşma |
 | Ortak kurumsal rapor bilgilerinin yeniden kullanımı | Çalışıyor; sınava özgü alanlar ayrı korunur |
@@ -660,6 +676,8 @@ MAHIR-PROTOTIP-HTML/
 |-- backend/app/agents/       # Öğretmen onayı sonrası beş analiz ajanı ve orkestratör
 |-- backend/app/ocr_quality_agent.py # Yükleme aşamasındaki OCR kalite ajanı
 |-- backend/app/general_report_merger.py # Üç Türk Dili ve Edebiyatı bileşen raporunu birleştirme
+|-- backend/run_ocr_worker.py # Yerel OCR işçisi (PaddleOCR-VL, :8002)
+|-- local/                    # Yerel RAG yığını: indeksleme, RAG servisi (/agents), llama-server, Qdrant
 |-- shared/pilot/tde9/        # 9. sınıf Türk Dili ve Edebiyatı pilot program verileri
 |-- shared/templates/         # Veri giriş ve rapor şablonları
 |-- tests/                    # Python ve JavaScript kontrolleri
