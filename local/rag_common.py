@@ -8,9 +8,9 @@ sentence-transformers ve qdrant-client yalnızca ilgili metot çağrılınca imp
 edilir (bkz. `backend/app/ocr_engine.py`'deki ertelenmiş import düzeni) -
 `Settings.from_env()` hiçbir ML kütüphanesi kurulu olmadan da çalışır.
 
-Donanım varsayımı: 6 GB VRAM'li tek GPU. Gömme modeli bu yüzden KASITLI olarak
+Donanım varsayımı: 4-6 GB VRAM'li tek GPU. Gömme modeli bu yüzden KASITLI olarak
 CPU'da (`CpuEmbedder`); GPU, indeksleme sırasında PaddleOCR-VL'ye, sorgu
-sırasında yerel LLM'e (llama-server, Qwen2.5-7B Q4_K_M ~5,2 GB) kalır -
+sırasında yerel LLM'e (llama-server, Qwen3-4B-Instruct-2507 Q4_K_M ~3,1 GB) kalır -
 reranker da bu yüzden varsayılan olarak CPU'da (`RERANKER_DEVICE=cpu`).
 """
 
@@ -249,7 +249,7 @@ class Settings:
         return cls(
             llm_base_url=llm_base_url,
             llm_api_key=_env_str("LLM_API_KEY", ""),
-            model_name=_env_str("MODEL_NAME", "qwen2.5-7b-instruct-q4_k_m"),
+            model_name=_env_str("MODEL_NAME", "qwen3-4b-instruct-2507-q4_k_m"),
             llm_context_window=llm_context_window,
             llm_temperature=_env_float("LLM_TEMPERATURE", 0.1, minimum=0.0, maximum=2.0),
             llm_max_tokens=llm_max_tokens,
@@ -465,8 +465,9 @@ class CpuEmbedder:
 class CrossEncoderReranker:
     """`BAAI/bge-reranker-v2-m3` ile (soru, parça) çiftlerini yeniden puanlar.
 
-    Varsayılan cihaz CPU: 6 GB VRAM sorgu anında yerel LLM'e (llama-server,
-    Q4_K_M ~5,2 GB) ayrılmıştır, fp16 reranker (~1,2-1,5 GB) yanına sığmaz.
+    Varsayılan cihaz CPU: VRAM sorgu anında yerel LLM'e (llama-server, Qwen3-4B
+    Q4_K_M ~3,1 GB) ve OCR işçisine (~2-3 GB) ayrılmıştır, fp16 reranker
+    (~1,2-1,5 GB) 4 GB karta sığmaz, 6 GB'de payı daraltır.
     `device="cuda"`/`"auto"` ancak LLM kısmi offload ile (`LLM_GPU_LAYERS`
     düşürülerek) yer açıldığında anlamlı; GPU'da OOM olursa model CPU'ya
     taşınıp aynı parti yeniden denenir - sorgu düşmez, yalnız yavaşlar.

@@ -85,12 +85,12 @@
     <text x="846" y="126" text-anchor="middle" font-size="17" font-weight="700" fill="#db2777">5</text>
     <text x="870" y="126" font-size="14" font-weight="700" fill="#ffffff">Modeller iner</text>
     <text x="832" y="176" font-size="13" fill="#334155">İlk açılışta otomatik:</text>
-    <text x="832" y="198" font-size="13" fill="#334155">Qwen 4,4 · bge-m3 4,3</text>
+    <text x="832" y="198" font-size="13" fill="#334155">Qwen3-4B 2,4 · bge-m3 4,3</text>
     <text x="832" y="220" font-size="13" fill="#334155">reranker 2,1 · OCR 1,9</text>
     <text x="832" y="242" font-size="13" fill="#334155">Docling 0,5 (GB)</text>
     <line x1="832" y1="262" x2="984" y2="262" stroke="#e2e8f0"/>
     <text x="832" y="286" font-size="13" font-weight="700" fill="#db2777">Süre: 30-60 dk</text>
-    <text x="832" y="308" font-size="13" font-weight="700" fill="#db2777">Disk: 13,2 GB</text>
+    <text x="832" y="308" font-size="13" font-weight="700" fill="#db2777">Disk: 11,2 GB</text>
   </g>
   <polygon points="1004,200 1018,210 1004,220" fill="#94a3b8"/>
 
@@ -112,5 +112,5 @@
   </g>
 
   <rect x="10" y="350" width="1190" height="50" rx="12" fill="#f1f5f9" stroke="#cbd5e1"/>
-  <text x="605" y="381" text-anchor="middle" font-size="15" font-weight="600" fill="#0f172a">Toplam: 1-2 saat   ·   ≈ 20 GB indirme (yalnız ilk kurulum)   ·   ≈ 25 GB kalıcı disk   ·   sonrasında tamamen çevrim dışı çalışır</text>
+  <text x="605" y="381" text-anchor="middle" font-size="15" font-weight="600" fill="#0f172a">Toplam: 1-2 saat   ·   ≈ 18 GB indirme (yalnız ilk kurulum)   ·   ≈ 23 GB kalıcı disk   ·   sonrasında tamamen çevrim dışı çalışır</text>
 </svg>

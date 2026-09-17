@@ -3,24 +3,24 @@
   <rect width="1200" height="340" rx="18" fill="#ffffff"/>
   <text x="20" y="36" font-size="22" font-weight="700" fill="#0f172a">Disk bütçesi - kurulum bitince ne kadar yer kaplar?</text>
 
-  <text x="20" y="72" font-size="14" font-weight="700" fill="#0f172a">Kalıcı (kurulum sonrası): ≈ 25 GB</text>
-  <!-- 1160 px = 25,3 GB -> 45,85 px/GB -->
+  <text x="20" y="72" font-size="14" font-weight="700" fill="#0f172a">Kalıcı (kurulum sonrası): ≈ 23 GB</text>
+  <!-- 1160 px = 23,3 GB -> 49,8 px/GB -->
   <g>
-    <rect x="20" y="82" width="481" height="44" fill="#2563eb"/>
-    <text x="260" y="110" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">Python paketleri 10,5 GB</text>
-    <rect x="501" y="82" width="202" height="44" fill="#db2777"/>
-    <text x="602" y="110" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">Qwen LLM 4,4</text>
-    <rect x="703" y="82" width="197" height="44" fill="#7c3aed"/>
-    <text x="801" y="110" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">bge-m3 4,3</text>
-    <rect x="900" y="82" width="96" height="44" fill="#0891b2"/>
-    <text x="948" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">2,1</text>
-    <rect x="996" y="82" width="87" height="44" fill="#d97706"/>
-    <text x="1039" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">1,9</text>
-    <rect x="1083" y="82" width="50" height="44" fill="#16a34a"/>
-    <text x="1108" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">1,1</text>
-    <rect x="1133" y="82" width="23" height="44" fill="#64748b"/>
-    <rect x="1156" y="82" width="14" height="44" fill="#0f766e"/>
-    <rect x="1170" y="82" width="10" height="44" fill="#a16207"/>
+    <rect x="20" y="82" width="523" height="44" fill="#2563eb"/>
+    <text x="281" y="110" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">Python paketleri 10,5 GB</text>
+    <rect x="543" y="82" width="119" height="44" fill="#db2777"/>
+    <text x="602" y="110" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">Qwen 2,4</text>
+    <rect x="662" y="82" width="214" height="44" fill="#7c3aed"/>
+    <text x="769" y="110" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">bge-m3 4,3</text>
+    <rect x="876" y="82" width="105" height="44" fill="#0891b2"/>
+    <text x="928" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">2,1</text>
+    <rect x="981" y="82" width="95" height="44" fill="#d97706"/>
+    <text x="1028" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">1,9</text>
+    <rect x="1076" y="82" width="55" height="44" fill="#16a34a"/>
+    <text x="1103" y="110" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">1,1</text>
+    <rect x="1131" y="82" width="25" height="44" fill="#64748b"/>
+    <rect x="1156" y="82" width="15" height="44" fill="#0f766e"/>
+    <rect x="1171" y="82" width="9" height="44" fill="#a16207"/>
     <rect x="20" y="82" width="1160" height="44" fill="none" stroke="#0f172a" stroke-width="1"/>
   </g>
 
@@ -36,7 +36,7 @@
   <!-- lejant -->
   <g font-size="13" fill="#334155">
     <rect x="20" y="222" width="13" height="13" fill="#2563eb"/><text x="40" y="233">Python paketleri (.venv) - 10,5 GB</text>
-    <rect x="410" y="222" width="13" height="13" fill="#db2777"/><text x="430" y="233">Qwen2.5-7B-Instruct GGUF - 4,4 GB</text>
+    <rect x="410" y="222" width="13" height="13" fill="#db2777"/><text x="430" y="233">Qwen3-4B-Instruct-2507 GGUF - 2,4 GB</text>
     <rect x="800" y="222" width="13" height="13" fill="#7c3aed"/><text x="820" y="233">bge-m3 gömme modeli - 4,3 GB</text>
     <rect x="20" y="248" width="13" height="13" fill="#0891b2"/><text x="40" y="259">bge-reranker-v2-m3 - 2,1 GB</text>
     <rect x="410" y="248" width="13" height="13" fill="#d97706"/><text x="430" y="259">PaddleOCR-VL-1.6 + PP-DocLayoutV3 - 1,9 GB</text>

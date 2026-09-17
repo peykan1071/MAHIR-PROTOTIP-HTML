@@ -1,4 +1,4 @@
-"""MAHİR yerel RAG sorgu servisi: bge-m3 (CPU) -> Qdrant -> bge-reranker-v2-m3 (CPU) -> yerel Qwen2.5-7B (llama-server, GPU).
+"""MAHİR yerel RAG sorgu servisi: bge-m3 (CPU) -> Qdrant -> bge-reranker-v2-m3 (CPU) -> yerel Qwen3-4B (llama-server, GPU).
 
 `ingestion_pipeline.py`'nin yazdığı koleksiyon üzerinde çalışır. Akış:
 
@@ -9,7 +9,7 @@
    yeniden puanlar ve ilk `top_k` seçilir; kapalıysa dense sıraya göreli
    skor eşiği (`RAG_RELATIVE_SCORE_FLOOR`) uygulanır.
 4. Bağlam, KATI bir sistem promptuyla (yalnız bağlamdan, Türkçe, yoksa
-   "Bu bilgi belgede bulunmuyor.") yerel llama-server'a (Qwen2.5-7B-Instruct
+   "Bu bilgi belgede bulunmuyor.") yerel llama-server'a (Qwen3-4B-Instruct-2507
    Q4_K_M, OpenAI uyumlu `/v1/chat/completions`, bkz. `llm_server.ps1`)
    gönderilir. Hiç isabet yoksa LLM ÇAĞRILMAZ. Her şey yerel: dışarıya hiçbir
    istek çıkmaz. `LLM_BASE_URL`/`LLM_API_KEY` ile başka bir OpenAI uyumlu uç

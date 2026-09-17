@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  MAHİR yerel LLM sunucusu: llama.cpp llama-server ile Qwen2.5-7B-Instruct GGUF Q4_K_M.
+  MAHİR yerel LLM sunucusu: llama.cpp llama-server ile Qwen3-4B-Instruct-2507 GGUF Q4_K_M.
 
 .DESCRIPTION
   local/.env'deki LLAMA_SERVER_EXE, LLM_HF_REPO / LLM_GGUF_PATH, LLM_GPU_LAYERS,
@@ -10,10 +10,11 @@
   OpenAI uyumlu /chat/completions ve /models sunar - rag_service.py'nin
   LLM_BASE_URL'i buraya bakar.
 
-  6 GB VRAM varsayımı: tüm katmanlar GPU'da (-ngl 99), KV önbelleği q8_0 + flash
-  attention, tek yuva (--parallel 1) ki 8k pencere bölünmesin, küçük tamponlar
-  (-b 512 -ub 256). Başlangıçta "CUDA out of memory" görürseniz LLM_GPU_LAYERS'ı
-  düşürün (24 ≈ 600 MB tasarruf).
+  Varsayılan model 4 GB VRAM'e tek başına sığar (ölçüldü: 3,1 GB ayrılmış bellek;
+  36 katman GPU'da, KV 8k q8_0 ≈ 0,6 GB). Tüm katmanlar GPU'da (-ngl 99), KV
+  önbelleği q8_0 + flash attention, tek yuva (--parallel 1) ki 8k pencere
+  bölünmesin, küçük tamponlar (-b 512 -ub 256). Başlangıçta "CUDA out of memory"
+  görürseniz LLM_GPU_LAYERS'ı düşürün (katman başına ≈ 85 MB ağırlık + KV).
 
 .PARAMETER DryRun
   Komutu çalıştırmadan yalnız yazdırır.
@@ -72,14 +73,14 @@ llama-server.exe bulunamadı: $Exe
 
 # --- Model kaynağı ---
 $GgufPath = Get-Setting "LLM_GGUF_PATH" ""
-$HfRepo = Get-Setting "LLM_HF_REPO" "bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M"
+$HfRepo = Get-Setting "LLM_HF_REPO" "unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M"
 if ($GgufPath -ne "") {
     if (-not [System.IO.Path]::IsPathRooted($GgufPath)) { $GgufPath = Join-Path (Split-Path -Parent $LocalDir) $GgufPath }
     if (-not (Test-Path $GgufPath)) { Write-Error "LLM_GGUF_PATH bulunamadı: $GgufPath"; exit 1 }
     $ModelArgs = @("-m", $GgufPath)
     $ModelLabel = $GgufPath
 } else {
-    # `-hf depo:kuant`: llama.cpp dosyayı HF'den indirip önbelleğe alır (tek seferlik ~4,7 GB).
+    # `-hf depo:kuant`: llama.cpp dosyayı HF'den indirip önbelleğe alır (tek seferlik ~2,5 GB).
     $ModelArgs = @("-hf", $HfRepo)
     $ModelLabel = "hf:$HfRepo"
 }
@@ -89,7 +90,7 @@ $Port = Get-Setting "LLM_PORT" "8080"
 $Ctx = Get-Setting "LLM_CONTEXT_WINDOW" "8192"
 $GpuLayers = Get-Setting "LLM_GPU_LAYERS" "99"
 $KvType = Get-Setting "LLM_KV_CACHE_TYPE" "q8_0"
-$Alias = Get-Setting "MODEL_NAME" "qwen2.5-7b-instruct-q4_k_m"
+$Alias = Get-Setting "MODEL_NAME" "qwen3-4b-instruct-2507-q4_k_m"
 $Threads = Get-Setting "LLM_THREADS" "0"
 if ([int]$Threads -le 0) {
     $physical = (Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfCores -Sum).Sum

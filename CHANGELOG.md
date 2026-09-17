@@ -2,6 +2,14 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Varsayılan LLM: Qwen3-4B-Instruct-2507 - 2026-09-17
+
+- **Karar:** 4 GB VRAM'li kartlarda çalışabilmek için varsayılan yerel LLM `Qwen2.5-7B-Instruct Q4_K_M` → **`Qwen3-4B-Instruct-2507 Q4_K_M`** (`unsloth/Qwen3-4B-Instruct-2507-GGUF`, Apache-2.0, "düşünme" bloğu olmayan Instruct sürümü). Kod mantığı, istemler, sözleşmeler ve testler değişmedi; yalnız varsayılan model adı/deposu ve belgeler.
+- **Ölçüm (RTX 4050 6 GB, aynı 8 kazanımlık teşhis turu):** VRAM 4,57 → **3,13 GB** ayrılmış; üretim 35,6 → **49,5 tok/s**, prompt 1,6k → 2,1k tok/s; teşhis turu 8/8 doğrulanmış, red yok (iki koşu; 7B 8/8 ve 7/8); LLM çağrısı başına 1,8-4,6 s; tur süresi ısınmış süreçte 91 s (7B 122 s; süre CPU reranker'ın 7-9 s/ajan maliyetiyle belirleniyor, servis yeni açıldığında ilk tur 18-26 s/ajan). Teşhis metinleri süreç bileşenlerini adıyla anıyor, `<think>` artığı yok.
+- **4 GB emülasyonu (2 GiB VRAM balastı):** LLM tek başına sığar. OCR işçisi (PaddleOCR-VL boşta 2,0 GB, çıkarımda 2,95 GB) ile aynı anda sığmaz ama Windows sürücüsü boşta kalan sürecin VRAM'ini RAM'e taşıyor: OOM yok, ilk istekte ~2 s geri yükleme (OCR 2 görsel 13-15 s, LLM üretim 50 tok/s, teşhis turu 106 s 8/8). 7B ile kısmi offload seçeneği de ölçüldü ve elendi: ngl=20 → 3,3 GB ama 14,8 tok/s / 162 s, ngl=16 → 2,8 GB / 11,5 tok/s / 171 s.
+- **Değişen dosyalar:** `local/llm_server.ps1` (`LLM_HF_REPO`/`MODEL_NAME` varsayılanları, açıklama), `local/rag_common.py` (`MODEL_NAME` varsayılanı, docstring'ler), `local/rag_service.py` ve `local/requirements.txt` (docstring/başlık), `local/.env.example` (LLM bloğu: neden 4B, 7B'ye dönüş satırları, GGUF önbelleği artık HF hub dizininde, `LLM_GPU_LAYERS` ve reranker notları ölçüme göre), README (rozet, kurulum rehberi 4 GB satırı ve boyutlar 13,2 → 11,2 GB / ≈ 25 → ≈ 23 GB / ~20 → ~18 GB indirme, model tablosu, "Yerel çalıştırma" şeması ve bellek notu), `assets/readme/19-*.svg`, `20-*.svg`.
+- **7B'ye dönüş:** `local/.env`'de `LLM_HF_REPO=bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M` ve `MODEL_NAME=qwen2.5-7b-instruct-q4_k_m` (6 GB VRAM ister).
+
 ## Sıfırdan Kurulum Rehberi (README) - 2026-09-17
 
 - **Yeni README bölümü "Sıfırdan kurulum (ilk kez kuranlar için)"** (İçindekiler 13; sonrakiler kaydı): iki seviye tablosu (yalnız arayüz / tam yapay zekâ), minimum sistem gereksinimleri, kurulacak programlar, 9 adımlı kurulum (her adımda süre + GB + "Kontrol" satırı), sonraki açılışlar için renkli Mermaid akışı, isteğe bağlı çevrim dışı kilidi ve "Sorun mu var?" tablosu. Hiç bilmeyen okuyucu hedeflendi; komutlar mevcut çalışan komutların aynısı.

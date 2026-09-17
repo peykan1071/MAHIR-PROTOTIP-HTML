@@ -2,7 +2,7 @@
 
 [![MAHİR Otomatik Testleri](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/peykan1071/MAHIR-PROTOTIP-HTML/actions/workflows/tests.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![LLM: llama.cpp ve Qwen2.5-7B](https://img.shields.io/badge/LLM-llama.cpp%20%7C%20Qwen2.5--7B%20Q4__K__M-2E8B57)](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF)
+[![LLM: llama.cpp ve Qwen3-4B-Instruct-2507](https://img.shields.io/badge/LLM-llama.cpp%20%7C%20Qwen3--4B--Instruct--2507%20Q4__K__M-2E8B57)](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507)
 [![OCR: PaddleOCR-VL](https://img.shields.io/badge/OCR-PaddleOCR--VL-E67E22)](https://github.com/PaddlePaddle/PaddleOCR)
 [![Vektör veritabanı: Qdrant](https://img.shields.io/badge/Vector_DB-Qdrant-DC244C?logo=qdrant&logoColor=white)](https://qdrant.tech/)
 [![Çalışma: tamamen yerel](https://img.shields.io/badge/%C3%87al%C4%B1%C5%9Fma-tamamen%20yerel%20%7C%20RTX%204050-6F42C1)](#yerel-çalıştırma)
@@ -569,7 +569,7 @@ Bu bölüm, MAHİR'i bilgisayarına ilk kez kuracak ve daha önce böyle bir kur
 | | Seviye | Neler çalışır? | Süre | Disk | Gerekenler |
 |:-:|---|---|---|---|---|
 | 🟢 | **1 - Sadece arayüz** | Evrak yükleme (CSV, Excel, metin PDF), doğrulama, kurallı analiz, rapor taslağı - yapay zekâ olmadan | 5 dk | 0,1 GB | Yalnız Python 3.10+ |
-| 🔵 | **2 - Tam yapay zekâ** | Seviye 1 + fotoğraf ve el yazısı OCR, program (müfredat) kaynaklı RAG, yerel LLM yorumu | 1-2 saat | ≈ 25 GB | NVIDIA ekran kartı, Docker Desktop, ~20 GB indirme |
+| 🔵 | **2 - Tam yapay zekâ** | Seviye 1 + fotoğraf ve el yazısı OCR, program (müfredat) kaynaklı RAG, yerel LLM yorumu | 1-2 saat | ≈ 23 GB | NVIDIA ekran kartı, Docker Desktop, ~18 GB indirme |
 
 Seviye 1 için [Windows'ta çalıştırma](#windowsta-çalıştırma) başlığındaki beş adım yeterlidir. Aşağıdaki rehber **Seviye 2** içindir; her adımın yanında ne kadar süreceği ve kaç GB yer kaplayacağı yazar.
 
@@ -580,13 +580,13 @@ Seviye 1 için [Windows'ta çalıştırma](#windowsta-çalıştırma) başlığ�
 | | Bileşen | En az | Test edilen makine |
 |:-:|---|---|---|
 | 🖥️ | İşletim sistemi | Windows 11, 64-bit | Windows 11 Pro |
-| 🎮 | Ekran kartı | NVIDIA, **6 GB VRAM** (LLM ~4,8 GB + OCR ~1 GB aynı anda) | GeForce RTX 4050 Laptop, 6 GB |
+| 🎮 | Ekran kartı | NVIDIA, **4 GB VRAM** (LLM 3,1 GB; OCR işçisi 2-3 GB ile sırayla) - 6 GB rahat | GeForce RTX 4050 Laptop 6 GB (4 GB, 2 GB balastla emüle edilerek ölçüldü) |
 | 🧠 | Bellek (RAM) | 16 GB | 16 GB |
 | ⚙️ | İşlemci | 8 çekirdek (gömme ve yeniden sıralama işlemcide çalışır) | Core 7 250H, 14 çekirdek |
-| 💾 | Boş disk | **35 GB** (kurulum bitince ≈ 25 GB kalır); SSD önerilir | SSD |
-| 🌐 | İnternet | Yalnız ilk kurulumda (~20 GB indirme); sonra gerekmez | - |
+| 💾 | Boş disk | **35 GB** (kurulum bitince ≈ 23 GB kalır); SSD önerilir | SSD |
+| 🌐 | İnternet | Yalnız ilk kurulumda (~18 GB indirme); sonra gerekmez | - |
 
-Daha küçük bir ekran kartında (4 GB) LLM tamamen sığmaz; `local\.env` içinde `LLM_GPU_LAYERS` düşürülerek bir kısmı işlemciye verilebilir ama yanıt süresi birkaç kat uzar. Ekran kartı hiç yoksa Seviye 1 kullanılır.
+4 GB kartta LLM (Qwen3-4B-Instruct-2507, 3,1 GB) tek başına sığar; OCR işçisiyle aynı kartta çalışırken Windows, o an boşta olan servisin belleğini sistem RAM'ine taşır ve ilk istekte ~2 saniyelik geri yükleme bedeli öder - hata vermez (ölçüldü). Daha küçük kartta `local\.env` içinde `LLM_GPU_LAYERS` düşürülerek katmanların bir kısmı işlemciye verilebilir ama yanıt süresi birkaç kat uzar. Ekran kartı hiç yoksa Seviye 1 kullanılır.
 
 Kurulacak programlar (hepsi ücretsizdir):
 
@@ -646,11 +646,11 @@ docker compose -f local/docker-compose.yml up -d
 
 *Kontrol:* `docker compose -f local/docker-compose.yml ps` → STATUS sütununda `healthy`.
 
-**7. Modellerin inmesini bekleyiniz** (30-60 dk, 13,2 GB). Modeller ayrı bir yerden indirilmez: her servis **ilk açılışında** kendi modelini otomatik indirir ve kullanıcı klasörünüze (`.cache\huggingface`, `.paddlex`) kaydeder. Aşağıdaki üç komutu **ayrı birer PowerShell penceresinde** (her birinde önce `.\.venv\Scripts\Activate.ps1`) sırayla çalıştırınız; her pencerede "hazır" satırını görünce bir sonrakine geçiniz. Pencereleri kapatmayınız, MAHİR bunları kullanır.
+**7. Modellerin inmesini bekleyiniz** (30-60 dk, 11,2 GB). Modeller ayrı bir yerden indirilmez: her servis **ilk açılışında** kendi modelini otomatik indirir ve kullanıcı klasörünüze (`.cache\huggingface`, `.paddlex`) kaydeder. Aşağıdaki üç komutu **ayrı birer PowerShell penceresinde** (her birinde önce `.\.venv\Scripts\Activate.ps1`) sırayla çalıştırınız; her pencerede "hazır" satırını görünce bir sonrakine geçiniz. Pencereleri kapatmayınız, MAHİR bunları kullanır.
 
 | Pencere | Komut | İndirdiği model | Boyut | Hazır olduğunda görünen satır |
 |:-:|---|---|---|---|
-| A | `powershell -ExecutionPolicy Bypass -File local/llm_server.ps1` | Qwen2.5-7B-Instruct (Q4_K_M) | 4,4 GB | `server is listening on http://127.0.0.1:8080` |
+| A | `powershell -ExecutionPolicy Bypass -File local/llm_server.ps1` | Qwen3-4B-Instruct-2507 (Q4_K_M) | 2,4 GB | `server is listening on http://127.0.0.1:8080` |
 | B | `python local/rag_service.py` | bge-m3 + bge-reranker-v2-m3 | 6,4 GB | `Uvicorn running on http://127.0.0.1:8001` |
 | C | `python backend/run_ocr_worker.py` | PaddleOCR-VL-1.6 + PP-DocLayoutV3 | 1,9 GB | `Pipeline hazır.` |
 
@@ -690,7 +690,7 @@ flowchart LR
     class W,T web
 ```
 
-Modeller her açılışta yeniden yüklenir: LLM sunucusu yaklaşık 20 saniye, RAG servisi yaklaşık 1 dakika, OCR işçisi 1-2 dakika. Yalnız CSV/Excel yükleyecekseniz OCR işçisi (Pencere C) açılmayabilir; görsel yüklerseniz "OCR işçisine ulaşılamadı" uyarısı çıkar, başka bir şey olmaz.
+Modeller her açılışta yeniden yüklenir: LLM sunucusu 10-20 saniye, RAG servisi yaklaşık 1 dakika, OCR işçisi 1-2 dakika. Yalnız CSV/Excel yükleyecekseniz OCR işçisi (Pencere C) açılmayabilir; görsel yüklerseniz "OCR işçisine ulaşılamadı" uyarısı çıkar, başka bir şey olmaz.
 
 > **İsteğe bağlı çevrim dışı kilidi.** Modeller indikten sonra `local\.env` içindeki `# HF_HUB_OFFLINE=1` satırının başındaki `#` işaretini silerseniz RAG servisi ve indeksleme Hugging Face'e hiç istek atmaz; internetsiz ortamda açılış bekleme süresi de kısalır.
 
@@ -709,11 +709,11 @@ Modeller her açılışta yeniden yüklenir: LLM sunucusu yaklaşık 20 saniye, 
 
 ## Yerel çalıştırma
 
-MAHİR tamamen yerel çalışır: hiçbir bulut servisi, API anahtarı ya da (modeller bir kez indikten sonra) internet bağlantısı gerekmez. Arayüz ve belge doğrulama akışı için yalnız `MAHIR_BASLAT.cmd` yeterlidir; **görsel OCR** ve **program kaynaklı RAG/LLM yorumlama** için aşağıdaki yerel servisler ayrıca başlatılır. Hedef donanım: 6 GB VRAM'li bir dizüstü (RTX 4050) - ilk kurulum adım adım [Sıfırdan kurulum](#sıfırdan-kurulum-ilk-kez-kuranlar-için) bölümünde, ayar ayrıntıları [`local/requirements.txt`](local/requirements.txt) ile [`local/.env.example`](local/.env.example) içinde açıklanmıştır.
+MAHİR tamamen yerel çalışır: hiçbir bulut servisi, API anahtarı ya da (modeller bir kez indikten sonra) internet bağlantısı gerekmez. Arayüz ve belge doğrulama akışı için yalnız `MAHIR_BASLAT.cmd` yeterlidir; **görsel OCR** ve **program kaynaklı RAG/LLM yorumlama** için aşağıdaki yerel servisler ayrıca başlatılır. Hedef donanım: 4-6 GB VRAM'li bir dizüstü (RTX 4050 6 GB'de ölçüldü) - ilk kurulum adım adım [Sıfırdan kurulum](#sıfırdan-kurulum-ilk-kez-kuranlar-için) bölümünde, ayar ayrıntıları [`local/requirements.txt`](local/requirements.txt) ile [`local/.env.example`](local/.env.example) içinde açıklanmıştır.
 
 ```text
 Tarayıcı -> :8000 web backend (MAHIR_BASLAT.cmd, yalnız standart kütüphane)
-              |-- MAHIR_RAG_URL = http://127.0.0.1:8001/agents        -> :8001 local/rag_service.py -> :8080 llama-server (Qwen2.5-7B Q4_K_M, GPU)
+              |-- MAHIR_RAG_URL = http://127.0.0.1:8001/agents        -> :8001 local/rag_service.py -> :8080 llama-server (Qwen3-4B-Instruct-2507 Q4_K_M, GPU)
               |                                                                                      `-> :6333 Qdrant (Docker)
               `-- MAHIR_OCR_URL = http://127.0.0.1:8002               -> :8002 backend/run_ocr_worker.py (PaddleOCR-VL, GPU)
 ```
@@ -722,7 +722,7 @@ Başlatma sırası (her satır ayrı bir terminal penceresi; `local/.env` bir ke
 
 ```powershell
 docker compose -f local/docker-compose.yml up -d                  # 1) Qdrant
-powershell -ExecutionPolicy Bypass -File local/llm_server.ps1     # 2) llama-server (ilk seferde ~4,7 GB GGUF iner)
+powershell -ExecutionPolicy Bypass -File local/llm_server.ps1     # 2) llama-server (ilk seferde ~2,4 GB GGUF iner)
 python local/rag_service.py                                       # 3) RAG servisi (/agents, /query, /health)
 python backend/run_ocr_worker.py                                  # 4) OCR işçisi (isteğe bağlı; yalnız görsel yüklemeler için)
 .\MAHIR_BASLAT.cmd                                                # 5) web arayüzü
@@ -738,7 +738,7 @@ Parçalama stratejisi belgenin yapısını izler ([`local/curriculum.py`](local/
 
 Web backend servis adreslerini koda gömülü varsayılanlardan alır; farklı bir port kullanılacaksa `MAHIR_RAG_URL` / `MAHIR_OCR_URL` ortam değişkenleri geçersiz kılar, boş string ilgili özelliği bilinçli olarak kapatır (analiz kurallı ajanlarla, görseller OCR'sız öğretmen kontrolüyle devam eder).
 
-> **Süre ve bellek notları.** llama-server bir analiz turunun teşhis istemlerini ardışık çözer: sekiz zayıf öğrenme çıktısı için yaklaşık 1,5 dakika (`RERANKER_ENABLED=false`) ile 4 dakika (reranker CPU'da açık). llama-server (~4,8 GB) ile OCR işçisi (PaddleOCR-VL, +~1 GB) 6 GB VRAM'e birlikte sığar ama pay dardır (ölçüldü: iki görsel OCR'da tepe 5,7-5,8 GB); işçi "CUDA out of memory" verirse `local/.env`'de `LLM_GPU_LAYERS` düşürülür (ör. 20) ya da görsel yükleme aşamasında llama-server kapalı tutulur. Görsel yüklemede "OCR işçisine ulaşılamadı … 10061" hatası, işçinin (`python backend/run_ocr_worker.py`) açık olmadığı anlamına gelir. Servisler modelleri açılışta yükler; ayrı bir ısıtma adımı yoktur. Uzun teşhis istemleri 8k pencereyi zorlarsa `LLM_CONTEXT_WINDOW=12288` (yaklaşık +120 MB KV önbelleği) denenebilir. Servislerde kimlik doğrulaması yoktur ve hepsi yalnız `127.0.0.1`'e bağlanır; yanlış kullanıma karşı yapısal koruma `local/rag_service.py` içindeki istem sayısı/uzunluğu sınırlarıdır (`MAX_AGENT_*`).
+> **Süre ve bellek notları.** llama-server bir analiz turunun teşhis istemlerini ardışık çözer: sekiz zayıf öğrenme çıktısı için yaklaşık 1,5-2 dakika (reranker CPU'da açık, ısınmış süreç; servis yeni açıldığında ilk tur 4-5 dakika). Qwen3-4B-Instruct-2507 Q4_K_M 3,1 GB ayrılmış VRAM kullanır (7B Q4_K_M 4,6 GB idi), üretim ~50 tok/s; OCR işçisi (PaddleOCR-VL) boşta ~2 GB, çıkarımda ~3 GB - 6 GB'de ikisi birlikte sığar (ölçüldü: iki görsel OCR'da tepe 5,9 GB). 4 GB kartta ikisi aynı anda sığmaz ama Windows sürücüsü boşta kalan sürecin VRAM'ini RAM'e taşır: OOM yerine ilk istekte ~2 s geri yükleme (2 GiB balastla emüle edildi: OCR 2 görsel 13-15 s, teşhis turu 106 s, 8/8). Yine de "CUDA out of memory" görülürse `local/.env`'de `LLM_GPU_LAYERS` düşürülür (ör. 24) ya da görsel yükleme aşamasında llama-server kapalı tutulur. Görsel yüklemede "OCR işçisine ulaşılamadı … 10061" hatası, işçinin (`python backend/run_ocr_worker.py`) açık olmadığı anlamına gelir. Servisler modelleri açılışta yükler; ayrı bir ısıtma adımı yoktur. Uzun teşhis istemleri 8k pencereyi zorlarsa `LLM_CONTEXT_WINDOW=12288` (yaklaşık +120 MB KV önbelleği) denenebilir. Servislerde kimlik doğrulaması yoktur ve hepsi yalnız `127.0.0.1`'e bağlanır; yanlış kullanıma karşı yapısal koruma `local/rag_service.py` içindeki istem sayısı/uzunluğu sınırlarıdır (`MAX_AGENT_*`).
 
 ## 9. sınıf Türk Dili ve Edebiyatı pilotu
 

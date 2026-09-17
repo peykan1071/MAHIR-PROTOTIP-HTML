@@ -1,6 +1,6 @@
 # MAHİR yerel RAG hattı - Python bağımlılıkları (Windows 11, NVIDIA RTX 4050 6 GB, CUDA 12.6).
 # Her şey yerel: Qdrant (Docker), PaddleOCR-VL (GPU), bge-m3 + reranker (CPU),
-# Qwen2.5-7B-Instruct Q4_K_M (llama-server, GPU) - dışarıya hiçbir istek çıkmaz.
+# Qwen3-4B-Instruct-2507 Q4_K_M (llama-server, GPU) - dışarıya hiçbir istek çıkmaz.
 #
 # ÖNKOŞULLAR (hedef dizüstü):
 #   * Python 3.12 veya 3.13 (64-bit). paddlepaddle-gpu'nun Windows wheel'i cp39-cp313
@@ -67,7 +67,7 @@ qdrant-client>=1.19,<2
 
 # --- LLM istemcisi (OpenAI uyumlu; yerel llama-server'a konuşur) ---
 # LLM'in kendisi pip paketi DEĞİL: llama.cpp'nin resmî Windows CUDA binary'si
-# (bkz. .env.example LLAMA_SERVER_EXE notu) + Qwen2.5-7B-Instruct GGUF Q4_K_M.
+# (bkz. .env.example LLAMA_SERVER_EXE notu) + Qwen3-4B-Instruct-2507 GGUF Q4_K_M.
 openai>=1.63,<4
 
 # --- HTTP servisi ---
