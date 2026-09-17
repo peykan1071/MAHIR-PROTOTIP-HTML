@@ -2,6 +2,12 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Teşhis Metninden Açılış Cümlesi Kaldırıldı - 2026-09-17
+
+- **Karar (kullanıcı):** `backend/app/agents/pipeline.py` içindeki `_OPENING_TEMPLATES` ve onunla üretilen '"<tema>" temasında sınıfın başarı oranı %30 olarak hesaplanmıştır.' açılış cümlesi kaldırıldı. Tema adı ve oran rapor satırında zaten görünüyor; her teşhisin aynı kalıpla başlaması metni tek düze gösteriyordu. `_compose_grounded_pedagogical_answer` artık `<model teşhisi> <kapanış>` döndürür; kapanış kalıpları (`Eksikliğin şiddeti: …` / güçlü-çıktı cümlesi) ve tüm doğrulama kuralları (kanıt örtüşmesi, oran tekrarı kırpma, tema girişi atma, uzunluk/kod sızıntısı) değişmedi.
+- **Ölü kod temizliği:** dosyanın başındaki, sonraki tanımlar tarafından gölgelenen (asla kullanılmayan) eski `_OPENING_TEMPLATES`/`_WEAK_CLOSING_TEMPLATES`/`_STRONG_CLOSING_TEMPLATES`/`_pick_template` kopyaları (98 satır, `{terms}` yer tutuculu 3. sürüm kalıntısı) silindi.
+- **Testler:** `RagContextAttachmentTests.test_grounded_diagnosis_is_wrapped_with_deterministic_facts` yeni sözleşmeye göre (metin modelin cümlesiyle başlar, "hesaplanmıştır"/yüzde/tırnaklı tema yok); yeni `test_strong_outcome_is_wrapped_with_closing_only`. 352 Python testi yeşil. Canlı tur: 8/8 doğrulanmış, red yok.
+
 ## Varsayılan LLM: Qwen3-4B-Instruct-2507 - 2026-09-17
 
 - **Karar:** 4 GB VRAM'li kartlarda çalışabilmek için varsayılan yerel LLM `Qwen2.5-7B-Instruct Q4_K_M` → **`Qwen3-4B-Instruct-2507 Q4_K_M`** (`unsloth/Qwen3-4B-Instruct-2507-GGUF`, Apache-2.0, "düşünme" bloğu olmayan Instruct sürümü). Kod mantığı, istemler, sözleşmeler ve testler değişmedi; yalnız varsayılan model adı/deposu ve belgeler.

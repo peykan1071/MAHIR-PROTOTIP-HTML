@@ -52,104 +52,6 @@ _NO_ANOMALY_TEXT = "Belirgin bir tutarsızlık görülmedi"
 # yüzden nihai sayı tekrar makul/küçük bir değere (8) çekilebildi.
 _DIAGNOSIS_TOP_K = 8
 
-# `_compose_grounded_pedagogical_answer`in cümle kalıp havuzları. Model
-# BAĞLAM'dan doğrulanmış BİR ya da İKİ terim seçiyor, cümlenin TAMAMINI
-# MAHİR kuruyor (kanıt garantisi bundan geliyor) - ama tek bir sabit kalıp
-# her satırı birebir aynı iskelete sokup raporu robotik/tek düze gösteriyordu.
-# Her varyant aynı zorunlu parçaları taşımak ZORUNDA (tırnaklı tema adı,
-# terim(ler), "%<oran> olarak hesaplanmıştır" - `RagContextAttachmentTests`
-# bunu doğruluyor); yalnız cümlenin çevresi değişiyor. `{terms}` tek bir
-# terimde "X", ikide "X ve Y" olarak önceden birleştirilip veriliyor - ayrı
-# `{term1}`/`{term2}` yer tutucuları TEK terimli durumda boş kalırdı.
-# Seçim `_pick_template` ile GİRDİYE göre belirlenimci (aynı kazanım aynı
-# yeniden üretimde hep aynı kalıbı alır - test edilebilirlik/kararlılık
-# için) ama farklı kazanımlar farklı kalıp alır, bu yüzden bir raporun
-# tamamı tek tip görünmez.
-#
-# 2026-08-22 (4. sürüm): TAM OLARAK İKİ zorunluluğu kaldırıldı - dar
-# kapsamlı bazı kazanımlarda BAĞLAM'da gerçekten TEK güçlü/somut aday
-# bulunuyor, model ikinciyi uydurmak yerine tamamen `not_found` diyip
-# öğretmene hiçbir yorum göstermiyordu. Artık BİR terim de kabul ediliyor;
-# doğrulama kuralı (`_term_is_grounded`) ve kanıt garantisi DEĞİŞMEDİ.
-_OPENING_TEMPLATES = (
-    (
-        '"{theme}" temasında {terms} kapsamındaki sınıf başarı oranı '
-        "%{percent} olarak hesaplanmıştır."
-    ),
-    (
-        '"{theme}" temasındaki {terms} bileşeninde sınıf başarı '
-        "oranı %{percent} olarak hesaplanmıştır."
-    ),
-    (
-        'Sınıfın "{theme}" temasında {terms} kapsamındaki başarı oranı '
-        "%{percent} olarak hesaplanmıştır."
-    ),
-    (
-        '"{theme}" temasında ölçülen {terms} performansına göre sınıf '
-        "başarı oranı %{percent} olarak hesaplanmıştır."
-    ),
-    (
-        '"{theme}" temasına ait {terms} göstergesinde sınıf başarı '
-        "oranı %{percent} olarak hesaplanmıştır."
-    ),
-    (
-        'Elde edilen verilere göre "{theme}" temasında {terms} '
-        "açısından sınıf başarı oranı %{percent} olarak hesaplanmıştır."
-    ),
-    (
-        '"{theme}" temasında {terms} temel alınarak sınıf '
-        "başarı oranı %{percent} olarak hesaplanmıştır."
-    ),
-    (
-        'Değerlendirme sonuçlarına göre "{theme}" temasında {terms} '
-        "bakımından sınıf başarı oranı %{percent} olarak hesaplanmıştır."
-    ),
-)
-_WEAK_CLOSING_TEMPLATES = (
-    (
-        "Eksikliğin şiddeti: {severity}. Bu performans, seçilen öğrenme "
-        "çıktısının sonraki süreçleri açısından sarmal risk taşır."
-    ),
-    (
-        "Eksikliğin şiddeti: {severity}. Bu durum, ileri düzey kazanımlar için "
-        "sarmal bir risk oluşturmaktadır."
-    ),
-    (
-        "Eksikliğin şiddeti: {severity}. Bu eksiklik, sonraki öğrenme "
-        "süreçlerine sarmal biçimde yansıyabilir."
-    ),
-    (
-        "Eksikliğin şiddeti: {severity}. Bu düzey, ilerleyen kazanımların "
-        "sağlıklı biçimde oluşması açısından risk taşımaktadır."
-    ),
-    (
-        "Eksikliğin şiddeti: {severity}. Bu tablo, sonraki öğrenme "
-        "basamaklarına sarmal biçimde etki edebilir."
-    ),
-    (
-        "Eksikliğin şiddeti: {severity}. Bu sonuç, ileriki kazanımların "
-        "temelini oluşturan bir alanda risk işaret etmektedir."
-    ),
-)
-_STRONG_CLOSING_TEMPLATES = (
-    "Bu sonuç, seçilen öğrenme çıktısında güçlü bir performans alanını gösterir.",
-    "Bu veriler, seçilen öğrenme çıktısında sağlam bir kazanım düzeyine işaret eder.",
-    "Sınıf, seçilen öğrenme çıktısında bu alanda belirgin bir başarı sergilemektedir.",
-    "Elde edilen veriler, seçilen öğrenme çıktısında yüksek bir yeterlik düzeyine karşılık gelmektedir.",
-    "Bu bulgular, seçilen öğrenme çıktısında sınıfın büyük ölçüde başarılı olduğunu göstermektedir.",
-    "Seçilen öğrenme çıktısına ilişkin veriler, güçlü bir performans düzeyini yansıtmaktadır.",
-)
-
-
-def _pick_template(templates: tuple[str, ...], *seed_parts: str) -> str:
-    """`seed_parts`e göre belirlenimci bir kalıp seçer (rastgele değil - aynı
-    girdi her zaman aynı kalıbı almalı, aksi hâlde bir raporu iki kez
-    üretmek farklı metin verirdi)."""
-
-    digest = hashlib.md5("|".join(seed_parts).encode("utf-8")).hexdigest()
-    return templates[int(digest, 16) % len(templates)]
-
-
 # LLM/RAG bir kaynak bulsa bile yanıt seçilen sınav becerisine saparsa metni
 # rapora taşımayız. Hücreyi sessizce boş bırakmak yerine öğretmene nedenini
 # açıklarız; bu cümle kaynak iddiası veya pedagojik içerik üretmez.
@@ -919,14 +821,12 @@ def _sanitize_anomaly_finding(answer: str, valid_question_numbers: set[int]) -> 
 # talimatını izlemediği, gerçek değerleri kendi uydurduğu görüldü - küçük bir
 # modelin "burada literal {TEMA} yaz" gibi alışılmadık bir talimatı güvenilir
 # biçimde izlemesi beklenemez). Bunun yerine MAHIR, modelin yalnız NİTEL
-# içerik ürettiği paragrafı DEĞİŞKEN bir açılış/kapanış kalıbıyla sarar - tema
-# adı, yüzde ve şiddet etiketi HİÇBİR ZAMAN modelden gelmez.
-_OPENING_TEMPLATES = (
-    '"{theme}" temasında sınıfın başarı oranı %{percent} olarak hesaplanmıştır.',
-    '"{theme}" temasındaki başarı oranı %{percent} olarak hesaplanmıştır.',
-    'Sınıfın "{theme}" temasındaki başarı oranı %{percent} olarak hesaplanmıştır.',
-    '"{theme}" temasında ölçülen başarı oranı %{percent} olarak hesaplanmıştır.',
-)
+# içerik ürettiği paragrafın ardına DEĞİŞKEN bir kapanış kalıbı ekler - şiddet
+# etiketi HİÇBİR ZAMAN modelden gelmez. 2026-09-17: tema adını ve yüzdeyi
+# tekrar eden açılış cümlesi ("… temasında … %30 olarak hesaplanmıştır.")
+# kaldırıldı - ikisi de rapor satırında zaten görünüyor, her teşhisin aynı
+# kalıpla başlaması metni tek düze gösteriyordu. Teşhis doğrudan modelin
+# cümlesiyle başlar.
 _WEAK_CLOSING_TEMPLATES = (
     "Eksikliğin şiddeti: {severity}. Bu performans, seçilen öğrenme çıktısının sonraki süreçleri açısından sarmal risk taşır.",
     "Eksikliğin şiddeti: {severity}. Bu durum, ileri düzey kazanımlar için sarmal bir risk oluşturmaktadır.",
@@ -1154,8 +1054,8 @@ def _compose_grounded_pedagogical_answer(
         _note_reason(reasons, "susulu-parantez-kalintisi (model yer tutucu yazdı)")
         return ""
     # Model prompttaki yasağa rağmen kendi yazdığı yüzdeyi tekrar edebiliyor
-    # (canlı ölçümde görüldü) - MAHİR oranı zaten kendi açılış cümlesinde
-    # söylediğinden bu ya gereksiz tekrar ya da modelin uydurduğu FARKLI bir
+    # (canlı ölçümde görüldü) - oran rapor satırında MAHİR'in hesabıyla zaten
+    # görünür, modelin yazdığı ya gereksiz tekrar ya da uydurduğu FARKLI bir
     # sayı olur; tüm yanıtı atmak yerine yalnız o cümleyi kırp, geri kalan
     # (genelde iyi) içeriği koru.
     diagnosis, stripped_scope_sentences = _strip_scope_violations(diagnosis, reasons)
@@ -1171,9 +1071,8 @@ def _compose_grounded_pedagogical_answer(
         return ""
 
     # Model, prompttaki açık yasağa rağmen paragrafa tema adını yazabiliyor
-    # (canlı ölçümde görüldü). MAHİR tema adını zaten açılış cümlesinde
-    # söylediğinden bu, öğretmene tema adını iki kez okutuyordu - baştaki
-    # "<tema> temasında ..." girişini at.
+    # (canlı ölçümde görüldü). Tema adı rapor satırında zaten görünür; baştaki
+    # "<tema> temasında ..." girişi öğretmene aynı adı iki kez okutuyordu - at.
     diagnosis = _drop_theme_lead_in(diagnosis, theme)
 
     # KANIT GARANTİSİ: teşhis metninin kendisi kaynakla yeterince örtüşüyor mu.
@@ -1191,17 +1090,14 @@ def _compose_grounded_pedagogical_answer(
     _note_reason(reasons, f"bilgi: kaynakla örtüşen ayırt edici sözcükler: {grounded_words}")
 
     rate = float(outcome.get("successRate") or 0.0)
-    percent = round(rate * 100)
     code = str(outcome.get("outcomeCode") or "")
-    opening = _pick_template(_OPENING_TEMPLATES, code, theme).format(theme=theme, percent=percent)
-
     if rate < 0.70:
         severity = "Kritik" if rate < 0.50 else "Orta"
         closing = _pick_template(_WEAK_CLOSING_TEMPLATES, code, theme, "weak").format(severity=severity)
     else:
         closing = _pick_template(_STRONG_CLOSING_TEMPLATES, code, theme, "strong")
 
-    return f"{opening} {_as_standalone_sentence(diagnosis)} {closing}"
+    return f"{_as_standalone_sentence(diagnosis)} {closing}"
 
 
 def _as_standalone_sentence(text: str) -> str:
@@ -1430,8 +1326,8 @@ def _sentence_violation(sentence: str) -> str:
     """
 
     # Modele yüzdeyi yazmaması söylendi ama yine de yazabiliyor (canlı
-    # ölçümde görüldü). MAHİR oranı zaten kendi açılış cümlesinde
-    # söylediğinden böyle bir cümle en iyi ihtimalle gereksiz tekrar, en
+    # ölçümde görüldü). Oran rapor satırında MAHİR'in hesabıyla zaten
+    # göründüğünden böyle bir cümle en iyi ihtimalle gereksiz tekrar, en
     # kötü ihtimalle modelin uydurduğu FARKLI bir sayı olur - ikisi de
     # rapora girmemeli.
     if _RATE_MENTION_PATTERN.search(sentence):
@@ -1486,8 +1382,8 @@ def _drop_dangling_reference(sentence: str) -> str:
 def _drop_theme_lead_in(diagnosis: str, theme: str) -> str:
     """Paragrafın başındaki `<tema> temasında[ki] ...` girişini atar.
 
-    MAHİR tema adını kendi açılış cümlesinde zaten söylüyor; model de yazınca
-    öğretmen aynı adı iki kez okuyor. Yalnız BAŞTAKİ giriş atılır - metnin
+    Tema adı rapor satırında zaten görünüyor; model de yazınca öğretmen aynı
+    adı iki kez okuyor. Yalnız BAŞTAKİ giriş atılır - metnin
     ortasında geçen tema adına dokunulmaz, çünkü orada cümlenin anlamını
     taşıyor olabilir.
     """
@@ -1515,8 +1411,8 @@ def _answer_matches_outcome_scope(
     Model metni burada düzeltilmez (bkz. `_strip_scope_violations` - o adım
     burada değil, `_compose_grounded_pedagogical_answer` içinde, sarmadan
     ÖNCE çalışır - oran tekrarı orada, HAM teşhis üzerinde temizlenir). Bu
-    fonksiyon SARILMIŞ (opening+diagnosis+closing) tam metni görür - MAHİR'in
-    kendi açılış cümlesi zaten oranı söylediği için burada oran ARAMAZ. Bu
+    fonksiyon SARILMIŞ (diagnosis+closing) tam metni görür ve burada oran
+    ARAMAZ (oran zaten kırpılmıştır, rapor satırı kendi hesabını gösterir). Bu
     fonksiyon yalnız SON bir güvenlik ağı: uzunluk veya kapsam sapması
     (kod sızıntısı, beceri/bileşen uyuşmazlığı) varsa yanıtın tamamı elenir.
 
@@ -1527,9 +1423,10 @@ def _answer_matches_outcome_scope(
     word_count = len(re.findall(r"\b[\wÇĞİÖŞÜçğıöşü]+(?:['’][\wÇĞİÖŞÜçğıöşü]+)?\b", answer))
     is_weak = float(outcome.get("successRate") or 0.0) < 0.70
     # Modelin kendi paragrafı (en çok 45/35 kelime, bkz. DIAGNOSIS_SYSTEM_
-    # PROMPT/STRENGTH_SYSTEM_PROMPT) artık MAHİR'in ürettiği açılış+kapanış
-    # cümleleriyle sarılıyor (bkz. `_compose_grounded_pedagogical_answer`) -
-    # sınır o toplamı karşılayacak kadar geniş tutulur.
+    # PROMPT/STRENGTH_SYSTEM_PROMPT) MAHİR'in ürettiği kapanış cümlesiyle
+    # sarılıyor (bkz. `_compose_grounded_pedagogical_answer`) - sınır o toplamı
+    # karşılayacak kadar geniş tutulur (açılış cümlesi kaldırıldı, sınır
+    # bilinçli olarak daraltılmadı: yalnız güvenlik ağı).
     limit = 90 if is_weak else 70
     if word_count > limit:
         _note_reason(reasons, f"uzunluk-asimi ({word_count} kelime, sınır {limit})")

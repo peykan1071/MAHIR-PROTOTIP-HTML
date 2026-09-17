@@ -176,17 +176,37 @@ class RagContextAttachmentTests(unittest.TestCase):
             "outcomeTheme": "2. Tema: Anlam Arayışı",
             "successRate": 0.20,
         }
-        # Model yalnız nitel teşhis yazar; tema/yüzde/şiddet MAHİR'den gelir.
+        # Model yalnız nitel teşhis yazar; şiddet etiketi MAHİR'den gelir. Tema
+        # adı ve yüzde rapor satırında zaten görünür - 2026-09-17'den beri
+        # metnin önüne "… temasında … %20 olarak hesaplanmıştır." açılışı
+        # KONMAZ, teşhis doğrudan modelin cümlesiyle başlar.
         answer = (
             '{"diagnosis":"Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır."}'
         )
         sources = [{"excerpt": "Metinde konu, ana duygu ve ana düşünce bütünlük içinde ele alınır."}]
         result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
-        self.assertIn('"Anlam Arayışı"', result)
-        self.assertIn("%20 olarak hesaplanmıştır", result)
+        self.assertTrue(result.startswith("Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır."), result)
+        self.assertNotIn("hesaplanmıştır", result)
+        self.assertNotIn("%20", result)
+        self.assertNotIn('"Anlam Arayışı"', result)
         self.assertIn("Eksikliğin şiddeti: Kritik.", result)
-        self.assertIn("Ana duygu, ana düşünce ve bütünlük ilişkisi kurulamamaktadır.", result)
         self.assertNotIn("etkinlik", result)
+
+    def test_strong_outcome_is_wrapped_with_closing_only(self):
+        outcome = {
+            "outcomeCode": "TDE2.2",
+            "outcomeTheme": "2. Tema: Anlam Arayışı",
+            "successRate": 0.85,
+        }
+        answer = '{"diagnosis":"ana duygu ve ana düşünce bütünlük içinde kurulmaktadır"}'
+        sources = [{"excerpt": "Metinde konu, ana duygu ve ana düşünce bütünlük içinde ele alınır."}]
+        result = _compose_grounded_pedagogical_answer(answer, outcome, sources)
+        # Açılış yok; modelin cümlesi büyük harfle başlatılıp noktalanır, ardından
+        # yalnız güçlü-çıktı kapanışı gelir.
+        self.assertTrue(result.startswith("Ana duygu ve ana düşünce bütünlük içinde kurulmaktadır. "), result)
+        self.assertNotIn("hesaplanmıştır", result)
+        self.assertNotIn("Eksikliğin şiddeti", result)
+        self.assertRegex(result, r"[Ss]eçilen öğrenme çıktısın[ad]a")
 
     def test_diagnosis_sharing_too_little_with_the_source_is_rejected(self):
         # Genel geçer, her kazanıma yazılabilecek bir cümle: kaynakla
@@ -397,7 +417,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertTrue(_answer_matches_outcome_scope("TDE3.3 konuşma becerisi güçlüdür.", outcome))
 
     def test_overlong_pedagogical_answer_is_rejected(self):
-        # MAHİR'in ürettiği açılış+kapanış cümleleriyle sarıldığından (bkz.
+        # MAHİR'in ürettiği kapanış cümlesiyle sarıldığından (bkz.
         # `_compose_grounded_pedagogical_answer`) sınır 70'ten 90'a çıktı.
         outcome = {"outcomeCode": "TDE1.2", "successRate": 0.30}
         answer = " ".join(["kanıt"] * 91)
