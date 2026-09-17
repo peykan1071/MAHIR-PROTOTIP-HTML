@@ -6,7 +6,8 @@ through `app/ocr_worker_client.py`; the default address on both sides is
 PaddleOCR-VL pipeline is loaded once here, before the first request.
 Kept separate so the teacher-facing server never loads paddle/torch and a
 model crash cannot take the web UI down. Needs the `local/requirements.txt`
-environment (paddlepaddle-gpu + CUDA 12.6 / cuDNN 9 on the machine).
+environment (paddlepaddle-gpu; CUDA 12.6 / cuDNN 9 come with the pip wheels,
+only the NVIDIA driver must be installed).
 
     cd backend ; python run_ocr_worker.py
 """

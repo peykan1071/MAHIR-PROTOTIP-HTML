@@ -51,16 +51,17 @@ Kaynaklar: [Millî Eğitim Bakanlığı, 2024–2025 Örgün Eğitim İstatistik
 10. [Uçtan uca MAHİR akışı](#uctan-uca-mahir-akisi)
 11. [Çok ajanlı mimari](#çok-ajanlı-mimari)
 12. [Projeyi inceleme rehberi](#projeyi-inceleme-rehberi)
-13. [Yerel çalıştırma: OCR, RAG ve LLM](#yerel-çalıştırma)
-14. [9. sınıf Türk Dili ve Edebiyatı pilotu](#9-sınıf-türk-dili-ve-edebiyatı-pilotu)
-15. [Doğruluk ve halüsinasyon kontrolü](#doğruluk-ve-halüsinasyon-kontrolü)
-16. [Veri güvenliği ve etik sınırlar](#veri-güvenliği-ve-etik-sınırlar)
-17. [Çalışan özellikler ve prototip sınırları](#çalışan-özellikler-ve-prototip-sınırları)
-18. [Testler](#testler)
-19. [Proje yapısı](#proje-yapısı)
-20. [Teknik belgeler ve kaynaklar](#teknik-belgeler-ve-kaynaklar)
-21. [Sonraki geliştirme adımları](#sonraki-geliştirme-adımları)
-22. [Ekip](#ekip)
+13. [Sıfırdan kurulum (ilk kez kuranlar için)](#sıfırdan-kurulum-ilk-kez-kuranlar-için)
+14. [Yerel çalıştırma: OCR, RAG ve LLM](#yerel-çalıştırma)
+15. [9. sınıf Türk Dili ve Edebiyatı pilotu](#9-sınıf-türk-dili-ve-edebiyatı-pilotu)
+16. [Doğruluk ve halüsinasyon kontrolü](#doğruluk-ve-halüsinasyon-kontrolü)
+17. [Veri güvenliği ve etik sınırlar](#veri-güvenliği-ve-etik-sınırlar)
+18. [Çalışan özellikler ve prototip sınırları](#çalışan-özellikler-ve-prototip-sınırları)
+19. [Testler](#testler)
+20. [Proje yapısı](#proje-yapısı)
+21. [Teknik belgeler ve kaynaklar](#teknik-belgeler-ve-kaynaklar)
+22. [Sonraki geliştirme adımları](#sonraki-geliştirme-adımları)
+23. [Ekip](#ekip)
 
 ## Eğitim-Öğretim Sürecinde Karşılaşılan Sorun
 
@@ -545,6 +546,8 @@ Bu dosyalar, örnek girdiden yapılandırılmış veriye, analiz çıktısına v
 
 Lütfen `index.html` dosyasını doğrudan açmayınız. Belge yükleme ve analiz servislerinin başlatılabilmesi için `MAHIR_BASLAT.cmd` dosyasını kullanınız.
 
+Bu adımlar yalnız arayüzü (Seviye 1) açar; fotoğraf OCR'ı ile program kaynaklı RAG/LLM yorumu için [Sıfırdan kurulum](#sıfırdan-kurulum-ilk-kez-kuranlar-için) rehberindeki Seviye 2 adımları gerekir.
+
 ### Komut satırıyla çalıştırma
 
 ```bash
@@ -559,9 +562,154 @@ Windows'ta `python` komutu tanınmıyorsa aşağıdaki komutu kullanınız:
 py backend/run_file_receiver.py
 ```
 
+## Sıfırdan kurulum (ilk kez kuranlar için)
+
+Bu bölüm, MAHİR'i bilgisayarına ilk kez kuracak ve daha önce böyle bir kurulum yapmamış okuyucu için yazılmıştır. Kurulum iki seviyede yapılabilir; ikinci seviye birincisinin üzerine kurulur:
+
+| | Seviye | Neler çalışır? | Süre | Disk | Gerekenler |
+|:-:|---|---|---|---|---|
+| 🟢 | **1 - Sadece arayüz** | Evrak yükleme (CSV, Excel, metin PDF), doğrulama, kurallı analiz, rapor taslağı - yapay zekâ olmadan | 5 dk | 0,1 GB | Yalnız Python 3.10+ |
+| 🔵 | **2 - Tam yapay zekâ** | Seviye 1 + fotoğraf ve el yazısı OCR, program (müfredat) kaynaklı RAG, yerel LLM yorumu | 1-2 saat | ≈ 25 GB | NVIDIA ekran kartı, Docker Desktop, ~20 GB indirme |
+
+Seviye 1 için [Windows'ta çalıştırma](#windowsta-çalıştırma) başlığındaki beş adım yeterlidir. Aşağıdaki rehber **Seviye 2** içindir; her adımın yanında ne kadar süreceği ve kaç GB yer kaplayacağı yazar.
+
+<p align="center"><img src="assets/readme/19-kurulum-yol-haritasi.svg" alt="Sıfırdan kurulum yol haritası: altı adım, her adımın süresi ve disk kullanımı" width="1000"></p>
+
+### Minimum sistem gereksinimleri
+
+| | Bileşen | En az | Test edilen makine |
+|:-:|---|---|---|
+| 🖥️ | İşletim sistemi | Windows 11, 64-bit | Windows 11 Pro |
+| 🎮 | Ekran kartı | NVIDIA, **6 GB VRAM** (LLM ~4,8 GB + OCR ~1 GB aynı anda) | GeForce RTX 4050 Laptop, 6 GB |
+| 🧠 | Bellek (RAM) | 16 GB | 16 GB |
+| ⚙️ | İşlemci | 8 çekirdek (gömme ve yeniden sıralama işlemcide çalışır) | Core 7 250H, 14 çekirdek |
+| 💾 | Boş disk | **35 GB** (kurulum bitince ≈ 25 GB kalır); SSD önerilir | SSD |
+| 🌐 | İnternet | Yalnız ilk kurulumda (~20 GB indirme); sonra gerekmez | - |
+
+Daha küçük bir ekran kartında (4 GB) LLM tamamen sığmaz; `local\.env` içinde `LLM_GPU_LAYERS` düşürülerek bir kısmı işlemciye verilebilir ama yanıt süresi birkaç kat uzar. Ekran kartı hiç yoksa Seviye 1 kullanılır.
+
+Kurulacak programlar (hepsi ücretsizdir):
+
+| Program | Ne için | Nereden | Dikkat |
+|---|---|---|---|
+| **NVIDIA ekran kartı sürücüsü** | Ekran kartını kullanmak için | [nvidia.com/drivers](https://www.nvidia.com/drivers) ya da NVIDIA App | Güncel sürücü yeter. **CUDA Toolkit kurmak gerekmez**; CUDA ve cuDNN kütüphaneleri Python paketleriyle birlikte iner. |
+| **Python 3.12 veya 3.13** (64-bit) | Servisler Python ile yazılmıştır | [python.org/downloads](https://www.python.org/downloads/) | Kurulum ekranında **"Add python.exe to PATH"** kutusunu işaretleyiniz. |
+| **Docker Desktop** | Qdrant vektör veritabanını çalıştırmak için | [docker.com](https://www.docker.com/products/docker-desktop/) | Kurulum WSL 2 bileşenini isteyebilir (kendisi kurar); program ~3-4 GB yer kaplar. |
+| **Git** (isteğe bağlı) | Projeyi indirmek ve güncel tutmak için | [git-scm.com](https://git-scm.com/) | ZIP olarak indirenler için gerekmez. |
+
+<p align="center"><img src="assets/readme/20-disk-butcesi.svg" alt="Disk bütçesi: kalıcı yaklaşık 25 GB, kurulum sırasında geçici 8,5 GB pip önbelleği" width="1000"></p>
+
+### Adım adım kurulum
+
+Komutlar **PowerShell** penceresine yazılır. Proje klasöründe PowerShell açmanın en kolay yolu: Dosya Gezgini'nde klasörün içine giriniz, üstteki adres çubuğuna `powershell` yazıp Enter'a basınız. Her adımın sonundaki *Kontrol* satırı, adımın doğru bittiğini nasıl anlayacağınızı söyler.
+
+**1. Programları kurunuz** (15-30 dk, ~4 GB). Yukarıdaki tablodaki programları kurunuz, bilgisayarı yeniden başlatınız ve Docker Desktop'ı bir kez açıp sol altta "Engine running" yazısını görünüz.
+*Kontrol:* yeni bir PowerShell'de `python --version` → `Python 3.13.x`; `nvidia-smi` → ekran kartınızın adı; `docker --version` → sürüm numarası.
+
+**2. Projeyi indiriniz** (2 dk, 0,1 GB). GitHub sayfasındaki yeşil **Code → Download ZIP** düğmesiyle indirip bir klasöre çıkarınız ya da Git ile:
+
+```powershell
+git clone https://github.com/peykan1071/MAHIR-PROTOTIP-HTML.git
+cd MAHIR-PROTOTIP-HTML
+```
+
+Referans müfredat PDF'i (`docs/tde2026.pdf`) projeyle birlikte gelir; ayrıca indirmeniz gerekmez.
+
+**3. Python paketlerini kurunuz** (20-40 dk, 10,5 GB). Proje klasöründe açtığınız PowerShell'de:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r local/requirements.txt
+```
+
+Satır başında `(.venv)` görünmesi sanal ortamın açık olduğunu gösterir; bundan sonraki her `python` komutu bu pencerede (ya da yeni bir pencerede yine `.\.venv\Scripts\Activate.ps1` yazdıktan sonra) çalıştırılır. `Activate.ps1` için "bu sistemde betik çalıştırma devre dışı" hatası alırsanız bir kez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` yazıp tekrar deneyiniz. Kurulum sırasında pip 8,5 GB'lık bir indirme önbelleği tutar; bittikten sonra `python -m pip cache purge` ile silebilirsiniz.
+*Kontrol:* `python -c "import torch; print(torch.cuda.is_available())"` → `True`.
+
+**4. llama.cpp'yi indiriniz** (5 dk, 1,1 GB). Yerel LLM'i çalıştıran program budur. [github.com/ggml-org/llama.cpp/releases](https://github.com/ggml-org/llama.cpp/releases) sayfasında en yeni sürümün "Assets" listesinden iki dosyayı indiriniz: `llama-bNNNN-bin-win-cuda-12.4-x64.zip` ve `cudart-llama-bin-win-cuda-12.4-x64.zip` (NNNN sürüm numarasıdır). İkisini de proje içindeki `local\llama.cpp\` klasörüne çıkarınız (klasör yoksa oluşturunuz).
+*Kontrol:* `local\llama.cpp\llama-server.exe` dosyası var.
+
+**5. Ayar dosyasını oluşturunuz** (1 dk):
+
+```powershell
+Copy-Item local\.env.example local\.env
+```
+
+Varsayılan ayarlar 6 GB'lık ekran kartı için hazırdır; dosyayı düzenlemeniz gerekmez. (Dosya bilgisayara özeldir, depoya gönderilmez.)
+
+**6. Qdrant'ı başlatınız** (2 dk, 0,3 GB). Docker Desktop açıkken:
+
+```powershell
+docker compose -f local/docker-compose.yml up -d
+```
+
+*Kontrol:* `docker compose -f local/docker-compose.yml ps` → STATUS sütununda `healthy`.
+
+**7. Modellerin inmesini bekleyiniz** (30-60 dk, 13,2 GB). Modeller ayrı bir yerden indirilmez: her servis **ilk açılışında** kendi modelini otomatik indirir ve kullanıcı klasörünüze (`.cache\huggingface`, `.paddlex`) kaydeder. Aşağıdaki üç komutu **ayrı birer PowerShell penceresinde** (her birinde önce `.\.venv\Scripts\Activate.ps1`) sırayla çalıştırınız; her pencerede "hazır" satırını görünce bir sonrakine geçiniz. Pencereleri kapatmayınız, MAHİR bunları kullanır.
+
+| Pencere | Komut | İndirdiği model | Boyut | Hazır olduğunda görünen satır |
+|:-:|---|---|---|---|
+| A | `powershell -ExecutionPolicy Bypass -File local/llm_server.ps1` | Qwen2.5-7B-Instruct (Q4_K_M) | 4,4 GB | `server is listening on http://127.0.0.1:8080` |
+| B | `python local/rag_service.py` | bge-m3 + bge-reranker-v2-m3 | 6,4 GB | `Uvicorn running on http://127.0.0.1:8001` |
+| C | `python backend/run_ocr_worker.py` | PaddleOCR-VL-1.6 + PP-DocLayoutV3 | 1,9 GB | `Pipeline hazır.` |
+
+**8. Müfredatı indeksleyiniz** (5-10 dk; ilk seferde +0,5 GB Docling modeli iner). Dördüncü bir pencerede:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python local/ingestion_pipeline.py --pdf docs/tde2026.pdf --program-id tde-9-tymm --replace
+```
+
+Bu işlem bir kez yapılır; sonuç Qdrant'ta kalıcıdır, bilgisayar kapansa da silinmez.
+*Kontrol:* çıktının sonunda `Parçalar: 172 …` benzeri bir satır ve `Qdrant: 172 nokta yazıldı`.
+
+**9. MAHİR'i açınız.** Proje klasöründeki `MAHIR_BASLAT.cmd` dosyasına çift tıklayınız; tarayıcı `http://127.0.0.1:8000/index.html` adresini açar.
+*Kontrol:* tarayıcıda `http://127.0.0.1:8001/health` → `"ok": true`. Sonra MAHİR'de [örnek sınav dosyasını](shared/sample-exam.csv) yükleyip analizi çalıştırınız; raporda program sayfa numaralı alıntılar görünüyorsa RAG ve LLM çalışıyor demektir.
+
+### Sonraki açılışlar
+
+İlk kurulumdan sonra internet gerekmez. Her açılışta yalnız şu sıra izlenir (Qdrant, Docker Desktop ile birlikte kendiliğinden açılır):
+
+```mermaid
+flowchart LR
+    D[["🐳 Docker Desktop<br/>(Qdrant otomatik açılır)"]] --> A
+    A["Pencere A<br/>llm_server.ps1<br/>:8080"] --> B["Pencere B<br/>rag_service.py<br/>:8001"]
+    B --> C["Pencere C<br/>run_ocr_worker.py<br/>:8002 (görsel OCR için)"]
+    C --> W["MAHIR_BASLAT.cmd<br/>:8000"]
+    W --> T["🌐 Tarayıcı<br/>127.0.0.1:8000/index.html"]
+    classDef docker fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef llm fill:#fce7f3,stroke:#db2777,color:#831843
+    classDef rag fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef ocr fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef web fill:#dcfce7,stroke:#16a34a,color:#14532d
+    class D docker
+    class A llm
+    class B rag
+    class C ocr
+    class W,T web
+```
+
+Modeller her açılışta yeniden yüklenir: LLM sunucusu yaklaşık 20 saniye, RAG servisi yaklaşık 1 dakika, OCR işçisi 1-2 dakika. Yalnız CSV/Excel yükleyecekseniz OCR işçisi (Pencere C) açılmayabilir; görsel yüklerseniz "OCR işçisine ulaşılamadı" uyarısı çıkar, başka bir şey olmaz.
+
+> **İsteğe bağlı çevrim dışı kilidi.** Modeller indikten sonra `local\.env` içindeki `# HF_HUB_OFFLINE=1` satırının başındaki `#` işaretini silerseniz RAG servisi ve indeksleme Hugging Face'e hiç istek atmaz; internetsiz ortamda açılış bekleme süresi de kısalır.
+
+### Sorun mu var?
+
+| Belirti | Sebep | Çözüm |
+|---|---|---|
+| `python` tanınmıyor | Kurulumda "Add to PATH" işaretlenmemiş | Python'u kaldırıp kutuyu işaretleyerek yeniden kurunuz ya da `python` yerine `py` yazınız |
+| `Activate.ps1` "betik çalıştırma devre dışı" | PowerShell güvenlik ilkesi | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (bir kez) |
+| `docker compose` "cannot connect" / "pipe" hatası | Docker Desktop açık değil | Docker Desktop'ı açıp "Engine running" yazısını bekleyiniz |
+| llama-server "CUDA out of memory" | Ekran kartı belleği dolu (başka bir program ya da OCR işçisi) | `local\.env` içine `LLM_GPU_LAYERS=20` yazıp Pencere A'yı yeniden başlatınız |
+| "OCR işçisine ulaşılamadı … 10061" | Pencere C açık değil | `python backend/run_ocr_worker.py` çalıştırınız |
+| "RAG servisine ulaşılamadı" | Pencere B açık değil ya da hâlâ model yüklüyor | `Uvicorn running` satırını bekleyiniz |
+| "address already in use" / port dolu | Aynı servis zaten başka bir pencerede açık | Eski pencereyi kapatınız |
+| İlk fotoğraf OCR'ı 40-60 saniye sürdü | Ekran kartının ilk ısınması; tek seferlik | Sonraki görseller çok daha hızlıdır |
+
 ## Yerel çalıştırma
 
-MAHİR tamamen yerel çalışır: hiçbir bulut servisi, API anahtarı ya da (modeller bir kez indikten sonra) internet bağlantısı gerekmez. Arayüz ve belge doğrulama akışı için yalnız `MAHIR_BASLAT.cmd` yeterlidir; **görsel OCR** ve **program kaynaklı RAG/LLM yorumlama** için aşağıdaki yerel servisler ayrıca başlatılır. Hedef donanım: 6 GB VRAM'li bir dizüstü (RTX 4050) - kurulum ve ayarlar [`local/requirements.txt`](local/requirements.txt) ile [`local/.env.example`](local/.env.example) içinde açıklanmıştır.
+MAHİR tamamen yerel çalışır: hiçbir bulut servisi, API anahtarı ya da (modeller bir kez indikten sonra) internet bağlantısı gerekmez. Arayüz ve belge doğrulama akışı için yalnız `MAHIR_BASLAT.cmd` yeterlidir; **görsel OCR** ve **program kaynaklı RAG/LLM yorumlama** için aşağıdaki yerel servisler ayrıca başlatılır. Hedef donanım: 6 GB VRAM'li bir dizüstü (RTX 4050) - ilk kurulum adım adım [Sıfırdan kurulum](#sıfırdan-kurulum-ilk-kez-kuranlar-için) bölümünde, ayar ayrıntıları [`local/requirements.txt`](local/requirements.txt) ile [`local/.env.example`](local/.env.example) içinde açıklanmıştır.
 
 ```text
 Tarayıcı -> :8000 web backend (MAHIR_BASLAT.cmd, yalnız standart kütüphane)

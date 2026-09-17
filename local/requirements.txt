@@ -5,9 +5,10 @@
 # ÖNKOŞULLAR (hedef dizüstü):
 #   * Python 3.12 veya 3.13 (64-bit). paddlepaddle-gpu'nun Windows wheel'i cp39-cp313
 #     için var; torch cu126 wheel'i cp312/cp313 için doğrulandı.
-#   * NVIDIA sürücüsü + CUDA Toolkit 12.6 + cuDNN 9 SİSTEMDE kurulu olmalı. Linux'un
-#     aksine paddlepaddle-gpu'nun Windows wheel'i CUDA kütüphanelerini kendisi
-#     taşımaz (torch taşır). Kurulum sonrası `nvcc --version` 12.6 göstermeli.
+#   * Güncel NVIDIA sürücüsü yeter; CUDA Toolkit / cuDNN'i sisteme kurmak GEREKMEZ.
+#     CUDA 12.6 çalışma zamanı ve cuDNN 9 pip ile gelir (nvidia-*-cu12 paketleri:
+#     torch cu126 wheel'i ve paddlepaddle-gpu 3.3 bağımlılıkları). Toolkit'siz
+#     makinede GPU OCR ve llama-server doğrulandı (2026-09-17); `nvidia-smi` çalışsın.
 #   * Sanal ortam kullanın:  python -m venv .venv ; .\.venv\Scripts\Activate.ps1
 #
 # KURULUM:

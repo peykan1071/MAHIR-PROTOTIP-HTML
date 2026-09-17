@@ -2,6 +2,14 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Sıfırdan Kurulum Rehberi (README) - 2026-09-17
+
+- **Yeni README bölümü "Sıfırdan kurulum (ilk kez kuranlar için)"** (İçindekiler 13; sonrakiler kaydı): iki seviye tablosu (yalnız arayüz / tam yapay zekâ), minimum sistem gereksinimleri, kurulacak programlar, 9 adımlı kurulum (her adımda süre + GB + "Kontrol" satırı), sonraki açılışlar için renkli Mermaid akışı, isteğe bağlı çevrim dışı kilidi ve "Sorun mu var?" tablosu. Hiç bilmeyen okuyucu hedeflendi; komutlar mevcut çalışan komutların aynısı.
+- **İki yeni görsel:** `assets/readme/19-kurulum-yol-haritasi.svg` (6 adımlı yol haritası) ve `assets/readme/20-disk-butcesi.svg` (yığılmış disk çubuğu). Elle yazılmış SVG, dış bağımlılık yok.
+- **Ölçülen sayılar (bu makine, 2026-09-17):** `.venv` 10,5 GB, pip önbelleği 8,5 GB (geçici), llama.cpp 1,1 GB, Qwen GGUF 4,4 GB, bge-m3 4,3 GB, reranker 2,1 GB, PaddleOCR 1,9 GB (`.paddlex`), Docling 0,5 GB, Qdrant imajı 0,3 GB → kalıcı ≈ 25 GB, kurulumda tepe ≈ 34 GB; indirme ≈ 20 GB.
+- **Düzeltme:** `local/requirements.txt` başlığı ve `backend/run_ocr_worker.py` docstring'i "CUDA Toolkit 12.6 + cuDNN 9 sistemde kurulu olmalı" diyordu; CUDA/cuDNN kütüphaneleri pip ile geliyor (`nvidia-cudnn-cu12 9.5.1.17`, `nvidia-cuda-runtime-cu12 12.6.77`, `torch 2.8.0+cu126`, `paddlepaddle-gpu 3.3.1`) ve Toolkit'siz makinede GPU OCR + llama-server doğrulandı - yalnız sürücü gerekir.
+- "Windows'ta çalıştırma" ve "Yerel çalıştırma" bölümlerinden rehbere bağlantı eklendi.
+
 ## "Uzak/Remote" Adlandırması ve Isıtma Hattı Kaldırıldı - 2026-09-17
 
 - **Karar:** Modal'dan kalan adlar temizlendi; servisler olduğu gibi adlandırılıyor (OCR işçisi, RAG servisi). Davranış/sözleşme değişmedi; yalnız adlar, iki env değişkeni ve öğretmene görünen iki hata mesajı değişti.

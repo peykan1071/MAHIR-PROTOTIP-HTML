@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+  <title>MAHİR sıfırdan kurulum yol haritası</title>
+  <rect width="1200" height="420" rx="18" fill="#ffffff"/>
+  <text x="600" y="40" text-anchor="middle" font-size="24" font-weight="700" fill="#0f172a">MAHİR · Sıfırdan kurulum yol haritası</text>
+  <text x="600" y="66" text-anchor="middle" font-size="14" fill="#475569">Seviye 2 - tam yapay zekâ (OCR + RAG + yerel LLM) · Windows 11 · NVIDIA ekran kartı · 6 adım</text>
+
+  <!-- 1 -->
+  <g>
+    <rect x="10" y="92" width="180" height="236" rx="14" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+    <rect x="10" y="92" width="180" height="56" rx="14" fill="#2563eb"/>
+    <rect x="10" y="120" width="180" height="28" fill="#2563eb"/>
+    <circle cx="38" cy="120" r="16" fill="#ffffff"/>
+    <text x="38" y="126" text-anchor="middle" font-size="17" font-weight="700" fill="#2563eb">1</text>
+    <text x="62" y="126" font-size="14" font-weight="700" fill="#ffffff">Programları kur</text>
+    <text x="24" y="176" font-size="13" fill="#334155">NVIDIA sürücüsü</text>
+    <text x="24" y="198" font-size="13" fill="#334155">Python 3.13 (64-bit)</text>
+    <text x="24" y="220" font-size="13" fill="#334155">Docker Desktop</text>
+    <text x="24" y="242" font-size="13" fill="#334155">Git (isteğe bağlı)</text>
+    <line x1="24" y1="262" x2="176" y2="262" stroke="#e2e8f0"/>
+    <text x="24" y="286" font-size="13" font-weight="700" fill="#2563eb">Süre: 15-30 dk</text>
+    <text x="24" y="308" font-size="13" font-weight="700" fill="#2563eb">Disk: ~4 GB</text>
+  </g>
+  <polygon points="196,200 210,210 196,220" fill="#94a3b8"/>
+
+  <!-- 2 -->
+  <g>
+    <rect x="212" y="92" width="180" height="236" rx="14" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
+    <rect x="212" y="92" width="180" height="56" rx="14" fill="#7c3aed"/>
+    <rect x="212" y="120" width="180" height="28" fill="#7c3aed"/>
+    <circle cx="240" cy="120" r="16" fill="#ffffff"/>
+    <text x="240" y="126" text-anchor="middle" font-size="17" font-weight="700" fill="#7c3aed">2</text>
+    <text x="264" y="126" font-size="14" font-weight="700" fill="#ffffff">Projeyi indir</text>
+    <text x="226" y="176" font-size="13" fill="#334155">GitHub'dan ZIP</text>
+    <text x="226" y="198" font-size="13" fill="#334155">ya da git clone</text>
+    <text x="226" y="220" font-size="13" fill="#334155">Müfredat PDF'i içinde</text>
+    <text x="226" y="242" font-size="13" fill="#334155">Klasörde PowerShell aç</text>
+    <line x1="226" y1="262" x2="378" y2="262" stroke="#e2e8f0"/>
+    <text x="226" y="286" font-size="13" font-weight="700" fill="#7c3aed">Süre: 2 dk</text>
+    <text x="226" y="308" font-size="13" font-weight="700" fill="#7c3aed">Disk: 0,1 GB</text>
+  </g>
+  <polygon points="398,200 412,210 398,220" fill="#94a3b8"/>
+
+  <!-- 3 -->
+  <g>
+    <rect x="414" y="92" width="180" height="236" rx="14" fill="#ffffff" stroke="#0891b2" stroke-width="2"/>
+    <rect x="414" y="92" width="180" height="56" rx="14" fill="#0891b2"/>
+    <rect x="414" y="120" width="180" height="28" fill="#0891b2"/>
+    <circle cx="442" cy="120" r="16" fill="#ffffff"/>
+    <text x="442" y="126" text-anchor="middle" font-size="17" font-weight="700" fill="#0891b2">3</text>
+    <text x="466" y="126" font-size="14" font-weight="700" fill="#ffffff">Python paketleri</text>
+    <text x="428" y="176" font-size="13" fill="#334155">python -m venv .venv</text>
+    <text x="428" y="198" font-size="13" fill="#334155">pip install -r</text>
+    <text x="428" y="220" font-size="13" fill="#334155">local/requirements.txt</text>
+    <text x="428" y="242" font-size="13" fill="#334155">CUDA Toolkit gerekmez</text>
+    <line x1="428" y1="262" x2="580" y2="262" stroke="#e2e8f0"/>
+    <text x="428" y="286" font-size="13" font-weight="700" fill="#0891b2">Süre: 20-40 dk</text>
+    <text x="428" y="308" font-size="13" font-weight="700" fill="#0891b2">Disk: 10,5 GB</text>
+  </g>
+  <polygon points="600,200 614,210 600,220" fill="#94a3b8"/>
+
+  <!-- 4 -->
+  <g>
+    <rect x="616" y="92" width="180" height="236" rx="14" fill="#ffffff" stroke="#d97706" stroke-width="2"/>
+    <rect x="616" y="92" width="180" height="56" rx="14" fill="#d97706"/>
+    <rect x="616" y="120" width="180" height="28" fill="#d97706"/>
+    <circle cx="644" cy="120" r="16" fill="#ffffff"/>
+    <text x="644" y="126" text-anchor="middle" font-size="17" font-weight="700" fill="#d97706">4</text>
+    <text x="668" y="126" font-size="14" font-weight="700" fill="#ffffff">llama.cpp</text>
+    <text x="630" y="176" font-size="13" fill="#334155">2 zip indir</text>
+    <text x="630" y="198" font-size="13" fill="#334155">(CUDA + cudart)</text>
+    <text x="630" y="220" font-size="13" fill="#334155">local/llama.cpp/ içine aç</text>
+    <text x="630" y="242" font-size="13" fill="#334155">llama-server.exe hazır</text>
+    <line x1="630" y1="262" x2="782" y2="262" stroke="#e2e8f0"/>
+    <text x="630" y="286" font-size="13" font-weight="700" fill="#d97706">Süre: 5 dk</text>
+    <text x="630" y="308" font-size="13" font-weight="700" fill="#d97706">Disk: 1,1 GB</text>
+  </g>
+  <polygon points="802,200 816,210 802,220" fill="#94a3b8"/>
+
+  <!-- 5 -->
+  <g>
+    <rect x="818" y="92" width="180" height="236" rx="14" fill="#ffffff" stroke="#db2777" stroke-width="2"/>
+    <rect x="818" y="92" width="180" height="56" rx="14" fill="#db2777"/>
+    <rect x="818" y="120" width="180" height="28" fill="#db2777"/>
+    <circle cx="846" cy="120" r="16" fill="#ffffff"/>
+    <text x="846" y="126" text-anchor="middle" font-size="17" font-weight="700" fill="#db2777">5</text>
+    <text x="870" y="126" font-size="14" font-weight="700" fill="#ffffff">Modeller iner</text>
+    <text x="832" y="176" font-size="13" fill="#334155">İlk açılışta otomatik:</text>
+    <text x="832" y="198" font-size="13" fill="#334155">Qwen 4,4 · bge-m3 4,3</text>
+    <text x="832" y="220" font-size="13" fill="#334155">reranker 2,1 · OCR 1,9</text>
+    <text x="832" y="242" font-size="13" fill="#334155">Docling 0,5 (GB)</text>
+    <line x1="832" y1="262" x2="984" y2="262" stroke="#e2e8f0"/>
+    <text x="832" y="286" font-size="13" font-weight="700" fill="#db2777">Süre: 30-60 dk</text>
+    <text x="832" y="308" font-size="13" font-weight="700" fill="#db2777">Disk: 13,2 GB</text>
+  </g>
+  <polygon points="1004,200 1018,210 1004,220" fill="#94a3b8"/>
+
+  <!-- 6 -->
+  <g>
+    <rect x="1020" y="92" width="180" height="236" rx="14" fill="#ffffff" stroke="#16a34a" stroke-width="2"/>
+    <rect x="1020" y="92" width="180" height="56" rx="14" fill="#16a34a"/>
+    <rect x="1020" y="120" width="180" height="28" fill="#16a34a"/>
+    <circle cx="1048" cy="120" r="16" fill="#ffffff"/>
+    <text x="1048" y="126" text-anchor="middle" font-size="17" font-weight="700" fill="#16a34a">6</text>
+    <text x="1072" y="126" font-size="14" font-weight="700" fill="#ffffff">İndeksle ve başlat</text>
+    <text x="1034" y="176" font-size="13" fill="#334155">.env kopyala, Qdrant aç</text>
+    <text x="1034" y="198" font-size="13" fill="#334155">Müfredatı bir kez indeksle</text>
+    <text x="1034" y="220" font-size="13" fill="#334155">5 pencere +</text>
+    <text x="1034" y="242" font-size="13" fill="#334155">MAHIR_BASLAT.cmd</text>
+    <line x1="1034" y1="262" x2="1186" y2="262" stroke="#e2e8f0"/>
+    <text x="1034" y="286" font-size="13" font-weight="700" fill="#16a34a">Süre: 10 dk</text>
+    <text x="1034" y="308" font-size="13" font-weight="700" fill="#16a34a">Sonrası: internet yok</text>
+  </g>
+
+  <rect x="10" y="350" width="1190" height="50" rx="12" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="605" y="381" text-anchor="middle" font-size="15" font-weight="600" fill="#0f172a">Toplam: 1-2 saat   ·   ≈ 20 GB indirme (yalnız ilk kurulum)   ·   ≈ 25 GB kalıcı disk   ·   sonrasında tamamen çevrim dışı çalışır</text>
+</svg>
