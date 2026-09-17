@@ -12,24 +12,24 @@ from unittest.mock import patch
 
 from backend.app.approved_data_analyzer import analyze_approved_data
 
-_no_remote = None
+_no_service = None
 
 
 def setUpModule():
     """LLM turunu kapat: bu dosya deterministik kanıt sayılarını sınıyor.
 
-    Ölçme Ajanı her analizde anomali prompt'u kuyruğa yazıyor; uzak adres
+    Ölçme Ajanı her analizde anomali prompt'u kuyruğa yazıyor; servis adresi
     tanımlı kalırsa bu testler gerçek GPU'ya istek atar (ölçüldü: 0,1 sn yerine
     18 sn) ve ağa bağımlı olur.
     """
 
-    global _no_remote
-    _no_remote = patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", "")
-    _no_remote.start()
+    global _no_service
+    _no_service = patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", "")
+    _no_service.start()
 
 
 def tearDownModule():
-    _no_remote.stop()
+    _no_service.stop()
 
 
 def _question(number, outcome_code, theme="1. Tema: Sayılar", max_score=10):

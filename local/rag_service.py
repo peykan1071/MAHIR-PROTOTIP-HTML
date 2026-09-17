@@ -20,11 +20,11 @@ HTTP (FastAPI):   python local/rag_service.py            -> http://127.0.0.1:800
     POST /retrieve  {question, top_k?, program_id?, document_name?, grade?, theme?, skill?, outcome_code?, section_kinds?, rerank?}
                                        - yalnız getirim (LLM sunucusu kapalıyken de çalışır)
     POST /query     {aynı alanlar}     - getirim + LLM yanıtı
-    POST /agents    {"agents": [...]}  - web backend'in ajan turu (aşağıda); {"warmup": true} ısıtma
+    POST /agents    {"agents": [...]}  - web backend'in ajan turu (aşağıda)
 Terminal:         python local/rag_service.py --ask "Soru" [--program-id X] [--retrieve-only] [--no-rerank]
 
 `/agents`, `backend/app/agents/llm.py`'nin sözleşmesidir (varsayılan
-`MAHIR_RAG_REMOTE_URL=http://127.0.0.1:8001/agents`): her öğe `{name, system,
+`MAHIR_RAG_URL=http://127.0.0.1:8001/agents`): her öğe `{name, system,
 user, maxTokens?, retrieval?: {programId, grade, theme, skill, outcomeCode, query, topK}}`
 taşır; `retrieval` taşıyanlar için müfredat bağlamı Qdrant'tan (sınıf/tema
 `must`, yanlış beceri `must_not` - bkz. `curriculum.py`) getirilip user
@@ -619,12 +619,6 @@ class RAGService:
 
     # --- ajan turu (`/agents`) ---
 
-    def warm_up(self) -> None:
-        """Modelleri belleğe alır (idempotent); web backend'in `/mahir-rag-warmup` pingi buraya düşer."""
-
-        self._embedder.load()
-        self._load_reranker()
-
     def run_agent_prompts(
         self, items: list[dict[str, Any]]
     ) -> tuple[bool, str, list[dict[str, Any]] | None]:
@@ -836,10 +830,6 @@ def handle_agents_request(service: RAGService, body: object) -> tuple[int, dict[
 
     if not isinstance(body, dict):
         return 400, {"ok": False, "message": "İstek gövdesi okunamadı."}
-
-    if body.get("warmup"):
-        service.warm_up()
-        return 200, {"ok": True, "message": "RAG hattı hazır.", "structuredData": {"ready": True}}
 
     raw_agents = body.get("agents")
     if not isinstance(raw_agents, list) or not raw_agents:

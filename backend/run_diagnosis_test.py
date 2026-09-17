@@ -3,7 +3,7 @@
 eder.
 
 Üretim kodunu KOPYALAMAZ, doğrudan çağırır - `agents/pipeline.py`'nin gerçekte
-kurduğu prompt'u, çalışan yerel RAG servisine (`MAHIR_RAG_REMOTE_URL`, varsayılan
+kurduğu prompt'u, çalışan yerel RAG servisine (`MAHIR_RAG_URL`, varsayılan
 `http://127.0.0.1:8001/agents`) gönderir ve öğretmenin göreceği metni üreten
 aynı doğrulama fonksiyonlarından geçirir. Böylece bu script'in sonucu her
 zaman canlı davranışla birebir aynı kalır. Önce Qdrant, llama-server ve
@@ -36,7 +36,7 @@ from app.agents.pipeline import (
     _enqueue_diagnosis_prompts,
 )
 from app.approved_data_analyzer import (
-    MAHIR_RAG_REMOTE_URL,
+    MAHIR_RAG_URL,
     _RAG_NO_ANSWER_TEXT,
     _RAG_WEAK_THRESHOLD,
     _normalize_theme_for_rag,
@@ -235,8 +235,8 @@ def main() -> int:
         print("UYARI: prompt kuyruğa yazılmadı (tema çözülemedi ya da soru boş kaldı).")
         return 1
 
-    print(f"\nUzak RAG/LLM servisine istek atılıyor: {MAHIR_RAG_REMOTE_URL}")
-    ok, message, results = run_agent_prompts(context.llm_queue, MAHIR_RAG_REMOTE_URL)
+    print(f"\nYerel RAG servisine istek atılıyor: {MAHIR_RAG_URL}")
+    ok, message, results = run_agent_prompts(context.llm_queue, MAHIR_RAG_URL)
     if not ok or not results:
         print(f"LLM turu başarısız: {message}")
         return 1

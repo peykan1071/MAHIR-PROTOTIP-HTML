@@ -565,9 +565,9 @@ MAHİR tamamen yerel çalışır: hiçbir bulut servisi, API anahtarı ya da (mo
 
 ```text
 Tarayıcı -> :8000 web backend (MAHIR_BASLAT.cmd, yalnız standart kütüphane)
-              |-- MAHIR_RAG_REMOTE_URL = http://127.0.0.1:8001/agents -> :8001 local/rag_service.py -> :8080 llama-server (Qwen2.5-7B Q4_K_M, GPU)
+              |-- MAHIR_RAG_URL = http://127.0.0.1:8001/agents        -> :8001 local/rag_service.py -> :8080 llama-server (Qwen2.5-7B Q4_K_M, GPU)
               |                                                                                      `-> :6333 Qdrant (Docker)
-              `-- MAHIR_OCR_REMOTE_URL = http://127.0.0.1:8002        -> :8002 backend/run_ocr_worker.py (PaddleOCR-VL, GPU)
+              `-- MAHIR_OCR_URL = http://127.0.0.1:8002               -> :8002 backend/run_ocr_worker.py (PaddleOCR-VL, GPU)
 ```
 
 Başlatma sırası (her satır ayrı bir terminal penceresi; `local/.env` bir kez `local/.env.example`'dan kopyalanır):
@@ -588,9 +588,9 @@ python local/ingestion_pipeline.py --pdf docs/tde2026.pdf --program-id tde-9-tym
 
 Parçalama stratejisi belgenin yapısını izler ([`local/curriculum.py`](local/curriculum.py)): önce tüm sınıflar için ortak **süreç bileşenleri** bölümü (s.20-27) kazanım başına tek parça olarak (`TDE1.2` + `a) TDE1.2.1…` + göstergeler), sonra 9. sınıf tema sayfaları (s.65-96) SINIF×TEMA alt-PDF'leri hâlinde Docling ile. Her parça `section_kind` (tema girişi, öğrenme çıktıları, içerik çerçevesi, anahtar kavramlar, öğrenme kanıtları, öğrenme-öğretme yaşantıları, farklılaştırma, tema sonu…) ve `outcome_codes` alanlarıyla etiketlenir; gömülen metin "9. Sınıf | 1. Tema: Sözün İnceliği | Öğrenme-Öğretme Yaşantıları | TDE2.2 | Okuma" ön ekiyle başlar. Docling'in düşürdüğü satır içi bölüm etiketleri pypdf akışından geri yerleştirilir, satır sonu heceleme artıkları ("sü - reci") sözlük onayıyla birleştirilir, parça tavanı 320 token'dır (`CHUNK_MAX_TOKENS`). Teşhis sırasında servis, tema filtreli parçaların önüne o kazanımın süreç bileşeni parçasını (`retrieval.outcomeCode`) ekler.
 
-Web backend servis adreslerini koda gömülü varsayılanlardan alır; farklı bir port kullanılacaksa `MAHIR_RAG_REMOTE_URL` / `MAHIR_OCR_REMOTE_URL` ortam değişkenleri geçersiz kılar, boş string ilgili özelliği bilinçli olarak kapatır (analiz kurallı ajanlarla, görseller OCR'sız öğretmen kontrolüyle devam eder).
+Web backend servis adreslerini koda gömülü varsayılanlardan alır; farklı bir port kullanılacaksa `MAHIR_RAG_URL` / `MAHIR_OCR_URL` ortam değişkenleri geçersiz kılar, boş string ilgili özelliği bilinçli olarak kapatır (analiz kurallı ajanlarla, görseller OCR'sız öğretmen kontrolüyle devam eder).
 
-> **Süre ve bellek notları.** llama-server bir analiz turunun teşhis istemlerini ardışık çözer: sekiz zayıf öğrenme çıktısı için yaklaşık 1,5 dakika (`RERANKER_ENABLED=false`) ile 4 dakika (reranker CPU'da açık). llama-server (~4,8 GB) ile OCR işçisi (PaddleOCR-VL, +~1 GB) 6 GB VRAM'e birlikte sığar ama pay dardır (ölçüldü: iki görsel OCR'da tepe 5,7-5,8 GB); işçi "CUDA out of memory" verirse `local/.env`'de `LLM_GPU_LAYERS` düşürülür (ör. 20) ya da görsel yükleme aşamasında llama-server kapalı tutulur. Görsel yüklemede "Uzak OCR sunucusuna ulaşılamadı … 10061" hatası, işçinin (`python backend/run_ocr_worker.py`) açık olmadığı anlamına gelir. Uzun teşhis istemleri 8k pencereyi zorlarsa `LLM_CONTEXT_WINDOW=12288` (yaklaşık +120 MB KV önbelleği) denenebilir. Servislerde kimlik doğrulaması yoktur ve hepsi yalnız `127.0.0.1`'e bağlanır; yanlış kullanıma karşı yapısal koruma `local/rag_service.py` içindeki istem sayısı/uzunluğu sınırlarıdır (`MAX_AGENT_*`).
+> **Süre ve bellek notları.** llama-server bir analiz turunun teşhis istemlerini ardışık çözer: sekiz zayıf öğrenme çıktısı için yaklaşık 1,5 dakika (`RERANKER_ENABLED=false`) ile 4 dakika (reranker CPU'da açık). llama-server (~4,8 GB) ile OCR işçisi (PaddleOCR-VL, +~1 GB) 6 GB VRAM'e birlikte sığar ama pay dardır (ölçüldü: iki görsel OCR'da tepe 5,7-5,8 GB); işçi "CUDA out of memory" verirse `local/.env`'de `LLM_GPU_LAYERS` düşürülür (ör. 20) ya da görsel yükleme aşamasında llama-server kapalı tutulur. Görsel yüklemede "OCR işçisine ulaşılamadı … 10061" hatası, işçinin (`python backend/run_ocr_worker.py`) açık olmadığı anlamına gelir. Servisler modelleri açılışta yükler; ayrı bir ısıtma adımı yoktur. Uzun teşhis istemleri 8k pencereyi zorlarsa `LLM_CONTEXT_WINDOW=12288` (yaklaşık +120 MB KV önbelleği) denenebilir. Servislerde kimlik doğrulaması yoktur ve hepsi yalnız `127.0.0.1`'e bağlanır; yanlış kullanıma karşı yapısal koruma `local/rag_service.py` içindeki istem sayısı/uzunluğu sınırlarıdır (`MAX_AGENT_*`).
 
 ## 9. sınıf Türk Dili ve Edebiyatı pilotu
 

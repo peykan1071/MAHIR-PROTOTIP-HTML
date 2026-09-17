@@ -134,13 +134,6 @@ class _Backend:
             [module.Hit(point_id="p", payload=hit.payload, retrieval_score=hit.score) for hit in hits]
         )
 
-    def warmup(self):
-        """`{"warmup": true}` gövdesine HTTP zarfı: `(status, body_dict)`."""
-
-        module, service = self._service([])
-        service.warm_up = lambda: None  # modelleri indirmeden
-        return module.handle_agents_request(service, {"warmup": True})
-
 
 def _item(name, user="kullanıcı metni", system="sistem", retrieval=None, max_tokens=None):
     item = {"name": name, "system": system, "user": user}
@@ -331,16 +324,6 @@ class SourceShapeTests(unittest.TestCase):
         self.assertEqual(source["pages"], [])
         self.assertEqual(source["headings"], [])
         self.assertEqual(source["excerpt"], "")
-
-
-class WarmUpEnvelopeTests(unittest.TestCase):
-    def test_warmup_returns_ready_without_running_a_query(self):
-        status, body = _Backend().warmup()
-
-        self.assertEqual(status, 200)
-        self.assertTrue(body["ok"])
-        self.assertEqual(body["structuredData"], {"ready": True})
-        self.assertIsInstance(body["message"], str)
 
 
 if __name__ == "__main__":

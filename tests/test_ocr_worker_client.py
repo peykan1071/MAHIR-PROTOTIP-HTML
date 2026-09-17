@@ -1,4 +1,4 @@
-"""Tests for the connection-level retry-with-backoff in `run_remote_image_group_ocr`.
+"""Tests for the connection-level retry-with-backoff in `request_image_group_ocr`.
 
 A live WinError 10053 ("bağlantı ana makinedeki yazılım tarafından iptal
 edildi") showed the worker itself was healthy - the request never reached it.
@@ -18,7 +18,7 @@ import unittest
 import urllib.error
 from unittest.mock import call, patch
 
-from backend.app import remote_ocr_client
+from backend.app import ocr_worker_client
 from backend.app.file_receiver import UploadedFile
 
 _FAKE_URL = "https://fake.example"
@@ -41,19 +41,19 @@ def _response(payload: dict[str, object]):
     return _FakeResponse(body)
 
 
-class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
+class RequestImageGroupOcrRetryTests(unittest.TestCase):
     def setUp(self):
-        patcher = patch("backend.app.remote_ocr_client.time.sleep")
+        patcher = patch("backend.app.ocr_worker_client.time.sleep")
         self.addCleanup(patcher.stop)
         self.mock_sleep = patcher.start()
 
     def test_connection_error_then_success_on_second_attempt_is_hidden(self):
         ok_response = _response({"ok": True, "message": "tamam", "structuredData": {"a": 1}})
         with patch(
-            "backend.app.remote_ocr_client.urllib.request.urlopen",
+            "backend.app.ocr_worker_client.urllib.request.urlopen",
             side_effect=[urllib.error.URLError("kopma"), ok_response],
         ) as mock_urlopen:
-            ok, message, data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
+            ok, message, data = ocr_worker_client.request_image_group_ocr(_uploaded_files(), _FAKE_URL)
 
         self.assertTrue(ok)
         self.assertEqual(message, "tamam")
@@ -64,10 +64,10 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
     def test_connection_error_twice_then_success_on_third_attempt_is_hidden(self):
         ok_response = _response({"ok": True, "message": "tamam", "structuredData": {"a": 1}})
         with patch(
-            "backend.app.remote_ocr_client.urllib.request.urlopen",
+            "backend.app.ocr_worker_client.urllib.request.urlopen",
             side_effect=[OSError("kopma-1"), OSError("kopma-2"), ok_response],
         ) as mock_urlopen:
-            ok, _message, _data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
+            ok, _message, _data = ocr_worker_client.request_image_group_ocr(_uploaded_files(), _FAKE_URL)
 
         self.assertTrue(ok)
         self.assertEqual(mock_urlopen.call_count, 3)
@@ -75,13 +75,13 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
 
     def test_connection_error_on_all_three_attempts_reports_unreachable(self):
         with patch(
-            "backend.app.remote_ocr_client.urllib.request.urlopen",
+            "backend.app.ocr_worker_client.urllib.request.urlopen",
             side_effect=[OSError("kopma-1"), OSError("kopma-2"), OSError("kopma-3")],
         ) as mock_urlopen:
-            ok, message, data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
+            ok, message, data = ocr_worker_client.request_image_group_ocr(_uploaded_files(), _FAKE_URL)
 
         self.assertFalse(ok)
-        self.assertIn("Uzak OCR sunucusuna ulaşılamadı", message)
+        self.assertIn("OCR işçisine ulaşılamadı", message)
         self.assertIn("kopma-3", message)
         self.assertIsNone(data)
         self.assertEqual(mock_urlopen.call_count, 3)
@@ -96,10 +96,10 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
             fp=io.BytesIO(json.dumps({"ok": False, "message": "sunucu hatası"}).encode("utf-8")),
         )
         with patch(
-            "backend.app.remote_ocr_client.urllib.request.urlopen",
+            "backend.app.ocr_worker_client.urllib.request.urlopen",
             side_effect=http_error,
         ) as mock_urlopen:
-            ok, message, data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
+            ok, message, data = ocr_worker_client.request_image_group_ocr(_uploaded_files(), _FAKE_URL)
 
         self.assertFalse(ok)
         self.assertEqual(message, "sunucu hatası")
@@ -123,13 +123,13 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
             fp=_TruncatedBody(),
         )
         with patch(
-            "backend.app.remote_ocr_client.urllib.request.urlopen",
+            "backend.app.ocr_worker_client.urllib.request.urlopen",
             side_effect=http_error,
         ) as mock_urlopen:
-            ok, message, data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
+            ok, message, data = ocr_worker_client.request_image_group_ocr(_uploaded_files(), _FAKE_URL)
 
         self.assertFalse(ok)
-        self.assertIn("Uzak OCR sunucusuna ulaşılamadı", message)
+        self.assertIn("OCR işçisine ulaşılamadı", message)
         self.assertIsNone(data)
         mock_urlopen.assert_called_once()
         self.mock_sleep.assert_not_called()
@@ -137,10 +137,10 @@ class RunRemoteImageGroupOcrRetryTests(unittest.TestCase):
     def test_single_attempt_success_still_works(self):
         ok_response = _response({"ok": True, "message": "tamam", "structuredData": None})
         with patch(
-            "backend.app.remote_ocr_client.urllib.request.urlopen",
+            "backend.app.ocr_worker_client.urllib.request.urlopen",
             return_value=ok_response,
         ) as mock_urlopen:
-            ok, message, data = remote_ocr_client.run_remote_image_group_ocr(_uploaded_files(), _FAKE_URL)
+            ok, message, data = ocr_worker_client.request_image_group_ocr(_uploaded_files(), _FAKE_URL)
 
         self.assertTrue(ok)
         self.assertEqual(message, "tamam")

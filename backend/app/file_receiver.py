@@ -5,7 +5,7 @@ filename extension. Word, PDF and image documents are accepted by the
 prototype and forwarded to the teacher-validation step; DOCX/PDF/XLSX tables
 are parsed when their headings can be recognised, and image groups are OCR'd
 by the separate OCR worker process (`run_ocr_worker.py`, reached through
-`remote_ocr_client.py`) when `MAHIR_OCR_REMOTE_URL` is set - no OCR model is
+`ocr_worker_client.py`) when `MAHIR_OCR_URL` is set - no OCR model is
 loaded into this process. A fixed MAHIR template is never required.
 """
 
@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import threading
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -34,8 +33,6 @@ from .timing import stage
 UPLOAD_PATH = "/mahir-upload"
 ANALYZE_PATH = "/mahir-analyze"
 MERGE_REPORTS_PATH = "/mahir-merge-reports"
-OCR_WARMUP_PATH = "/mahir-ocr-warmup"
-RAG_WARMUP_PATH = "/mahir-rag-warmup"
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 MAX_FILES_PER_UPLOAD = 10
 MAX_REQUEST_SIZE = MAX_UPLOAD_SIZE * MAX_FILES_PER_UPLOAD
@@ -57,13 +54,13 @@ ALLOWED_EXTENSIONS = {
 }
 IMAGE_EXTENSIONS = {".gif", ".jpeg", ".jpg", ".png", ".webp"}
 # OCR işçisinin (`backend/run_ocr_worker.py`, ayrı süreç, 127.0.0.1:8002) adresi
-# koda gömülü - `approved_data_analyzer.py`'deki `MAHIR_RAG_REMOTE_URL` ile aynı
+# koda gömülü - `approved_data_analyzer.py`'deki `MAHIR_RAG_URL` ile aynı
 # desen: sunucuyu her başlatışta env değişkeni ayarlamaya gerek yok;
 # unutulduğunda sunucu hata vermeden OCR'sız "pass-through" moduna düşüyordu.
 # Başka bir porta işaret etmek gerekirse env var geçersiz kılar; boş string
 # vermek OCR'ı bilinçli olarak kapatır.
-_DEFAULT_MAHIR_OCR_REMOTE_URL = "http://127.0.0.1:8002"
-MAHIR_OCR_REMOTE_URL = os.environ.get("MAHIR_OCR_REMOTE_URL", _DEFAULT_MAHIR_OCR_REMOTE_URL)
+_DEFAULT_MAHIR_OCR_URL = "http://127.0.0.1:8002"
+MAHIR_OCR_URL = os.environ.get("MAHIR_OCR_URL", _DEFAULT_MAHIR_OCR_URL)
 
 
 @dataclass(frozen=True)
@@ -106,51 +103,6 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.end_headers()
-
-    def do_GET(self) -> None:
-        """Serve the prototype, but intercept the warm-up pings first.
-
-        The browser can't call the OCR/RAG services itself (it never learns
-        their URLs, and they are on another origin), so both pings are proxied
-        here. They must return *immediately*: a warm-up call blocks for tens of
-        seconds while a service loads its models, and the teacher is meanwhile
-        picking files or reviewing scores - nothing may wait on it.
-        """
-
-        request_path = urlparse(self.path).path
-        if request_path == OCR_WARMUP_PATH:
-            # OCR ısıtması dosyalar seçilir seçilmez tetikleniyor; soğuk
-            # başlangıcı (~30-50 sn) "Verileri Oku"nun beklemesinden çıkarır.
-            from .remote_ocr_client import warm_up_remote_ocr
-
-            self._start_warm_up(MAHIR_OCR_REMOTE_URL, warm_up_remote_ocr)
-            return
-        if request_path == RAG_WARMUP_PATH:
-            # RAG ısıtması doğrulama ekranı açılınca tetikleniyor; öğretmen
-            # puanları incelerken ~110 sn'lik soğuk başlangıç biter ve
-            # scaledown_window=300 sayesinde analize kadar sıcak kalır. URL
-            # burada değil analiz modülünde tanımlı - modül üzerinden okunuyor
-            # ki testler onu yamalayabilsin.
-            from . import approved_data_analyzer
-            from .rag_client import warm_up_remote_rag
-
-            self._start_warm_up(approved_data_analyzer.MAHIR_RAG_REMOTE_URL, warm_up_remote_rag)
-            return
-        super().do_GET()
-
-    def _start_warm_up(self, remote_url: str, warm_up) -> None:
-        """Uzak ısıtmayı daemon thread'e atıp anında yanıt döner."""
-
-        if not remote_url:
-            # Uzak servis yapılandırılmamış (ör. OCR'sız yerel geliştirme):
-            # ısıtılacak bir şey yok, sessizce başarılı dön.
-            self._send_json(200, {"ok": True, "started": False})
-            return
-
-        threading.Thread(
-            target=warm_up, args=(remote_url,), name=warm_up.__name__, daemon=True
-        ).start()
-        self._send_json(200, {"ok": True, "started": True})
 
     def do_POST(self) -> None:
         request_path = urlparse(self.path).path
@@ -215,8 +167,8 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
                 flush=True,
             )
             # Yerel toplam: isteğin alınmasından yanıtın hazır olmasına kadar.
-            # `remote_ocr_client` kendi satırını ayrıca basıyor; aradaki fark
-            # yerel ayrıştırma, uzak satırdaki büyük süre ise soğuk başlangıç.
+            # `ocr_worker_client` kendi satırını (`ocr-isci`) ayrıca basıyor; aradaki
+            # fark yerel ayrıştırma, işçi satırındaki büyük süre ise gerçek OCR.
             ocr_decision = inspect_upload(uploaded_files, results)
             with stage(
                 "ocr-yerel",
@@ -548,14 +500,14 @@ def run_existing_backend_flow(
 
 
 def run_image_group_ocr(uploaded_files: list[UploadedFile]) -> tuple[bool, str, dict[str, object] | None]:
-    """Send an all-image upload group to the remote MAHIR OCR backend, if configured."""
+    """Send an all-image upload group to the OCR worker process, if configured."""
 
-    if not MAHIR_OCR_REMOTE_URL:
+    if not MAHIR_OCR_URL:
         return True, f"{len(uploaded_files)} görsel alındı ve öğretmen kontrolüne hazırlandı.", None
 
-    from .remote_ocr_client import run_remote_image_group_ocr
+    from .ocr_worker_client import request_image_group_ocr
 
-    return run_remote_image_group_ocr(uploaded_files, MAHIR_OCR_REMOTE_URL)
+    return request_image_group_ocr(uploaded_files, MAHIR_OCR_URL)
 
 
 def extract_uploaded_files(body: bytes, content_type: str) -> list[UploadedFile]:

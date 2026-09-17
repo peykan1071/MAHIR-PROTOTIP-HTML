@@ -213,7 +213,7 @@ class Settings:
         çağrılmalı (bu modülde ağır importlar ertelenmiş durumda).
 
         LLM için anahtar ZORUNLU DEĞİL: varsayılan uç yerel llama-server
-        (`LLM_BASE_URL`), anahtar kabul etmez/istemez. Uzak bir OpenAI uyumlu
+        (`LLM_BASE_URL`), anahtar kabul etmez/istemez. Başka bir OpenAI uyumlu
         uca geçilirse `LLM_API_KEY` verilir.
         """
 

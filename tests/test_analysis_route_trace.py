@@ -33,19 +33,19 @@ _PAYLOAD = {
     "students": [{"studentRef": "Ö-001", "scores": [8, 6, 7]}],
 }
 
-_no_remote = None
+_no_service = None
 
 
 def setUpModule():
     """LLM turu kapalı: burada sınanan şey izin TAŞINMASI, üretimi değil."""
 
-    global _no_remote
-    _no_remote = patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", "")
-    _no_remote.start()
+    global _no_service
+    _no_service = patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", "")
+    _no_service.start()
 
 
 def tearDownModule():
-    _no_remote.stop()
+    _no_service.stop()
 
 
 def _post(server, payload):

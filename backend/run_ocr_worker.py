@@ -1,8 +1,9 @@
 """Run the MAHİR OCR worker (PaddleOCR-VL, GPU) as its own local process.
 
 The web backend (`run_file_receiver.py`, :8000) forwards image uploads here
-through `app/remote_ocr_client.py`; the default address on both sides is
-`http://127.0.0.1:8002` (`MAHIR_OCR_WORKER_PORT` / `MAHIR_OCR_REMOTE_URL`).
+through `app/ocr_worker_client.py`; the default address on both sides is
+`http://127.0.0.1:8002` (`MAHIR_OCR_WORKER_PORT` / `MAHIR_OCR_URL`). The
+PaddleOCR-VL pipeline is loaded once here, before the first request.
 Kept separate so the teacher-facing server never loads paddle/torch and a
 model crash cannot take the web UI down. Needs the `local/requirements.txt`
 environment (paddlepaddle-gpu + CUDA 12.6 / cuDNN 9 on the machine).

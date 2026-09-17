@@ -475,7 +475,7 @@ class VisionOcr:
     def _get_pipeline(self) -> Any:
         if self._pipeline is not None:
             return self._pipeline
-        # PaddleX her kurulumda uzak model kaynaklarını yoklayıp dakikalarca
+        # PaddleX her kurulumda çevrim içi model kaynaklarını yoklayıp dakikalarca
         # bekletebiliyor - .env'de de var ama import'tan önce burada da garanti.
         os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
         try:

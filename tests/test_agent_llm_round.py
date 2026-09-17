@@ -60,7 +60,7 @@ def _capture(answer=""):
 
     calls = []
 
-    def fake(items, remote_url):
+    def fake(items, service_url):
         calls.append(items)
         return True, "ok", [
             {
@@ -80,7 +80,7 @@ def _capture(answer=""):
 class SingleRoundTests(unittest.TestCase):
     def test_every_agent_prompt_travels_in_one_request(self):
         calls, fake = _capture()
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 analyze_approved_data(_tde_payload())
 
@@ -90,7 +90,7 @@ class SingleRoundTests(unittest.TestCase):
         # Ölçme'nin anomali prompt'u getirimsiz, Pedagojik'inkiler getirimli.
         # İkisi ayrı isteklere düşerse maliyet ajan başına büyümeye başlar.
         calls, fake = _capture()
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 analyze_approved_data(_tde_payload())
 
@@ -111,7 +111,7 @@ class SingleRoundTests(unittest.TestCase):
             question["outcomeCode"] = f"M9.{index}"
 
         calls, fake = _capture()
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 analyze_approved_data(payload)
 
@@ -126,7 +126,7 @@ class SingleRoundTests(unittest.TestCase):
         payload["students"] = [{"studentRef": "Ö-001", "scores": [10, 10]}]
 
         calls, fake = _capture()
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 analyze_approved_data(payload)
 
@@ -134,9 +134,9 @@ class SingleRoundTests(unittest.TestCase):
         self.assertEqual(len(calls[0]), 2)
         self.assertTrue(all(item["name"].startswith("pedagoji/") for item in calls[0]))
 
-    def test_no_request_when_remote_is_not_configured(self):
+    def test_no_request_when_service_is_not_configured(self):
         calls, fake = _capture()
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", ""):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 result = analyze_approved_data(_tde_payload())
 
@@ -149,7 +149,7 @@ class LlmTraceTests(unittest.TestCase):
 
     def _trace(self, answer=""):
         calls, fake = _capture(answer=answer)
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 _analysis, trace = analyze_approved_data_traced(_tde_payload())
         return {entry["agent"]: entry for entry in trace["agents"]}
@@ -180,7 +180,7 @@ class LlmTraceTests(unittest.TestCase):
         # Faz 3'ün asıl iddiası burada görünür hâle geliyor: dört LLM istemi,
         # TEK tur. Süre ajanlara bölüştürülmüyor - paylaştırmak uydurma olurdu.
         calls, fake = _capture(answer="teşhis")
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 _analysis, trace = analyze_approved_data_traced(_tde_payload())
 
@@ -190,12 +190,12 @@ class LlmTraceTests(unittest.TestCase):
         self.assertGreaterEqual(trace["llmRound"]["durationMs"], 0.0)
 
     def test_no_round_leaves_the_record_empty(self):
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", ""):
             _analysis, trace = analyze_approved_data_traced(_tde_payload())
         self.assertEqual(trace["llmRound"], {})
 
     def test_failed_round_is_traced_as_not_ok(self):
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch(
                 "backend.app.agents.llm.run_agent_prompts",
                 return_value=(False, "ulaşılamadı", None),
@@ -205,7 +205,7 @@ class LlmTraceTests(unittest.TestCase):
         self.assertEqual(trace["llmRound"]["resultCount"], 0)
 
     def test_failed_round_leaves_llm_calls_empty(self):
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch(
                 "backend.app.agents.llm.run_agent_prompts",
                 return_value=(False, "ulaşılamadı", None),
@@ -224,7 +224,7 @@ class DiagnosisSourceTests(unittest.TestCase):
     """
 
     def _outcomes(self, sources):
-        def fake(items, remote_url):
+        def fake(items, service_url):
             return True, "ok", [
                 {
                     "name": item["name"],
@@ -234,7 +234,7 @@ class DiagnosisSourceTests(unittest.TestCase):
                 for item in items
             ]
 
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 return analyze_approved_data(_tde_payload())["outcomes"]
 
@@ -264,7 +264,7 @@ class DiagnosisSourceTests(unittest.TestCase):
         self.assertEqual(by_name["ek-kilavuz.pdf"], [3, 4], "Sayfalar sıralı olmalı.")
 
     def test_malformed_source_entries_are_dropped_not_raised(self):
-        # Uzak uç sözleşmeyi bozarsa alan boş kalır; analiz kesilmez.
+        # Servis sözleşmeyi bozarsa alan boş kalır; analiz kesilmez.
         outcomes = self._outcomes([
             {"documentName": "", "pages": [5]},
             {"pages": [7]},
@@ -277,7 +277,7 @@ class DiagnosisSourceTests(unittest.TestCase):
 
     def test_field_is_always_present_even_without_a_diagnosis(self):
         # Alan varlığı öngörülebilir olmalı - `ragContext` ile aynı ilke.
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", ""):
             outcomes = analyze_approved_data(_tde_payload())["outcomes"]
         for outcome in outcomes:
             with self.subTest(code=outcome["outcomeCode"]):
@@ -318,7 +318,7 @@ class AnomalyAgentTests(unittest.TestCase):
             "documentNumber": "EVRAK-123",
         })
         calls, fake = _capture()
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 analyze_approved_data(payload)
 
@@ -332,7 +332,7 @@ class AnomalyAgentTests(unittest.TestCase):
         # Gizlilik kapısı kimlik alanlarını reddediyor; bu prompt o sınırın
         # arkasına yan kapı açmamalı. Yalnız SORU düzeyinde toplu değer gider.
         calls, fake = _capture()
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 analyze_approved_data(_tde_payload(scores=(3, 4, 2)))
 
@@ -347,10 +347,10 @@ class AnomalyAgentTests(unittest.TestCase):
     def test_findings_reach_the_summary_without_touching_any_number(self):
         calls, fake = _capture(answer="- Soru 3: sınıfın tamamı sıfır aldı.")
         payload = _tde_payload()
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 enriched = analyze_approved_data(payload)
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", ""):
             plain = analyze_approved_data(payload)
 
         self.assertIn("Soru 3", enriched["summary"]["anomalies"])
@@ -362,7 +362,7 @@ class AnomalyAgentTests(unittest.TestCase):
 
     def test_no_finding_leaves_the_field_empty(self):
         calls, fake = _capture(answer="Belirgin bir tutarsızlık görülmedi.")
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=fake):
                 result = analyze_approved_data(_tde_payload())
 

@@ -8,14 +8,20 @@ Mevcut prototipte Ölçme ve Pedagojik Analiz ajanlarının istemleri bu ortak
 turda birleştirilir. Katman daha fazla uzman rolü aynı turda taşıyabilecek
 biçimde kurulmuştur; bu, bütün ajanların LLM kullandığı anlamına gelmez.
 
-Bu modül `rag_client` ile aynı sözleşmeyi taşır: **asla istisna fırlatmaz**.
-LLM arızası isteğe bağlı bir ajanı düşürür, öğretmenin analizini değil
-(bkz. `agents/orchestrator.py`, zorunlu/isteğe bağlı ayrımı).
+Servis adresi `approved_data_analyzer.MAHIR_RAG_URL` (varsayılan
+http://127.0.0.1:8001/agents; boş string LLM turunu kapatır). HTTP istemcisi de
+burada (`_post_json`) - `ocr_worker_client.py` ile aynı `{"ok", "message",
+"structuredData"}` zarfı. Bu modül **asla istisna fırlatmaz**: LLM arızası
+isteğe bağlı bir ajanı düşürür, öğretmenin analizini değil (bkz.
+`agents/orchestrator.py`, zorunlu/isteğe bağlı ayrımı).
 """
 
 from __future__ import annotations
 
+import json
 import time
+import urllib.error
+import urllib.request
 from typing import Any
 
 # Servisin sınırlarıyla aynı olmalı (bkz. local/rag_service.py MAX_AGENT_*).
@@ -23,15 +29,21 @@ from typing import Any
 # çağırana yakın yerde üretilsin.
 MAX_PROMPTS_PER_REQUEST = 16
 
-# Uzak uç noktanın anladığı alanlar. Kuyruktaki sözlük bunlardan fazlasını
+# Servisin anladığı alanlar. Kuyruktaki sözlük bunlardan fazlasını
 # taşıyabiliyor (ör. `agent`: LLM kaydının hangi ajanın izine düşeceği) ve o
 # alanlar yerel - beyaz liste, çağıran tarafın iç alanlarının sessizce ağa
 # sızmasını yapısal olarak engelliyor.
 _WIRE_KEYS = ("name", "system", "user", "maxTokens", "retrieval")
 
+# llama-server bir turun N prompt'unu ARDIŞIK çözer (--parallel 1): prompt
+# başına ~10 s LLM + reranker açıksa ~20 s CPU. 8 zayıf öğrenme çıktısı ≈ 4 dk.
+# Bu istek analiz sırasında tek bir kez gidiyor.
+_SERVICE_TIMEOUT_SECONDS = 600
+_UNREACHABLE_MESSAGE = "RAG servisine ulaşılamadı (local/rag_service.py çalışıyor mu?)"
+
 
 def build_prompt(agent: str, system: str, user: str, max_tokens: int | None = None) -> dict[str, Any]:
-    """Uzak uç noktanın beklediği tek prompt sözlüğünü kurar."""
+    """Servisin beklediği tek prompt sözlüğünü kurar."""
 
     item: dict[str, Any] = {"name": agent, "system": system, "user": user}
     if max_tokens:
@@ -39,9 +51,41 @@ def build_prompt(agent: str, system: str, user: str, max_tokens: int | None = No
     return item
 
 
+def _post_json(service_url: str, body_payload: dict[str, object]) -> tuple[bool, str, object | None]:
+    """Ajan turunun HTTP gövdesi: `POST <service_url>` JSON -> `(ok, mesaj, structuredData)`.
+
+    Servis (`local/rag_service.py` `/agents`) `{"ok", "message", "structuredData"}`
+    zarfını 2xx dışı durumda da döndürür; o Türkçe mesaj öne çıkarılır.
+    Beklenen arıza kipleri (ağ hatası, zaman aşımı, bozuk JSON) istisna değil
+    `(False, <Türkçe mesaj>, None)` döndürür - bu modül asla istisna fırlatmaz.
+    """
+
+    body = json.dumps(body_payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    request = urllib.request.Request(service_url.rstrip("/"), data=body, method="POST", headers=headers)
+
+    try:
+        with urllib.request.urlopen(request, timeout=_SERVICE_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        try:
+            payload = json.loads(error.read().decode("utf-8"))
+            return False, str(payload.get("message") or error), None
+        except (ValueError, UnicodeDecodeError):
+            return False, f"{_UNREACHABLE_MESSAGE}: {error}", None
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as error:
+        return False, f"{_UNREACHABLE_MESSAGE}: {error}", None
+
+    return (
+        bool(payload.get("ok")),
+        str(payload.get("message", "")),
+        payload.get("structuredData"),
+    )
+
+
 def run_agent_prompts(
     items: list[dict[str, Any]],
-    remote_url: str,
+    service_url: str,
 ) -> tuple[bool, str, list[dict[str, Any]] | None]:
     """Prompt'ları tek partide çalıştırır; sonuçlar giriş sırasıyla döner.
 
@@ -63,15 +107,10 @@ def run_agent_prompts(
     if len(items) > MAX_PROMPTS_PER_REQUEST:
         return False, f"Tek istekte en çok {MAX_PROMPTS_PER_REQUEST} prompt gönderilebilir.", None
 
-    # `rag_client._post` yeniden kullanılıyor: HTTPError gövdesinden Türkçe
-    # mesaj çıkarmayı ve zaman aşımını zaten doğru yapıyor. İkinci bir HTTP
-    # istemcisi yazmak bunu kopyalamak olurdu.
-    from ..rag_client import _post
-
     wire = [{key: item[key] for key in _WIRE_KEYS if key in item} for item in items]
 
     began = time.monotonic()
-    ok, message, structured_data = _post(remote_url, {"agents": wire})
+    ok, message, structured_data = _post_json(service_url, {"agents": wire})
     duration_ms = (time.monotonic() - began) * 1000
     if not ok or not isinstance(structured_data, dict):
         return ok, message, None

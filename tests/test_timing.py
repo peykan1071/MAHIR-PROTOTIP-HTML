@@ -65,8 +65,8 @@ class StageFailureTests(unittest.TestCase):
         buffer = io.StringIO()
         with redirect_stdout(buffer):
             with self.assertRaises(RuntimeError):
-                with stage("ocr-uzak", dosya=3):
-                    raise RuntimeError("uzak servis düştü")
+                with stage("ocr-isci", dosya=3):
+                    raise RuntimeError("servis düştü")
         line = buffer.getvalue()
         self.assertIn("sure=", line)
         self.assertIn("dosya=3", line)
@@ -78,7 +78,7 @@ class StageFailureTests(unittest.TestCase):
         buffer = io.StringIO()
         with redirect_stdout(buffer):
             with self.assertRaises(KeyboardInterrupt):
-                with stage("ocr-uzak"):
+                with stage("ocr-isci"):
                     raise KeyboardInterrupt
         self.assertIn("hata=evet", buffer.getvalue())
 

@@ -3872,45 +3872,16 @@ const fileUploadBridge = (() => {
       renderFilesList();
     };
 
-    // Uzak OCR işçisinin soğuk başlangıcı ölçülen sürenin %75-85'i (konteyner
-    // açılışı + modelleri GPU'ya yükleme ~30-50 sn; asıl OCR yalnızca 7-12 sn).
-    // Öğretmen dosyalarını seçer seçmez bu hazırlığı başlatıyoruz ki "Verileri
-    // Oku"ya bastığında büyük ölçüde bitmiş olsun. Ateşle-unut: yanıtı
-    // beklenmez, hatası yutulur - ısıtma başarısız olsa da yükleme eskisi gibi
-    // (yalnızca daha yavaş) çalışır.
-    // Tek seferlik değil, kısılmış: öğretmen aynı oturumda ikinci bir grup
-    // yüklediğinde konteyner çoktan kapanmış olabilir, o yüzden yeniden
-    // ısıtılabilmeli - ama her dosya seçiminde tekrar tekrar değil.
-    const WARM_UP_THROTTLE_MS = 30000;
-    const warmUpAt = {};
-    const warmUp = (path) => {
-      const now = Date.now();
-      if (now - (warmUpAt[path] || 0) < WARM_UP_THROTTLE_MS) return;
-      warmUpAt[path] = now;
-      fetch(path).catch(() => {});
-    };
-    const warmUpOcr = () => warmUp("/mahir-ocr-warmup");
-    // RAG'in soğuk başlangıcı daha da uzun (ölçülen ~110 sn: konteyner +
-    // bge-m3 + vLLM/Qwen2.5-7B) ve bugün tam "Onayla ve Analiz Et"e basıldığı
-    // anda ödeniyor. Doğrulama ekranı açılırken ısıtıyoruz: öğretmen puanları
-    // incelerken hazırlık biter, rag_service.py'deki scaledown_window=300 de
-    // konteyneri o inceleme boyunca ayakta tutar.
-    const warmUpRag = () => warmUp("/mahir-rag-warmup");
-
     // --- Süre ölçümü ---
     //
     // İki uzun işlem (belge okuma ve analiz) sessizdi: öğretmen butona basıp
     // bekliyor, ne kadar beklediği hiçbir yere yazılmıyordu. Ölçüm kırılımlı,
-    // çünkü tek bir toplam asıl soruyu yanıtlamıyor - aynı iş soğuk
-    // konteynerde 160 sn, sıcakta 15,7 sn sürebiliyor (ölçüldü).
+    // çünkü tek bir toplam asıl soruyu yanıtlamıyor - aynı iş modeller
+    // soğukken 160 sn, sıcakken 15,7 sn sürebiliyor (ölçüldü).
     //
     // Biçimlendirme MAHIRReportExport.durationText'ten geliyor ("16,7 sn" /
     // "340 ms", tr-TR); ikinci bir biçimlendirici yazmaya gerek yok.
     const durationText = (ms) => window.MAHIRReportExport?.durationText?.(ms) ?? `${Math.round(ms)} ms`;
-
-    // Isıtmanın üzerinden geçen süre: "neden 45 sn sürdü"nün cevabı çoğu zaman
-    // burada. Kısaysa uzak konteyner hâlâ soğuk demektir.
-    const sinceWarmUp = (path) => (warmUpAt[path] ? durationText(Date.now() - warmUpAt[path]) : "ısıtılmadı");
 
     const startTimer = (label) => {
       const began = performance.now();
@@ -3948,7 +3919,6 @@ const fileUploadBridge = (() => {
       selectedFiles = merged;
       fileInput.value = "";
       renderFilesList();
-      warmUpOcr();
     };
 
     const configureSourceMode = (mode) => {
@@ -5482,8 +5452,7 @@ const fileUploadBridge = (() => {
             rota: durationText(payload.trace?.totalMs ?? 0),
             llmTuru: round.promptCount ? durationText(round.durationMs) : "yok",
             istem: round.promptCount || 0,
-            ajan: payload.trace?.agents?.length || 0,
-            isitmadanBeri: sinceWarmUp("/mahir-rag-warmup")
+            ajan: payload.trace?.agents?.length || 0
           });
           showMessage(`Analiz tamamlandı. Öğrenme kanıtlarına dayalı değerlendirme raporu görüntülenmeye hazırdır. (${elapsed})`, "success");
           saveOcrDraft();
@@ -5495,7 +5464,7 @@ const fileUploadBridge = (() => {
             approvalMessage.textContent = error.message;
             approvalMessage.focus({ preventScroll: true });
           }
-          const elapsed = stopTimer({ hata: error.message, isitmadanBeri: sinceWarmUp("/mahir-rag-warmup") });
+          const elapsed = stopTimer({ hata: error.message });
           showMessage(`${error.message} (${elapsed})`, "error");
           return false;
         })
@@ -5570,7 +5539,6 @@ const fileUploadBridge = (() => {
           summary: { questionCount: questions.length, studentCount }
         }, { manualStructure: true });
         screenManager.showScreen("validation-screen");
-        warmUpRag();
         return;
       }
       if (!selectedFiles.length) return;
@@ -5590,7 +5558,7 @@ const fileUploadBridge = (() => {
       window.clearInterval(progressTimer);
       progressTimer = window.setInterval(() => updateOcrProgress(completedOcrFiles, uploadBatch.length), 1000);
 
-      // Öğretmen tek seferde 100 evraka kadar seçer. Uzak OCR işçisinin güvenli
+      // Öğretmen tek seferde 100 evraka kadar seçer. OCR işçisinin güvenli
       // istek sınırı 10 dosya olduğundan arayüz bunları öğretmene teknik "grup"
       // göstermeden arka planda 10'lu dilimler hâlinde sırayla gönderir.
       // Dosya adı yalnız öğretmen izlenebilirliği için saklanır; sınav türü veya
@@ -5790,13 +5758,11 @@ const fileUploadBridge = (() => {
           showFinalReview();
           showReportIntro();
           screenManager.showScreen("validation-screen");
-          warmUpRag();
           console.info("[MAHIR] Sınav evrakları backend alıcısına gönderildi.", { fileCount: uploadBatch.length, sessionDocumentCount: processedDocumentKeys.size, examGroupCount: consolidatedGroups.length });
           const elapsed = stopTimer({
             dosya: uploadBatch.length,
             boyut: formatBytes(uploadedBytes),
-            ogrenci: mergedData.documents.length || mergedData.students.length,
-            isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
+            ogrenci: mergedData.documents.length || mergedData.students.length
           });
           showMessage(failedFiles.length
             ? `${message} ${failedFiles.length} kaynak görsel okunamadı; başarılı sonuçlar korundu. Yalnız bu evrakları yeniden deneyebilirsiniz. (${elapsed})`
@@ -5811,8 +5777,7 @@ const fileUploadBridge = (() => {
           const elapsed = stopTimer({
             dosya: uploadBatch.length,
             boyut: formatBytes(uploadedBytes),
-            hata: error.message,
-            isitmadanBeri: sinceWarmUp("/mahir-ocr-warmup")
+            hata: error.message
           });
           showMessage(`${error.message || "Belge okuma servisine ulaşılamadı."} (${elapsed})`, "error");
           retryOcrFiles = [...uploadBatch];

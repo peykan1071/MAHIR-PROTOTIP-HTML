@@ -1,10 +1,10 @@
 """Dedicated OCR worker server (PaddleOCR-VL on the local GPU), run as its own
 process by `backend/run_ocr_worker.py` on 127.0.0.1:8002 - separate from the
 MAHIR file receiver (`file_receiver.py`), which has no PaddleOCR dependency
-and simply forwards image groups here over HTTP (see `remote_ocr_client.py`).
+and simply forwards image groups here over HTTP (see `ocr_worker_client.py`).
 
 Speaks the same request/response shape as `file_receiver.py`'s
-`/mahir-upload` (`{"ok", "message", "structuredData"}`) so `remote_ocr_client.py`
+`/mahir-upload` (`{"ok", "message", "structuredData"}`) so `ocr_worker_client.py`
 needs no special-casing for what it's talking to.
 """
 
@@ -23,7 +23,7 @@ from .file_receiver import (
     extract_uploaded_files,
     validate_file_name,
 )
-from .ocr_protocol import UPLOAD_PATH, WARMUP_PATH
+from .ocr_worker_client import UPLOAD_PATH
 
 
 class OCRWorkerHandler(BaseHTTPRequestHandler):
@@ -38,28 +38,6 @@ class OCRWorkerHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.end_headers()
-
-    def do_GET(self) -> None:
-        """Ön-ısıtma: modelleri GPU'ya yükletir, hiç predict çalıştırmaz.
-
-        Ölçüldü: bir isteğin 50-57 saniyesinin 30-50'si model yükleme, yalnızca
-        7-12 saniyesi gerçek OCR. Bu uç nokta o hazırlığı, öğretmen daha
-        dosyalarını seçerken tetiklemek için var.
-
-        `ensure_available()` idempotenttir (`ocr_engine._get_pipeline` tek
-        seferlik kurulum yapar), bu yüzden model yüklüyken anında döner.
-        """
-
-        if self.path != WARMUP_PATH:
-            self._send_json(404, {"ok": False, "message": "Bilinmeyen alıcı yolu."})
-            return
-
-        try:
-            ocr_engine.ensure_available()
-        except RuntimeError as error:
-            self._send_json(503, {"ok": False, "ready": False, "message": str(error)})
-            return
-        self._send_json(200, {"ok": True, "ready": True, "message": "OCR hattı hazır."})
 
     def do_POST(self) -> None:
         if self.path != UPLOAD_PATH:

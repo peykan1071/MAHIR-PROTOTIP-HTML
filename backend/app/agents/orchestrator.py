@@ -2,7 +2,7 @@
 
 Handoff SIRALI ve CED TEK YAZARLI: her an yalnız bir ajan belgeye yazar.
 Paralel koşum bilinçli olarak kapsam dışı - kazanç küçük (hat zaten saniyeler
-sürüyor, darboğaz uzak LLM çağrısı), bedeli büyük (aynı belgeye eşzamanlı
+sürüyor, darboğaz LLM servisi çağrısı), bedeli büyük (aynı belgeye eşzamanlı
 yazım).
 
 Arıza yalıtımı: bir ajan istisna fırlatırsa iz `failed` işaretlenir ve KALAN
@@ -250,7 +250,7 @@ def _flush_llm_queue(context: AgentContext) -> None:
     """Kuyruğa yazılmış TÜM ajan prompt'larını tek istekte gönderir.
 
     Mevcut iki LLM destekli rolün istemleri burada tek ağ isteğinde
-    birleştirilir. Böylece her rol için ayrı uzak servis turu oluşturulmaz.
+    birleştirilir. Böylece her rol için ayrı servis turu oluşturulmaz.
 
     Kuyruk boşsa hiç istek atılmaz - kayıtlı olmayan derslerde ve LLM'in
     yapılandırılmadığı ortamlarda bugünkü davranış aynen korunur.
@@ -260,14 +260,14 @@ def _flush_llm_queue(context: AgentContext) -> None:
     "sonuç gelmedi" durumunu kendi sebep koduyla loglayabilsin.
     """
 
-    from ..approved_data_analyzer import MAHIR_RAG_REMOTE_URL
+    from ..approved_data_analyzer import MAHIR_RAG_URL
 
-    if context.llm_queue and MAHIR_RAG_REMOTE_URL:
+    if context.llm_queue and MAHIR_RAG_URL:
         from .llm import run_agent_prompts
 
         started = time.perf_counter()
         try:
-            ok, message, results = run_agent_prompts(context.llm_queue, MAHIR_RAG_REMOTE_URL)
+            ok, message, results = run_agent_prompts(context.llm_queue, MAHIR_RAG_URL)
         except Exception:  # noqa: BLE001 - istemci zaten yutuyor; bu son emniyet.
             _logger.exception("LLM turu istisna verdi")
             ok, message, results = False, "istisna", None

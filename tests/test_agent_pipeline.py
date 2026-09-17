@@ -52,25 +52,25 @@ def _payload(**extra):
     }
 
 
-_no_remote = None
+_no_service = None
 
 
 def setUpModule():
     """Bu dosya hattın DETERMİNİSTİK davranışını sınıyor; LLM turu kapalı.
 
-    Ölçme Ajanı artık her analizde anomali prompt'u kuyruğa yazıyor. Uzak adres
+    Ölçme Ajanı artık her analizde anomali prompt'u kuyruğa yazıyor. Servis adresi
     tanımlı kalırsa bu testler gerçek GPU'ya istek atar - yavaş, pahalı ve ağa
     bağımlı olur (ölçüldü: 10 sn yerine 149 sn). LLM turunun kendisi
     `test_agent_llm_round.py`de sahte sunucuya karşı sınanıyor.
     """
 
-    global _no_remote
-    _no_remote = patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", "")
-    _no_remote.start()
+    global _no_service
+    _no_service = patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", "")
+    _no_service.start()
 
 
 def tearDownModule():
-    _no_remote.stop()
+    _no_service.stop()
 
 
 def _run(payload):
@@ -329,7 +329,7 @@ def _pipeline_with(name, description, required):
 
     class Boom:
         def run(self, context):
-            raise RuntimeError("uzak servis düştü")
+            raise RuntimeError("servis düştü")
 
     Boom.name, Boom.description, Boom.required = name, description, required
     return tuple(Boom() if agent.name == name else agent for agent in PIPELINE)

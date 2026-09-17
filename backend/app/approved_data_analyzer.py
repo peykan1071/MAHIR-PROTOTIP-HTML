@@ -20,13 +20,13 @@ from .assessment_profiles import (
 # ölçme toplamları `measurement_engine`e, program eşleştirme ise
 # `agents/pipeline.py::ProgramMappingAgent`a taşındı.
 
-# Yerel RAG servisinin (`local/rag_service.py`, `/agents` ucu) adresi. "REMOTE":
-# servis bu sürecin dışında, HTTP üzerinden - aynı makinede olsa da. Varsayılan
+# Yerel RAG servisinin (`local/rag_service.py`, `/agents` ucu) adresi. Varsayılan
 # koda gömülü ki terminalde her seferinde ayarlamaya gerek olmasın; başka bir
-# porta/makineye işaret etmek gerekirse env var geçersiz kılar, boş string
-# LLM turunu bilinçli olarak kapatır (analiz kurallı ajanlarla devam eder).
-_DEFAULT_MAHIR_RAG_REMOTE_URL = "http://127.0.0.1:8001/agents"
-MAHIR_RAG_REMOTE_URL = os.environ.get("MAHIR_RAG_REMOTE_URL", _DEFAULT_MAHIR_RAG_REMOTE_URL)
+# porta işaret etmek gerekirse env var geçersiz kılar, boş string LLM turunu
+# bilinçli olarak kapatır (analiz kurallı ajanlarla devam eder). Modül
+# niteliği olarak okunur ki testler `patch(... "MAHIR_RAG_URL", "")` diyebilsin.
+_DEFAULT_MAHIR_RAG_URL = "http://127.0.0.1:8001/agents"
+MAHIR_RAG_URL = os.environ.get("MAHIR_RAG_URL", _DEFAULT_MAHIR_RAG_URL)
 _RAG_WEAK_THRESHOLD = 0.70  # assets/js/mahir-report-export-common.js:buildDevelopmentNeedsBlock ile aynı eşik
 _RAG_NO_ANSWER_TEXT = "Bu bilgi belgede bulunmuyor."
 

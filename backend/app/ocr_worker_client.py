@@ -1,10 +1,10 @@
-"""Forward an image group to the MAHIR OCR worker process instead of loading
+"""Forward an image group to the MAHİR OCR worker process instead of loading
 PaddleOCR-VL into the web backend.
 
 The other side is `ocr_worker.py` started by `backend/run_ocr_worker.py`
-(default `http://127.0.0.1:8002`, configured through
-`file_receiver.MAHIR_OCR_REMOTE_URL`). It speaks the same `/mahir-upload`
-request/response shape as the local file receiver.
+(default `http://127.0.0.1:8002`, configured through `file_receiver.MAHIR_OCR_URL`).
+It speaks the same `/mahir-upload` request/response shape as the local file
+receiver. This module is stdlib-only so the web backend never imports paddle.
 """
 
 from __future__ import annotations
@@ -18,28 +18,31 @@ import urllib.request
 import uuid
 
 from .file_receiver import UploadedFile
-from .ocr_protocol import UPLOAD_PATH, WARMUP_PATH
 from .timing import stage
 
-_REMOTE_TIMEOUT_SECONDS = 300
+# İşçi ile paylaşılan yol: `ocr_worker.py` aynı sabiti buradan alır.
+UPLOAD_PATH = "/mahir-upload"
+
+_WORKER_TIMEOUT_SECONDS = 300
 # Canlıda ölçüldü: WinError 10053 tek bir anlık blip değil, aynı yükleme
 # içinde birden fazla denemeyi arka arkaya vurabilen tekrarlayan bir yerel
 # ağ/rota kesintisi olabiliyor (bkz. `_post_to_worker_with_retry`). Yerel
 # işçide de aynı yeniden deneme işe yarar: işçi modeli yüklerken bağlantı
 # reddedilebilir. Artan beklemeyle 2 yeniden deneme (toplam 3 deneme, ~7 sn).
 _CONNECTION_RETRY_DELAYS_SECONDS = (2, 5)
+_UNREACHABLE_MESSAGE = "OCR işçisine ulaşılamadı (backend/run_ocr_worker.py çalışıyor mu?)"
 
 
 def _post_to_worker(request: urllib.request.Request) -> dict[str, object]:
-    with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
+    with urllib.request.urlopen(request, timeout=_WORKER_TIMEOUT_SECONDS) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
 def _post_to_worker_with_retry(request: urllib.request.Request) -> dict[str, object]:
     """Post once, then retry on connection-level failures only.
 
-    `HTTPError` is a real answer from the server (401/500/...) and is
-    re-raised immediately - retrying it would not change the outcome. Only
+    `HTTPError` is a real answer from the worker (500/...) and is re-raised
+    immediately - retrying it would not change the outcome. Only
     `URLError`/`TimeoutError`/`OSError` (the request never reaching the
     worker at all, e.g. WinError 10053) gets retried, backing off across
     `_CONNECTION_RETRY_DELAYS_SECONDS`.
@@ -57,16 +60,16 @@ def _post_to_worker_with_retry(request: urllib.request.Request) -> dict[str, obj
     raise last_error
 
 
-def run_remote_image_group_ocr(
-    uploaded_files: list[UploadedFile], remote_url: str
+def request_image_group_ocr(
+    uploaded_files: list[UploadedFile], worker_url: str
 ) -> tuple[bool, str, dict[str, object] | None]:
-    """POST an image group to a remote /mahir-upload endpoint and relay its response."""
+    """POST an image group to the worker's /mahir-upload endpoint and relay its response."""
 
     boundary = uuid.uuid4().hex
     body = _build_multipart_body(uploaded_files, boundary)
     headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
     request = urllib.request.Request(
-        remote_url.rstrip("/") + UPLOAD_PATH,
+        worker_url.rstrip("/") + UPLOAD_PATH,
         data=body,
         method="POST",
         headers=headers,
@@ -75,12 +78,11 @@ def run_remote_image_group_ocr(
     # İşçi çağrısının kendi süresi ayrı ölçülüyor: yerel toplamla arasındaki
     # fark yerel ayrıştırma, buradaki büyük süre ise işçinin model yüklemesi
     # (ilk istekte) + gerçek OCR. Süreyi dönüş tipine eklemek yerine burada
-    # basmak kasıtlı: 3'lü demet
-    # `run_image_group_ocr` -> `run_existing_backend_flow` -> `do_POST` boyunca
-    # akıyor ve testler ona bağlı; her katmanın kendi satırını basması
-    # `ocr_engine`in bugün yaptığının aynısı.
+    # basmak kasıtlı: 3'lü demet `run_image_group_ocr` -> `run_existing_backend_flow`
+    # -> `do_POST` boyunca akıyor ve testler ona bağlı; her katmanın kendi
+    # satırını basması `ocr_engine`in bugün yaptığının aynısı.
     try:
-        with stage("ocr-uzak", dosya=len(uploaded_files), bayt=len(body)):
+        with stage("ocr-isci", dosya=len(uploaded_files), bayt=len(body)):
             payload = _post_to_worker_with_retry(request)
     except urllib.error.HTTPError as error:
         # The worker still answers with its usual {"ok", "message", ...} JSON body even on a
@@ -89,36 +91,15 @@ def run_remote_image_group_ocr(
             payload = json.loads(error.read().decode("utf-8"))
             return False, str(payload.get("message") or error), None
         except (ValueError, UnicodeDecodeError, http.client.IncompleteRead):
-            return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None
+            return False, f"{_UNREACHABLE_MESSAGE}: {error}", None
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as error:
-        return False, f"Uzak OCR sunucusuna ulaşılamadı: {error}", None
+        return False, f"{_UNREACHABLE_MESSAGE}: {error}", None
 
     return (
         bool(payload.get("ok")),
         str(payload.get("message", "")),
         payload.get("structuredData"),
     )
-
-
-def warm_up_remote_ocr(remote_url: str) -> bool:
-    """Ask the OCR worker to load its models now, before any real upload.
-
-    Loading PaddleOCR-VL onto the GPU takes tens of seconds against only
-    7-12 s of actual OCR. Calling this the moment the teacher picks files
-    moves that preparation off the wait that follows "Verileri Oku ve Kontrol Et".
-
-    Never raises: a warm-up is best-effort by definition, and a failed one must
-    stay invisible - the upload that follows works exactly as before, just
-    slower. Returns whether the remote reported itself ready, for tests/logs.
-    """
-
-    request = urllib.request.Request(remote_url.rstrip("/") + WARMUP_PATH, method="GET")
-    try:
-        with urllib.request.urlopen(request, timeout=_REMOTE_TIMEOUT_SECONDS) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except Exception:  # noqa: BLE001 - ısıtma en iyi çaba; hiçbir hata dışarı sızmamalı.
-        return False
-    return bool(payload.get("ok"))
 
 
 def _build_multipart_body(uploaded_files: list[UploadedFile], boundary: str) -> bytes:

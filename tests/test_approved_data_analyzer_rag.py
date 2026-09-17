@@ -31,7 +31,7 @@ from backend.app.approved_data_analyzer import (
     analyze_approved_data_traced,
 )
 
-_FAKE_REMOTE_URL = "https://fake.example/web_query"
+_FAKE_URL = "https://fake.example/web_query"
 
 
 def _evidence_json(terms, rationales, key="gapRationale"):
@@ -56,7 +56,7 @@ def _llm_reply(*answers):
     kirilgan olurdu.
     """
 
-    def fake(items, remote_url):
+    def fake(items, service_url):
         diagnoses = [item for item in items if str(item.get("name", "")).startswith("pedagoji/")]
         results = []
         for item in items:
@@ -87,7 +87,7 @@ def _llm_reply_sequence(*per_call_answers):
 
     call_count = 0
 
-    def fake(items, remote_url):
+    def fake(items, service_url):
         nonlocal call_count
         index = min(call_count, len(per_call_answers) - 1)
         call_count += 1
@@ -347,11 +347,11 @@ class RagContextAttachmentTests(unittest.TestCase):
         answer = '{"diagnosis":"{TEMA} temasında ana duygu belirsizdir.","groundedTerms":["ana duygu"]}'
         self.assertEqual(_compose_grounded_pedagogical_answer(answer, outcome, sources), "")
 
-    def test_ragcontext_field_always_present_even_without_remote_url(self):
-        # MAHIR_RAG_REMOTE_URL artık koda gömülü bir varsayılana sahip (bkz.
+    def test_ragcontext_field_always_present_even_without_service_url(self):
+        # MAHIR_RAG_URL artık koda gömülü bir varsayılana sahip (bkz.
         # approved_data_analyzer.py) - "yapılandırılmamış" durumu burada
         # açıkça boş string'e çekilerek test ediliyor, gerçek ağ çağrısı yapılmaz.
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", ""):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", ""):
             with _llm_patch() as mock_query:
                 result = analyze_approved_data(_weak_tde_payload())
         mock_query.assert_not_called()
@@ -363,7 +363,7 @@ class RagContextAttachmentTests(unittest.TestCase):
             "questions": [{"number": 1, "maxScore": 100}],
             "students": [{"studentRef": "Ö-001", "scores": [10]}],
         }
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with _llm_patch() as mock_query:
                 result = analyze_approved_data(payload)
         mock_query.assert_not_called()
@@ -375,7 +375,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         payload["exam"]["examSequence"] = "2. Dinleme/İzleme Sınavı"
         payload["exam"]["componentType"] = "listening"
         payload["students"][0]["scores"] = [90]  # successRate 0.90 >= eşik (0.70)
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with _llm_patch(side_effect=_llm_reply(("Seçili çıktı güçlü düzeydedir.", [{"documentName": "x"}]))) as mock_query:
                 result = analyze_approved_data(payload)
         mock_query.assert_called_once()
@@ -449,7 +449,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         payload["exam"]["examType"] = "Dinleme/İzleme Sınavı"
         payload["exam"]["componentType"] = "listening"
         canned = ("Öğrenciler mülakatta konuşarak açık ve örtük iletiyi belirler.", [{"documentName": "x"}])
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=_llm_reply(canned)):
                 result = analyze_approved_data(payload)
         context = result["outcomes"][0]["ragContext"]
@@ -463,7 +463,7 @@ class RagContextAttachmentTests(unittest.TestCase):
             "Yanıt üretildi.",
             {"answer": "Bu kazanım dinleme becerisini kapsar.", "sources": [{"documentName": "x"}]},
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=_llm_reply((canned[2]["answer"], canned[2]["sources"]))) as mock_query:
                 result = analyze_approved_data(_weak_tde_payload())
         mock_query.assert_called_once()
@@ -471,7 +471,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertEqual(len(prompts), 1)
         self.assertIn("Sözün İnceliği", prompts[0]["user"])
         self.assertIn("TDE1.2", prompts[0]["user"])
-        self.assertEqual(mock_query.call_args[0][1], _FAKE_REMOTE_URL)
+        self.assertEqual(mock_query.call_args[0][1], _FAKE_URL)
         # Getirim filtreleri prompt'un kendi `retrieval` blogunda gidiyor.
         self.assertEqual(prompts[0]["retrieval"]["programId"], "tde-9-tymm")
         self.assertEqual(prompts[0]["retrieval"]["grade"], "9")
@@ -489,7 +489,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         # hem de bilişsel düzey teşhisinin asıl dayanağı - çıktı bazında toplama
         # sırasında düşürülürse RAG elinde yalnızca çıplak bir kod kalıyor.
         canned = (True, "Yanıt üretildi.", {"answer": "teşhis", "sources": [{"documentName": "x"}]})
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=_llm_reply((canned[2]["answer"], canned[2]["sources"]))) as mock_query:
                 analyze_approved_data(_weak_tde_payload())
         item = _diagnosis_prompts(mock_query)[0]
@@ -532,7 +532,7 @@ class RagContextAttachmentTests(unittest.TestCase):
 
     def test_no_answer_in_document_leaves_ragcontext_empty(self):
         canned = (True, "Yanıt üretildi.", {"answer": "Bu bilgi belgede bulunmuyor.", "sources": []})
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=_llm_reply((canned[2]["answer"], canned[2]["sources"]))):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
@@ -549,7 +549,7 @@ class RagContextAttachmentTests(unittest.TestCase):
                 "sources": [{"documentName": "x"}],
             },
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=_llm_reply((canned[2]["answer"], canned[2]["sources"]))):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
@@ -562,7 +562,7 @@ class RagContextAttachmentTests(unittest.TestCase):
             "Yanıt üretildi.",
             {"answer": "Bu bilgi belgede bulunmuyor.", "sources": [{"documentName": "x"}]},
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts", side_effect=_llm_reply((canned[2]["answer"], canned[2]["sources"]))):
                 result = analyze_approved_data(_weak_tde_payload())
         self.assertEqual(result["outcomes"][0]["ragContext"], "")
@@ -573,7 +573,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         # getirebilir ve yanlış temadan "kaynaklı" görünen bir teşhis üretebilir.
         payload = _weak_tde_payload()
         payload["questions"][0]["outcomeTheme"] = ""
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with _llm_patch() as mock_query:
                 result = analyze_approved_data(payload)
         mock_query.assert_not_called()
@@ -581,8 +581,8 @@ class RagContextAttachmentTests(unittest.TestCase):
 
     def test_rag_failure_leaves_ragcontext_empty_and_does_not_raise(self):
         # LLM turu başarısız: analiz yine de tamamlanmalı, yalnız teşhis boş kalır.
-        failure = (False, "Uzak RAG sunucusuna ulaşılamadı.", None)
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        failure = (False, "RAG servisine ulaşılamadı.", None)
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with _llm_patch(return_value=failure) as mock_query:
                 result = analyze_approved_data(_weak_tde_payload())
         mock_query.assert_called_once()
@@ -591,7 +591,7 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertEqual(result["outcomes"][0]["successRate"], 0.30)
 
     def test_rag_exception_leaves_ragcontext_empty_and_does_not_raise(self):
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with _llm_patch(side_effect=RuntimeError("boom")) as mock_query:
                 result = analyze_approved_data(_weak_tde_payload())
         mock_query.assert_called_once()
@@ -645,7 +645,7 @@ class DiagnosisGroundingRetryTests(unittest.TestCase):
         good = _evidence_json(
             ["Sözün İnceliği", "anlam oluşturma"], ["İkinci deneme 1.", "İkinci deneme 2."]
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch(
                 "backend.app.agents.llm.run_agent_prompts",
                 side_effect=_llm_reply_sequence([(bad, self._SOURCES)], [(good, self._SOURCES)]),
@@ -667,7 +667,7 @@ class DiagnosisGroundingRetryTests(unittest.TestCase):
         bad = _evidence_json(
             ["dinleme becerisi", "kelime dağarcığı"], ["İlk deneme 1.", "İlk deneme 2."]
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch(
                 "backend.app.agents.llm.run_agent_prompts",
                 side_effect=_llm_reply_sequence([(bad, self._SOURCES)]),
@@ -687,7 +687,7 @@ class DiagnosisGroundingRetryTests(unittest.TestCase):
         bad = _evidence_json(
             ["dinleme becerisi", "kelime dağarcığı"], ["İlk deneme 1.", "İlk deneme 2."]
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch(
                 "backend.app.agents.llm.run_agent_prompts",
                 side_effect=_llm_reply_sequence([(bad, self._SOURCES)]),
@@ -706,7 +706,7 @@ class DiagnosisGroundingRetryTests(unittest.TestCase):
         good = _evidence_json(
             ["Sözün İnceliği", "anlam oluşturma"], ["Birinci deneme 1.", "Birinci deneme 2."]
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch(
                 "backend.app.agents.llm.run_agent_prompts",
                 side_effect=_llm_reply_sequence([(good, self._SOURCES)]),
@@ -820,7 +820,7 @@ class RagBatchingTests(unittest.TestCase):
                 {"answer": "ikinci teşhis", "sources": [{"documentName": "y"}]},
             ],
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts",
                       side_effect=_llm_reply(*[(r["answer"], r["sources"]) for r in canned[2]])) as mock_batch:
                 result = analyze_approved_data(_two_weak_outcomes_payload())
@@ -842,7 +842,7 @@ class RagBatchingTests(unittest.TestCase):
                 {"answer": "ANLAM ARAYIŞI teşhisi", "sources": [{"documentName": "y"}]},
             ],
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts",
                       side_effect=_llm_reply(*[(r["answer"], r["sources"]) for r in canned[2]])) as mock_batch:
                 result = analyze_approved_data(_two_weak_outcomes_payload())
@@ -857,7 +857,7 @@ class RagBatchingTests(unittest.TestCase):
         payload = _two_weak_outcomes_payload()
         payload["questions"][0]["outcomeTheme"] = ""
         canned = (True, "Yanıt üretildi.", [{"answer": "teşhis", "sources": [{"documentName": "y"}]}])
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts",
                       side_effect=_llm_reply(*[(r["answer"], r["sources"]) for r in canned[2]])) as mock_batch:
                 result = analyze_approved_data(payload)
@@ -878,9 +878,9 @@ class RagBatchingTests(unittest.TestCase):
         #
         # Korunan güvence: teşhis bir ZENGİNLEŞTİRME. Tur başarısız olursa
         # hücreler boş kalır, analiz eksiksiz üretilir ve istisna fırlamaz.
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts",
-                       return_value=(False, "Uzak RAG sunucusuna ulaşılamadı.", None)):
+                       return_value=(False, "RAG servisine ulaşılamadı.", None)):
                 result = analyze_approved_data(_two_weak_outcomes_payload())
 
         self.assertEqual([item["ragContext"] for item in result["outcomes"]], ["", ""])
@@ -889,7 +889,7 @@ class RagBatchingTests(unittest.TestCase):
         self.assertEqual(len(result["questions"]), 2)
 
     def test_llm_round_exception_is_swallowed_too(self):
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts",
                        side_effect=RuntimeError("bağlantı koptu")):
                 result = analyze_approved_data(_two_weak_outcomes_payload())
@@ -908,7 +908,7 @@ class RagBatchingTests(unittest.TestCase):
                 {"answer": "ikinci teşhis", "sources": [{"documentName": "y"}]},
             ],
         )
-        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_REMOTE_URL", _FAKE_REMOTE_URL):
+        with patch("backend.app.approved_data_analyzer.MAHIR_RAG_URL", _FAKE_URL):
             with patch("backend.app.agents.llm.run_agent_prompts",
                        side_effect=_llm_reply(*[(r["answer"], r["sources"]) for r in canned[2]])):
                 result = analyze_approved_data(_two_weak_outcomes_payload())

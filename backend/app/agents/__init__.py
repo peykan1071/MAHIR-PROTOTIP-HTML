@@ -8,7 +8,7 @@ sınırında belgeyi doğrular ve iz (trace) biriktirir.
 
 Bu paket öğretmen onayından sonra çalışan beş analiz ajanını içerir. Yükleme
 öncesindeki Belge Okuma ve OCR Kalite Ajanı `backend/app/ocr_quality_agent.py`
-altında ayrı çalışır. Uzak LLM bağımlılığı yalnız ihtiyaç anında çağrılır.
+altında ayrı çalışır. LLM servisi yalnız ihtiyaç anında çağrılır.
 """
 
 from .base import Agent, AgentContext, AgentIssue, AgentResult, AgentTrace, trace_of

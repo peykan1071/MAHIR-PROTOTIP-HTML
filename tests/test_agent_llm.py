@@ -73,7 +73,7 @@ class AgentLlmTests(unittest.TestCase):
 
     def test_local_only_fields_never_reach_the_wire(self):
         # `agent` alanı LLM kaydının hangi ajanın izine düşeceğini söylüyor -
-        # yerel bir yönlendirme bilgisi. Uzak uç nokta onu tanımıyor; gövdeye
+        # yerel bir yönlendirme bilgisi. Servis onu tanımıyor; gövdeye
         # sızması hem sözleşmeyi bozar hem de "ne gönderdiğimizi biliyoruz"
         # güvencesini zayıflatır.
         self._reply([("a", "x")])
@@ -153,14 +153,14 @@ class AgentLlmTests(unittest.TestCase):
 
     # --- Asla istisna fırlatmaz ---
 
-    def test_remote_failure_returns_false_without_raising(self):
+    def test_service_failure_returns_false_without_raising(self):
         self._reply([], ok=False, message="Ajan yanıtları üretilemedi: patladı", status=500)
         ok, message, results = llm.run_agent_prompts(self._prompts(2), self.url)
         self.assertFalse(ok)
         self.assertIsNone(results)
         self.assertIn("üretilemedi", message)
 
-    def test_unreachable_remote_returns_false_without_raising(self):
+    def test_unreachable_service_returns_false_without_raising(self):
         ok, message, results = llm.run_agent_prompts(self._prompts(1), "http://127.0.0.1:9")
         self.assertFalse(ok)
         self.assertIsNone(results)

@@ -744,7 +744,7 @@ class PedagogicalAnalysisAgent:
             # outcome'a hiç dokunulmaz, ragContext boş kalır.
 
         if retry_candidates:
-            from ..approved_data_analyzer import MAHIR_RAG_REMOTE_URL
+            from ..approved_data_analyzer import MAHIR_RAG_URL
             from .llm import run_agent_prompts
 
             retry_prompts = [
@@ -753,9 +753,9 @@ class PedagogicalAnalysisAgent:
                 if name in prompts_by_name
             ]
             retry_results: dict[str, dict[str, Any]] = {}
-            if retry_prompts and MAHIR_RAG_REMOTE_URL:
+            if retry_prompts and MAHIR_RAG_URL:
                 try:
-                    ok, message, results = run_agent_prompts(retry_prompts, MAHIR_RAG_REMOTE_URL)
+                    ok, message, results = run_agent_prompts(retry_prompts, MAHIR_RAG_URL)
                 except Exception:  # noqa: BLE001 - retry turu da ana tur gibi ajanı asla düşürmez.
                     _logger.exception("RAG yeniden deneme turu istisna verdi")
                     ok, message, results = False, "istisna", None

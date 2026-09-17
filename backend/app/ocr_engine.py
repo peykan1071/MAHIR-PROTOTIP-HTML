@@ -3,7 +3,7 @@
 This module only runs inside the OCR worker process (see `ocr_worker.py`,
 started by `backend/run_ocr_worker.py` on the local GPU). The MAHIR file
 receiver never imports this module; it forwards image uploads over HTTP
-instead (see `remote_ocr_client.py`), so the web server process never loads
+instead (see `ocr_worker_client.py`), so the web server process never loads
 paddle/torch.
 
 Each uploaded image is expected to show one handwritten score table per the
@@ -51,7 +51,7 @@ def _get_pipeline():
     global _pipeline
     if _pipeline is None:
         # Model dosyaları zaten önbellekte (bkz. Dockerfile) olsa bile PaddleX, her
-        # pipeline kurulumunda uzak model kaynaklarına (BOS/HuggingFace/ModelScope/
+        # pipeline kurulumunda çevrim içi model kaynaklarına (BOS/HuggingFace/ModelScope/
         # AIStudio) bir bağlantı kontrolü yapıp dakikalarca bekletebiliyor. Bu
         # kontrolü kapatıyoruz.
         os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
