@@ -580,11 +580,13 @@ python backend/run_ocr_worker.py                                  # 4) OCR işç
 .\MAHIR_BASLAT.cmd                                                # 5) web arayüzü
 ```
 
-Referans belge bir kez indekslenir (kayıtlı program için belge adı otomatik çözülür):
+Referans belge bir kez indekslenir (kayıtlı program için belge adı ve sayfa planı otomatik çözülür; `docs/tde2026.pdf`, MEB'in 2024 Ortaöğretim TDE Öğretim Programı PDF'i):
 
 ```powershell
-python local/ingestion_pipeline.py --pdf <MEB TDE 9 öğretim programı PDF'i> --program-id tde-9-tymm --replace
+python local/ingestion_pipeline.py --pdf docs/tde2026.pdf --program-id tde-9-tymm --replace
 ```
+
+Parçalama stratejisi belgenin yapısını izler ([`local/curriculum.py`](local/curriculum.py)): önce tüm sınıflar için ortak **süreç bileşenleri** bölümü (s.20-27) kazanım başına tek parça olarak (`TDE1.2` + `a) TDE1.2.1…` + göstergeler), sonra 9. sınıf tema sayfaları (s.65-96) SINIF×TEMA alt-PDF'leri hâlinde Docling ile. Her parça `section_kind` (tema girişi, öğrenme çıktıları, içerik çerçevesi, anahtar kavramlar, öğrenme kanıtları, öğrenme-öğretme yaşantıları, farklılaştırma, tema sonu…) ve `outcome_codes` alanlarıyla etiketlenir; gömülen metin "9. Sınıf | 1. Tema: Sözün İnceliği | Öğrenme-Öğretme Yaşantıları | TDE2.2 | Okuma" ön ekiyle başlar. Docling'in düşürdüğü satır içi bölüm etiketleri pypdf akışından geri yerleştirilir, satır sonu heceleme artıkları ("sü - reci") sözlük onayıyla birleştirilir, parça tavanı 320 token'dır (`CHUNK_MAX_TOKENS`). Teşhis sırasında servis, tema filtreli parçaların önüne o kazanımın süreç bileşeni parçasını (`retrieval.outcomeCode`) ekler.
 
 Web backend servis adreslerini koda gömülü varsayılanlardan alır; farklı bir port kullanılacaksa `MAHIR_RAG_REMOTE_URL` / `MAHIR_OCR_REMOTE_URL` ortam değişkenleri geçersiz kılar, boş string ilgili özelliği bilinçli olarak kapatır (analiz kurallı ajanlarla, görseller OCR'sız öğretmen kontrolüyle devam eder).
 

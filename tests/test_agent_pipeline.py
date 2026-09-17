@@ -430,5 +430,18 @@ class AgentBoundaryTests(unittest.TestCase):
         self.assertEqual(context.analysis["outcomes"][0]["successRate"], 0.123)
 
 
+class ParentOutcomeCodeTests(unittest.TestCase):
+    """`retrieval.outcomeCode`: alt bileşen seçildiyse üst kod, yoksa kazanım kodu, yoksa boş."""
+
+    def test_component_code_collapses_to_parent(self):
+        from backend.app.agents.pipeline import _parent_outcome_code
+
+        self.assertEqual(_parent_outcome_code({"outcomeCode": "TDE1.2.3"}), "TDE1.2")
+        self.assertEqual(_parent_outcome_code({"outcomeCode": "TDE1.2.3", "parentOutcomeCode": "TDE1.2"}), "TDE1.2")
+        self.assertEqual(_parent_outcome_code({"outcomeCode": "TDE4.1"}), "TDE4.1")
+        self.assertEqual(_parent_outcome_code({"outcomeCode": "", "parentOutcomeCode": ""}), "")
+        self.assertEqual(_parent_outcome_code({"outcomeCode": "kod-yok"}), "")
+
+
 if __name__ == "__main__":
     unittest.main()

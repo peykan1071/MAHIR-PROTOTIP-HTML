@@ -57,6 +57,13 @@ class ChunkPayloadTests(unittest.TestCase):
         self.assertEqual(payload["theme_key"], "ANLAMINYAPITAŞLARI")
         self.assertEqual(payload["skill_key"], "okuma")
 
+    def test_payload_carries_section_kind_and_outcome_codes(self):
+        record = self._record(section_kind="ogrenme_ogretme", outcome_codes=["TDE2.1", "TDE2.2"])
+        payload = record.payload("Program (2024)", "tde-9-tymm", "t")
+        self.assertEqual(payload["section_kind"], "ogrenme_ogretme")
+        self.assertEqual(payload["outcome_codes"], ["TDE2.1", "TDE2.2"])
+        self.assertIsNot(payload["outcome_codes"], record.outcome_codes, "payload kopya taşımalı")
+
     def test_untagged_document_writes_null_keys(self):
         # Müfredat deseni olmayan belge (ör. README): alanlar var ama None -
         # `must_not skill_key` filtresi bu parçaları korur, `must grade` ise eler.
@@ -65,6 +72,8 @@ class ChunkPayloadTests(unittest.TestCase):
         self.assertIsNone(payload["theme"])
         self.assertIsNone(payload["theme_key"])
         self.assertIsNone(payload["skill_key"])
+        self.assertIsNone(payload["section_kind"])
+        self.assertEqual(payload["outcome_codes"], [])
 
     def test_write_points_uses_the_record_payload_and_deterministic_ids(self):
         records = [self._record(chunk_index=0, grade="9", theme="Tema", skill_key="okuma"), self._record(chunk_index=1, text="ikinci")]
@@ -90,7 +99,8 @@ class ChunkPayloadTests(unittest.TestCase):
         )
         self.assertEqual(set(points[0].payload), {
             "text", "contextualized_text", "document_name", "program_id", "pages", "headings",
-            "chunk_index", "source_kind", "grade", "theme", "theme_key", "skill_key", "ingested_at",
+            "chunk_index", "source_kind", "grade", "theme", "theme_key", "skill_key", "section_kind", "outcome_codes",
+            "ingested_at",
         })
 
 

@@ -479,6 +479,9 @@ class RagContextAttachmentTests(unittest.TestCase):
         # Beceri de gidiyor: aynı temada dört beceri listesi neredeyse birebir
         # aynı metni taşıyor, ayrımı sunucu tarafında yalnız bu alan sağlıyor.
         self.assertEqual(prompts[0]["retrieval"]["skill"], "Dinleme/İzleme")
+        # Üst kazanım kodu: servis bununla kilitli süreç bileşeni parçalarını
+        # (program PDF'i s.20-27) bağlamın başına ekler.
+        self.assertEqual(prompts[0]["retrieval"]["outcomeCode"], "TDE1.2")
         self.assertEqual(result["outcomes"][0]["ragContext"], "Bu kazanım dinleme becerisini kapsar.")
 
     def test_outcome_description_reaches_both_question_and_retrieval_query(self):

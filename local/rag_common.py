@@ -265,7 +265,7 @@ class Settings:
             embedding_device=_env_str("EMBEDDING_DEVICE", "cpu"),
             embedding_threads=_env_int("EMBEDDING_THREADS", 0, minimum=0),
             embedding_batch_size=_env_int("EMBEDDING_BATCH_SIZE", 8, minimum=1),
-            chunk_max_tokens=_env_int("CHUNK_MAX_TOKENS", 512, minimum=64),
+            chunk_max_tokens=_env_int("CHUNK_MAX_TOKENS", 320, minimum=64),
             ocr_enabled=_env_bool("OCR_ENABLED", True),
             ocr_device=_env_str("OCR_DEVICE", "gpu:0"),
             ocr_engine=ocr_engine,
@@ -645,7 +645,7 @@ def check_qdrant_ready(client: "QdrantClient", collection: str) -> tuple[bool, s
 # Filtrelenen payload alanları: `program_id`/`document_name`/`source_kind` genel,
 # `grade`/`theme_key`/`skill_key` müfredat belgelerine özgü (bkz. curriculum.py;
 # rag_service.py `retrieve()` bu anahtarlarla `must`/`must_not` kurar).
-PAYLOAD_INDEX_FIELDS = ("program_id", "document_name", "source_kind", "grade", "theme_key", "skill_key")
+PAYLOAD_INDEX_FIELDS = ("program_id", "document_name", "source_kind", "grade", "theme_key", "skill_key", "section_kind", "outcome_codes")
 
 
 def ensure_collection(client: "QdrantClient", collection: str, dimension: int) -> bool:

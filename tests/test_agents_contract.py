@@ -52,13 +52,16 @@ class _Backend:
     `max_tokens_seen`: her üretim çağrısında kullanılan `max_tokens`.
     """
 
-    def __init__(self, contexts=None, sources=None, reply=None, retrieval_error=None):
+    def __init__(self, contexts=None, sources=None, reply=None, retrieval_error=None, components=None):
         self.contexts = dict(contexts or {})
         self.sources = dict(sources or {})
+        # Öğe indeksine göre süreç bileşeni parçaları: `(point_id, metin)` listesi.
+        self.components = dict(components or {})
         self.reply = reply or (lambda conversation: "yanıt")
         self.retrieval_error = retrieval_error
         self.conversations = []
         self.max_tokens_seen = []
+        self.component_calls = []  # (outcome_code, section_kinds, top_k, rerank)
         self.llm_error = None
 
     # --- uygulamaya bağlı kısım: local/rag_service.py ---
@@ -77,10 +80,22 @@ class _Backend:
         # `retrieve()` öğe sırasıyla, yalnız `retrieval` taşıyanlar için çağrılır.
         pending = [index for index, item in enumerate(items) if isinstance(item.get("retrieval"), dict)]
 
-        def fake_retrieve(question, top_k=None, program_id=None, document_name=None, rerank=None, **_filters):
+        current = {"index": None}
+
+        def fake_retrieve(question, top_k=None, program_id=None, document_name=None, rerank=None, **filters):
             if backend.retrieval_error:
                 raise module.RetrievalError(backend.retrieval_error)
+            if filters.get("section_kinds"):
+                # Bileşen getirimi: aynı öğe için tema getiriminden hemen sonra gelir.
+                index = current["index"]
+                backend.component_calls.append((filters.get("outcome_code"), list(filters["section_kinds"]), top_k, rerank))
+                hits = [
+                    module.Hit(point_id=point_id, payload={"contextualized_text": text, "text": text, "_index": index}, retrieval_score=1.0)
+                    for point_id, text in backend.components.get(index, [])
+                ]
+                return module.RetrievalResult(hits=hits, reranked=False, pool_size=len(hits))
             index = pending.pop(0)
+            current["index"] = index
             if index not in backend.contexts:
                 return module.RetrievalResult(hits=[], reranked=False, pool_size=0)
             hit = module.Hit(
@@ -225,6 +240,43 @@ class AgentBatchContractTests(unittest.TestCase):
         self.assertTrue(ok, "retrieval taşımayan parti getirim katmanına hiç dokunmamalı.")
 
 
+class ComponentRetrievalContractTests(unittest.TestCase):
+    """`retrieval.outcomeCode`: kazanımın süreç bileşeni parçaları bağlamın başına gelir."""
+
+    def test_component_chunks_come_before_theme_context(self):
+        backend = _Backend(
+            contexts={0: "TEMA PARÇASI"},
+            sources={0: [{"documentName": "x"}]},
+            components={0: [("c1", "BİLEŞEN PARÇASI")]},
+        )
+        spec = {**_RETRIEVAL, "outcomeCode": "TDE1.2"}
+        ok, _message, results = backend.run([_item("pedagoji", user="TEŞHİS ET", retrieval=spec)])
+
+        self.assertTrue(ok)
+        self.assertEqual(backend.conversations[0][1]["content"], "BAĞLAM:\nBİLEŞEN PARÇASI\n\n---\n\nTEMA PARÇASI\n\nTEŞHİS ET")
+        self.assertEqual(backend.component_calls, [("TDE1.2", ["surec_bilesenleri"], 2, False)])
+        self.assertEqual(results[0]["sources"], [{"documentName": "x"}])
+
+    def test_without_outcome_code_no_component_retrieval_happens(self):
+        backend = _Backend(contexts={0: "TEMA PARÇASI"}, sources={0: []}, components={0: [("c1", "BİLEŞEN")]})
+        backend.run([_item("pedagoji", retrieval=_RETRIEVAL)])
+        self.assertEqual(backend.component_calls, [])
+        self.assertEqual(backend.conversations[0][1]["content"], "BAĞLAM:\nTEMA PARÇASI\n\nkullanıcı metni")
+
+    def test_component_hit_alone_is_enough_to_reach_the_llm(self):
+        # Tema filtresi boş dönse de bileşen parçası varsa üretim yapılır.
+        backend = _Backend(contexts={}, sources={0: [{"documentName": "x"}]}, components={0: [("c1", "BİLEŞEN")]})
+        ok, _message, results = backend.run([_item("pedagoji", user="U", retrieval={**_RETRIEVAL, "outcomeCode": "TDE1.2"})])
+        self.assertTrue(ok)
+        self.assertEqual(len(backend.conversations), 1)
+        self.assertNotEqual(results[0]["answer"], NO_ANSWER_TEXT)
+
+    def test_same_point_id_is_not_repeated(self):
+        backend = _Backend(contexts={0: "AYNI"}, sources={0: []}, components={0: [("0", "AYNI")]})
+        backend.run([_item("pedagoji", user="U", retrieval={**_RETRIEVAL, "outcomeCode": "TDE1.2"})])
+        self.assertEqual(backend.conversations[0][1]["content"], "BAĞLAM:\nAYNI\n\nU")
+
+
 class AgentPromptValidationTests(unittest.TestCase):
     def setUp(self):
         self.backend = _Backend()
@@ -257,7 +309,7 @@ class SourceShapeTests(unittest.TestCase):
                 "theme": "Tema",
                 "pages": [3, 4],
                 "headings": ["Okuma"],
-                "text": "x" * 500,
+                "text": "x" * 1500,
             },
             0.87,
         )
@@ -268,7 +320,9 @@ class SourceShapeTests(unittest.TestCase):
         )
         self.assertEqual(source["documentName"], "Program")
         self.assertEqual(source["pages"], [3, 4])
-        self.assertEqual(len(source["excerpt"]), 300)
+        # 2026-09-17: 300 -> 1200. Backend doğrulayıcısı terimleri yalnız alıntıda arar; 320 tokenlik
+        # parçanın tamamı görünmeli (bkz. local/rag_service.py EXCERPT_CHARS).
+        self.assertEqual(len(source["excerpt"]), 1200)
         self.assertEqual(source["score"], 0.87)
 
     def test_missing_payload_fields_are_safe(self):

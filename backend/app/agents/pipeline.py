@@ -1277,6 +1277,19 @@ def _term_is_grounded(term: str, evidence: str) -> bool:
     return all(_word_is_grounded(word, evidence_words) for word in term_words)
 
 
+_OUTCOME_CODE_PATTERN = re.compile(r"\b(TDE\d+\.\d+)(?:\.\d+)*\b")
+
+
+def _parent_outcome_code(outcome: dict[str, Any]) -> str:
+    """Getirim için üst kazanım kodu: `TDE1.2.3` -> `TDE1.2`; üst kod verilmişse o; yoksa boş."""
+
+    for key in ("parentOutcomeCode", "outcomeCode"):
+        match = _OUTCOME_CODE_PATTERN.search(str(outcome.get(key) or ""))
+        if match:
+            return match.group(1)
+    return ""
+
+
 def _enqueue_diagnosis_prompts(
     context: AgentContext, outcome_results: list[dict[str, Any]], program: Any
 ) -> dict[str, dict[str, Any]]:
@@ -1385,6 +1398,12 @@ def _enqueue_diagnosis_prompts(
                 # `_detect_skill_key`). Boş bırakılırsa eleme yapılmaz,
                 # bugünkü davranış korunur.
                 "skill": outcome.get("outcomeSkill") or "",
+                # Üst kazanım kodu (TDE1.2; alt bileşen seçildiyse üst kod): servis
+                # bu kodla kilitli süreç bileşeni parçalarını (program PDF'i
+                # s.20-27, `section_kind=surec_bilesenleri`) bağlamın başına
+                # ekler - teşhis promptu "süreç bileşenini adıyla an" istiyor ve
+                # o bileşenler tema sayfalarında YOK. Boşsa servis eklemez.
+                "outcomeCode": _parent_outcome_code(outcome),
                 # Getirimde gömülen metin, üretim talimatından KASITLI ayrı:
                 # başarı oranı ve "teşhis et" emri müfredat düzyazısında
                 # karşılığı olmayan, sorgu vektörünü uzaklaştıran gürültü.

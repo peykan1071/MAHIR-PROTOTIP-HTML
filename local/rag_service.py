@@ -17,7 +17,7 @@
 
 HTTP (FastAPI):   python local/rag_service.py            -> http://127.0.0.1:8001
     GET  /health                       - Qdrant/koleksiyon/model/LLM (llama-server erişilebilir mi) durumu
-    POST /retrieve  {question, top_k?, program_id?, document_name?, grade?, theme?, skill?, rerank?}
+    POST /retrieve  {question, top_k?, program_id?, document_name?, grade?, theme?, skill?, outcome_code?, section_kinds?, rerank?}
                                        - yalnız getirim (LLM sunucusu kapalıyken de çalışır)
     POST /query     {aynı alanlar}     - getirim + LLM yanıtı
     POST /agents    {"agents": [...]}  - web backend'in ajan turu (aşağıda); {"warmup": true} ısıtma
@@ -25,10 +25,12 @@ Terminal:         python local/rag_service.py --ask "Soru" [--program-id X] [--r
 
 `/agents`, `backend/app/agents/llm.py`'nin sözleşmesidir (varsayılan
 `MAHIR_RAG_REMOTE_URL=http://127.0.0.1:8001/agents`): her öğe `{name, system,
-user, maxTokens?, retrieval?: {programId, grade, theme, skill, query, topK}}`
+user, maxTokens?, retrieval?: {programId, grade, theme, skill, outcomeCode, query, topK}}`
 taşır; `retrieval` taşıyanlar için müfredat bağlamı Qdrant'tan (sınıf/tema
 `must`, yanlış beceri `must_not` - bkz. `curriculum.py`) getirilip user
-mesajının başına eklenir, isabetsiz öğe LLM'e hiç gitmez ve
+mesajının başına eklenir; `outcomeCode` varsa o kazanımın süreç bileşeni
+parçaları (`section_kind=surec_bilesenleri`, kodla kilitli, en çok 2) bağlamın
+başına konur. İsabetsiz öğe LLM'e hiç gitmez ve
 "Bu bilgi belgede bulunmuyor." alır. Yanıt zarfı `{"ok", "message",
 "structuredData": {"results": [{name, answer, sources}]}}`, giriş sırasıyla.
 Sözleşmenin davranış testleri: `tests/test_agents_contract.py`.
@@ -83,7 +85,15 @@ MAX_QUESTION_CHARS = 2000
 # Sabit bir 60k gibi değer 8k pencereli yerel modelde "context size exceeded"
 # üretirdi. Bu yalnız `build_context`'in bağımsız kullanımı için geri düşüş.
 FALLBACK_CONTEXT_CHARS = 16_000
-EXCERPT_CHARS = 300
+# Kaynak alıntısı: backend'in teşhis doğrulayıcısı (`pipeline.py::_grounded_word_overlap`)
+# modelin seçtiği terimleri YALNIZ bu alıntıda arıyor. 300'de 1,4-1,9k karakterlik
+# parçaların üçte ikisi görünmez kalıp doğru terimler "ungrounded" sayılıyordu;
+# 1200, 320 tokenlik (~1000 karakter) parçanın tamamını kapsar.
+EXCERPT_CHARS = 1200
+# Kazanıma özgü süreç bileşeni parçaları (curriculum.py `surec_bilesenleri`,
+# s.20-27): teşhis istemine tema parçalarının ÖNÜNE eklenir.
+COMPONENT_SECTION_KIND = "surec_bilesenleri"
+COMPONENT_TOP_K = 2
 
 # `/agents` sınırları. `backend/app/agents/llm.py::MAX_PROMPTS_PER_REQUEST` ile
 # aynı (16); istemci de kontrol ediyor ki ağ turu boşa gitmesin. Çıktı tavanı
@@ -412,10 +422,13 @@ class RAGService:
         grade: str | None = None,
         theme: str | None = None,
         skill: str | None = None,
+        outcome_code: str | None = None,
+        section_kinds: Sequence[str] | None = None,
     ) -> RetrievalResult:
         """Gömme -> Qdrant aday havuzu -> (reranker | göreli eşik) -> ilk `top_k`.
 
-        `grade`/`theme` `must` filtresidir (payload `grade`, `theme_key`);
+        `grade`/`theme`/`outcome_code`/`section_kinds` `must` filtresidir
+        (payload `grade`, `theme_key`, `outcome_codes`, `section_kind`);
         `skill` ise `must_not`: yalnız YANLIŞ beceriye ait olduğu belgeden
         okunan parçalar elenir, beceri başlığı taşımayan parçalar (tema
         tanıtımı vb.) her beceri için geçerli kanıt olarak korunur
@@ -451,6 +464,10 @@ class RAGService:
             conditions.append(FieldCondition(key="grade", match=MatchValue(value=str(grade))))
         if theme:
             conditions.append(FieldCondition(key="theme_key", match=MatchValue(value=theme_match_key(str(theme)))))
+        if outcome_code:
+            conditions.append(FieldCondition(key="outcome_codes", match=MatchAny(any=[str(outcome_code)])))
+        if section_kinds:
+            conditions.append(FieldCondition(key="section_kind", match=MatchAny(any=[str(kind) for kind in section_kinds])))
         exclusions = []
         excluded = excluded_skill_keys(skill)
         if excluded:
@@ -586,8 +603,12 @@ class RAGService:
         grade: str | None = None,
         theme: str | None = None,
         skill: str | None = None,
+        outcome_code: str | None = None,
+        section_kinds: Sequence[str] | None = None,
     ) -> QueryResult:
-        retrieval = self.retrieve(question, top_k, program_id, document_name, rerank, grade, theme, skill)
+        retrieval = self.retrieve(
+            question, top_k, program_id, document_name, rerank, grade, theme, skill, outcome_code, section_kinds
+        )
         timings = dict(retrieval.timings_ms)
         if not retrieval.hits:
             return QueryResult(NO_ANSWER_TEXT, [], retrieval.reranked, None, llm_called=False, timings_ms=timings)
@@ -628,30 +649,46 @@ class RAGService:
                 continue
             query_text = str(spec.get("query") or item.get("user") or "").strip()[:MAX_QUESTION_CHARS]
             top_k = min(max(_int_or(spec.get("topK"), self._settings.default_top_k), 1), self._settings.max_top_k)
+            program_id = str(spec.get("programId") or "") or None
+            outcome_code = str(spec.get("outcomeCode") or "") or None
             try:
                 retrieval = self.retrieve(
                     query_text,
                     top_k=top_k,
-                    program_id=str(spec.get("programId") or "") or None,
+                    program_id=program_id,
                     grade=str(spec.get("grade") or "") or None,
                     theme=str(spec.get("theme") or "") or None,
                     skill=str(spec.get("skill") or "") or None,
                 )
+                # Kazanımın süreç bileşenleri (sınıf/tema taşımaz, kodla kilitlenir) tema
+                # parçalarının ÖNÜNE: teşhis promptu "süreç bileşenini adıyla an" istiyor.
+                component_hits: list[Hit] = []
+                if outcome_code:
+                    component_hits = self.retrieve(
+                        query_text,
+                        top_k=COMPONENT_TOP_K,
+                        program_id=program_id,
+                        rerank=False,
+                        outcome_code=outcome_code,
+                        section_kinds=[COMPONENT_SECTION_KIND],
+                    ).hits
             except (RetrievalError, ValueError) as error:
                 return False, str(error), None
-            if not retrieval.hits:
+            seen_ids = {hit.point_id for hit in component_hits}
+            hits = component_hits + [hit for hit in retrieval.hits if hit.point_id not in seen_ids]
+            if not hits:
                 logger.info("Ajan %r: getirim boş (program=%s sınıf=%s tema=%s).", item.get("name"), spec.get("programId"), spec.get("grade"), spec.get("theme"))
                 continue
             budget = max(
                 self._settings.context_char_budget() - len(str(item.get("system") or "")) - len(str(item.get("user") or "")),
                 1000,
             )
-            context, used_count = build_agent_context(retrieval.hits, budget)
+            context, used_count = build_agent_context(hits, budget)
             contexts[index] = context
-            sources[index] = build_agent_sources(retrieval.hits[:used_count])
+            sources[index] = build_agent_sources(hits[:used_count])
             logger.info(
-                "Ajan %r: %d/%d parça bağlama girdi (%s).", item.get("name"), used_count, len(retrieval.hits),
-                ", ".join(f"{key}={value}" for key, value in retrieval.timings_ms.items()),
+                "Ajan %r: %d/%d parça bağlama girdi, %d bileşen parçası (%s).", item.get("name"), used_count, len(hits),
+                len(component_hits), ", ".join(f"{key}={value}" for key, value in retrieval.timings_ms.items()),
             )
 
         answers: dict[int, str] = {}
@@ -705,6 +742,8 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
         grade: str | None = Field(default=None, max_length=20, description="payload `grade` (ör. \"9\")")
         theme: str | None = Field(default=None, max_length=200, description="tema adı; `theme_key` ile eşlenir")
         skill: str | None = Field(default=None, max_length=50, description="Dinleme/İzleme|Konuşma|Okuma|Yazma")
+        outcome_code: str | None = Field(default=None, max_length=20, description="payload `outcome_codes` içinde (ör. TDE1.2)")
+        section_kinds: list[str] | None = Field(default=None, description="payload `section_kind` bunlardan biri")
         rerank: bool | None = Field(default=None, description="None -> RERANKER_ENABLED ayarı")
 
     @asynccontextmanager
@@ -741,7 +780,8 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
     def retrieve(body: QueryRequest, request: Request) -> dict[str, Any]:
         service: RAGService = request.app.state.rag
         result = service.retrieve(
-            body.question, body.top_k, body.program_id, body.document_name, body.rerank, body.grade, body.theme, body.skill
+            body.question, body.top_k, body.program_id, body.document_name, body.rerank, body.grade, body.theme, body.skill,
+            body.outcome_code, body.section_kinds,
         )
         return {
             "ok": True,
@@ -756,7 +796,8 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
     def query(body: QueryRequest, request: Request) -> dict[str, Any]:
         service: RAGService = request.app.state.rag
         result = service.query(
-            body.question, body.top_k, body.program_id, body.document_name, body.rerank, body.grade, body.theme, body.skill
+            body.question, body.top_k, body.program_id, body.document_name, body.rerank, body.grade, body.theme, body.skill,
+            body.outcome_code, body.section_kinds,
         )
         return {
             "ok": True,

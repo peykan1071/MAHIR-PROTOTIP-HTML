@@ -23,8 +23,14 @@ Bir PDF'i şu adımlardan geçirip Qdrant'a yazar:
 
 Kullanım:
 
-    python local/ingestion_pipeline.py --pdf tdeogr.pdf --program-id tde-9-tymm \
-        [--document-title "..."] [--start-page 65 --end-page 97] [--replace] [--no-ocr] [--dry-run]
+    python local/ingestion_pipeline.py --pdf docs/tde2026.pdf --program-id tde-9-tymm --replace
+        [--document-title "..."] [--start-page 65 --end-page 71] [--no-ocr] [--dry-run] [--show-chunks N]
+
+Sayfa aralığı verilmezse programın indeks planı (`curriculum.INDEX_PLANS`)
+uygulanır: tde-9-tymm için önce s.20-27 ortak süreç bileşenleri (kazanım
+başına parça), sonra s.65-96 tema sayfaları. Her parça `section_kind` (tema
+içi bölüm türü) ve `outcome_codes` taşır; gömülen metin "9. Sınıf | 1. Tema:
+... | Öğrenme-Öğretme Yaşantıları | TDE2.2 | Okuma" ön ekiyle başlar.
 
 `--document-title` belgenin RESMÎ adıdır, dosya adı değil - Qdrant payload'ına
 yazılır ve oradan öğretmenin raporundaki kaynak gösterimine çıkar. Kayıtlı
@@ -59,10 +65,24 @@ from typing import TYPE_CHECKING, Any, Sequence
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from curriculum import (  # noqa: E402 - sys.path yukarıda ayarlandı
+    PageRange,
+    build_vocabulary,
+    classify_sections,
+    context_prefix,
+    dehyphenate,
     detect_grade_sections,
     detect_skill_key,
     detect_theme_sections,
+    extract_outcome_codes,
+    first_locatable_position,
+    fix_spurious_spaces,
+    heading_precedes,
+    is_boilerplate_piece,
+    recover_inline_titles,
     resolve_document_title,
+    resolve_index_plan,
+    split_process_components,
+    squash,
     theme_match_key,
 )
 from rag_common import (  # noqa: E402
@@ -96,6 +116,8 @@ SCANNED_PAGE_RENDER_SCALE = 200 / 72
 SOURCE_TEXT = "text"
 SOURCE_OCR_PAGE = "ocr_page"
 SOURCE_OCR_FIGURE = "ocr_figure"
+# Bundan kısa, cümle olmayan Docling parçası başlık artığı sayılır (bkz. HierarchicalChunker.chunk).
+TINY_CHUNK_CHARS = 40
 
 
 # --- Veri yapıları ----------------------------------------------------------------------
@@ -116,6 +138,10 @@ class ChunkRecord:
     grade: str | None = None
     theme: str | None = None
     skill_key: str | None = None
+    # Tema içi bölüm türü (curriculum.SECTION_KINDS) ve parçada geçen üst
+    # kazanım kodları - rag_service bunlarla bileşen parçasını kilitler.
+    section_kind: str | None = None
+    outcome_codes: list[str] = field(default_factory=list)
 
     @property
     def theme_key(self) -> str | None:
@@ -137,6 +163,8 @@ class ChunkRecord:
             "theme": self.theme,
             "theme_key": self.theme_key,
             "skill_key": self.skill_key,
+            "section_kind": self.section_kind,
+            "outcome_codes": list(self.outcome_codes),
             "ingested_at": ingested_at,
         }
 
@@ -150,6 +178,7 @@ class CurriculumSection:
     pdf_bytes: bytes = field(repr=False)
     page_offset: int
     page_count: int
+    theme_no: int | None = None  # sınıf içindeki sıra (belgedeki "N. TEMA" numarası)
 
     @property
     def label(self) -> str:
@@ -165,7 +194,7 @@ class IngestionReport:
     collection: str
     dry_run: bool
     total_pages: int = 0
-    page_range: tuple[int, int] | None = None
+    page_ranges: list[tuple[int, int]] = field(default_factory=list)  # indekslenen orijinal sayfa aralıkları
     scanned_pages: list[int] = field(default_factory=list)
     ocr_failed_pages: list[int] = field(default_factory=list)
     figures_seen: int = 0
@@ -178,6 +207,8 @@ class IngestionReport:
     durations_s: dict[str, float] = field(default_factory=dict)
     # Tespit edilen SINIF/TEMA bölümleri: (sınıf, tema, orijinal başlangıç, bitiş).
     sections: list[tuple[str | None, str | None, int, int]] = field(default_factory=list)
+    # Bölüm türü -> parça sayısı (chunking kalitesinin hızlı göstergesi).
+    section_kind_counts: dict[str, int] = field(default_factory=dict)
     # Üretilen parçalar (gömme öncesi hâliyle) - `--show-chunks` ve programatik
     # çağıranlar için; özet metnine girmez.
     chunks: list[ChunkRecord] = field(default_factory=list, repr=False)
@@ -187,7 +218,7 @@ class IngestionReport:
         return self.chunks_text + self.chunks_ocr_page + self.chunks_ocr_figure
 
     def summary(self) -> str:
-        pages = f"{self.page_range[0]}-{self.page_range[1]}" if self.page_range else f"1-{self.total_pages}"
+        pages = ", ".join(f"{first}-{last}" for first, last in self.page_ranges) or f"1-{self.total_pages}"
         grades = sorted({grade for grade, _, _, _ in self.sections if grade})
         themes = [theme for _, theme, _, _ in self.sections if theme]
         lines = [
@@ -196,6 +227,8 @@ class IngestionReport:
             + (f" (sınıf: {', '.join(grades)}; tema: {len(themes)})" if grades or themes else " (etiketsiz - müfredat deseni yok)"),
             f"Parçalar: {self.chunk_count} = metin {self.chunks_text} + taranmış sayfa {self.chunks_ocr_page} "
             f"+ görsel {self.chunks_ocr_figure}",
+            "Bölüm türleri: "
+            + (", ".join(f"{kind}={count}" for kind, count in sorted(self.section_kind_counts.items())) or "-"),
             f"Taranmış sayfalar: {self.scanned_pages or 'yok'}; görsel: {self.figures_ocr}/{self.figures_seen} OCR'landı",
             f"Qdrant: {'KURU ÇALIŞMA - yazılmadı' if self.dry_run else f'{self.points_written} nokta yazıldı'} "
             f"(koleksiyon {self.collection})",
@@ -228,6 +261,20 @@ def slice_pdf_pages(pdf_bytes: bytes, start_page: int, end_page: int) -> bytes:
     return buffer.getvalue()
 
 
+def read_page_texts(pdf_bytes: bytes) -> list[str]:
+    """Her sayfanın pypdf metin katmanı (1. sayfa -> indeks 0); bozuk sayfa boş string."""
+
+    from pypdf import PdfReader  # noqa: PLC0415
+
+    texts: list[str] = []
+    for page in PdfReader(io.BytesIO(pdf_bytes)).pages:
+        try:
+            texts.append(page.extract_text() or "")
+        except Exception:  # noqa: BLE001 - bozuk bir sayfa metin katmanı yok sayılsın, OCR karar versin
+            texts.append("")
+    return texts
+
+
 def find_scanned_pages(pdf_bytes: bytes, min_text_chars: int) -> tuple[int, set[int]]:
     """`(toplam sayfa, metin katmanı olmayan 1-indeksli sayfalar)` döndürür.
 
@@ -237,18 +284,9 @@ def find_scanned_pages(pdf_bytes: bytes, min_text_chars: int) -> tuple[int, set[
     (VLM o sayfayı yine doğru okur).
     """
 
-    from pypdf import PdfReader  # noqa: PLC0415
-
-    reader = PdfReader(io.BytesIO(pdf_bytes))
-    scanned: set[int] = set()
-    for index, page in enumerate(reader.pages, start=1):
-        try:
-            text = page.extract_text() or ""
-        except Exception:  # noqa: BLE001 - bozuk bir sayfa metin katmanı yok sayılsın, OCR karar versin
-            text = ""
-        if len(text.strip()) < min_text_chars:
-            scanned.add(index)
-    return len(reader.pages), scanned
+    texts = read_page_texts(pdf_bytes)
+    scanned = {index for index, text in enumerate(texts, start=1) if len(text.strip()) < min_text_chars}
+    return len(texts), scanned
 
 
 def render_pdf_page(pdf_bytes: bytes, page_number: int, scale: float = SCANNED_PAGE_RENDER_SCALE) -> "Image.Image":
@@ -374,20 +412,24 @@ class HierarchicalChunker:
 
         chunker = self._get()
         records: list[ChunkRecord] = []
+        pending_headings: list[str] = []
         for chunk in chunker.chunk(dl_doc=document):
             text = (chunk.text or "").strip()
             if not text:
                 continue
             headings = [str(heading) for heading in (getattr(chunk.meta, "headings", None) or [])]
+            # Başlık artığı parça ("Temel Kabuller", 15 karakter, cümle değil): tek
+            # başına gömülmez, bir sonraki parçanın başlık zincirine eklenir.
+            if len(text) < TINY_CHUNK_CHARS and not text.endswith((".", "!", "?", ":")) and "\n" not in text:
+                pending_headings.extend(heading for heading in [*headings, text] if heading not in pending_headings)
+                continue
+            merged_headings = [*pending_headings, *(heading for heading in headings if heading not in pending_headings)]
+            pending_headings = []
             pages = list(fixed_pages) if fixed_pages is not None else _pages_of_chunk(chunk, page_offset)
+            # `contextualized_text` burada geçici; `_ingest_section` bölüm etiketiyle
+            # yapısal ön eki kurar (Docling'in `contextualize()` zinciri tek seviyeliydi).
             records.append(
-                ChunkRecord(
-                    text=text,
-                    contextualized_text=chunker.contextualize(chunk=chunk),
-                    headings=headings,
-                    pages=pages,
-                    source_kind=source_kind,
-                )
+                ChunkRecord(text=text, contextualized_text=text, headings=merged_headings, pages=pages, source_kind=source_kind)
             )
         return records
 
@@ -701,7 +743,9 @@ def _write_points(
     return len(points)
 
 
-def split_curriculum_sections(pdf_bytes: bytes, page_offset: int) -> list[CurriculumSection]:
+def split_curriculum_sections(
+    pdf_bytes: bytes, page_offset: int, vocabulary: frozenset[str] = frozenset()
+) -> list[CurriculumSection]:
     """PDF'i SINIF başlıklarına, her sınıfı TEMA başlıklarına göre alt-PDF'lere böler.
 
     Neden bölüyoruz: Docling'in başlık zinciri ve sayfa numaraları bölüm
@@ -717,15 +761,18 @@ def split_curriculum_sections(pdf_bytes: bytes, page_offset: int) -> list[Curric
         grade_bytes = pdf_bytes if len(grade_sections) == 1 else slice_pdf_pages(pdf_bytes, grade_start, grade_end)
         grade_offset = page_offset + (grade_start - 1)
         theme_sections = detect_theme_sections(grade_bytes)
-        for theme_name, theme_start, theme_end in theme_sections:
+        for theme_no, (theme_name, theme_start, theme_end) in enumerate(theme_sections, start=1):
             section_bytes = grade_bytes if len(theme_sections) == 1 else slice_pdf_pages(grade_bytes, theme_start, theme_end)
             sections.append(
                 CurriculumSection(
                     grade=grade_label,
-                    theme=theme_name,
+                    # pypdf başlıkta sahte boşluk bırakabilir ("ANLAMIN Y API TAŞLARI"); `theme_key`
+                    # boşluksuz olduğundan filtre etkilenmez, ama ön ek ve rapor düzgün görünsün.
+                    theme=fix_spurious_spaces(theme_name, vocabulary) if theme_name else None,
                     pdf_bytes=section_bytes,
                     page_offset=grade_offset + (theme_start - 1),
                     page_count=theme_end - theme_start + 1,
+                    theme_no=theme_no if theme_name else None,
                 )
             )
     return sections
@@ -739,13 +786,17 @@ def _ingest_section(
     ocr: VisionOcr | None,
     settings: Settings,
     report: IngestionReport,
+    vocabulary: frozenset[str] = frozenset(),
+    reference_texts: Sequence[str] = (),
 ) -> list[ChunkRecord]:
     """Tek bir SINIF×TEMA bölümünü parçalar: Docling (CPU) + isteğe bağlı PaddleOCR-VL.
 
-    `scanned`: bölüme göre 1-indeksli, metin katmanı olmayan sayfalar. Dönen
-    her parça bölümün sınıf/temasıyla ve kendi başlığından okunan beceriyle
-    etiketlenir. Tek sayfa/görsel OCR hataları rapora uyarı olarak yazılır,
-    bölüm çökmez.
+    `scanned`: bölüme göre 1-indeksli, metin katmanı olmayan sayfalar. Docling
+    parçaları belge sırasında `curriculum.classify_sections`'tan geçer: satır
+    içi bölüm başlıklarında bölünür, tür (`section_kind`) ve kazanım kodları
+    etiketlenir, heceleme artıkları birleştirilir; gömülen metin yapısal ön ek
+    (sınıf | tema | bölüm | kod | beceri) + ham metindir. Tek sayfa/görsel OCR
+    hataları rapora uyarı olarak yazılır, bölüm çökmez.
     """
 
     page_offset = section.page_offset
@@ -774,9 +825,41 @@ def _ingest_section(
             record for record in text_records
             if not record.pages or not set(record.pages).issubset(scanned_original)
         ]
-        records.extend(text_records)
-        report.chunks_text += len(text_records)
-        logger.info("%s: Docling %d metin parçası", section.label, len(text_records))
+        # Bölüm etiketleme (curriculum.classify_sections): bir Docling parçası satır
+        # içi başlıkta bölünüp birden çok kayıt üretebilir; sayfalar kaynaktan gelir.
+        # Docling'in düşürdüğü satır içi etiketler pypdf akışından geri yerleştirilir
+        # (curriculum.recover_inline_titles), sonra bölüm türleri etiketlenir.
+        reference_squashed = squash("\n".join(reference_texts))
+        aligned: list[tuple[list[str], str]] = []
+        cursor = 0
+        for record in text_records:
+            text, headings = record.text, record.headings
+            if reference_squashed:
+                # Sayfa geçişinde bir sonraki sayfanın etiketi bu parçaya başlık
+                # olmuşsa (akışta parçadan SONRA geçiyor) düşürülür.
+                position = first_locatable_position(text, reference_squashed, cursor)
+                headings = [heading for heading in headings if heading_precedes(heading, reference_squashed, position)]
+                text, cursor = recover_inline_titles(text, reference_squashed, cursor)
+            aligned.append((headings, text))
+        pieces = [piece for piece in classify_sections(aligned) if not is_boilerplate_piece(piece.text)]
+        for piece in pieces:
+            origin = text_records[piece.source_index]
+            text = dehyphenate(piece.text, vocabulary)
+            skill_key = detect_skill_key([*piece.headings, *piece.outcome_codes], text)
+            records.append(
+                ChunkRecord(
+                    text=text,
+                    contextualized_text=text,
+                    headings=piece.headings,
+                    pages=origin.pages,
+                    source_kind=SOURCE_TEXT,
+                    skill_key=skill_key,
+                    section_kind=piece.section_kind,
+                    outcome_codes=piece.outcome_codes,
+                )
+            )
+        report.chunks_text += len(pieces)
+        logger.info("%s: Docling %d parça -> %d etiketli parça", section.label, len(text_records), len(pieces))
 
     # PaddleOCR-VL (GPU): taranmış sayfalar bütün olarak, metinli sayfalardaki resimler kırpılarak.
     if ocr is not None:
@@ -837,8 +920,65 @@ def _ingest_section(
     for record in records:
         record.grade = section.grade
         record.theme = section.theme
-        record.skill_key = detect_skill_key(record.headings, record.text)
+        if record.source_kind != SOURCE_TEXT:  # OCR kayıtları etiketlemeden geçmedi
+            record.outcome_codes = extract_outcome_codes(record.headings, record.text)
+            record.skill_key = detect_skill_key([*record.headings, *record.outcome_codes], record.text)
+        prefix = context_prefix(
+            section.grade, section.theme_no, section.theme, record.section_kind,
+            record.outcome_codes, record.skill_key, record.headings,
+        )
+        record.contextualized_text = f"{prefix}\n{record.text}" if prefix else record.text
+        report.section_kind_counts[record.section_kind or "-"] = report.section_kind_counts.get(record.section_kind or "-", 0) + 1
     return records
+
+
+def _ingest_components(
+    page_texts: list[str], page_range: PageRange, vocabulary: frozenset[str], settings: Settings, report: IngestionReport
+) -> list[ChunkRecord]:
+    """Ortak "Öğrenme Çıktıları ve Süreç Bileşenleri" sayfalarını kazanım başına parçalar.
+
+    Docling değil pypdf metni: bölüm düz satır yapısında (`TDE1.2. ...` /
+    `a) TDE1.2.1. ...` / göstergeler), tablo yok; satır tabanlı bölücü kesin
+    sınır verir. Parçalar sınıf/tema taşımaz (tüm sınıflar için ortak) -
+    `rag_service` bunları `section_kind` + `outcome_codes` ile getirir.
+    """
+
+    texts = [(page, page_texts[page - 1]) for page in range(page_range.start_page, page_range.end_page + 1)]
+    # ~3,5 karakter/token: tavan `CHUNK_MAX_TOKENS` ile aynı ölçekte kalsın.
+    blocks = split_process_components(texts, vocabulary, max_chars=int(settings.chunk_max_tokens * 3.5))
+    records: list[ChunkRecord] = []
+    for block in blocks:
+        text = fix_spurious_spaces(block.text, vocabulary)
+        skill_key = detect_skill_key([block.code], text)
+        prefix = context_prefix(None, None, None, "surec_bilesenleri", [block.code], skill_key, [])
+        records.append(
+            ChunkRecord(
+                text=text,
+                contextualized_text=f"{prefix}\n{text}",
+                headings=[block.title],
+                pages=block.pages,
+                source_kind=SOURCE_TEXT,
+                skill_key=skill_key,
+                section_kind="surec_bilesenleri",
+                outcome_codes=[block.code],
+            )
+        )
+    report.chunks_text += len(records)
+    report.section_kind_counts["surec_bilesenleri"] = report.section_kind_counts.get("surec_bilesenleri", 0) + len(records)
+    codes = sorted({record.outcome_codes[0] for record in records})
+    logger.info("Süreç bileşenleri s.%d-%d: %d parça, %d kazanım kodu", page_range.start_page, page_range.end_page, len(records), len(codes))
+    return records
+
+
+def _resolve_page_ranges(program_id: str, start_page: int | None, end_page: int | None, total_pages: int) -> list[PageRange]:
+    """Elle aralık > program planı > tüm belge."""
+
+    if start_page is not None and end_page is not None:
+        return [PageRange(start_page, end_page)]
+    plan = resolve_index_plan(program_id)
+    if plan:
+        return list(plan)
+    return [PageRange(1, total_pages)]
 
 
 def ingest_pdf(
@@ -871,61 +1011,80 @@ def ingest_pdf(
         dry_run=dry_run,
     )
 
-    # 1) Kapsam: sayfa aralığı dilimlenir; taranmış sayfalar metin katmanından
-    #    tespit edilir; SINIF/TEMA bölümleri bulunur (desen yoksa tek bölüm).
+    # 1) Kapsam: aralıklar (elle verilen tek aralık, yoksa programın indeks planı,
+    #    yoksa tüm belge); taranmış sayfalar metin katmanından; SINIF/TEMA
+    #    bölümleri (desen yoksa tek bölüm); heceleme/boşluk düzeltme sözlüğü.
     with _Timer(report, "hazırlık"):
         pdf_bytes = pdf_path.read_bytes()
         try:
-            if start_page is not None and end_page is not None:
-                scoped_bytes = slice_pdf_pages(pdf_bytes, start_page, end_page)
-                page_offset = start_page - 1
-                report.page_range = (start_page, end_page)
-            else:
-                scoped_bytes = pdf_bytes
-                page_offset = 0
-            scoped_page_count, scanned = find_scanned_pages(scoped_bytes, settings.ocr_min_text_chars_per_page)
-            sections = split_curriculum_sections(scoped_bytes, page_offset)
+            page_texts = read_page_texts(pdf_bytes)
+            ranges = _resolve_page_ranges(program_id, start_page, end_page, len(page_texts))
+            if any(r.start_page < 1 or r.end_page > len(page_texts) or r.end_page < r.start_page for r in ranges):
+                raise IndexError("aralık")
+            vocabulary = build_vocabulary(*page_texts)
+            theme_ranges = [r for r in ranges if r.kind != "surec_bilesenleri"]
+            sections_by_range: list[tuple[PageRange, list[CurriculumSection]]] = []
+            for page_range in theme_ranges:
+                whole = page_range.start_page == 1 and page_range.end_page == len(page_texts)
+                scoped_bytes = pdf_bytes if whole else slice_pdf_pages(pdf_bytes, page_range.start_page, page_range.end_page)
+                sections_by_range.append((page_range, split_curriculum_sections(scoped_bytes, page_range.start_page - 1, vocabulary)))
         except IndexError as error:
             raise IngestionError("Sayfa aralığı belgenin sınırları dışında.") from error
         except Exception as error:  # noqa: BLE001 - pypdf üçüncü parti; bozuk PDF açık mesajla dönmeli
             raise IngestionError(f"PDF sayfaları okunamadı: {error}") from error
-        report.total_pages = scoped_page_count
-        report.scanned_pages = sorted(page + page_offset for page in scanned)
+        report.page_ranges = [(r.start_page, r.end_page) for r in ranges]
+        report.total_pages = sum(r.end_page - r.start_page + 1 for r in ranges)
+        in_theme_pages = {page for r in theme_ranges for page in range(r.start_page, r.end_page + 1)}
+        report.scanned_pages = sorted(
+            page for page, text in enumerate(page_texts, start=1)
+            if page in in_theme_pages and len(text.strip()) < settings.ocr_min_text_chars_per_page
+        )
         report.sections = [
             (section.grade, section.theme, section.page_offset + 1, section.page_offset + section.page_count)
+            for _, sections in sections_by_range
             for section in sections
         ]
-        if scanned and not use_ocr:
+        if report.scanned_pages and not use_ocr:
             report.warnings.append(
-                f"{len(scanned)} sayfada metin katmanı yok ama OCR kapalı - bu sayfalar dizine girmeyecek."
+                f"{len(report.scanned_pages)} sayfada metin katmanı yok ama OCR kapalı - bu sayfalar dizine girmeyecek."
             )
         logger.info(
-            "%s: %d sayfa (aralık %s), %d bölüm, taranmış: %s", pdf_path.name, scoped_page_count,
-            report.page_range or "tümü", len(sections), report.scanned_pages or "yok",
+            "%s: %d sayfa (aralık %s), %d bölüm, taranmış: %s", pdf_path.name, report.total_pages,
+            ", ".join(f"{a}-{b}" for a, b in report.page_ranges), len(report.sections), report.scanned_pages or "yok",
         )
         for grade, theme, first, last in report.sections:
             if grade or theme:
                 logger.info("  bölüm: sınıf=%s tema=%s sayfa %d-%d", grade, theme, first, last)
 
-    # 2-3) Bölüm başına Docling (CPU) + PaddleOCR-VL (GPU). OCR modeli bölümler
-    #      boyunca tembel yüklenir, tek kez; `with` biterken bırakılır - gömme
-    #      VRAM boşaldıktan sonra başlar.
+    # 2-3) Bileşen aralığı pypdf ile; tema bölümleri Docling (CPU) + PaddleOCR-VL
+    #      (GPU). OCR modeli bölümler boyunca tembel yüklenir, tek kez; `with`
+    #      biterken bırakılır - gömme VRAM boşaldıktan sonra başlar.
+    records: list[ChunkRecord] = []
+    with _Timer(report, "bileşenler"):
+        for page_range in ranges:
+            if page_range.kind == "surec_bilesenleri":
+                records.extend(_ingest_components(page_texts, page_range, vocabulary, settings, report))
     parser = DoclingParser(threads=settings.resolved_threads(settings.docling_threads))
     chunker = HierarchicalChunker(settings.embedding_model, settings.chunk_max_tokens)
     scanned_original = set(report.scanned_pages)
-    records: list[ChunkRecord] = []
     ocr_context = (
         VisionOcr(settings.ocr_device, settings.ocr_engine, settings.ocr_max_image_side) if use_ocr else nullcontext(None)
     )
     with ocr_context as ocr:
-        for section in sections:
-            first, last = section.page_offset + 1, section.page_offset + section.page_count
-            section_scanned = {page - section.page_offset for page in scanned_original if first <= page <= last}
-            records.extend(_ingest_section(section, section_scanned, parser, chunker, ocr, settings, report))
+        for _, sections in sections_by_range:
+            for section in sections:
+                first, last = section.page_offset + 1, section.page_offset + section.page_count
+                section_scanned = {page - section.page_offset for page in scanned_original if first <= page <= last}
+                records.extend(
+                    _ingest_section(
+                        section, section_scanned, parser, chunker, ocr, settings, report, vocabulary,
+                        reference_texts=page_texts[first - 1:last],
+                    )
+                )
     if use_ocr:
         logger.info(
             "OCR: %d taranmış sayfa, %d/%d görsel -> %d + %d parça",
-            len(scanned), report.figures_ocr, report.figures_seen, report.chunks_ocr_page, report.chunks_ocr_figure,
+            len(report.scanned_pages), report.figures_ocr, report.figures_seen, report.chunks_ocr_page, report.chunks_ocr_figure,
         )
 
     if not records:
