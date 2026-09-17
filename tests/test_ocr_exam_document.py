@@ -41,6 +41,23 @@ class ExamDocumentParserTests(unittest.TestCase):
         result = _parse_exam_rows([["Açıklama", "9-A"], ["Sınav Türü", "Yazılı"]])
         self.assertEqual(result["exam"]["classSection"], "")
 
+    def test_ocr_misread_label_still_yields_the_class_section(self):
+        # Canlı (2026-09-17, anonim 9B fixture'ı): PaddleOCR-VL etiketi "Simif/Şube"
+        # okudu ("nı" -> "mi"); değer hücresi "9 - B" doğruydu ama etiket birebir
+        # eşleşmediği için sınıf boş kaldı ve öğretmen "kaynak görselden kontrol
+        # edip doldurunuz" uyarısı aldı. Tek harflik OCR karışması etiketi düşürmemeli.
+        for label in ("Simif/Şube", "Sınıf/Sube", "Sinif / Şube", "Sınıt/Şube"):
+            with self.subTest(label=label):
+                result = _parse_exam_rows([[label, "9 - B"], ["Sinav Türü", "Yazılı"]])
+                self.assertEqual(result["exam"]["classSection"], "9-B")
+                self.assertEqual(result["exam"]["examType"], "Yazılı")
+
+    def test_label_tolerance_does_not_match_unrelated_labels(self):
+        # Tolerans başka etiketleri birbirine karıştırmamalı: "Sınav Türü" satırındaki
+        # değer sınıf sanılmaz, "Sorular" başlığı etiket sanılmaz.
+        result = _parse_exam_rows([["Sınav Türü", "9-A"], ["Sorular", "S1", "S2"]])
+        self.assertEqual(result["exam"]["classSection"], "")
+
     def test_one_image_becomes_one_student_document(self):
         rows = [
             ["Öğrencinin Adı-Soyadı", "ÖĞRENCİ-001", "Sınav Türü", "Yazılı"],

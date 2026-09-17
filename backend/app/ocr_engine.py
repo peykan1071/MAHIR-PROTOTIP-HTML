@@ -126,14 +126,38 @@ def _normalize_label(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.casefold().translate(str.maketrans("çğıöşü", "cgiosu"))).strip()
 
 
+# Etiket hücreleri basılı metin olsa da PaddleOCR-VL tek harfi karıştırabiliyor
+# (canlı, anonim 9B fixture'ı: "Sınıf/Şube" -> "Simif/Şube"). Boşluksuz biçimde
+# etiket uzunluğunda bir pencere kaydırılır ve benzerlik bu eşiği geçerse etiket
+# sayılır: 9 harflik "sinifsube" için tek harf farkı 0,89, iki harf 0,78 verir.
+# Farklı etiketler birbirine yaklaşmaz ("sinifsube" ~ "sinavturu" 0,44).
+_LABEL_MATCH_RATIO = 0.8
+
+
+def _label_in(normalized_text: str, normalized_label: str) -> bool:
+    """Normalize edilmiş metin etiketi (OCR toleransıyla) içeriyor mu?"""
+
+    if normalized_label in normalized_text:
+        return True
+    compact_text = normalized_text.replace(" ", "")
+    compact_label = normalized_label.replace(" ", "")
+    if compact_label in compact_text:
+        return True
+    if len(compact_label) < 6 or len(compact_text) < len(compact_label) - 1:
+        return False
+    from difflib import SequenceMatcher  # noqa: PLC0415 - yalnız bu geri düşüş yolunda
+
+    width = len(compact_label)
+    for start in range(0, len(compact_text) - width + 2):
+        window = compact_text[start : start + width]
+        if SequenceMatcher(None, window, compact_label).ratio() >= _LABEL_MATCH_RATIO:
+            return True
+    return False
+
+
 def _row_has(row: list[str], *needles: str) -> bool:
     text = " ".join(_normalize_label(cell) for cell in row)
-    compact_text = text.replace(" ", "")
-    return any(
-        (normalized := _normalize_label(needle)) in text
-        or normalized.replace(" ", "") in compact_text
-        for needle in needles
-    )
+    return any(_label_in(text, _normalize_label(needle)) for needle in needles)
 
 
 def _numbers_after_label(row: list[str]) -> list[float | int]:
@@ -158,10 +182,10 @@ def _value_after_label(rows: list[list[str]], *labels: str) -> str:
     for row in rows:
         for index, cell in enumerate(row):
             normalized = _normalize_label(cell)
-            if any(label in normalized for label in normalized_labels):
+            if any(_label_in(normalized, label) for label in normalized_labels):
                 for candidate in row[index + 1:]:
                     value = candidate.strip()
-                    if value and not any(label in _normalize_label(value) for label in normalized_labels):
+                    if value and not any(_label_in(_normalize_label(value), label) for label in normalized_labels):
                         return value
     return ""
 
