@@ -391,23 +391,19 @@ def _build_rag_retrieval_query(outcome: dict[str, Any]) -> str:
 def _build_rag_question(outcome: dict[str, Any]) -> str:
     """LLM'e sorulan soru (getirim sorgusu değil - o `_build_rag_retrieval_query`).
 
-    2026-08-22: Başarı oranı ve şiddet etiketi buradan KALDIRILDI. Eskiden
-    model paragrafın kendisini yazdığı için bunlara ihtiyacı vardı; artık
-    yalnızca BAĞLAM'dan bir ila üç terim SEÇİYOR (`{"evidenceTerms":[...]}`,
-    `pipeline.py::_compose_grounded_pedagogical_answer`) ve oranı/şiddeti
-    MAHİR kendi hesaplıyor - modelin bunlara erişimi gerekmiyor. Canlı
-    ölçümde bu sayılar sorudayken model tekrar tekrar "%30 başarı oranı"
-    veya "Kritik" gibi SORU'nun kendi cümlesini "evidenceTerms" olarak
-    seçip BAĞLAM'daki gerçek müfredat metnini hiç kullanmadı - kaldırılması
-    bu tuzağı ortadan kaldırıyor.
+    Başarı oranı ve şiddet etiketi KASITLI olarak yok (2026-08-22): oran ve
+    şiddet MAHİR'in kendi hesabıdır; sorudayken model onları yanıtına
+    kopyalıyor, BAĞLAM'daki müfredat metnini kullanmıyordu. Soru, sistem
+    promptunun (`prompts.DIAGNOSIS_SYSTEM_PROMPT`) sözleşmesiyle aynı dili
+    konuşur: BAĞLAM'daki süreç bileşenlerine dayalı nitel teşhis. 2026-09-18:
+    eski "bir ila üç terim seç" ifadesi (evidenceTerms kalıntısı) kaldırıldı;
+    kısa soru deneyde kaynakla örtüşmeyi 12,4 -> 13,6 sözcüğe çıkardı.
     """
 
     parts = _outcome_identity_parts(outcome)
     if not parts:
         return ""
     return (
-        f"{' - '.join(parts)} öğrenme çıktısı için BAĞLAM'daki öğretim "
-        "programı metninden bu çıktıyla doğrudan ilgili bir ila üç somut "
-        "terimi adıyla anarak yanıtla. Eksikliğin nedenini, öğrenci "
-        "sayısını veya öğrencinin bilgisini tahmin etme."
+        f"{' - '.join(parts)} öğrenme çıktısındaki eksikliği BAĞLAM'daki "
+        "süreç bileşenlerine ve kavramlara dayanarak teşhis et."
     )

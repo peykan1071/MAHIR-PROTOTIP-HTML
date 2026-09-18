@@ -421,6 +421,23 @@ class RagContextAttachmentTests(unittest.TestCase):
         self.assertTrue(reasons[0].startswith(_REASON_CODE_LEAK))
         self.assertTrue(_answer_matches_outcome_scope("TDE3.3 konuşma becerisi güçlüdür.", outcome))
 
+    def test_sub_codes_of_the_selected_outcome_are_not_a_leak(self):
+        # 2026-09-18 deneyi: 7 yapılandırma x 16 çağrıda görülen TEK red türü,
+        # modelin s.20-27 süreç bileşeni parçasında GERÇEKTEN yazan alt kodları
+        # (TDE3.2.2 gibi) anmasıydı - bu uydurma değil, kaynaktan kopya; yine de
+        # her seferinde bir retry çağrısına mal oluyordu. Seçili kazanımın alt
+        # kodları artık izinli; yabancı kazanımların kodları yine sızıntı.
+        outcome = {"outcomeCode": "TDE3.2", "componentType": "speaking", "outcomeDescription": "konuşma içeriği oluşturabilme"}
+        self.assertTrue(_answer_matches_outcome_scope("TDE3.2.2 ve TDE3.2.3 süreçlerini uygulamamaktadır.", outcome))
+        # Ebeveyn kodun kardeş alt kodları da aynı kazanımın bileşenleri.
+        component = {"outcomeCode": "TDE3.2.2", "parentOutcomeCode": "TDE3.2", "componentType": "speaking", "outcomeDescription": "tahmin eder"}
+        self.assertTrue(_answer_matches_outcome_scope("TDE3.2.5 süreci uygulanmamaktadır.", component))
+        # Önek çakışması alt kod DEĞİL: TDE3.20.1, TDE3.2'nin altı değildir.
+        reasons: list[str] = []
+        self.assertFalse(_answer_matches_outcome_scope("TDE3.20.1 süreci uygulanmamaktadır.", outcome, reasons))
+        self.assertTrue(reasons[0].startswith(_REASON_CODE_LEAK))
+        self.assertFalse(_answer_matches_outcome_scope("TDE3.3.1 süreci uygulanmamaktadır.", outcome))
+
     def test_overlong_pedagogical_answer_is_rejected(self):
         # MAHİR'in ürettiği kapanış cümlesiyle sarıldığından (bkz.
         # `_compose_grounded_pedagogical_answer`) sınır 70'ten 90'a çıktı.
@@ -992,9 +1009,14 @@ class NoBloomTests(unittest.TestCase):
     def test_question_asks_for_curriculum_grounding(self):
         # Eski kapanış emri modelin yanıtı bilişsel kıyasa harcamasına yol
         # açıyordu; yenisi getirilen müfredat metnine demirlemeyi istiyor.
+        # 2026-09-18: "bir ila üç somut terimi adıyla anarak yanıtla" eski
+        # evidenceTerms sözleşmesinin kalıntısıydı (sistem promptu 1-5 öğeli
+        # paragraf istiyor); SORU artık güncel sözleşmeyle aynı dili konuşur.
         question = self._question()
         self.assertIn("BAĞLAM", question)
-        self.assertIn("adıyla anarak", question)
+        self.assertIn("süreç bileşen", question)
+        self.assertIn("teşhis et", question)
+        self.assertNotIn("bir ila üç", question)
 
     def test_bloom_helpers_are_gone_for_good(self):
         # Yardımcı geri gelirse prompt'a da geri sızması an meselesi.

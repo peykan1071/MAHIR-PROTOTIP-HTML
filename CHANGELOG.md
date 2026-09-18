@@ -2,6 +2,14 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## RAG Ayar Deneyi ve İki Düzeltme - 2026-09-18
+
+- **Deney (depo değişmeden, scratchpad betikleri):** 8 kazanım (4 tema × 4 beceri) ile iki katman. Katman 1 (getirim, LLM yok; "ilgili parça" = aynı temada `outcome_codes ∋ kod`): temel ayar R@8 = 1,00, MRR = 1,00; aday havuzu 24/36, `RERANKER_MIN_SCORE` 0,2/0,4 ve `RAG_RELATIVE_SCORE_FLOOR` **etkisiz**; reranker kapalı R 0,85; sorgu metni varyantları (yalnız kazanım / tema+beceri / süreç ipucu) R 0,69-0,71 ile daha kötü; beceri filtresi kapalı → yanlış beceri parçaları sızar (0,81); parça boyutu 224/512 token (ayrı koleksiyonlar `mahir_local_chunks_c224`/`_c512`) kazanç yok. Katman 2 (Qwen3-4B, retry'sız, 2 koşu): temel 15/16, k=6 15/16, k=12 14/16, kısa SORU 15/16 (örtüşme 12,4 → 13,6), reranker kapalı 13/16, 224 token 14/16, 512 token 13/16. Görülen **tek** red türü `kod-sizintisi`: model, süreç bileşeni parçasında (s.20-27) gerçekten yazan alt kodları (`TDE3.2.2`) anıyor, doğrulayıcı yalnız ana kodu kabul ediyordu → her seferinde bir retry çağrısı.
+- **Düzeltme 1 - alt kod toleransı:** `pipeline.py::_answer_matches_outcome_scope` izinli kodun `"."` ile devam eden alt kodlarını sızıntı saymaz (önek çakışması `TDE3.20.1` yine elenir, yabancı kazanım kodları yine elenir). Testler: `test_sub_codes_of_the_selected_outcome_are_not_a_leak`.
+- **Düzeltme 2 - SORU güncel sözleşmeyle:** `approved_data_analyzer.py::_build_rag_question` eski "bir ila üç somut terimi adıyla anarak yanıtla" (evidenceTerms kalıntısı) yerine "… eksikliği BAĞLAM'daki süreç bileşenlerine ve kavramlara dayanarak teşhis et."; güçlü-çıktı sorusu (`pipeline.py`) aynı biçimde. Test `test_question_asks_for_curriculum_grounding` güncellendi.
+- **Bilinçli olarak yapılmayan:** `_DIAGNOSIS_TOP_K` 8 → 6 (kalite eşdeğer ama R@6 = 0,96; kapsama riski), `.env` getirim ayarları (etkisiz).
+- **Doğrulama:** 352 Python + 13 JS yeşil; canlı retry'sız 2 koşu **16/16** (önce 15/16), üretim turu 8/8, retry yok.
+
 ## Ajan Prompt'ları Sadeleştirildi - 2026-09-18
 
 - **Neden:** aynı yasak ("tema/yüzde/şiddet yazma") beş yerde tekrarlanıyor, JSON şeması hem sistem promptunda hem kullanıcı mesajındaki "YANIT SÖZLEŞMESİ"nde yazıyor, kaldırılan açılış cümlesine ("sistem tarafından üretilen bir cümlede belirtilecek") atıflar kalmıştı; `_RATIONALE_RETRY_HINT` şemada olmayan `gapRationale` alanını, `_SCOPE_RETRY_HINT` artık kabul edilen nedensellik/öneri dilini anlatıyordu (ilgili sebep kodları hiçbir doğrulama dalında üretilmiyor).

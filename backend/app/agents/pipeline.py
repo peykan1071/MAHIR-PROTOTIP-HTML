@@ -1209,8 +1209,8 @@ def _enqueue_diagnosis_prompts(
         # cümlesini (ör. "%90") "evidenceTerms" diye seçmesine yol açıyordu.
         question = _build_rag_question(outcome) if is_weak else (
             f"{' - '.join(str(part) for part in (outcome.get('outcomeTheme'), outcome.get('outcomeCode'), outcome.get('outcomeDescription'), outcome.get('outcomeSkill')) if part)} "
-            "öğrenme çıktısı için BAĞLAM'daki somut süreç bileşenlerine dayanarak güçlü "
-            "performansı kanıtlayan iki somut terimi adıyla anarak seç."
+            "öğrenme çıktısındaki güçlü performansı BAĞLAM'daki süreç bileşenlerine ve "
+            "kavramlara dayanarak betimle."
         )
         if not question:
             _logger.info("RAG atlandı: cikti=%s sebep=soru-bos", code)
@@ -1401,7 +1401,16 @@ def _answer_matches_outcome_scope(
         str(value).upper() for value in (outcome.get("outcomeCode"), outcome.get("parentOutcomeCode")) if value
     }
     mentioned_codes = {code.upper() for code in re.findall(r"\bTDE\d+(?:\.\d+)+\b", answer, re.IGNORECASE)}
-    leaked_codes = mentioned_codes - allowed_codes
+    # İzinli kodun ALT kodları (TDE3.2 için TDE3.2.2) sızıntı değil: program
+    # PDF'inin süreç bileşenleri bölümü (s.20-27) tam olarak bu alt kodlarla
+    # yazılmış ve model onları BAĞLAM'dan kopyalıyor - 2026-09-18 deneyinde
+    # (7 yapılandırma x 16 çağrı) görülen tek red türü buydu ve her biri bir
+    # retry çağrısına mal oluyordu. "." ile devam şartı önek çakışmasını
+    # (TDE3.20.1) dışarıda tutar; yabancı kazanım kodları yine elenir.
+    leaked_codes = {
+        code for code in mentioned_codes
+        if not any(code == allowed or code.startswith(allowed + ".") for allowed in allowed_codes)
+    }
     if leaked_codes:
         _note_reason(reasons, f"kod-sizintisi: {sorted(leaked_codes)} (izinli: {sorted(allowed_codes)})")
         return False
