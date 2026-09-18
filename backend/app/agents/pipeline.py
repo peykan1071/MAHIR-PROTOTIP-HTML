@@ -112,46 +112,28 @@ def _reason_code(reason: str) -> str:
 
 # `PedagogicalAnalysisAgent._evaluate_diagnosis_result`in "retry" durumu için:
 # ilk denemede doğrulanamayan çıktılar, başarısızlığın SEBEBİNE göre seçilen
-# bir düzeltici notla AYNI getirime bir kez daha sorulur. Önceden tek bir
-# sabit ipucu vardı (yalnızca terim-ayarı sorunundan bahsediyordu) - gerçek
-# sebep başka bir şeyse (ör. gerekçe charter filtresiyle boşaldıysa) o ipucu
-# alakasızdı ve retry aynı sebeple tekrar başarısız olma ihtimali yüksekti.
+# bir düzeltici notla AYNI getirime bir kez daha sorulur. İki ipucu var, çünkü
+# doğrulayıcının bugün ürettiği sebepler iki sınıfa ayrılıyor: kaynakla örtüşme
+# (`terim-baglamda-yok`) ve kapsam (uzunluk, kod sızıntısı, çapraz beceri).
+# 2026-09-18: `gapRationale` şemasına ve artık kabul edilen nedensellik/öneri
+# diline atıf yapan bayat ipuçları silindi - o sebepler hiçbir dalda üretilmiyor.
 _GROUNDING_RETRY_HINT = (
-    "\n\nNOT: Önceki denemende seçtiğin en az bir terim BAĞLAM'da BİREBİR "
-    "geçmiyordu (eş anlamlı ya da çekim eki değiştirilmiş bir ifade "
-    "kullanmıştın) veya yanıtın seçilen öğrenme çıktısının kapsamı dışına "
-    "çıkmıştı. Bu kez YALNIZCA BAĞLAM'da harfi harfine geçen kelime veya "
-    "kelime öbeklerini seç; hiçbir kelimeyi değiştirme."
-)
-
-_RATIONALE_RETRY_HINT = (
-    "\n\nNOT: Önceki denemende gerekçe (gapRationale/strengthRationale) "
-    "zorunluluk kipiyle yazılmıştı (ör. '...gerekir', '...gereklidir', "
-    "'...yapılmalıdır', '...önerilir') ve bu yüzden tamamen elendi. Bu kez "
-    "gerekçeyi DOĞRUDAN GÖZLEMSEL bir cümleyle yaz - ne yapılması "
-    "GEREKTİĞİNİ değil, öğrencide NE EKSİK/NE GÜÇLÜ olduğunu anlat. Örnek "
-    "kalıplar: '...net biçimde kurulamamaktadır.', '...sınırlı düzeyde "
-    "kalmaktadır.', '...başarıyla uygulanmaktadır.'"
+    "\n\nNOT: Önceki denemen BAĞLAM'daki müfredat sözcükleriyle yeterince örtüşmedi. "
+    "Bu kez BAĞLAM'da BİREBİR geçen süreç bileşeni ve kavram adlarını kullan; "
+    "sözcükleri değiştirme, yalnızca çekim eki ekle."
 )
 
 _SCOPE_RETRY_HINT = (
-    "\n\nNOT: Önceki denemen ya çok uzundu, ya kanıtlanamayacak bir "
-    "nedensellik/öğrenci sayısı iddiası içeriyordu, ya öneri/etkinlik dili "
-    "kullanmıştı ya da izin verilmeyen bir kazanım kodu/beceri alanı "
-    "sızdırmıştı. Bu kez YALNIZCA seçilen öğrenme çıktısının kapsamında "
-    "kal, kısa ve tanı-odaklı yaz; hiçbir öneri, etkinlik veya nedensellik "
-    "iddiası ekleme."
+    "\n\nNOT: Önceki denemen ya çok uzundu ya da izin verilmeyen bir kazanım "
+    "kodu/beceri alanı içeriyordu. Bu kez YALNIZCA seçilen öğrenme çıktısının "
+    "kapsamında kal ve kelime sınırına uy."
 )
 
-# Sebep kodu -> retry ipucu. Eşlenmeyen sebepler (ör. kanıt sayısı/biçim
-# sorunları - bunlar zaten JSON şemasının kendisiyle ilgili, prompttaki
-# ÇIKTI FORMATI zaten bunu anlatıyor) varsayılan (terim-ayarı) ipucuna düşer.
+# Sebep kodu -> retry ipucu. Eşlenmeyen sebepler (JSON/biçim sorunları - sistem
+# promptu çıktı şemasını zaten anlatıyor) varsayılan (örtüşme) ipucuna düşer.
 _RETRY_HINTS_BY_REASON: dict[str, str] = {
     _REASON_TERM_UNGROUNDED: _GROUNDING_RETRY_HINT,
-    _REASON_RATIONALE_STRIPPED: _RATIONALE_RETRY_HINT,
     _REASON_TOO_LONG: _SCOPE_RETRY_HINT,
-    _REASON_CAUSAL_OVERCLAIM: _SCOPE_RETRY_HINT,
-    _REASON_ACTION_LANGUAGE: _SCOPE_RETRY_HINT,
     _REASON_CODE_LEAK: _SCOPE_RETRY_HINT,
     _REASON_CROSS_SKILL_LEAK: _SCOPE_RETRY_HINT,
 }
@@ -1249,9 +1231,13 @@ def _enqueue_diagnosis_prompts(
             # beyaz listeyle kuruyor.
             "agent": PedagogicalAnalysisAgent.name,
             "system": DIAGNOSIS_SYSTEM_PROMPT if is_weak else STRENGTH_SYSTEM_PROMPT,
+            # Kullanıcı mesajı yalnız VERİ taşır (sınav türü, kazanım, soru); kurallar
+            # ve çıktı şeması tek yerde, sistem promptunda. 2026-09-18: buradaki
+            # "YANIT SÖZLEŞMESİ" tekrarı (~110 token/çağrı) ve hiçbir promptun atıf
+            # yapmadığı "SINAV SIRASI" satırı kaldırıldı. Servis BAĞLAM'ı bu metnin
+            # başına ekler (bkz. local/rag_service.py `run_agent_prompts`).
             "user": (
                 f"SINAV TÜRÜ: {(context.payload.get('exam') or {}).get('examType') or context.scratch.get('componentType')}\n"
-                f"SINAV SIRASI: {(context.payload.get('exam') or {}).get('examSequence') or 'Belirtilmedi'}\n"
                 f"SEÇİLMİŞ ÖĞRENME ÇIKTISI: {outcome.get('outcomeCode')} — {outcome.get('outcomeDescription')}\n"
                 + (
                     f"ÜST ÖĞRENME ÇIKTISI: {outcome.get('parentOutcomeCode')} — {outcome.get('parentOutcomeDescription')}\n"
@@ -1259,28 +1245,7 @@ def _enqueue_diagnosis_prompts(
                     and outcome.get("parentOutcomeCode") != outcome.get("outcomeCode")
                     else ""
                 )
-                # Eskiden burada ayrıca bir "YANIT SÖZLEŞMESİ" bloğu vardı
-                # (evidenceTerms'e özgü JSON talimatı) - 2026-08-22 (2. sürüm)
-                # yeni sistem promptu kendi ÇIKTI FORMATI'nı zaten tam
-                # taşıdığından KALDIRILDI; o eski blok bırakılsaydı yeni
-                # şemayla ("evidence"/"gapRationale") ÇELİŞİRDİ - tam olarak
-                # bu oturumun daha önce düzelttiği "sistem promptu ile
-                # kullanıcı mesajı çelişiyor" hatasının aynısını geri
-                # getirirdi.
-                + f"SORU: {question}\n\nYalnızca bu sınav türü, seçilmiş öğrenme çıktısı ve yukarıdaki BAĞLAM'a dayanarak Türkçe yanıtla."
-                + (
-                    "\n\nYANIT SÖZLEŞMESİ: Yalnız geçerli JSON döndür: "
-                    "{\"diagnosis\":\"tema/yüzde/şiddet İÇERMEYEN, yalnız nitel teşhis paragrafı\"}. "
-                    "Tema adı, yüzde sayısı veya şiddet kelimesi yazma - bunlar ayrıca ekleniyor. "
-                    "BAĞLAM'daki müfredat sözcüklerini kendi sözcüklerinle değiştirmeden "
-                    "kullan. Markdown kullanma."
-                    if is_weak else
-                    "\n\nYANIT SÖZLEŞMESİ: Yalnız geçerli JSON döndür: "
-                    "{\"diagnosis\":\"tema/yüzde İÇERMEYEN, yalnız nitel teşhis paragrafı\"}. Tema "
-                    "adı veya yüzde sayısı yazma - bunlar ayrıca ekleniyor. "
-                    "BAĞLAM'daki müfredat sözcüklerini kendi sözcüklerinle değiştirmeden kullan. "
-                    "Markdown kullanma."
-                )
+                + f"SORU: {question}"
             ),
             "retrieval": {
                 "programId": program.id,

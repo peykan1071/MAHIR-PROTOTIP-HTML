@@ -400,9 +400,14 @@ class RagContextAttachmentTests(unittest.TestCase):
                 result = analyze_approved_data(payload)
         mock_query.assert_called_once()
         prompt = _diagnosis_prompts(mock_query)[0]
-        self.assertIn("Dinleme/İzleme Sınavı", prompt["user"])
-        self.assertIn("SINAV SIRASI: 2. Dinleme/İzleme Sınavı", prompt["user"])
+        self.assertIn("SINAV TÜRÜ: Dinleme/İzleme Sınavı", prompt["user"])
         self.assertIn("TDE1.2", prompt["user"])
+        # 2026-09-18 sadeleştirme: hiçbir prompt sınav sırasına atıf yapmıyordu ve
+        # kullanıcı mesajındaki "YANIT SÖZLEŞMESİ" sistem promptunun ÇIKTI
+        # FORMATI'nı birebir tekrarlıyordu - ikisi de kullanıcı mesajından çıktı.
+        self.assertNotIn("SINAV SIRASI", prompt["user"])
+        self.assertNotIn("YANIT SÖZLEŞMESİ", prompt["user"])
+        self.assertNotIn("JSON", prompt["user"])
         self.assertEqual(result["outcomes"][0]["ragContext"], "Seçili çıktı güçlü düzeydedir.")
 
     def test_foreign_code_or_skill_is_rejected(self):
@@ -748,19 +753,23 @@ class GroundingRetryHintSelectionTests(unittest.TestCase):
         hint = _grounding_retry_hint_for(_REASON_TERM_UNGROUNDED)
         self.assertIn("BİREBİR", hint)
 
-    def test_rationale_stripped_gets_the_rationale_hint(self):
-        hint = _grounding_retry_hint_for(_REASON_RATIONALE_STRIPPED)
-        self.assertIn("GÖZLEMSEL", hint)
-        self.assertNotIn("BİREBİR", hint)
-
     def test_scope_violation_reasons_get_the_scope_hint(self):
-        for reason in (_REASON_TOO_LONG, _REASON_CAUSAL_OVERCLAIM, _REASON_ACTION_LANGUAGE, _REASON_CODE_LEAK, _REASON_CROSS_SKILL_LEAK):
+        for reason in (_REASON_TOO_LONG, _REASON_CODE_LEAK, _REASON_CROSS_SKILL_LEAK):
             with self.subTest(reason=reason):
                 hint = _grounding_retry_hint_for(reason)
                 self.assertIn("kapsamında kal", hint)
+                self.assertNotIn("BİREBİR", hint)
 
     def test_unmapped_or_missing_reason_falls_back_to_the_default_hint(self):
-        for reason in (_REASON_EVIDENCE_COUNT, _REASON_EVIDENCE_ITEM_SHAPE, _REASON_DUPLICATE_TERMS, None, "bilinmeyen-yeni-sebep"):
+        # 2026-09-18: `gerekce-charter-bosaltti`, `nedensellik-iddiasi` ve
+        # `eylem-dili` sebepleri hiçbir doğrulama dalında üretilmiyor (nedensellik
+        # ve öneri dili artık kabul ediliyor, gerekçe alanı şemada yok) - özel
+        # ipuçları silindi, bu sebepler de varsayılana düşer.
+        for reason in (
+            _REASON_EVIDENCE_COUNT, _REASON_EVIDENCE_ITEM_SHAPE, _REASON_DUPLICATE_TERMS,
+            _REASON_RATIONALE_STRIPPED, _REASON_CAUSAL_OVERCLAIM, _REASON_ACTION_LANGUAGE,
+            None, "bilinmeyen-yeni-sebep",
+        ):
             with self.subTest(reason=reason):
                 self.assertIn("BİREBİR", _grounding_retry_hint_for(reason))
 

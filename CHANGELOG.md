@@ -2,6 +2,15 @@
 
 Bu dosya, MAHİR projesindeki önemli değişiklikleri kronolojik olarak takip etmek için hazırlanmıştır.
 
+## Ajan Prompt'ları Sadeleştirildi - 2026-09-18
+
+- **Neden:** aynı yasak ("tema/yüzde/şiddet yazma") beş yerde tekrarlanıyor, JSON şeması hem sistem promptunda hem kullanıcı mesajındaki "YANIT SÖZLEŞMESİ"nde yazıyor, kaldırılan açılış cümlesine ("sistem tarafından üretilen bir cümlede belirtilecek") atıflar kalmıştı; `_RATIONALE_RETRY_HINT` şemada olmayan `gapRationale` alanını, `_SCOPE_RETRY_HINT` artık kabul edilen nedensellik/öneri dilini anlatıyordu (ilgili sebep kodları hiçbir doğrulama dalında üretilmiyor).
+- **Token (Qwen3-4B tokenizer):** `DIAGNOSIS_SYSTEM_PROMPT` 1022 → 632, `STRENGTH_SYSTEM_PROMPT` 352 → 256, `ANOMALY_SYSTEM_PROMPT` 315 → 271, kullanıcı mesajı "YANIT SÖZLEŞMESİ" 108 → 0 (silindi), `_GROUNDING_RETRY_HINT` 112 → 71, `_SCOPE_RETRY_HINT` 118 → 58, `_RATIONALE_RETRY_HINT` 165 → silindi. Zayıf-çıktı çağrısı başına talimat 1130 → 632 token (‑44 %); çağrı toplamı ~3,7-4,6k → ~3,1-4,1k (BAĞLAM baskın, ona dokunulmadı).
+- **Korunan sözleşmeler:** "Bu bilgi belgede bulunmuyor.", 1-5 somut öğe / müfredat sözcükleri / kod UYDURMA yasağı, tema-yüzde-şiddet-sarmal risk yazmama (tek yerde), teselli ve dolgu sözcük yasağı, "EN ÇOK 45 KELİME" + 15 tabanı, `{"diagnosis": …}` JSON (tek yerde), anomali biçimi (`- Soru N:`, "Belirgin bir tutarsızlık görülmedi."). `DiagnosisPromptContractTests` değişmeden geçiyor.
+- **Kullanıcı mesajı:** yalnız veri taşır - SINAV TÜRÜ / SEÇİLMİŞ ÖĞRENME ÇIKTISI / (ÜST ÖĞRENME ÇIKTISI) / SORU. "SINAV SIRASI" satırı (hiçbir prompt atıf yapmıyordu) ve kuyruk cümlesi silindi.
+- **Retry:** iki ipucu kaldı (örtüşme / kapsam); `_RETRY_HINTS_BY_REASON`'dan üretilmeyen üç sebep çıktı, bunlar varsayılan ipucuna düşer. Ölü sebep sabitleri (testler import ediyor) ayrı temizlik.
+- **Doğrulama:** 351 Python + 13 JS testi yeşil; canlı iki tur 8/8 doğrulanmış, red yok; LLM çağrısı 1,5-2,8 s (önce 1,8-4,6 s). `local/rag_service.py::SYSTEM_PROMPT` (`/query`) değişmedi.
+
 ## Teşhis Metninden Açılış Cümlesi Kaldırıldı - 2026-09-17
 
 - **Karar (kullanıcı):** `backend/app/agents/pipeline.py` içindeki `_OPENING_TEMPLATES` ve onunla üretilen '"<tema>" temasında sınıfın başarı oranı %30 olarak hesaplanmıştır.' açılış cümlesi kaldırıldı. Tema adı ve oran rapor satırında zaten görünüyor; her teşhisin aynı kalıpla başlaması metni tek düze gösteriyordu. `_compose_grounded_pedagogical_answer` artık `<model teşhisi> <kapanış>` döndürür; kapanış kalıpları (`Eksikliğin şiddeti: …` / güçlü-çıktı cümlesi) ve tüm doğrulama kuralları (kanıt örtüşmesi, oran tekrarı kırpma, tema girişi atma, uzunluk/kod sızıntısı) değişmedi.
