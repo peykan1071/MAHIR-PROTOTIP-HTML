@@ -44,10 +44,29 @@ function Start-MahirWindow {
     }
 }
 
-# 1) llama-server (:8080) - ExecutionPolicy zaten bu pencerede Bypass, script
-# doğrudan çağrılır (iç içe ikinci bir powershell süreci açmaya gerek yok).
-Start-MahirWindow -Title "MAHIR - LLM (:8080)" -Port 8080 `
-    -Command "Set-Location '$projectRoot'; & 'local\llm_server.ps1'"
+# 1) llama-server (:8080) - YALNIZ yerel profilde. `LLM_PROFILE=evren` ise LLM
+# uzak bir uçtan (SSB EVREN) gelir; yerel modeli açmak 3 GB VRAM'i boşa harcar.
+function Get-MahirLlmProfile {
+    $envFile = Join-Path $projectRoot "local\.env"
+    if ($env:LLM_PROFILE) { return $env:LLM_PROFILE.Trim().ToLower() }   # kabuk .env'i ezer
+    if (-not (Test-Path -LiteralPath $envFile -PathType Leaf)) { return "yerel" }
+    foreach ($line in Get-Content $envFile -Encoding UTF8) {
+        $trimmed = $line.Trim()
+        if ($trimmed -match '^LLM_PROFILE\s*=\s*(.+)$') { return $Matches[1].Trim().Trim('"', "'").ToLower() }
+    }
+    return "yerel"
+}
+
+$llmProfile = Get-MahirLlmProfile
+if ($llmProfile -eq "yerel") {
+    # ExecutionPolicy zaten bu pencerede Bypass, script doğrudan çağrılır
+    # (iç içe ikinci bir powershell süreci açmaya gerek yok).
+    Start-MahirWindow -Title "MAHIR - LLM (:8080)" -Port 8080 `
+        -Command "Set-Location '$projectRoot'; & 'local\llm_server.ps1'"
+}
+else {
+    Write-Host "LLM profili '$llmProfile' - yerel llama-server açılmıyor (LLM uzak uçtan geliyor)." -ForegroundColor DarkGray
+}
 
 # 2) RAG servisi (:8001) ve 3) OCR işçisi (:8002) - repo `.venv`'i gerekir
 # (paddle/torch/fastapi); yoksa README "Sıfırdan kurulum" adımları izlenmeli.
