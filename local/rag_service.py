@@ -490,8 +490,8 @@ class RAGService:
             ).points
         except Exception as error:  # noqa: BLE001 - bağlantı/zaman aşımı/koleksiyon hatası -> 503
             raise RetrievalError(
-                f"Belge dizininden okunamadı ({error.__class__.__name__}). Qdrant çalışıyor mu? "
-                "`docker compose -f local/docker-compose.yml up -d`"
+                f"Belge dizininden okunamadı ({error.__class__.__name__}). İndeks klasörü "
+                "(QDRANT_PATH) yerinde mi? Klasör depoyla birlikte gelir."
             ) from error
         timings["search_ms"] = round((time.monotonic() - started) * 1000, 1)
 

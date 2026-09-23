@@ -569,7 +569,7 @@ Bu bölüm, MAHİR'i bilgisayarına ilk kez kuracak ve daha önce böyle bir kur
 | | Seviye | Neler çalışır? | Süre | Disk | Gerekenler |
 |:-:|---|---|---|---|---|
 | 🟢 | **1 - Sadece arayüz** | Evrak yükleme (CSV, Excel, metin PDF), doğrulama, kurallı analiz, rapor taslağı - yapay zekâ olmadan | 5 dk | 0,1 GB | Yalnız Python 3.10+ |
-| 🔵 | **2 - Tam yapay zekâ** | Seviye 1 + fotoğraf ve el yazısı OCR, program (müfredat) kaynaklı RAG, yerel LLM yorumu | 1-2 saat | ≈ 23 GB | NVIDIA ekran kartı, Docker Desktop, ~18 GB indirme |
+| 🔵 | **2 - Tam yapay zekâ** | Seviye 1 + fotoğraf ve el yazısı OCR, program (müfredat) kaynaklı RAG, yerel LLM yorumu | 1-2 saat | ≈ 20 GB | NVIDIA ekran kartı, ~18 GB indirme |
 
 Seviye 1 için [Windows'ta çalıştırma](#windowsta-çalıştırma) başlığındaki beş adım yeterlidir. Aşağıdaki rehber **Seviye 2** içindir; her adımın yanında ne kadar süreceği ve kaç GB yer kaplayacağı yazar.
 
@@ -594,7 +594,6 @@ Kurulacak programlar (hepsi ücretsizdir):
 |---|---|---|---|
 | **NVIDIA ekran kartı sürücüsü** | Ekran kartını kullanmak için | [nvidia.com/drivers](https://www.nvidia.com/drivers) ya da NVIDIA App | Güncel sürücü yeter. **CUDA Toolkit kurmak gerekmez**; CUDA ve cuDNN kütüphaneleri Python paketleriyle birlikte iner. |
 | **Python 3.12 veya 3.13** (64-bit) | Servisler Python ile yazılmıştır | [python.org/downloads](https://www.python.org/downloads/) | Kurulum ekranında **"Add python.exe to PATH"** kutusunu işaretleyiniz. |
-| **Docker Desktop** | Qdrant vektör veritabanını çalıştırmak için | [docker.com](https://www.docker.com/products/docker-desktop/) | Kurulum WSL 2 bileşenini isteyebilir (kendisi kurar); program ~3-4 GB yer kaplar. |
 | **Git** (isteğe bağlı) | Projeyi indirmek ve güncel tutmak için | [git-scm.com](https://git-scm.com/) | ZIP olarak indirenler için gerekmez. |
 
 <p align="center"><img src="assets/readme/20-disk-butcesi.svg" alt="Disk bütçesi: kalıcı yaklaşık 25 GB, kurulum sırasında geçici 8,5 GB pip önbelleği" width="1000"></p>
@@ -603,8 +602,8 @@ Kurulacak programlar (hepsi ücretsizdir):
 
 Komutlar **PowerShell** penceresine yazılır. Proje klasöründe PowerShell açmanın en kolay yolu: Dosya Gezgini'nde klasörün içine giriniz, üstteki adres çubuğuna `powershell` yazıp Enter'a basınız. Her adımın sonundaki *Kontrol* satırı, adımın doğru bittiğini nasıl anlayacağınızı söyler.
 
-**1. Programları kurunuz** (15-30 dk, ~4 GB). Yukarıdaki tablodaki programları kurunuz, bilgisayarı yeniden başlatınız ve Docker Desktop'ı bir kez açıp sol altta "Engine running" yazısını görünüz.
-*Kontrol:* yeni bir PowerShell'de `python --version` → `Python 3.13.x`; `nvidia-smi` → ekran kartınızın adı; `docker --version` → sürüm numarası.
+**1. Programları kurunuz** (15-30 dk, ~1 GB). Yukarıdaki tablodaki programları kurunuz ve bilgisayarı yeniden başlatınız.
+*Kontrol:* yeni bir PowerShell'de `python --version` → `Python 3.13.x`; `nvidia-smi` → ekran kartınızın adı.
 
 **2. Projeyi indiriniz** (2 dk, 0,1 GB). GitHub sayfasındaki yeşil **Code → Download ZIP** düğmesiyle indirip bir klasöre çıkarınız ya da Git ile:
 
@@ -638,15 +637,7 @@ Copy-Item local\.env.example local\.env
 
 Varsayılan ayarlar 6 GB'lık ekran kartı için hazırdır; dosyayı düzenlemeniz gerekmez. (Dosya bilgisayara özeldir, depoya gönderilmez.)
 
-**6. Qdrant'ı başlatınız** (2 dk, 0,3 GB). Docker Desktop açıkken:
-
-```powershell
-docker compose -f local/docker-compose.yml up -d
-```
-
-*Kontrol:* `docker compose -f local/docker-compose.yml ps` → STATUS sütununda `healthy`.
-
-**7. Modellerin inmesini bekleyiniz** (30-60 dk, 11,2 GB). Modeller ayrı bir yerden indirilmez: her servis **ilk açılışında** kendi modelini otomatik indirir ve kullanıcı klasörünüze (`.cache\huggingface`, `.paddlex`) kaydeder. Aşağıdaki üç komutu **ayrı birer PowerShell penceresinde** (her birinde önce `.\.venv\Scripts\Activate.ps1`) sırayla çalıştırınız; her pencerede "hazır" satırını görünce bir sonrakine geçiniz. Pencereleri kapatmayınız, MAHİR bunları kullanır.
+**6. Modellerin inmesini bekleyiniz** (30-60 dk, 11,2 GB). Modeller ayrı bir yerden indirilmez: her servis **ilk açılışında** kendi modelini otomatik indirir ve kullanıcı klasörünüze (`.cache\huggingface`, `.paddlex`) kaydeder. Aşağıdaki üç komutu **ayrı birer PowerShell penceresinde** (her birinde önce `.\.venv\Scripts\Activate.ps1`) sırayla çalıştırınız; her pencerede "hazır" satırını görünce bir sonrakine geçiniz. Pencereleri kapatmayınız, MAHİR bunları kullanır.
 
 | Pencere | Komut | İndirdiği model | Boyut | Hazır olduğunda görünen satır |
 |:-:|---|---|---|---|
@@ -654,44 +645,45 @@ docker compose -f local/docker-compose.yml up -d
 | B | `python local/rag_service.py` | bge-m3 + bge-reranker-v2-m3 | 6,4 GB | `Uvicorn running on http://127.0.0.1:8001` |
 | C | `python backend/run_ocr_worker.py` | PaddleOCR-VL-1.6 + PP-DocLayoutV3 | 1,9 GB | `Pipeline hazır.` |
 
-**8. Müfredatı indeksleyiniz** (5-10 dk; ilk seferde +0,5 GB Docling modeli iner). Dördüncü bir pencerede:
+**7. Müfredat indeksi hazır gelir.** Vektör indeksi (`local/qdrant_index/`) depoyla birlikte indiğinden **indeksleme yapmanıza gerek yoktur** - ne Docker ne de ayrı bir veritabanı kurulur; RAG servisi bu klasörü doğrudan okur.
+
+Yalnız müfredat belgesi değişirse yeniden üretilir (5-10 dk; ilk seferde +0,5 GB Docling modeli iner). **RAG servisi (Pencere B) kapalıyken** çalıştırınız - indeks klasörünü aynı anda tek süreç açabilir:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 python local/ingestion_pipeline.py --pdf docs/tde2026.pdf --program-id tde-9-tymm --replace
 ```
 
-Bu işlem bir kez yapılır; sonuç Qdrant'ta kalıcıdır, bilgisayar kapansa da silinmez.
 *Kontrol:* çıktının sonunda `Parçalar: 172 …` benzeri bir satır ve `Qdrant: 172 nokta yazıldı`.
 
-**9. MAHİR'i açınız.** Proje klasöründeki `MAHIR_BASLAT.cmd` dosyasına çift tıklayınız; tarayıcı `http://127.0.0.1:8000/index.html` adresini açar.
+**8. MAHİR'i açınız.** Proje klasöründeki `MAHIR_BASLAT.cmd` dosyasına çift tıklayınız; tarayıcı `http://127.0.0.1:8000/index.html` adresini açar.
 *Kontrol:* tarayıcıda `http://127.0.0.1:8001/health` → `"ok": true`. Sonra MAHİR'de [örnek sınav dosyasını](shared/sample-exam.csv) yükleyip analizi çalıştırınız; raporda program sayfa numaralı alıntılar görünüyorsa RAG ve LLM çalışıyor demektir.
 
 ### Sonraki açılışlar
 
-İlk kurulumdan sonra internet gerekmez. `MAHIR_BASLAT.cmd`'ye çift tıklamak artık **tüm zinciri** kendiliğinden dener - Docker Desktop, Qdrant, Pencere A/B/C'yi ayrı ayrı elle açmaya gerek yok:
+İlk kurulumdan sonra internet gerekmez. `MAHIR_BASLAT.cmd`'ye çift tıklamak **tüm zinciri** kendiliğinden açar - Pencere A/B/C'yi ayrı ayrı elle açmaya gerek yok:
 
 ```mermaid
 flowchart LR
-    W["MAHIR_BASLAT.cmd"] --> D[["🐳 Docker Desktop<br/>(gerekirse açılır)<br/>Qdrant :6333"]]
-    W --> A["Pencere A<br/>llm_server.ps1<br/>:8080"]
+    W["MAHIR_BASLAT.cmd"] --> A["Pencere A<br/>llm_server.ps1<br/>:8080"]
     W --> B["Pencere B<br/>rag_service.py<br/>:8001"]
     W --> C["Pencere C<br/>run_ocr_worker.py<br/>:8002"]
     W --> S[":8000 dosya alıcı<br/>(aynı pencerede, ön planda)"]
+    B -.okur.-> D[("local/qdrant_index<br/>gömülü vektör indeksi")]
     S --> T["🌐 Tarayıcı<br/>127.0.0.1:8000/index.html"]
-    classDef docker fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+    classDef store fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
     classDef llm fill:#fce7f3,stroke:#db2777,color:#831843
     classDef rag fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
     classDef ocr fill:#fef3c7,stroke:#d97706,color:#78350f
     classDef web fill:#dcfce7,stroke:#16a34a,color:#14532d
-    class D docker
+    class D store
     class A llm
     class B rag
     class C ocr
     class W,S,T web
 ```
 
-Modeller her açılışta yeniden yüklenir: LLM sunucusu 10-20 saniye, RAG servisi yaklaşık 1 dakika, OCR işçisi 1-2 dakika - pencereler arka planda kendi hızında yüklenirken `:8000` hemen açılır, pencereleri kapatmayınız. Bir servis zaten çalışıyorsa (portu dinleniyorsa) `MAHIR_BASLAT.cmd` onu atlar, ikinci kez açmaz. Docker Desktop kurulu değilse ya da açılamazsa yalnız Qdrant/RAG devre dışı kalır, script durmaz; OCR işçisi de `.venv` bulunamazsa aynı şekilde atlanıp uyarı basar. Yalnız CSV/Excel yükleyecekseniz OCR işçisinin (Pencere C) hazır olmasını beklemenize gerek yok; görsel yüklerseniz henüz hazır değilse "OCR işçisine ulaşılamadı" uyarısı çıkar, başka bir şey olmaz.
+Modeller her açılışta yeniden yüklenir: LLM sunucusu 10-20 saniye, RAG servisi yaklaşık 1 dakika, OCR işçisi 1-2 dakika - pencereler arka planda kendi hızında yüklenirken `:8000` hemen açılır, pencereleri kapatmayınız. Bir servis zaten çalışıyorsa (portu dinleniyorsa) `MAHIR_BASLAT.cmd` onu atlar, ikinci kez açmaz. RAG servisi ve OCR işçisi `.venv` bulunamazsa atlanıp uyarı basar, script durmaz. Yalnız CSV/Excel yükleyecekseniz OCR işçisinin (Pencere C) hazır olmasını beklemenize gerek yok; görsel yüklerseniz henüz hazır değilse "OCR işçisine ulaşılamadı" uyarısı çıkar, başka bir şey olmaz.
 
 > **İsteğe bağlı çevrim dışı kilidi.** Modeller indikten sonra `local\.env` içindeki `# HF_HUB_OFFLINE=1` satırının başındaki `#` işaretini silerseniz RAG servisi ve indeksleme Hugging Face'e hiç istek atmaz; internetsiz ortamda açılış bekleme süresi de kısalır.
 
@@ -701,7 +693,7 @@ Modeller her açılışta yeniden yüklenir: LLM sunucusu 10-20 saniye, RAG serv
 |---|---|---|
 | `python` tanınmıyor | Kurulumda "Add to PATH" işaretlenmemiş | Python'u kaldırıp kutuyu işaretleyerek yeniden kurunuz ya da `python` yerine `py` yazınız |
 | `Activate.ps1` "betik çalıştırma devre dışı" | PowerShell güvenlik ilkesi | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` (bir kez) |
-| `docker compose` "cannot connect" / "pipe" hatası | Docker Desktop açık değil | Docker Desktop'ı açıp "Engine running" yazısını bekleyiniz |
+| "İndeks klasörü başka bir süreç tarafından kullanılıyor" | RAG servisi (Pencere B) açıkken indeksleme denendi | Pencere B'yi kapatıp komutu yeniden çalıştırınız |
 | llama-server "CUDA out of memory" | Ekran kartı belleği dolu (başka bir program ya da OCR işçisi) | `local\.env` içine `LLM_GPU_LAYERS=20` yazıp Pencere A'yı yeniden başlatınız |
 | "OCR işçisine ulaşılamadı … 10061" | Pencere C açık değil | `python backend/run_ocr_worker.py` çalıştırınız |
 | "RAG servisine ulaşılamadı" | Pencere B açık değil ya da hâlâ model yüklüyor | `Uvicorn running` satırını bekleyiniz |
@@ -715,18 +707,19 @@ MAHİR tamamen yerel çalışır: hiçbir bulut servisi, API anahtarı ya da (mo
 ```text
 Tarayıcı -> :8000 web backend (MAHIR_BASLAT.cmd, yalnız standart kütüphane)
               |-- MAHIR_RAG_URL = http://127.0.0.1:8001/agents        -> :8001 local/rag_service.py -> :8080 llama-server (Qwen3-4B-Instruct-2507 Q4_K_M, GPU)
-              |                                                                                      `-> :6333 Qdrant (Docker)
+              |                                                                                      `-> local/qdrant_index (gömülü, sunucu yok)
               `-- MAHIR_OCR_URL = http://127.0.0.1:8002               -> :8002 backend/run_ocr_worker.py (PaddleOCR-VL, GPU)
 ```
 
-Başlatma sırası (her satır ayrı bir terminal penceresi; `local/.env` bir kez `local/.env.example`'dan kopyalanır):
+Vektör indeksi ayrı bir servis değildir: `qdrant-client`'ın gömülü kipiyle `local/qdrant_index/` klasöründen okunur, depoyla birlikte gelir ve Docker gerektirmez.
+
+Başlatma sırası (`MAHIR_BASLAT.cmd` bunların hepsini kendisi açar; elle açmak isteyenler için her satır ayrı bir terminal penceresi, `local/.env` bir kez `local/.env.example`'dan kopyalanır):
 
 ```powershell
-docker compose -f local/docker-compose.yml up -d                  # 1) Qdrant
-powershell -ExecutionPolicy Bypass -File local/llm_server.ps1     # 2) llama-server (ilk seferde ~2,4 GB GGUF iner)
-python local/rag_service.py                                       # 3) RAG servisi (/agents, /query, /health)
-python backend/run_ocr_worker.py                                  # 4) OCR işçisi (isteğe bağlı; yalnız görsel yüklemeler için)
-.\MAHIR_BASLAT.cmd                                                # 5) web arayüzü
+powershell -ExecutionPolicy Bypass -File local/llm_server.ps1     # 1) llama-server (ilk seferde ~2,4 GB GGUF iner)
+python local/rag_service.py                                       # 2) RAG servisi (/agents, /query, /health)
+python backend/run_ocr_worker.py                                  # 3) OCR işçisi (isteğe bağlı; yalnız görsel yüklemeler için)
+.\MAHIR_BASLAT.cmd                                                # 4) web arayüzü
 ```
 
 Referans belge bir kez indekslenir (kayıtlı program için belge adı ve sayfa planı otomatik çözülür; `docs/tde2026.pdf`, MEB'in 2024 Ortaöğretim TDE Öğretim Programı PDF'i):
@@ -828,7 +821,7 @@ MAHIR-PROTOTIP-HTML/
 |-- backend/app/ocr_quality_agent.py # Yükleme aşamasındaki OCR kalite ajanı
 |-- backend/app/general_report_merger.py # Üç Türk Dili ve Edebiyatı bileşen raporunu birleştirme
 |-- backend/run_ocr_worker.py # Yerel OCR işçisi (PaddleOCR-VL, :8002)
-|-- local/                    # Yerel RAG yığını: indeksleme, RAG servisi (/agents), llama-server, Qdrant
+|-- local/                    # Yerel RAG yığını: indeksleme, RAG servisi (/agents), llama-server, gömülü Qdrant indeksi
 |-- shared/pilot/tde9/        # 9. sınıf Türk Dili ve Edebiyatı pilot program verileri
 |-- shared/templates/         # Veri giriş ve rapor şablonları
 |-- tests/                    # Python ve JavaScript kontrolleri

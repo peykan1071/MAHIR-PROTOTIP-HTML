@@ -18,3 +18,9 @@ backend/logs/
 # GGUF model dosyaları - GB boyutunda, depoya girmemeli.
 local/llama.cpp/
 local/models/
+
+# Gömülü Qdrant indeksi (local/qdrant_index/) KASITLI olarak depoya girer:
+# birkaç MB'lık bir yapı çıktısıdır, klonlayan herkes hazır indeksle gelsin
+# (bkz. README "Müfredat indeksi hazır gelir"). Yalnız çalışma zamanı kilit
+# dosyası dışlanır - o, indeksi açmış olan sürece özgüdür.
+local/qdrant_index/.lock

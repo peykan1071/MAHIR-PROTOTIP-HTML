@@ -90,6 +90,15 @@ def _env_str(name: str, default: str) -> str:
     return os.environ.get(name, default).strip()
 
 
+def _resolve_repo_path(value: str) -> str:
+    """Göreli yolu repo köküne göre çözer; mutlak yolu olduğu gibi bırakır."""
+
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = LOCAL_DIR.parent / path
+    return str(path)
+
+
 def _env_int(name: str, default: int, minimum: int | None = None) -> int:
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -163,10 +172,8 @@ class Settings:
     llm_temperature: float
     llm_max_tokens: int
     llm_timeout_s: float
-    # Qdrant
-    qdrant_host: str
-    qdrant_port: int
-    qdrant_api_key: str
+    # Qdrant (gömülü kip: sunucu/konteyner yok, veri düz bir klasörde)
+    qdrant_path: str
     qdrant_collection: str
     # Gömme (CPU)
     embedding_model: str
@@ -254,12 +261,10 @@ class Settings:
             llm_temperature=_env_float("LLM_TEMPERATURE", 0.1, minimum=0.0, maximum=2.0),
             llm_max_tokens=llm_max_tokens,
             llm_timeout_s=_env_float("LLM_TIMEOUT_S", 180.0, minimum=1.0),
-            # "localhost" DEĞİL: Windows'ta httpx önce ::1'i dener, Docker Desktop
-            # yalnız IPv4 loopback'e bağlıdır ve reddedilen IPv6 denemesi her
-            # istekte ~2 s yer (ölçüldü: 2.050 ms -> 5 ms).
-            qdrant_host=_env_str("QDRANT_HOST", "127.0.0.1"),
-            qdrant_port=_env_int("QDRANT_PORT", 6333, minimum=1),
-            qdrant_api_key=_env_str("QDRANT_API_KEY", ""),
+            # Göreli yol repo köküne göre çözülür - betiğin hangi dizinden
+            # çağrıldığı fark etmesin (ingestion_pipeline.py repo kökünden,
+            # rag_service.py local/ içinden çalıştırılabiliyor).
+            qdrant_path=_resolve_repo_path(_env_str("QDRANT_PATH", "local/qdrant_index")),
             qdrant_collection=_env_str("QDRANT_COLLECTION", "mahir_local_chunks_v1"),
             embedding_model=_env_str("EMBEDDING_MODEL", "BAAI/bge-m3"),
             embedding_device=_env_str("EMBEDDING_DEVICE", "cpu"),
@@ -601,36 +606,38 @@ class CrossEncoderReranker:
 # --- Qdrant -----------------------------------------------------------------------------
 
 
-def make_qdrant_client(settings: Settings, timeout_s: int = 30) -> "QdrantClient":
-    """REST istemcisi (docker-compose.yml'deki loopback portuna)."""
+def make_qdrant_client(settings: Settings) -> "QdrantClient":
+    """Gömülü (yerel klasör) istemcisi - sunucu ya da konteyner gerektirmez.
+
+    Veri `QDRANT_PATH` klasöründe tutulur ve depoyla birlikte gelir. Gömülü
+    kipte klasörü AYNI ANDA TEK SÜREÇ açabilir: RAG servisi çalışırken
+    indeksleme yapılamaz (`ingestion_pipeline.py` bunu anlaşılır bir hataya
+    çevirir). Bu ölçekte (birkaç yüz nokta, 1024 boyut) saf-Python arama
+    milisaniyeler sürer.
+    """
 
     from qdrant_client import QdrantClient  # noqa: PLC0415
 
-    return QdrantClient(
-        host=settings.qdrant_host,
-        port=settings.qdrant_port,
-        api_key=settings.qdrant_api_key or None,
-        timeout=timeout_s,
-        prefer_grpc=False,
-    )
+    return QdrantClient(path=settings.qdrant_path)
 
 
 def check_qdrant_ready(client: "QdrantClient", collection: str) -> tuple[bool, str, dict[str, Any]]:
-    """Sunucuya ulaşılabiliyor mu, koleksiyon var mı, kaç nokta var - tek çağrıda.
+    """İndeks klasörü okunabiliyor mu, koleksiyon var mı, kaç nokta var - tek çağrıda.
 
     Hiç istisna fırlatmaz: `(ok, Türkçe mesaj, bilgi)` döndürür; `ok=False`
-    yalnız SUNUCUYA ulaşılamadığında (koleksiyonun henüz olmaması normal bir
+    yalnız KLASÖR OKUNAMADIĞINDA (koleksiyonun henüz olmaması normal bir
     durumdur - ilk indekslemeden önce öyle olur).
     """
 
     info: dict[str, Any] = {"collection": collection, "exists": False, "points": 0}
     try:
         exists = client.collection_exists(collection)
-    except Exception as error:  # noqa: BLE001 - bağlantı/yetki/zaman aşımı; hepsi aynı şekilde raporlanır
+    except Exception as error:  # noqa: BLE001 - okuma/izin/bozuk klasör; hepsi aynı şekilde raporlanır
         return (
             False,
-            f"Qdrant'a ulaşılamadı ({error.__class__.__name__}). Sunucu çalışıyor mu? "
-            "`docker compose -f local/docker-compose.yml up -d` ile başlatın.",
+            f"İndeks klasörü okunamadı ({error.__class__.__name__}). QDRANT_PATH doğru mu? "
+            "Klasör depoyla birlikte gelir; yoksa `python local/ingestion_pipeline.py "
+            "--pdf docs/tde2026.pdf --program-id tde-9-tymm --replace` ile yeniden üretin.",
             info,
         )
     info["exists"] = exists
@@ -650,17 +657,19 @@ PAYLOAD_INDEX_FIELDS = ("program_id", "document_name", "source_kind", "grade", "
 
 
 def ensure_collection(client: "QdrantClient", collection: str, dimension: int) -> bool:
-    """Koleksiyon yoksa (dense, cosine) oluşturur; filtre alanlarına indeks açar.
+    """Koleksiyon yoksa (dense, cosine) oluşturur. Dönüş: yeni oluşturulduysa True.
 
     Varsa vektör boyutunu doğrular: farklı boyutlu bir gömme modeliyle var olan
     koleksiyona yazmak Qdrant'ta sessizce başarısız olmaz ama noktalar
     karışır - burada açık hata veriyoruz (çözüm: yeni `QDRANT_COLLECTION` adı).
-    Payload indeksleri her çağrıda yeniden istenir (idempotent) ki sonradan
-    eklenen alanlar eski koleksiyonlarda da indekslensin. Dönüş: yeni
-    oluşturulduysa True.
+
+    Payload indeksi AÇILMAZ: gömülü kipte etkisizdir (qdrant-client bunu her
+    çağrıda uyarıyla bildirirdi) ve bu ölçekte gereksizdir - filtreler yine
+    çalışır, yalnız tarama ile. `PAYLOAD_INDEX_FIELDS` filtre alanlarının
+    listesi olarak belgeleme amacıyla duruyor.
     """
 
-    from qdrant_client.models import Distance, PayloadSchemaType, VectorParams  # noqa: PLC0415
+    from qdrant_client.models import Distance, VectorParams  # noqa: PLC0415
 
     created = False
     if client.collection_exists(collection):
@@ -679,8 +688,4 @@ def ensure_collection(client: "QdrantClient", collection: str, dimension: int) -
         logger.info("Koleksiyon oluşturuldu: %s (%d-d, cosine)", collection, dimension)
         created = True
 
-    for field_name in PAYLOAD_INDEX_FIELDS:
-        client.create_payload_index(
-            collection_name=collection, field_name=field_name, field_schema=PayloadSchemaType.KEYWORD
-        )
     return created

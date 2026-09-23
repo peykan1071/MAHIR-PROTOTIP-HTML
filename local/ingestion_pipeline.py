@@ -1113,7 +1113,16 @@ def ingest_pdf(
 
     # 5) Qdrant yazımı.
     with _Timer(report, "qdrant"):
-        client = make_qdrant_client(settings)
+        try:
+            client = make_qdrant_client(settings)
+        except RuntimeError as error:
+            # Gömülü kipte indeks klasörünü aynı anda tek süreç açabilir; bu
+            # neredeyse her zaman RAG servisinin açık olmasından kaynaklanır.
+            raise IngestionError(
+                "İndeks klasörü başka bir süreç tarafından kullanılıyor: RAG servisi "
+                "(Pencere B, local/rag_service.py) açıkken indeksleme yapılamaz. "
+                "Önce o pencereyi kapatıp komutu yeniden çalıştırın."
+            ) from error
         try:
             try:
                 ensure_collection(client, settings.qdrant_collection, embedder.dimension)
@@ -1122,10 +1131,10 @@ def ingest_pdf(
                 )
             except IngestionError:
                 raise
-            except Exception as error:  # noqa: BLE001 - bağlantı/yazım hatası; kullanıcıya ipucuyla dön
+            except Exception as error:  # noqa: BLE001 - yazım hatası; kullanıcıya ipucuyla dön
                 raise IngestionError(
-                    f"Qdrant'a yazılamadı ({error.__class__.__name__}: {error}). Sunucu çalışıyor mu? "
-                    "`docker compose -f local/docker-compose.yml up -d`"
+                    f"İndekse yazılamadı ({error.__class__.__name__}: {error}). "
+                    f"QDRANT_PATH yazılabilir mi? ({settings.qdrant_path})"
                 ) from error
         finally:
             client.close()
