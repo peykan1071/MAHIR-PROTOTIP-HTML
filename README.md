@@ -669,15 +669,16 @@ Bu işlem bir kez yapılır; sonuç Qdrant'ta kalıcıdır, bilgisayar kapansa d
 
 ### Sonraki açılışlar
 
-İlk kurulumdan sonra internet gerekmez. Her açılışta yalnız şu sıra izlenir (Qdrant, Docker Desktop ile birlikte kendiliğinden açılır):
+İlk kurulumdan sonra internet gerekmez. `MAHIR_BASLAT.cmd`'ye çift tıklamak artık **tüm zinciri** kendiliğinden dener - Docker Desktop, Qdrant, Pencere A/B/C'yi ayrı ayrı elle açmaya gerek yok:
 
 ```mermaid
 flowchart LR
-    D[["🐳 Docker Desktop<br/>(Qdrant otomatik açılır)"]] --> A
-    A["Pencere A<br/>llm_server.ps1<br/>:8080"] --> B["Pencere B<br/>rag_service.py<br/>:8001"]
-    B --> C["Pencere C<br/>run_ocr_worker.py<br/>:8002 (görsel OCR için)"]
-    C --> W["MAHIR_BASLAT.cmd<br/>:8000"]
-    W --> T["🌐 Tarayıcı<br/>127.0.0.1:8000/index.html"]
+    W["MAHIR_BASLAT.cmd"] --> D[["🐳 Docker Desktop<br/>(gerekirse açılır)<br/>Qdrant :6333"]]
+    W --> A["Pencere A<br/>llm_server.ps1<br/>:8080"]
+    W --> B["Pencere B<br/>rag_service.py<br/>:8001"]
+    W --> C["Pencere C<br/>run_ocr_worker.py<br/>:8002"]
+    W --> S[":8000 dosya alıcı<br/>(aynı pencerede, ön planda)"]
+    S --> T["🌐 Tarayıcı<br/>127.0.0.1:8000/index.html"]
     classDef docker fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
     classDef llm fill:#fce7f3,stroke:#db2777,color:#831843
     classDef rag fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
@@ -687,10 +688,10 @@ flowchart LR
     class A llm
     class B rag
     class C ocr
-    class W,T web
+    class W,S,T web
 ```
 
-Modeller her açılışta yeniden yüklenir: LLM sunucusu 10-20 saniye, RAG servisi yaklaşık 1 dakika, OCR işçisi 1-2 dakika. Yalnız CSV/Excel yükleyecekseniz OCR işçisi (Pencere C) açılmayabilir; görsel yüklerseniz "OCR işçisine ulaşılamadı" uyarısı çıkar, başka bir şey olmaz.
+Modeller her açılışta yeniden yüklenir: LLM sunucusu 10-20 saniye, RAG servisi yaklaşık 1 dakika, OCR işçisi 1-2 dakika - pencereler arka planda kendi hızında yüklenirken `:8000` hemen açılır, pencereleri kapatmayınız. Bir servis zaten çalışıyorsa (portu dinleniyorsa) `MAHIR_BASLAT.cmd` onu atlar, ikinci kez açmaz. Docker Desktop kurulu değilse ya da açılamazsa yalnız Qdrant/RAG devre dışı kalır, script durmaz; OCR işçisi de `.venv` bulunamazsa aynı şekilde atlanıp uyarı basar. Yalnız CSV/Excel yükleyecekseniz OCR işçisinin (Pencere C) hazır olmasını beklemenize gerek yok; görsel yüklerseniz henüz hazır değilse "OCR işçisine ulaşılamadı" uyarısı çıkar, başka bir şey olmaz.
 
 > **İsteğe bağlı çevrim dışı kilidi.** Modeller indikten sonra `local\.env` içindeki `# HF_HUB_OFFLINE=1` satırının başındaki `#` işaretini silerseniz RAG servisi ve indeksleme Hugging Face'e hiç istek atmaz; internetsiz ortamda açılış bekleme süresi de kısalır.
 
