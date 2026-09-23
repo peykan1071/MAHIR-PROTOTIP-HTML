@@ -353,44 +353,24 @@ class RAGService:
             self._reranker_error = f"{error.__class__.__name__}: {error}"
             logger.warning("Reranker yüklenemedi, dense sırayla devam edilecek: %s", self._reranker_error)
 
-    def _llm_unreachable_hint(self) -> str:
-        """Uç noktaya göre doğru ipucu: yerel sunucu mu, uzak servis mi.
-
-        Yerel profilde llama-server'ı başlatmak çözümdür; uzak bir uçta
-        (ör. EVREN) o öneri yanlış yönlendirir - orada ağ ve anahtar bakılır.
-        """
-
-        if self._settings.llm_profile == "yerel":
-            return "llama-server çalışıyor mu? `powershell -File local/llm_server.ps1` ile başlatın."
-        return (
-            f"Uç: {self._settings.llm_base_url} (profil: {self._settings.llm_profile}). "
-            "Ağ bağlantısını ve LLM_API_KEY'i kontrol edin."
-        )
-
     def llm_status(self) -> tuple[bool, str]:
-        """LLM ucuna kısa zaman aşımıyla `/v1/models` sorar - `(erişilebilir, mesaj)`.
+        """llama-server'a kısa zaman aşımıyla `/v1/models` sorar - `(erişilebilir, mesaj)`.
 
         Hiç istisna fırlatmaz. llama-server bu uçta yüklü GGUF'un yolunu/alias'ını
         döndürür; mesaj sunulan model adını da taşır ki `/health`'te hangi
-        modelin servis edildiği görülsün. Uzak profilde uç onlarca model
-        sayabildiği için liste kırpılır.
+        dosyanın servis edildiği görülsün.
         """
 
         if self._llm is None:
             return False, "LLM istemcisi kurulmadı (start() çağrılmadı)."
-        # Yerelde 3 sn yeterli; uzak uçta ilk bağlantı (TLS + internet) bunu aşar.
-        probe_timeout = 3.0 if self._settings.llm_profile == "yerel" else 15.0
         try:
-            served = [
-                str(model.id)
-                for model in self._llm.with_options(timeout=probe_timeout, max_retries=0).models.list().data
-            ]
+            served = [str(model.id) for model in self._llm.with_options(timeout=3.0, max_retries=0).models.list().data]
         except Exception as error:  # noqa: BLE001 - bağlantı/zaman aşımı/401; hepsi "erişilemiyor"
-            return False, f"LLM sunucusuna ulaşılamadı ({error.__class__.__name__}). {self._llm_unreachable_hint()}"
-        listed = ", ".join(served[:5]) + (f" (+{len(served) - 5})" if len(served) > 5 else "")
-        seen = self._settings.model_name in served
-        note = "" if seen or not served else f" - UYARI: seçili model '{self._settings.model_name}' listede yok"
-        return True, f"LLM sunucusu hazır; sunulan model: {listed or '?'}{note}"
+            return False, (
+                f"LLM sunucusuna ulaşılamadı ({error.__class__.__name__}). llama-server çalışıyor mu? "
+                "`powershell -File local/llm_server.ps1` ile başlatın."
+            )
+        return True, f"LLM sunucusu hazır; sunulan model: {', '.join(served) or '?'}"
 
     def close(self) -> None:
         if self._qdrant is not None:
@@ -416,7 +396,6 @@ class RAGService:
                 "error": self._reranker_error,
             },
             "llm": {
-                "profile": self._settings.llm_profile,
                 "base_url": self._settings.llm_base_url,
                 "model": self._settings.model_name,
                 "context_window": self._settings.llm_context_window,
@@ -588,19 +567,15 @@ class RAGService:
         except RateLimitError as error:
             raise LlmFailure("LLM sunucusu istek sınırı döndürdü (429); biraz sonra yeniden deneyin.", http_status=429) from error
         except APITimeoutError as error:
-            detail = (
-                "GPU'ya tam sığmayan model CPU'da çok yavaşlar - llama-server logunda "
-                "'offloaded N/M layers' satırına bakın"
-                if self._settings.llm_profile == "yerel"
-                else "uzak uç yoğun olabilir; LLM_TIMEOUT_S artırılabilir"
-            )
             raise LlmFailure(
-                f"LLM {self._settings.llm_timeout_s:.0f} sn içinde yanıt vermedi ({detail}).",
+                f"LLM {self._settings.llm_timeout_s:.0f} sn içinde yanıt vermedi (GPU'ya tam sığmayan model CPU'da "
+                "çok yavaşlar - llama-server logunda 'offloaded N/M layers' satırına bakın).",
                 http_status=504,
             ) from error
         except APIConnectionError as error:
             raise LlmFailure(
-                f"LLM sunucusuna bağlanılamadı ({self._settings.llm_base_url}). {self._llm_unreachable_hint()}",
+                f"LLM sunucusuna bağlanılamadı ({self._settings.llm_base_url}). llama-server çalışıyor mu? "
+                "`powershell -File local/llm_server.ps1`",
                 http_status=503,
             ) from error
         except APIStatusError as error:

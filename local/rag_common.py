@@ -99,49 +99,8 @@ def _resolve_repo_path(value: str) -> str:
     return str(path)
 
 
-# LLM profilleri: `LLM_PROFILE` hangisinin etkin olduğunu söyler, her profilin
-# değerleri `<PROFİL>_BASE_URL` gibi kendi ön ekiyle `.env`de yan yana durur -
-# geçiş tek kelimedir, ikinci bir dosya ya da yorum satırı oynatmak gerekmez.
-LLM_PROFILES = ("yerel", "evren")
-DEFAULT_LLM_PROFILE = "yerel"
-
-
-def _profile_env(profile: str, suffix: str, direct_name: str, default: str) -> str:
-    """Bir LLM ayarını çözer. Öncelik: doğrudan değişken > profil > varsayılan.
-
-    Doğrudan `LLM_BASE_URL`/`MODEL_NAME` gibi bir değişken tanımlıysa O kazanır;
-    böylece `LLM_BASE_URL=... python ...` biçimindeki geçici denemeler ve
-    profil kavramından önceki `.env` dosyaları aynen çalışmaya devam eder
-    (bkz. tests/test_agents_contract.py - hiç `.env` olmadan Settings kurar).
-    """
-
-    direct = os.environ.get(direct_name, "").strip()
-    if direct:
-        return direct
-    return _env_str(f"{profile.upper()}_{suffix}", default)
-
-
 def _env_int(name: str, default: int, minimum: int | None = None) -> int:
     raw = os.environ.get(name, "").strip()
-    if not raw:
-        return default
-    try:
-        value = int(raw)
-    except ValueError as error:
-        raise RagConfigError(f"{name} tam sayı olmalı, verilen: {raw!r}.") from error
-    if minimum is not None and value < minimum:
-        raise RagConfigError(f"{name} en az {minimum} olmalı, verilen: {value}.")
-    return value
-
-
-def _env_int_or(raw: str, name: str, default: int, minimum: int | None = None) -> int:
-    """`_env_int` ile aynı doğrulama, ama değeri ortamdan değil hazır alır.
-
-    Profil çözümlemesi (`_profile_env`) değeri zaten metin olarak döndürdüğü
-    için gerekli; hata mesajları kullanıcının gördüğü değişken adını taşır.
-    """
-
-    raw = raw.strip()
     if not raw:
         return default
     try:
@@ -204,10 +163,8 @@ def physical_cpu_count() -> int:
 class Settings:
     """Tüm hat ayarları - `.env` + süreç ortamından bir kez okunur, sonra değişmez."""
 
-    # LLM - etkin profil (`LLM_PROFILE`): "yerel" llama-server ya da "evren"
-    # (SSB/SSYZ, Türkiye'de barındırılan OpenAI uyumlu uç). Aynı istemci her
-    # ikisine de konuşur; yalnız base_url/api_key/model/pencere değişir.
-    llm_profile: str
+    # LLM - yerel llama-server (OpenAI uyumlu /v1). Aynı istemci herhangi bir
+    # OpenAI uyumlu uca da konuşabilir; yalnız LLM_BASE_URL/LLM_API_KEY değişir.
     llm_base_url: str
     llm_api_key: str
     model_name: str
@@ -274,32 +231,11 @@ class Settings:
             load_dotenv(dotenv_path, override=False)
             resolved_path = Path(dotenv_path)
 
-        llm_profile = _env_str("LLM_PROFILE", DEFAULT_LLM_PROFILE).lower()
-        if llm_profile not in LLM_PROFILES:
-            raise RagConfigError(
-                f"LLM_PROFILE {' / '.join(LLM_PROFILES)} olmalı, verilen: {llm_profile!r}."
-            )
-
-        llm_base_url = _profile_env(llm_profile, "BASE_URL", "LLM_BASE_URL", "http://127.0.0.1:8080/v1").rstrip("/")
+        llm_base_url = _env_str("LLM_BASE_URL", "http://127.0.0.1:8080/v1").rstrip("/")
         if not llm_base_url.startswith(("http://", "https://")):
             raise RagConfigError(f"LLM_BASE_URL http(s):// ile başlamalı, verilen: {llm_base_url!r}.")
-        llm_context_window = _env_int_or(
-            _profile_env(llm_profile, "CONTEXT_WINDOW", "LLM_CONTEXT_WINDOW", ""),
-            "LLM_CONTEXT_WINDOW",
-            default=8192,
-            minimum=1024,
-        )
-        # Profile bağlı: akıl yürüten (reasoning) modellerde "düşünme" token'ları
-        # da bu bütçeden harcanır - ölçüldü: aynı istemde 519-1960 düşünme
-        # token'ı. 1024 ile gemma-4-31b ve deepseek-v4.1-flash bütçeyi düşünmede
-        # tüketip BOŞ content döndürüyordu. Yerelde (Qwen3-4B-Instruct, düşünme
-        # bloğu yok) 1024 yeterli ve bağlam bütçesini daraltmamak için öyle kalır.
-        llm_max_tokens = _env_int_or(
-            _profile_env(llm_profile, "MAX_TOKENS", "LLM_MAX_TOKENS", ""),
-            "LLM_MAX_TOKENS",
-            default=1024,
-            minimum=1,
-        )
+        llm_context_window = _env_int("LLM_CONTEXT_WINDOW", 8192, minimum=1024)
+        llm_max_tokens = _env_int("LLM_MAX_TOKENS", 1024, minimum=1)
         if llm_max_tokens >= llm_context_window:
             raise RagConfigError(
                 f"LLM_MAX_TOKENS ({llm_max_tokens}) LLM_CONTEXT_WINDOW'dan ({llm_context_window}) küçük olmalı."
@@ -318,10 +254,9 @@ class Settings:
             raise RagConfigError(f"RAG_DEFAULT_TOP_K ({default_top_k}) RAG_MAX_TOP_K'yı ({max_top_k}) aşamaz.")
 
         return cls(
-            llm_profile=llm_profile,
             llm_base_url=llm_base_url,
-            llm_api_key=_profile_env(llm_profile, "API_KEY", "LLM_API_KEY", ""),
-            model_name=_profile_env(llm_profile, "MODEL", "MODEL_NAME", "qwen3-4b-instruct-2507-q4_k_m"),
+            llm_api_key=_env_str("LLM_API_KEY", ""),
+            model_name=_env_str("MODEL_NAME", "qwen3-4b-instruct-2507-q4_k_m"),
             llm_context_window=llm_context_window,
             llm_temperature=_env_float("LLM_TEMPERATURE", 0.1, minimum=0.0, maximum=2.0),
             llm_max_tokens=llm_max_tokens,
