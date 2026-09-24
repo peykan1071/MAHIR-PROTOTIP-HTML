@@ -97,6 +97,15 @@ MAX_AGENT_PROMPTS = 16
 MAX_AGENT_PROMPT_CHARS = 8000
 MAX_AGENT_OUTPUT_TOKENS = 1024
 
+# Bir ajan turunda üretim arızası iki kovaya ayrılır (bkz. `run_agent_prompts`).
+# Bu kovadaki `LlmFailure.http_status` değerleri SUNUCU düzeyi arızalardır:
+# kalan istemler de aynı duvara çarpacağı için tur hemen kesilir. Özellikle 504
+# kritik - `LLM_TIMEOUT_S=180` ile 11 istem tek tek zaman aşımına uğrasa tur 33
+# dakika sürerdi. Kovada olmayan her şey (502 "Model boş yanıt döndürdü",
+# beklenmeyen SDK hatası) ÖĞEYE özgü sayılır ve yalnız o öğeyi düşürür.
+# Değerler `_chat`in zaten atadığı kodlardır; yeni bir sinyal icat edilmiyor.
+ABORT_ON_LLM_STATUSES = frozenset({429, 503, 504})
+
 # Katı, bağlama demirli sistem promptu - `/query` için. `/agents` bu promptu
 # KULLANMAZ: orada system/user çağırandan (backend `agents/prompts.py`) gelir.
 # NO_ANSWER_TEXT cümlesi backend'in tanıdığı cümleyle aynı.
@@ -618,9 +627,28 @@ class RAGService:
         `retrieval` taşıyan öğeler için bağlam Qdrant'tan getirilip user
         mesajının başına `BAĞLAM:` ile eklenir ve sonuca `sources` yazılır;
         isabeti boş çıkan öğe LLM'e HİÇ gitmez, `NO_ANSWER_TEXT` alır.
-        `retrieval` taşımayanlar düz prompt olarak gider. Getirim arızası tüm
-        turu düşürür (hiçbir öğe üretilmez); üretim arızası da öyle - yarım
-        tur, yanlış ajana yanlış yanıt bağlanmasından daha kötü olurdu.
+        `retrieval` taşımayanlar düz prompt olarak gider.
+
+        ARIZA POLİTİKASI - "arıza öğeye mi özgü, sunucuya mı?":
+
+        * `RetrievalError` (Qdrant okunamıyor) TÜM öğeleri etkiler -> tur düşer.
+        * Getirimden gelen `ValueError` o öğenin `retrieval` isteğinin bozuk
+          olması demektir -> yalnız o öğe bağlamsız kalır, tur sürer.
+        * Üretimde `ABORT_ON_LLM_STATUSES` kovasındaki arızalar (bağlantı,
+          zaman aşımı, istek sınırı) -> tur hemen kesilir, kalan öğeler
+          denenmez.
+        * Diğer üretim arızaları (boş yanıt vb.) -> yalnız o öğe düşer,
+          `NO_ANSWER_TEXT` alır ve tur sürer. Denenen ÜRETİMLERİN TAMAMI
+          düştüyse tur yine başarısız döner.
+
+        Kısmi tur güvenli, çünkü sonuç listesi `enumerate(items)` ile index
+        hizalı kuruluyor: düşen öğe yanıt yerine `NO_ANSWER_TEXT` alır, sıra
+        kaymaz, yanlış ajana yanlış yanıt bağlanamaz. (Eskiden tek arıza tüm
+        turu düşürüyordu; canlı ölçümde 11 istemin 1'i boş yanıt döndürdüğü
+        için 249 saniyelik iş çöpe gitmişti.) Çağıran tarafta
+        `backend/app/agents/llm.py` yalnız sayı eşitliğini denetler ve
+        `pipeline.py::PedagogicalAnalysisAgent.apply_llm` eksik sonucu zaten
+        "skip" olarak işler.
 
         Üretim ardışıktır (llama-server `--parallel 1`): N prompt ≈ N × tek
         prompt süresi. Dönüş `(ok, mesaj, sonuçlar | None)`.
@@ -657,8 +685,17 @@ class RAGService:
                         outcome_code=outcome_code,
                         section_kinds=[COMPONENT_SECTION_KIND],
                     ).hits
-            except (RetrievalError, ValueError) as error:
+            except RetrievalError as error:
+                # İndeks okunamıyor: kalan öğeler de okunamayacak.
                 return False, str(error), None
+            except ValueError as error:
+                # Bu öğenin `retrieval` isteği geçersiz (ör. yalnız boşluktan
+                # oluşan `query`; `reject_agent_prompts` onu yakalamaz çünkü
+                # `user` doludur). Yalnız bu öğe bağlamsız kalır.
+                logger.warning(
+                    "Ajan %r: getirim isteği geçersiz (%s); öğe bağlamsız geçiliyor.", item.get("name"), error
+                )
+                continue
             seen_ids = {hit.point_id for hit in component_hits}
             hits = component_hits + [hit for hit in retrieval.hits if hit.point_id not in seen_ids]
             if not hits:
@@ -677,6 +714,8 @@ class RAGService:
             )
 
         answers: dict[int, str] = {}
+        attempted = 0
+        failures: list[str] = []
         for index, item in enumerate(items):
             if isinstance(item.get("retrieval"), dict) and index not in contexts:
                 continue  # isabetsiz: üretecek bağlamı yok, "belgede bulunmuyor" doğru yanıt
@@ -690,13 +729,28 @@ class RAGService:
                 requested = MAX_AGENT_OUTPUT_TOKENS
             max_tokens = min(MAX_AGENT_OUTPUT_TOKENS, requested, self._settings.llm_max_tokens)
             started = time.monotonic()
+            attempted += 1
             try:
                 answers[index] = self._chat(messages, max_tokens).strip()
-            except Exception as error:  # noqa: BLE001 - LlmFailure dâhil; bir tur düşer, servis düşmez
-                return False, f"Ajan yanıtları üretilemedi: {error}", None
+            except Exception as error:  # noqa: BLE001 - LlmFailure dâhil; servis düşmez
+                failures.append(str(error))
+                logger.warning("Ajan %r: yanıt üretilemedi (%s).", item.get("name"), error)
+                if getattr(error, "http_status", 502) in ABORT_ON_LLM_STATUSES:
+                    logger.warning("Sunucu düzeyi LLM arızası; turun kalan %d öğesi denenmiyor.", len(items) - index - 1)
+                    return False, f"Ajan yanıtları üretilemedi: {error}", None
+                continue
             logger.info("Ajan %r: LLM %.0f ms, %d karakter.", item.get("name"), (time.monotonic() - started) * 1000, len(answers[index]))
 
-        return True, "Ajan yanıtları üretildi.", [
+        if attempted and len(failures) == attempted:
+            # Denenen her üretim düştü: kısmi sonuç diye sunulacak bir şey yok.
+            return False, f"Ajan yanıtları üretilemedi: {failures[0]}", None
+
+        message = "Ajan yanıtları üretildi."
+        if failures:
+            message = f"Ajan yanıtları üretildi; {len(failures)}/{attempted} istem yanıtsız kaldı."
+            logger.warning("Ajan turu kısmi: %d/%d istem yanıtsız kaldı.", len(failures), attempted)
+
+        return True, message, [
             {
                 "name": str(item.get("name") or ""),
                 "answer": answers.get(index, NO_ANSWER_TEXT),

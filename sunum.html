@@ -1693,19 +1693,17 @@ table { font-size: 0.80em; }
 section.diyagram .mermaid svg { max-height: 540px !important; }
 ;" data-marpit-pagination-total="30">
 <header>MAHİR — kod tabanı</header>
-<h2 id="en-pahal%C4%B1-bor%C3%A7-agents-hepsi-ya-hi%C3%A7">En pahalı borç: <code>/agents</code> hepsi-ya-hiç</h2>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-python"><span class="hljs-comment"># local/rag_service.py:695</span>
+<h2 id="en-pahal%C4%B1-bor%C3%A7tu-agents-hepsi-ya-hi%C3%A7">En pahalı borçtu: <code>/agents</code> hepsi-ya-hiç</h2>
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code class="language-python"><span class="hljs-comment"># ÖNCE - tek istem düşünce 11&#x27;lik turun tamamı çöpe</span>
 <span class="hljs-keyword">except</span> Exception <span class="hljs-keyword">as</span> error:
     <span class="hljs-keyword">return</span> <span class="hljs-literal">False</span>, <span class="hljs-string">f&quot;Ajan yanıtları üretilemedi: <span class="hljs-subst">{error}</span>&quot;</span>, <span class="hljs-literal">None</span>
 </code></pre>
-<p>Gerçek bir tur kaydı:</p>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code>LLM turu başarısız (... Model boş yanıt döndürdü.)
-LLM turu: prompt=11 sonuc=0 sure=249.3s
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code>LLM turu: prompt=11 sonuc=0 sure=249.3s
 </code></pre>
-<div class="patlar">
-<p><strong>11 istemden 10'u başarılı olsa bile 249 saniye çöpe gidiyor.</strong> Kusur<br />
-modelde değil, <strong>yapıda</strong>: boş yanıt hangi modelden gelirse gelsin tur<br />
-tümüyle düşüyor.</p>
+<div class="iyi">
+<p><strong>Düzeltildi.</strong> Düşen öğe <code>NO_ANSWER_TEXT</code> alır, tur sürer; yalnız sunucu<br />
+düzeyi arıza (503/504/429) turu keser. Sıra kayması riski zaten yoktu:<br />
+sonuçlar <code>enumerate</code> ile index hizalı kuruluyor.</p>
 </div>
 <footer>Kaynak: docs/architecture/kod-tabani-analizi.md · e4547e5</footer>
 </section>

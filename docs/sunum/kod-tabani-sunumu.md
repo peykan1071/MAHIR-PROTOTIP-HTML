@@ -370,26 +370,23 @@ turda tek başına **~88 saniye**.
 
 ---
 
-## En pahalı borç: `/agents` hepsi-ya-hiç
+## En pahalı borçtu: `/agents` hepsi-ya-hiç
 
 ```python
-# local/rag_service.py:695
+# ÖNCE - tek istem düşünce 11'lik turun tamamı çöpe
 except Exception as error:
     return False, f"Ajan yanıtları üretilemedi: {error}", None
 ```
 
-Gerçek bir tur kaydı:
-
 ```
-LLM turu başarısız (... Model boş yanıt döndürdü.)
 LLM turu: prompt=11 sonuc=0 sure=249.3s
 ```
 
-<div class="patlar">
+<div class="iyi">
 
-**11 istemden 10'u başarılı olsa bile 249 saniye çöpe gidiyor.** Kusur
-modelde değil, **yapıda**: boş yanıt hangi modelden gelirse gelsin tur
-tümüyle düşüyor.
+**Düzeltildi.** Düşen öğe `NO_ANSWER_TEXT` alır, tur sürer; yalnız sunucu
+düzeyi arıza (503/504/429) turu keser. Sıra kayması riski zaten yoktu:
+sonuçlar `enumerate` ile index hizalı kuruluyor.
 
 </div>
 

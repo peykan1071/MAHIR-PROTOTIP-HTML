@@ -62,7 +62,15 @@ class _Backend:
         self.conversations = []
         self.max_tokens_seen = []
         self.component_calls = []  # (outcome_code, section_kinds, top_k, rerank)
+        # `llm_error`: HER üretim çağrısında fırlatılır (sunucu tamamen bozuk).
+        # `llm_errors`: çağrı SIRASINA göre (0-tabanlı) tek tek arıza - kısmi
+        # tur sözleşmesi ancak böyle ölçülebilir.
         self.llm_error = None
+        self.llm_errors = {}
+        self.llm_call_count = 0  # denenen üretim sayısı; arıza olsa da artar
+        # Öğe indeksine göre getirim arızası (`RetrievalError` tüm turu keser,
+        # `ValueError` yalnız o öğeyi bağlamsız bırakmalı).
+        self.retrieval_errors = {}
 
     # --- uygulamaya bağlı kısım: local/rag_service.py ---
 
@@ -96,6 +104,8 @@ class _Backend:
                 return module.RetrievalResult(hits=hits, reranked=False, pool_size=len(hits))
             index = pending.pop(0)
             current["index"] = index
+            if index in backend.retrieval_errors:
+                raise backend.retrieval_errors[index]
             if index not in backend.contexts:
                 return module.RetrievalResult(hits=[], reranked=False, pool_size=0)
             hit = module.Hit(
@@ -106,8 +116,12 @@ class _Backend:
             return module.RetrievalResult(hits=[hit], reranked=False, pool_size=1)
 
         def fake_chat(messages, max_tokens):
+            attempt = backend.llm_call_count
+            backend.llm_call_count += 1
             if backend.llm_error:
                 raise backend.llm_error
+            if attempt in backend.llm_errors:
+                raise backend.llm_errors[attempt]
             backend.conversations.append(messages)
             backend.max_tokens_seen.append(max_tokens)
             return backend.reply(messages)
@@ -231,6 +245,94 @@ class AgentBatchContractTests(unittest.TestCase):
         backend = _Backend(retrieval_error="çağrılmamalıydı")
         ok, _message, _results = backend.run([_item("a"), _item("b")])
         self.assertTrue(ok, "retrieval taşımayan parti getirim katmanına hiç dokunmamalı.")
+
+
+class PartialBatchContractTests(unittest.TestCase):
+    """Tek istemin düşmesi turu düşürmez; sunucu düzeyi arıza turu keser.
+
+    Canlı kanıt (2026-09-24 öncesi davranış): 11 istemlik bir turda model tek
+    bir öğe için boş yanıt döndürdü ve 249 saniyelik işin tamamı çöpe gitti
+    (`LLM turu: prompt=11 sonuc=0 sure=249.3s`). Sonuç listesi zaten index
+    hizalı kuruluyor ve eksik öğe `NO_ANSWER_TEXT` alıyor, yani kısmi tur
+    yanlış ajana yanlış yanıt bağlayamaz - erken `return` bu yolu
+    kullanılamaz kılıyordu.
+    """
+
+    def _llm_failure(self, message, http_status=502):
+        module = _load_local_service()
+        return module.LlmFailure(message, http_status=http_status)
+
+    def test_one_failed_prompt_does_not_drop_the_batch(self):
+        backend = _Backend(reply=lambda conversation: "gerçek yanıt")
+        backend.llm_errors = {1: self._llm_failure("Model boş yanıt döndürdü.")}
+
+        ok, _message, results = backend.run([_item("a"), _item("b"), _item("c")])
+
+        self.assertTrue(ok, "Tek öğenin düşmesi turu düşürmemeli.")
+        self.assertEqual([result["name"] for result in results], ["a", "b", "c"])
+        self.assertEqual(results[1]["answer"], NO_ANSWER_TEXT, "Düşen öğe 'belgede bulunmuyor' almalı.")
+        self.assertEqual(results[0]["answer"], "gerçek yanıt")
+        self.assertEqual(results[2]["answer"], "gerçek yanıt")
+        self.assertEqual(backend.llm_call_count, 3, "Arızadan sonraki öğeler yine denenmeli.")
+
+    def test_partial_failure_is_reported_in_the_message(self):
+        backend = _Backend()
+        backend.llm_errors = {0: self._llm_failure("Model boş yanıt döndürdü.")}
+
+        _ok, message, _results = backend.run([_item("a"), _item("b")])
+
+        self.assertIn("1", message, "Mesaj kaç öğenin düştüğünü söylemeli.")
+
+    def test_all_failed_prompts_still_report_failure(self):
+        backend = _Backend()
+        backend.llm_errors = {
+            0: self._llm_failure("Model boş yanıt döndürdü."),
+            1: self._llm_failure("Model boş yanıt döndürdü."),
+        }
+
+        ok, message, results = backend.run([_item("a"), _item("b")])
+
+        self.assertFalse(ok, "Denenen her üretim düştüyse tur başarısızdır.")
+        self.assertIn("Ajan yanıtları üretilemedi", message)
+        self.assertIsNone(results)
+
+    def test_connection_failure_aborts_the_batch_early(self):
+        backend = _Backend()
+        backend.llm_errors = {0: self._llm_failure("LLM sunucusuna bağlanılamadı.", http_status=503)}
+
+        ok, _message, results = backend.run([_item("a"), _item("b"), _item("c")])
+
+        self.assertFalse(ok)
+        self.assertIsNone(results)
+        self.assertEqual(backend.llm_call_count, 1, "Sunucu erişilemezken kalan öğeler denenmemeli.")
+
+    def test_timeout_aborts_the_batch_early(self):
+        # Asıl maliyet koruması: LLM_TIMEOUT_S=180 ile 11 öğe tek tek zaman
+        # aşımına uğrarsa tur 33 dakika sürerdi.
+        backend = _Backend()
+        backend.llm_errors = {0: self._llm_failure("LLM yanıt vermedi.", http_status=504)}
+
+        ok, _message, results = backend.run([_item("a"), _item("b"), _item("c")])
+
+        self.assertFalse(ok)
+        self.assertIsNone(results)
+        self.assertEqual(backend.llm_call_count, 1, "Zaman aşımında kalan öğeler denenmemeli.")
+
+    def test_invalid_per_item_retrieval_query_does_not_drop_the_batch(self):
+        # `retrieval.query` yalnız boşluktan oluşursa `retrieve()` ValueError
+        # fırlatır; `reject_agent_prompts` bunu yakalamaz çünkü `user` doludur.
+        # Bu, o öğeye özgü bir hatadır - Qdrant arızası değil.
+        backend = _Backend(contexts={1: "bağlam"}, sources={1: [{"documentName": "y"}]})
+        backend.retrieval_errors = {0: ValueError("Soru boş olamaz.")}
+
+        ok, _message, results = backend.run([
+            _item("bozuk", retrieval=_RETRIEVAL),
+            _item("saglam", user="U2", retrieval=_RETRIEVAL),
+        ])
+
+        self.assertTrue(ok, "Bir öğenin bozuk getirim isteği turu düşürmemeli.")
+        self.assertEqual(results[0]["answer"], NO_ANSWER_TEXT)
+        self.assertNotEqual(results[1]["answer"], NO_ANSWER_TEXT)
 
 
 class ComponentRetrievalContractTests(unittest.TestCase):

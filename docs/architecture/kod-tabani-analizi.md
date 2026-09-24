@@ -98,8 +98,9 @@ sequenceDiagram
     W-->>T: {ok, structuredData: analysis}
 ```
 
-**Dikkat:** `/agents` turu **hepsi-ya-hiç**tir. Tek prompt düşerse
-`run_agent_prompts` `False` döner ve tüm tur kaybolur (bkz. 3.4).
+**Not:** `/agents` turu artık **kısmi sonuç** döndürür. Tek istem düşerse
+yalnız o öğe `NO_ANSWER_TEXT` alır; sunucu düzeyi arıza (503/504/429) turu
+keser (bkz. 3.4).
 
 ---
 
@@ -166,8 +167,8 @@ Kırmızı kenar gerçek bir döngüdür (bkz. 3.1).
 
 **LLM kuyruğu deseni** ([`base.py:127`](../../backend/app/agents/base.py)):
 ajanlar LLM'i doğrudan çağırmaz, promptlarını kuyruğa yazar; orkestratör
-hepsini **tek HTTP isteğinde** gönderir. Doğru bir karar — ama 3.4'teki
-hepsi-ya-hiç sorununun da kaynağı.
+hepsini **tek HTTP isteğinde** gönderir. Doğru bir karar — 3.4'teki
+hepsi-ya-hiç sorununun da kaynağıydı; o kusur artık giderildi.
 
 ### 2.5 Veri ve doğrulama
 
@@ -277,10 +278,10 @@ kontrol tablosu, kazanım eşleştirme, analiz çağrısı, rapor render'ı ve s
 Pratik sonuç: rapor gösterimini değiştirirken yükleme akışını bozma riski
 sürüyor ve bu riski sınırlayan bir tip ya da arayüz hâlâ yok.
 
-### 3.4 `/agents` hepsi-ya-hiç — en pahalı borç
+### 3.4 `/agents` hepsi-ya-hiç — DÜZELTİLDİ (2026-09-24)
 
 [`rag_service.py`](../../local/rag_service.py) `run_agent_prompts` bir
-prompt düştüğünde `return False` ediyor; orkestratör turu tamamen atıyor.
+prompt düştüğünde `return False` ediyordu; orkestratör turu tamamen atıyordu.
 
 Canlı kanıt ([`backend/logs/mahir-backend.log`](../../backend/logs/)):
 
@@ -289,13 +290,42 @@ LLM turu başarısız (Ajan yanıtları üretilemedi: Model boş yanıt döndür
 LLM turu: prompt=11 sonuc=0 sure=249.3s
 ```
 
-**11 istemden 10'u başarılı olsa bile 249 saniyelik iş çöpe gidiyor.**
+**11 istemden 10'u başarılı olsa bile 249 saniyelik iş çöpe gidiyordu.**
 (Bu kayıt, uzak bir LLM ucunun denendiği bir oturumda oluştu ve o deneme
-geri alındı; ama kusur modele değil **yapıya** aittir: boş yanıt hangi
-modelden gelirse gelsin tur tümüyle düşer.)
+geri alındı; ama kusur modele değil **yapıya** aitti: boş yanıt hangi
+modelden gelirse gelsin tur tümüyle düşüyordu.)
+
 Kod yorumundaki gerekçe ("yarım tur, yanlış ajana yanlış yanıt
-bağlanmasından daha kötü olurdu") mantıklı ama yanlış ikilem kuruyor:
-sonuçlar zaten indeksle eşleşiyor, düşen prompt açık bir hata taşıyabilir.
+bağlanmasından daha kötü olurdu") iki ayrı riski karıştırıyordu. **Sıra
+kayması** riski gerçek ama zaten kapalı: sonuç listesi `enumerate(items)`
+ile index hizalı kuruluyor ve eksik öğe `NO_ANSWER_TEXT` alıyor,
+`agents/llm.py` de sayı eşitliğini denetliyor. **Tek öğenin düşmesi** ise
+sıra kaymasına yol açmıyor.
+
+**Bugünkü davranış — "arıza öğeye mi özgü, sunucuya mı?":**
+
+| Arıza | Karar |
+|---|---|
+| `RetrievalError` (Qdrant okunamıyor) | tüm öğeleri etkiler → tur düşer |
+| Getirimde `ValueError` (o öğenin isteği bozuk) | yalnız o öğe bağlamsız kalır |
+| Üretimde 503 / 504 / 429 (`ABORT_ON_LLM_STATUSES`) | tur hemen kesilir, kalan öğeler denenmez |
+| Üretimde diğerleri (boş yanıt vb.) | yalnız o öğe düşer, `NO_ANSWER_TEXT` alır |
+| Denenen ÜRETİMLERİN tamamı düştü | tur yine başarısız döner |
+
+504'ün kesme kovasında olması kasıtlı: `LLM_TIMEOUT_S=180` ile 11 istem tek
+tek zaman aşımına uğrasa tur 33 dakika sürerdi. Sınıflandırma `_chat`in
+zaten atadığı `LlmFailure.http_status` değerlerine dayanıyor.
+
+Aynı dayanıklılık deseni OCR işçisinde zaten vardı
+([`ocr_worker.py:101-107`](../../backend/app/ocr_worker.py)): tek görsel
+patladığında o belge uyarıyla geçilir, kalan 24'ü okunur.
+
+Sözleşmenin testleri: `tests/test_agents_contract.py::PartialBatchContractTests`.
+
+**Kalan sınır:** kısmi turda backend logu `prompt=11 sonuc=11` yazar, çünkü
+`orchestrator._flush_llm_queue` dönen sonuç SAYISINI sayıyor ve düşen öğeler
+de `NO_ANSWER_TEXT` ile geri dönüyor. Hangi öğelerin düştüğü RAG servisi
+logunda (Pencere B) görünür.
 
 ### 3.5 Darboğaz — reranker
 
@@ -348,18 +378,19 @@ prompt kurma ve yeniden deneme mantığını da içeriyor.
 
 Sıralama **etki ÷ risk** ile yapıldı.
 
-### 1) `/agents` kısmi sonuç — en yüksek etki, en düşük risk
+### 1) `/agents` kısmi sonuç — YAPILDI (2026-09-24)
 
-**Neden ilk:** tek dosyada, ~20 satır, davranış değişikliği ölçülebilir ve
-kullanıcının bugün yaşadığı somut hatayı çözüyor.
+**Neden ilkti:** tek dosyada, ~20 satır, davranış değişikliği ölçülebilir
+ve kullanıcının bugün yaşadığı somut hatayı çözüyordu.
 
-**Ne yapılmalı:** düşen prompt turu düşürmesin; sonucunda açık bir hata
-alanı taşısın, `pipeline.py` bunu "teşhis üretilemedi" olarak göstersin.
-`tests/test_agents_contract.py::test_generation_failure_returns_false_with_a_turkish_message`
-sözleşmesi bilinçli olarak güncellenmeli.
+**Ne yapıldı:** düşen istem artık turu düşürmüyor; yalnız o öğe
+`NO_ANSWER_TEXT` alıyor ve `pipeline.py` onu zaten "skip" olarak işliyor.
+Sunucu düzeyi arızalar (`ABORT_ON_LLM_STATUSES` = 503/504/429) turu
+kesmeye devam ediyor. Ayrıntı ve tablo için bkz. 3.4.
 
-**Bedeli:** sözleşme değişikliği. Yarım turun gösterimi arayüzde
-düşünülmeli.
+**Sözleşme testleri:** `PartialBatchContractTests` (6 yeni test). Mevcut
+22 sözleşme testinin hiçbiri değişmedi — "denenen her üretim düştüyse tur
+başarısızdır" kuralı eski davranışı tek öğelik partilerde birebir koruyor.
 
 ### 2) `file_receiver.py` ayrıştırması
 
