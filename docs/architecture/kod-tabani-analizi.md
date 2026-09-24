@@ -8,7 +8,7 @@
 
 | Katman | Satır | Dosya |
 |---|---:|---:|
-| Ön yüz (`script.js` + `assets/js` + `index.html`) | ~9.700 | 10 |
+| Ön yüz (`script.js` + `assets/js` + `index.html`) | ~7.900 | 10 |
 | Backend (`backend/`) | ~7.000 | 30 |
 | RAG yığını (`local/`) | ~3.600 | 4 |
 
@@ -140,7 +140,7 @@ Kırmızı kenar gerçek bir döngüdür (bkz. 3.1).
 | Dosya | Görevi | Bağımlılık | Kritik fonksiyon | State rolü |
 |---|---|---|---|---|
 | [`file_receiver.py`](../../backend/app/file_receiver.py) | Üç rotayı ve statik sunumu yürütür; hangi ayrıştırıcının çağrılacağına karar verir | 9 modül (hub) | `run_existing_backend_flow:391`, `extract_uploaded_files:513` | **State yok** — her istek bağımsız |
-| [`script.js`](../../script.js) | Tüm arayüz, öğretmen onayı, takma ad üretimi, rapor gösterimi | `assets/js/*` | `createSession:17`, `studentRef` üretimi `:5400` | **Tek oturum nesnesi**, bellekte; sayfa yenilenince biter |
+| [`script.js`](../../script.js) | Tüm arayüz, öğretmen onayı, takma ad üretimi, rapor gösterimi | `assets/js/*` | `fileUploadBridge:848` (3.485 satır), `studentRef` üretimi `:3656` | **State yok** — modül kapanışındaki değişkenler; sayfa yenilenince biter |
 | [`ocr_worker_client.py`](../../backend/app/ocr_worker_client.py) | Görsel grubunu `:8002`'ye taşır | `file_receiver` (döngü) | `request_image_group_ocr` | yok |
 | [`ocr_quality_agent.py`](../../backend/app/ocr_quality_agent.py) | Belge türü ve okuma kalitesi kararı (deterministik, LLM yok) | — | — | yok |
 
@@ -244,14 +244,38 @@ Sonuç: OCR yönlendirmesini değiştirmek için statik sunucuyu barındıran
 dosyaya dokunmak gerekiyor; test etmek için HTTP katmanını ayağa
 kaldırmak gerekiyor.
 
-### 3.3 `script.js` — 6.217 satırlık tek IIFE
+### 3.3 `script.js` — yekpare `fileUploadBridge`
 
-259 fonksiyon, 68 `addEventListener`, tek `createSession()` nesnesi, modül
-sınırı yok, dışa aktarım yok. `assets/js/` altında sekiz modül ayrılmış
-ama ana dosya hâlâ yekpare.
+**2026-09-24 güncellemesi.** Dosyanın ilk 1.672 satırı `window.MAHIR`
+altında ikinci bir "ajan" katmanı taşıyordu (`AIOrchestrator`,
+`DocumentAgent`, gövdesi boş `class OCRService {}`, `createMockInput()`).
+Bu katman canlı akışın parçası değildi: tek dış kanalı `window.MAHIR` idi ve
+onu hiçbir yer okumuyordu; DOM'a, olaylara, depolamaya, ağa hiç dokunmuyordu.
+Gerçek ajan hattıyla ([`backend/app/agents/`](../../backend/app/agents/))
+aynı isimleri taşıdığı için okuyanı yanıltıyordu. Çağrılmayan iki fonksiyon
+ve hiç tetiklenmeyen dört olay dalıyla birlikte silindi (1.752 satır).
+
+| Ölçüm (aynı yöntemle sayıldı) | Önce | Sonra |
+|---|---:|---:|
+| Satır | 6.217 | **4.465** |
+| Üst düzey IIFE | 8 | **4** |
+| `addEventListener` | 68 | 67 |
+| `fetch(` | 5 | 5 |
+| Adlı tanım (`const/let/var/function X`) | 1.100 | 880 |
+
+`fetch` sayısının değişmemesi kasıtlı bir kanıt: ağ davranışına hiç
+dokunulmadı. Silme [`tests/script-surface-lock.test.js`](../../tests/script-surface-lock.test.js)
+ile kilitlendi.
+
+**Kalan borç.** Dosya artık dört üst düzey modül: `preparationManager`
+(3–671), `screenManager` (673–845), `fileUploadBridge` (848–4332),
+`reportApprovalManager` (4334–4459). Bunlardan `fileUploadBridge` tek
+başına **3.485 satır** — dosyanın %78'i. Adı yanıltıcı: yükleme, öğretmen
+kontrol tablosu, kazanım eşleştirme, analiz çağrısı, rapor render'ı ve süre
+ölçümü hepsi o closure'da.
 
 Pratik sonuç: rapor gösterimini değiştirirken yükleme akışını bozma riski
-var ve bu riski sınırlayan bir tip ya da arayüz yok.
+sürüyor ve bu riski sınırlayan bir tip ya da arayüz hâlâ yok.
 
 ### 3.4 `/agents` hepsi-ya-hiç — en pahalı borç
 
@@ -352,15 +376,26 @@ o da güncellenmeli.
 
 ### 3) `script.js` modüllemesi
 
-**Neden üçüncü:** en yüksek kazanç ama en yüksek risk — 68 olay dinleyici
-ve tek oturum nesnesi, tip yok, tarayıcı testleri sınırlı.
+**Durum: kısmen yapıldı (2026-09-24).** İlk adım — ölü `window.MAHIR`
+katmanının, çağrılmayan iki fonksiyonun ve hiç tetiklenmeyen dört olay
+dalının silinmesi — tamamlandı: 1.752 satır gitti, davranış değişmedi
+(bkz. 3.3). Bu adım risksizdi çünkü silinen kodun hiçbir çağrısı yoktu.
 
-**Ne yapılmalı:** kademeli. Önce oturum state'ini açık bir modüle çıkar,
+**Kalan iş:** `fileUploadBridge` (848–4332, 3.485 satır) tek closure'da
+yükleme, öğretmen kontrol tablosu, kazanım eşleştirme, analiz çağrısı ve
+rapor render'ını birlikte taşıyor.
+
+**Neden hâlâ üçüncü:** en yüksek kazanç ama en yüksek risk — 67 olay
+dinleyici, modül kapanışında paylaşılan onlarca değişken, tip yok,
+tarayıcı testleri sınırlı.
+
+**Ne yapılmalı:** kademeli. Önce closure state'ini açık bir modüle çıkar,
 sonra `assets/js/` desenini izleyerek yükleme / onay / rapor bölümlerini
 ayrı ES modüllerine taşı.
 
-**Bedeli:** yüksek. Bu iş ancak arayüz testleri güçlendirildikten sonra
-güvenli olur — aksi hâlde regresyon görünmez kalır.
+**Bedeli:** yüksek. Ölü kod silmenin aksine bu iş **çalışan** satırları
+taşıyor; ancak arayüz testleri güçlendirildikten sonra güvenli olur —
+aksi hâlde regresyon görünmez kalır.
 
 > **Listeye alınmayan ama unutulmaması gereken:** reranker darboğazı
 > (3.5) mimari değil ayar sorunu; kimlik doğrulama (3.6) ise yerel
@@ -373,7 +408,7 @@ güvenli olur — aksi hâlde regresyon görünmez kalır.
 ```mermaid
 flowchart TB
     subgraph B0["Bölge 0 — Öğretmenin tarayıcısı"]
-        UI["index.html + script.js<br/>oturum nesnesi (bellekte)"]
+        UI["index.html + script.js<br/>durum modül kapanışında (bellekte)"]
         JS["assets/js/*<br/>rapor dışa aktarım, yedekleme"]
         PSD["studentRef üretimi Ö-001<br/>ad-soyad BURADAN ÇIKMAZ"]
     end
@@ -420,7 +455,7 @@ flowchart TB
 ```
 
 **Şemanın okunuşu:** kırmızı ve sarı bölgeler ad-soyad görür; yeşil bölge
-**görmez**. Bu sınır [`script.js:5400`](../../script.js) ile
+**görmez**. Bu sınır [`script.js:3656`](../../script.js) ile
 [`approved_data_analyzer.py:259`](../../backend/app/approved_data_analyzer.py)
 arasında kuruluyor ve kod düzeyinde zorlanıyor. Sistemin en değerli
 mimari özelliği budur; herhangi bir taşıma kararında korunması gereken

@@ -99,7 +99,12 @@ assert.match(script, /listbox\.hidden = true/);
 assert.match(script, /outcome\.indicators\.forEach/);
 assert.match(styles, /\.outcome-combobox-listbox\[hidden\]/);
 assert.doesNotMatch(script, /saved-exam-outcome-select/);
-assert.match(script, /outcomes: availableOutcomes/);
+// 2026-09-24: `outcomes: availableOutcomes` iddiasi kaldirildi. O satir
+// `createSavedOutcomeSummary` govdesindeydi; b3d8432 ("coklu sinavlarda ortak
+// ogrenme ciktilari") bu fonksiyonun CAGRISINI kaldirip yerine asagidaki
+// `placeQuestionMapAtPageEnd()` akisini koymustu - fonksiyon o gunden beri
+// oksuzdu, test ise olu kodu korumaya devam ediyordu. Ozelligin bugunku
+// karsiligini iki satir asagidaki placeQuestionMapAtPageEnd iddialari tutuyor.
 assert.match(script, /options\.slice\(0, 9\)/);
 assert.match(script, /Math\.min\(visibleOptionHeight, 420, availableSpace\)/);
 assert.match(script, /item\.append\(heading, privacyNotice, tableWrap/);

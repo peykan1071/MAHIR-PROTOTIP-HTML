@@ -86,7 +86,7 @@ bilmektir.
 
 | Katman | Satır | Dosya | En büyüğü |
 |---|---:|---:|---|
-| Ön yüz | ~9.700 | 10 | `script.js` — 6.217 |
+| Ön yüz | ~7.900 | 10 | `script.js` — 4.465 |
 | Backend | ~7.000 | 30 | `pipeline.py` — 1.440 |
 | RAG yığını | ~3.600 | 4 | `ingestion_pipeline.py` — 1.220 |
 
@@ -416,15 +416,15 @@ veri sınıfı; HTTP sunucu modülünde durmamalı. Klasik "vibe coding" yaması
 
 ---
 
-## `script.js` — 6.217 satırlık tek IIFE
+## `script.js` — 1.752 satır ölü kod silindi
 
-| Ölçüm | Değer |
-|---|---:|
-| Fonksiyon | 259 |
-| `addEventListener` | 68 |
-| `fetch` çağrısı | 5 |
-| Modül sınırı | **0** |
-| Oturum nesnesi | **1** (bellekte) |
+| Ölçüm | Önce | Sonra |
+|---|---:|---:|
+| Satır | 6.217 | **4.465** |
+| Üst düzey IIFE | 8 | **4** |
+| `addEventListener` | 68 | 67 |
+| `fetch` çağrısı | 5 | 5 |
+| En büyük closure | — | `fileUploadBridge` **3.485** |
 
 <div class="patlar">
 
@@ -549,12 +549,12 @@ o da güncellenmeli.
 
 ## 3) `script.js` modüllemesi
 
-**Neden üçüncü:** en yüksek kazanç, **en yüksek risk**.
+**İlk adım yapıldı:** ölü `window.MAHIR` katmanı + çağrılmayan iki
+fonksiyon + hiç tetiklenmeyen dört olay dalı → **1.752 satır** gitti,
+davranış değişmedi. Çağrısı olmayan kodu silmek risksizdi.
 
-68 olay dinleyici, tek oturum nesnesi, tip yok, arayüz testi sınırlı.
-
-**Kademeli olmalı:** önce oturum state'i açık bir modüle, sonra
-`assets/js/` desenini izleyerek yükleme / onay / rapor bölümleri.
+**Kalan iş, en yüksek risk:** `fileUploadBridge` tek closure'da 3.485
+satır — 67 olay dinleyici, paylaşılan onlarca değişken, tip yok.
 
 <div class="patlar">
 

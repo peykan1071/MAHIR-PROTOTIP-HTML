@@ -796,7 +796,7 @@ Python doğrulamalarını çalıştırmak için:
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-Node.js kuruluysa repodaki 13 JavaScript test dosyasının tamamı ve ana tarayıcı betiğinin sözdizimi kontrolü çalıştırılabilir:
+Node.js kuruluysa repodaki 14 JavaScript test dosyasının tamamı ve ana tarayıcı betiğinin sözdizimi kontrolü çalıştırılabilir:
 
 ```bash
 node --test tests/*.test.js

@@ -288,9 +288,9 @@ section.diyagram .mermaid svg { max-height: 540px !important; }
 <tbody>
 <tr>
 <td>Ön yüz</td>
-<td style="text-align:right">~9.700</td>
+<td style="text-align:right">~7.900</td>
 <td style="text-align:right">10</td>
-<td><code>script.js</code> — 6.217</td>
+<td><code>script.js</code> — 4.465</td>
 </tr>
 <tr>
 <td>Backend</td>
@@ -1882,34 +1882,40 @@ table { font-size: 0.80em; }
 section.diyagram .mermaid svg { max-height: 540px !important; }
 ;" data-marpit-pagination-total="30">
 <header>MAHİR — kod tabanı</header>
-<h2 id="scriptjs--6217-sat%C4%B1rl%C4%B1k-tek-iife"><code>script.js</code> — 6.217 satırlık tek IIFE</h2>
+<h2 id="scriptjs--1752-sat%C4%B1r-%C3%B6l%C3%BC-kod-silindi"><code>script.js</code> — 1.752 satır ölü kod silindi</h2>
 <table>
 <thead>
 <tr>
 <th>Ölçüm</th>
-<th style="text-align:right">Değer</th>
+<th style="text-align:right">Önce</th>
+<th style="text-align:right">Sonra</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Fonksiyon</td>
-<td style="text-align:right">259</td>
+<td>Satır</td>
+<td style="text-align:right">6.217</td>
+<td style="text-align:right"><strong>4.465</strong></td>
+</tr>
+<tr>
+<td>Üst düzey IIFE</td>
+<td style="text-align:right">8</td>
+<td style="text-align:right"><strong>4</strong></td>
 </tr>
 <tr>
 <td><code>addEventListener</code></td>
 <td style="text-align:right">68</td>
+<td style="text-align:right">67</td>
 </tr>
 <tr>
 <td><code>fetch</code> çağrısı</td>
 <td style="text-align:right">5</td>
+<td style="text-align:right">5</td>
 </tr>
 <tr>
-<td>Modül sınırı</td>
-<td style="text-align:right"><strong>0</strong></td>
-</tr>
-<tr>
-<td>Oturum nesnesi</td>
-<td style="text-align:right"><strong>1</strong> (bellekte)</td>
+<td>En büyük closure</td>
+<td style="text-align:right">—</td>
+<td style="text-align:right"><code>fileUploadBridge</code> <strong>3.485</strong></td>
 </tr>
 </tbody>
 </table>
@@ -2652,10 +2658,11 @@ section.diyagram .mermaid svg { max-height: 540px !important; }
 ;" data-marpit-pagination-total="30">
 <header>MAHİR — kod tabanı</header>
 <h2 id="3-scriptjs-mod%C3%BCllemesi">3) <code>script.js</code> modüllemesi</h2>
-<p><strong>Neden üçüncü:</strong> en yüksek kazanç, <strong>en yüksek risk</strong>.</p>
-<p>68 olay dinleyici, tek oturum nesnesi, tip yok, arayüz testi sınırlı.</p>
-<p><strong>Kademeli olmalı:</strong> önce oturum state'i açık bir modüle, sonra<br />
-<code>assets/js/</code> desenini izleyerek yükleme / onay / rapor bölümleri.</p>
+<p><strong>İlk adım yapıldı:</strong> ölü <code>window.MAHIR</code> katmanı + çağrılmayan iki<br />
+fonksiyon + hiç tetiklenmeyen dört olay dalı → <strong>1.752 satır</strong> gitti,<br />
+davranış değişmedi. Çağrısı olmayan kodu silmek risksizdi.</p>
+<p><strong>Kalan iş, en yüksek risk:</strong> <code>fileUploadBridge</code> tek closure'da 3.485<br />
+satır — 67 olay dinleyici, paylaşılan onlarca değişken, tip yok.</p>
 <div class="patlar">
 <p><strong>Bu iş ancak arayüz testleri güçlendirildikten sonra güvenli.</strong> Aksi<br />
 hâlde regresyon görünmez kalır — ve bunu fark eden kişi öğretmen olur.</p>

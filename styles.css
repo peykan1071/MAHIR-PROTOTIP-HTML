@@ -871,20 +871,6 @@ input[type="checkbox"] {
   flex-wrap: wrap;
 }
 
-[data-classified-groups] section {
-  margin-block: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--border-color, #cfe0e7);
-  border-radius: 0.75rem;
-}
-
-.classified-group-button {
-  display: block;
-  width: 100%;
-  margin-block-start: 0.5rem;
-  text-align: left;
-}
-
 .outcome-combobox-option-heading {
   display: block;
 }
@@ -1339,28 +1325,6 @@ button[aria-disabled="true"] {
   color: #84291f;
   background: #fff5f3;
   font-size: 0.88rem;
-}
-
-.saved-group-outcome-summary {
-  margin-bottom: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--border-color, #cfe1e7);
-  border-radius: 0.75rem;
-  background: #f7fcfb;
-}
-
-.saved-group-outcome-summary h4 {
-  margin: 0 0 0.75rem;
-}
-
-.saved-outcome-data-table th:first-child,
-.saved-outcome-data-table td:first-child {
-  width: 5rem;
-}
-
-.saved-outcome-data-table th:nth-child(2),
-.saved-outcome-data-table td:nth-child(2) {
-  width: 8rem;
 }
 
 .saved-group-validation-note[hidden] {
