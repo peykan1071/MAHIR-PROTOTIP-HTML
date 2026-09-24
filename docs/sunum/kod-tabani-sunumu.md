@@ -373,7 +373,7 @@ turda tek başına **~88 saniye**.
 ## En pahalı borç: `/agents` hepsi-ya-hiç
 
 ```python
-# local/rag_service.py:705
+# local/rag_service.py:695
 except Exception as error:
     return False, f"Ajan yanıtları üretilemedi: {error}", None
 ```

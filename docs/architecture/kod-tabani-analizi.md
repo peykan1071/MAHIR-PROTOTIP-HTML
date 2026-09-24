@@ -215,7 +215,7 @@ beklenenden **iyi** yapıyor.
   `CrossEncoderReranker` `threading.Lock` kullanıyor
   ([`rag_common.py:400`](../../local/rag_common.py), `:498`).
 - **GPU erişimi seri.** OCR çıkarımı `ThreadPoolExecutor(max_workers=1)`
-  üzerinden gidiyor ([`ocr_engine.py:41`](../../backend/app/ocr_engine.py)),
+  üzerinden gidiyor ([`ocr_engine.py:44`](../../backend/app/ocr_engine.py)),
   yani `ThreadingHTTPServer` olmasına rağmen iki eşzamanlı yükleme GPU'da
   çakışmıyor.
 - **Zarif bozulma.** OCR ya da RAG kapalıyken CSV/Excel akışı çalışmaya
@@ -329,7 +329,7 @@ içindeki `ImportError` ile bir CUDA OOM aynı mesaja düşüyor.
 
 ### 3.8 Gizli yarış — `_get_executor()`
 
-[`ocr_engine.py:41`](../../backend/app/ocr_engine.py) global `_executor`'ı
+[`ocr_engine.py:44`](../../backend/app/ocr_engine.py) global `_executor`'ı
 kilitsiz tembel kuruyor. İki eşzamanlı istek ikisi de `None` görürse **iki
 executor, iki iş parçacığı, iki pipeline** oluşur → 6 GB kartta OOM.
 

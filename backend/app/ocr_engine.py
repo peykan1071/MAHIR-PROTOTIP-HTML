@@ -6,14 +6,17 @@ receiver never imports this module; it forwards image uploads over HTTP
 instead (see `ocr_worker_client.py`), so the web server process never loads
 paddle/torch.
 
-Each uploaded image is expected to show one handwritten score table per the
-MAHIR paper template: a student-number column, one column per question, and
-a total column (see `AA.jpg` at the repo root for a reference photo). OCR on
-handwritten, skewed, glare-affected photos misreads header text often (e.g.
-"Öğrenci No" -> "Openci No", "Soru 1" -> "Sonu 1") even when the numeric
-values are read correctly, so rows are interpreted positionally (first
-column = student number, last column = total, everything between = scores)
-rather than by matching header text.
+Each uploaded image shows ONE student's sheet from the MAHIR paper template
+(`shared/templates/Ornek_Sinav_Kagidi_Soru_Bazli_Puan_Cizelgesi.docx`): a
+metadata table (Ogrencinin Adi-Soyadi / Ogrenci Okul No / Sinif-Sube / Sinav
+Turu) sitting above a score table (Sorular | S1..Sn | Toplam / Azami Puan /
+Ogrencinin Aldigi Puan). PaddleOCR-VL returns both as one HTML fragment, so
+`_parse_exam_rows` locates rows by their printed LABEL text rather than by
+their position on the page. OCR misreads single letters in those printed
+labels often ("Sinif/Sube" -> "Simif/Sube") even when the handwritten numbers
+are read correctly, so label matching is fuzzy (`_LABEL_MATCH_RATIO`). Only
+WITHIN a located row are cells read positionally, and empty cells are kept as
+None so a missing S3 cannot shift S4 into its place.
 
 The pipeline is only ever created and called from one dedicated worker
 thread (via `_EXECUTOR`, a single-worker `ThreadPoolExecutor`): calling it
@@ -86,21 +89,6 @@ def ensure_available() -> None:
         _get_executor().submit(_get_pipeline).result()
     except ImportError as error:
         raise RuntimeError("PaddleOCR bu Python ortamında kurulu değil.") from error
-
-
-def read_student_rows(image_bytes: bytes, extension: str) -> list[dict[str, object]]:
-    """OCR one exam-score image and return the student row(s) found in its table."""
-
-    html_text = _run_ocr(image_bytes, extension)
-    rows = _extract_table_rows(html_text)
-    if not rows:
-        raise ValueError("Görselde tablo tespit edilemedi.")
-
-    data_rows = rows[1:] if len(rows) > 1 else rows
-    students = [row for row in (_parse_positional_row(row) for row in data_rows) if row is not None]
-    if not students:
-        raise ValueError("Görseldeki tablo satırından öğrenci bilgisi okunamadı.")
-    return students
 
 
 def read_exam_document(image_bytes: bytes, extension: str) -> dict[str, object]:
@@ -395,43 +383,6 @@ def _looks_like_full_name(value: str) -> bool:
         return False
     words = re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşü]+", normalized)
     return len(words) >= 2 and len("".join(words)) >= 5
-
-
-def _parse_positional_row(row: list[str]) -> dict[str, object] | None:
-    if len(row) < 2:
-        return None
-
-    privacy_findings: list[str] = []
-    safe_cells: list[str] = []
-    for cell in row:
-        if _looks_like_tckn(cell):
-            if "TCKN" not in privacy_findings:
-                privacy_findings.append("TCKN")
-            continue
-        if _looks_like_full_name(cell):
-            if "AD_SOYAD" not in privacy_findings:
-                privacy_findings.append("AD_SOYAD")
-            continue
-        safe_cells.append(cell)
-
-    if len(safe_cells) < 2:
-        return None
-
-    student_no = safe_cells[0].strip()
-    total_score = _parse_number(safe_cells[-1])
-    scores = [_parse_number(cell) for cell in safe_cells[1:-1]]
-
-    if not student_no and total_score is None and all(score is None for score in scores):
-        return None
-
-    return {
-        "studentNo": student_no,
-        "scores": scores,
-        "totalScore": total_score,
-        "calculatedTotal": round(sum(score or 0 for score in scores), 2),
-        "control": "",
-        "privacyFindings": privacy_findings,
-    }
 
 
 class _TableRowsExtractor(HTMLParser):

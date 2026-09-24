@@ -80,11 +80,6 @@ logger = logging.getLogger("mahir.local.service")
 SERVICE_TITLE = "MAHİR Yerel RAG Servisi"
 SERVICE_VERSION = "1.0.0"
 MAX_QUESTION_CHARS = 2000
-# Bağlam üst sınırı (karakter) `Settings.context_char_budget()`'ten gelir:
-# llama-server'ın `-c` penceresi (LLM_CONTEXT_WINDOW) - üretim payı - şablon payı.
-# Sabit bir 60k gibi değer 8k pencereli yerel modelde "context size exceeded"
-# üretirdi. Bu yalnız `build_context`'in bağımsız kullanımı için geri düşüş.
-FALLBACK_CONTEXT_CHARS = 16_000
 # Kaynak alıntısı: backend'in teşhis doğrulayıcısı (`pipeline.py::_grounded_word_overlap`)
 # modelin seçtiği terimleri YALNIZ bu alıntıda arıyor. 300'de 1,4-1,9k karakterlik
 # parçaların üçte ikisi görünmez kalıp doğru terimler "ungrounded" sayılıyordu;
@@ -181,7 +176,7 @@ def build_sources(hits: Sequence[Hit]) -> list[dict[str, Any]]:
     ]
 
 
-def build_context(hits: Sequence[Hit], max_chars: int = FALLBACK_CONTEXT_CHARS) -> tuple[str, int]:
+def build_context(hits: Sequence[Hit], max_chars: int) -> tuple[str, int]:
     """Numaralı bağlam blokları: `[n] (Belge, s. X-Y)` başlığı + başlık zincirli metin.
 
     Toplam `max_chars`'ı aşarsa sondaki (en düşük sıralı) parçalar atılır.
@@ -309,10 +304,6 @@ class RAGService:
         self._qdrant: "QdrantClient | None" = None
         self._llm: "OpenAI | None" = None
         self._started = False
-
-    @property
-    def settings(self) -> Settings:
-        return self._settings
 
     def start(self, warm_models: bool = True) -> None:
         """İstemcileri kurar, modelleri ısıtır. Qdrant'a ya da llama-server'a
