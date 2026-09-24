@@ -24,3 +24,10 @@ local/models/
 # (bkz. README "Müfredat indeksi hazır gelir"). Yalnız çalışma zamanı kilit
 # dosyası dışlanır - o, indeksi açmış olan sürece özgüdür.
 local/qdrant_index/.lock
+
+# Marp sunum çıktıları. `sunum.html` KASITLI olarak depoya girer: klonlayan
+# herkes Node/Marp kurmadan sunumu açabilsin diye. Kaynağı değişince YENİDEN
+# ÜRETİLİP commit'lenmeli, yoksa sessizce bayatlar (komut README'de).
+# PDF/PPTX çıktıları izlenmez - büyük ikili dosyalar, gerektiğinde üretilir.
+sunum.pdf
+sunum.pptx

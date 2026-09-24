@@ -837,6 +837,8 @@ MAHIR-PROTOTIP-HTML/
 - [Pedagojik Analiz Ajanı](docs/architecture/pedagogical-analysis-agent.md)
 - [Raporlama Ajanı](docs/architecture/reporting-agent.md)
 - [Standart Eğitim Belgesi](docs/architecture/canonical-education-document.md)
+- [Kod tabanı analizi](docs/architecture/kod-tabani-analizi.md) — mimari, dosya envanteri, teknik borç
+- [Kod tabanı sunumu](docs/sunum/kod-tabani-sunumu.md) — Marp slaytları (`npx @marp-team/marp-cli docs/sunum/kod-tabani-sunumu.md --html -o sunum.html`)
 - [Türkiye Yüzyılı Maarif Modeli](https://tymm.meb.gov.tr/)
 - [9. sınıf Türk Dili ve Edebiyatı pilot veri paketi](shared/pilot/tde9/README.md)
 - [Geliştirme ilkeleri](DEVELOPMENT_CHARTER.md)
