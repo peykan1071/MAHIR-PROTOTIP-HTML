@@ -19,6 +19,7 @@ isteğe bağlı bir ajanı düşürür, öğretmenin analizini değil (bkz.
 from __future__ import annotations
 
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -41,6 +42,13 @@ _WIRE_KEYS = ("name", "system", "user", "maxTokens", "retrieval")
 _SERVICE_TIMEOUT_SECONDS = 600
 _UNREACHABLE_MESSAGE = "RAG servisine ulaşılamadı (local/rag_service.py çalışıyor mu?)"
 
+# Paylaşılan parola başlığı - `local/rag_service.py` aynı adı bekler.
+# Servis 127.0.0.1 dışına açıldığında (RunPod pod'u) `/agents` ucu GPU'yu
+# meşgul eden açık bir üretim noktası olurdu. Parola BOŞSA başlık hiç
+# gönderilmez ve servis de doğrulama yapmaz - yerel kurulumda davranış aynı.
+SHARED_SECRET_HEADER = "X-MAHIR-RAG-Key"
+SHARED_SECRET_ENV = "MAHIR_RAG_SHARED_SECRET"
+
 
 def build_prompt(agent: str, system: str, user: str, max_tokens: int | None = None) -> dict[str, Any]:
     """Servisin beklediği tek prompt sözlüğünü kurar."""
@@ -62,6 +70,9 @@ def _post_json(service_url: str, body_payload: dict[str, object]) -> tuple[bool,
 
     body = json.dumps(body_payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
+    secret = os.environ.get(SHARED_SECRET_ENV, "")
+    if secret:
+        headers[SHARED_SECRET_HEADER] = secret
     request = urllib.request.Request(service_url.rstrip("/"), data=body, method="POST", headers=headers)
 
     try:

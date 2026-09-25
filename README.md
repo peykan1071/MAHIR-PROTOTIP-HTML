@@ -687,6 +687,23 @@ Modeller her açılışta yeniden yüklenir: LLM sunucusu 10-20 saniye, RAG serv
 
 > **İsteğe bağlı çevrim dışı kilidi.** Modeller indikten sonra `local\.env` içindeki `# HF_HUB_OFFLINE=1` satırının başındaki `#` işaretini silerseniz RAG servisi ve indeksleme Hugging Face'e hiç istek atmaz; internetsiz ortamda açılış bekleme süresi de kısalır.
 
+### Yerel mi, bulut mu?
+
+`MAHIR_BASLAT.ps1` iki kiple çalışır. **Varsayılan `yerel`dir ve yukarıda anlatılan davranışın tamamı odur** - hiçbir şey yapmanıza gerek yok.
+
+| | `MAHIR_BASLAT.cmd` (yerel) | `MAHIR_BASLAT_BULUT.cmd` (bulut) |
+|---|---|---|
+| llama-server `:8080` | bu makinede | uzakta |
+| RAG servisi `:8001` | bu makinede | uzakta |
+| OCR işçisi `:8002` | bu makinede | uzakta |
+| Dosya alıcı `:8000` | bu makinede | bu makinede |
+| `.venv` (torch/paddle) | gerekli | **gerekmez** |
+| İnternet | gerekmez | gerekir |
+
+Bulut kipi, yapay zekâ katmanı uzak bir GPU sunucusunda çalışırken kullanılır. Adresler ve paylaşılan parolalar `local\.env.bulut` dosyasından okunur; şablon için [`local/.env.bulut.example`](local/.env.bulut.example) dosyasını kopyalayıp doldurunuz. Uzak servise ulaşılamazsa arayüz yine açılır, CSV/Excel akışı çalışır ve yalnız analiz adımı hata verir - yerel kipteki toleransın aynısı.
+
+Terminalden: `.\MAHIR_BASLAT.ps1 -Kip yerel` veya `.\MAHIR_BASLAT.ps1 -Kip bulut`.
+
 ### Sorun mu var?
 
 | Belirti | Sebep | Çözüm |

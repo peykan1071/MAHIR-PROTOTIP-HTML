@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -32,8 +33,13 @@ def _configure_logging() -> None:
 
 def main() -> None:
     _configure_logging()
-    host = "127.0.0.1"
-    port = 8000
+    # Bind adresi ortamdan okunur; varsayılan YEREL kalır. Konteynerde
+    # (RunPod pod'u, VPS) `MAHIR_HOST=0.0.0.0` verilmeden dışarıdan
+    # erişilemez - `rag_service.py`'nin `RAG_SERVICE_HOST` deseniyle aynı
+    # (bkz. `local/rag_common.py`). Varsayılanı 127.0.0.1 bırakmak kasıtlı:
+    # yanlışlıkla ağa açılmaktansa açık bir karar gerektirsin.
+    host = os.environ.get("MAHIR_HOST", "127.0.0.1")
+    port = int(os.environ.get("MAHIR_PORT", "8000"))
     server = create_server(host=host, port=port)
 
     print(f"MAHİR dosya alıcı çalışıyor: http://{host}:{port}/index.html", flush=True)

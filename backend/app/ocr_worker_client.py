@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import http.client
 import mimetypes
+import os
 import time
 import urllib.error
 import urllib.request
@@ -22,6 +23,17 @@ from .timing import stage
 
 # İşçi ile paylaşılan yol: `ocr_worker.py` aynı sabiti buradan alır.
 UPLOAD_PATH = "/mahir-upload"
+
+# Paylaşılan parola başlığı. İşçi 127.0.0.1 dışına açıldığında (RunPod pod'u)
+# bu uç, kimlik doğrulaması olmadan dosya kabul eden açık bir yükleme noktası
+# olurdu. Bu katman depoda vardı ve servisler yerele dönünce kaldırılmıştı
+# (7189aba); uzak dağıtım geri geldiği için aynı desenle geri geliyor.
+# `ocr_worker.py` aynı sabiti buradan alır - iki taraf tek yerden okusun.
+#
+# Parola BOŞSA doğrulama tümüyle atlanır: yerelde (varsayılan kurulum)
+# hiçbir şey değişmez, yalnız uzak dağıtımda ayarlanır.
+SHARED_SECRET_HEADER = "X-MAHIR-OCR-Key"
+SHARED_SECRET_ENV = "MAHIR_OCR_SHARED_SECRET"
 
 _WORKER_TIMEOUT_SECONDS = 300
 # Canlıda ölçüldü: WinError 10053 tek bir anlık blip değil, aynı yükleme
@@ -68,6 +80,9 @@ def request_image_group_ocr(
     boundary = uuid.uuid4().hex
     body = _build_multipart_body(uploaded_files, boundary)
     headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    secret = os.environ.get(SHARED_SECRET_ENV, "")
+    if secret:
+        headers[SHARED_SECRET_HEADER] = secret
     request = urllib.request.Request(
         worker_url.rstrip("/") + UPLOAD_PATH,
         data=body,

@@ -1,3 +1,13 @@
+﻿param(
+    # yerel : bugünkü davranış - llama-server (:8080), RAG (:8001) ve OCR
+    #         (:8002) bu makinede ayrı pencerelerde açılır. Varsayılan.
+    # bulut : yalnız web katmanı (:8000) burada açılır; RAG/OCR/LLM uzakta
+    #         (RunPod pod'u) çalışır, adresleri ve parolaları
+    #         `local/.env.bulut` dosyasından okunur. `.venv` GEREKMEZ.
+    [ValidateSet("yerel", "bulut")]
+    [string]$Kip = "yerel"
+)
+
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -44,25 +54,78 @@ function Start-MahirWindow {
     }
 }
 
-# 1) llama-server (:8080) - ExecutionPolicy zaten bu pencerede Bypass, script
-# doğrudan çağrılır (iç içe ikinci bir powershell süreci açmaya gerek yok).
-Start-MahirWindow -Title "MAHIR - LLM (:8080)" -Port 8080 `
-    -Command "Set-Location '$projectRoot'; & 'local\llm_server.ps1'"
+# Bulut kipi ayarlarını YALNIZ beklenen değişkenlerle süreç ortamına yükler.
+# Değerler ekrana yazdırılmaz. Bu yükleyici yeni değil: aynı desen depoda
+# `secrets.local.txt` için vardı ve servisler yerele dönünce kaldırılmıştı
+# (7189aba); uzak dağıtım geri geldiği için geri geliyor.
+function Import-MahirCloudSettings {
+    $cloudEnv = Join-Path $projectRoot "local\.env.bulut"
+    if (-not (Test-Path -LiteralPath $cloudEnv -PathType Leaf)) {
+        throw "Bulut kipi için ayar dosyası bulunamadı: $cloudEnv`nÖrnek: local\.env.bulut.example dosyasını kopyalayıp doldurunuz."
+    }
+    $allowed = @("MAHIR_RAG_URL", "MAHIR_OCR_URL", "MAHIR_RAG_SHARED_SECRET", "MAHIR_OCR_SHARED_SECRET")
+    foreach ($line in Get-Content -LiteralPath $cloudEnv) {
+        $trimmed = $line.Trim()
+        if (-not $trimmed -or $trimmed.StartsWith("#")) { continue }
+        $separator = $trimmed.IndexOf("=")
+        if ($separator -lt 1) {
+            throw "local\.env.bulut içinde geçersiz bir satır var."
+        }
+        $name = $trimmed.Substring(0, $separator).Trim()
+        $value = $trimmed.Substring($separator + 1).Trim()
+        if ($name -notin $allowed) {
+            throw "local\.env.bulut içinde izin verilmeyen değişken var: $name"
+        }
+        [Environment]::SetEnvironmentVariable($name, $value, "Process")
+    }
+}
 
-# 2) RAG servisi (:8001) ve 3) OCR işçisi (:8002) - repo `.venv`'i gerekir
-# (paddle/torch/fastapi); yoksa README "Sıfırdan kurulum" adımları izlenmeli.
-if (Test-Path -LiteralPath $venvPython -PathType Leaf) {
-    Start-MahirWindow -Title "MAHIR - RAG (:8001)" -Port 8001 `
-        -Command "Set-Location '$projectRoot'; & '$venvPython' 'local\rag_service.py'"
+# Uzak RAG servisine dokunur. Ulaşılamıyorsa DURMAZ: web arayüzü ve CSV/Excel
+# akışı yapay zekâ katmanı olmadan da çalışır (yerel kipteki aynı tolerans).
+function Test-MahirCloudReachable {
+    $ragUrl = [Environment]::GetEnvironmentVariable("MAHIR_RAG_URL", "Process")
+    if (-not $ragUrl) {
+        Write-Host "MAHIR_RAG_URL tanımlı değil - analiz adımı çalışmayacak." -ForegroundColor Yellow
+        return
+    }
+    $healthUrl = ($ragUrl -replace "/agents/?$", "").TrimEnd("/") + "/health"
+    try {
+        Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 8 | Out-Null
+        Write-Host "Uzak RAG servisi hazır: $healthUrl" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Host "Uzak RAG servisine ulaşılamadı ($healthUrl)." -ForegroundColor Yellow
+        Write-Host "Pod kapalı olabilir:  runpodctl start pod <pod-id>" -ForegroundColor Yellow
+        Write-Host "Arayüz yine de açılıyor; CSV/Excel akışı çalışır, analiz adımı hata verir.`n" -ForegroundColor DarkGray
+    }
+}
 
-    Start-MahirWindow -Title "MAHIR - OCR (:8002)" -Port 8002 `
-        -Command "Set-Location '$projectRoot'; & '$venvPython' 'backend\run_ocr_worker.py'"
+if ($Kip -eq "yerel") {
+    # 1) llama-server (:8080) - ExecutionPolicy zaten bu pencerede Bypass, script
+    # doğrudan çağrılır (iç içe ikinci bir powershell süreci açmaya gerek yok).
+    Start-MahirWindow -Title "MAHIR - LLM (:8080)" -Port 8080 `
+        -Command "Set-Location '$projectRoot'; & 'local\llm_server.ps1'"
+
+    # 2) RAG servisi (:8001) ve 3) OCR işçisi (:8002) - repo `.venv`'i gerekir
+    # (paddle/torch/fastapi); yoksa README "Sıfırdan kurulum" adımları izlenmeli.
+    if (Test-Path -LiteralPath $venvPython -PathType Leaf) {
+        Start-MahirWindow -Title "MAHIR - RAG (:8001)" -Port 8001 `
+            -Command "Set-Location '$projectRoot'; & '$venvPython' 'local\rag_service.py'"
+
+        Start-MahirWindow -Title "MAHIR - OCR (:8002)" -Port 8002 `
+            -Command "Set-Location '$projectRoot'; & '$venvPython' 'backend\run_ocr_worker.py'"
+    }
+    else {
+        Write-Host "$venvPython bulunamadı - RAG servisi ve OCR işçisi başlatılamadı. Kurulum için README'deki 'Sıfırdan kurulum' bölümüne bakın." -ForegroundColor Yellow
+    }
+
+    Write-Host "Modeller pencerelerinde arka planda yükleniyor (LLM ~10-20 sn, RAG ~1 dk, OCR ~1-2 dk) - pencereleri kapatmayın.`n" -ForegroundColor DarkGray
 }
 else {
-    Write-Host "$venvPython bulunamadı - RAG servisi ve OCR işçisi başlatılamadı. Kurulum için README'deki 'Sıfırdan kurulum' bölümüne bakın." -ForegroundColor Yellow
+    Write-Host "BULUT kipi: RAG, OCR ve LLM uzakta çalışıyor; burada yalnız web katmanı (:8000) açılacak." -ForegroundColor Cyan
+    Import-MahirCloudSettings
+    Test-MahirCloudReachable
 }
-
-Write-Host "Modeller pencerelerinde arka planda yükleniyor (LLM ~10-20 sn, RAG ~1 dk, OCR ~1-2 dk) - pencereleri kapatmayın.`n" -ForegroundColor DarkGray
 
 $listener = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue |
     Where-Object { $_.LocalAddress -in @("127.0.0.1", "0.0.0.0", "::1", "::") } |

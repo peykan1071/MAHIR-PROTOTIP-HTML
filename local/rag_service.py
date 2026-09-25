@@ -45,7 +45,9 @@ parametresi sanıyordu. Yalnız tip denetimi için import edilen adlar
 
 import argparse
 import json
+import hmac
 import logging
+import os
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -105,6 +107,18 @@ MAX_AGENT_OUTPUT_TOKENS = 1024
 # beklenmeyen SDK hatası) ÖĞEYE özgü sayılır ve yalnız o öğeyi düşürür.
 # Değerler `_chat`in zaten atadığı kodlardır; yeni bir sinyal icat edilmiyor.
 ABORT_ON_LLM_STATUSES = frozenset({429, 503, 504})
+
+# `/agents` paylaşılan parolası. `backend/app/agents/llm.py` aynı başlık adını
+# gönderir. Servis 127.0.0.1 dışına açıldığında (RunPod pod'u) bu uç, GPU'yu
+# meşgul eden açık bir üretim noktası olurdu; `MAX_AGENT_*` sınırları kötüye
+# kullanımı yavaşlatır ama engellemez.
+#
+# Parola BOŞSA doğrulama tümüyle atlanır - yerel kurulumda davranış değişmez.
+# Yalnız `/agents` korunur: `/health` durum sorgusudur, `/retrieve` ve
+# `/query` ise elle doğrulama yüzeyidir ve LLM'i `/query` üzerinden zaten
+# `llm_max_tokens` sınırlar.
+AGENT_SECRET_HEADER = "X-MAHIR-RAG-Key"
+AGENT_SECRET_ENV = "MAHIR_RAG_SHARED_SECRET"
 
 # Katı, bağlama demirli sistem promptu - `/query` için. `/agents` bu promptu
 # KULLANMAZ: orada system/user çağırandan (backend `agents/prompts.py`) gelir.
@@ -210,6 +224,24 @@ def build_context(hits: Sequence[Hit], max_chars: int) -> tuple[str, int]:
 
 
 # --- `/agents` yardımcıları (saf; tests/test_agents_contract.py) ---------------------------
+
+
+def agent_secret_rejection(header_value: str) -> str:
+    """Parola geçersizse Türkçe ret sebebi, geçerliyse boş string döndürür.
+
+    `reject_agent_prompts` ile aynı desen: karar saf bir fonksiyonda, HTTP
+    zarfı çağıranda. Böylece FastAPI kurulu olmayan bir ortamda da
+    sınanabiliyor (sözleşme testleri sistem Python'ında koşuyor).
+
+    `AGENT_SECRET_ENV` tanımlı değilse ya da boşsa doğrulama TÜMÜYLE atlanır:
+    yerel kurulumda (127.0.0.1) bugünkü davranış birebir korunur. Parola
+    yalnız servis ağa açıldığında ayarlanır.
+    """
+
+    expected = os.environ.get(AGENT_SECRET_ENV, "")
+    if expected and not hmac.compare_digest(header_value, expected):
+        return "Yetkisiz istek."
+    return ""
 
 
 def reject_agent_prompts(items: list[object]) -> str:
@@ -368,7 +400,8 @@ class RAGService:
         except Exception as error:  # noqa: BLE001 - bağlantı/zaman aşımı/401; hepsi "erişilemiyor"
             return False, (
                 f"LLM sunucusuna ulaşılamadı ({error.__class__.__name__}). llama-server çalışıyor mu? "
-                "`powershell -File local/llm_server.ps1` ile başlatın."
+                "Windows'ta `powershell -File local/llm_server.ps1`, "
+                "Linux'ta `local/llm_server.sh` ile başlatın."
             )
         return True, f"LLM sunucusu hazır; sunulan model: {', '.join(served) or '?'}"
 
@@ -575,7 +608,7 @@ class RAGService:
         except APIConnectionError as error:
             raise LlmFailure(
                 f"LLM sunucusuna bağlanılamadı ({self._settings.llm_base_url}). llama-server çalışıyor mu? "
-                "`powershell -File local/llm_server.ps1`",
+                "Windows: `powershell -File local/llm_server.ps1` · Linux: `local/llm_server.sh`",
                 http_status=503,
             ) from error
         except APIStatusError as error:
@@ -854,6 +887,14 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
     # mantığı `handle_agents_request`'te (FastAPI'siz test edilir).
     @app.post("/agents")
     async def agents(request: Request) -> JSONResponse:
+        # Parola gövde OKUNMADAN önce doğrulanır: FastAPI `request.json()`
+        # gövde boyutunu sınırlamaz, yetkisiz bir istek keyfî büyüklükte
+        # JSON ayrıştırtmamalı. Kararın kendisi `agent_secret_rejection`'da,
+        # yani FastAPI'siz test edilebiliyor (bkz. `reject_agent_prompts`
+        # ile aynı "Türkçe sebep ya da boş string" deseni).
+        rejection = agent_secret_rejection(request.headers.get(AGENT_SECRET_HEADER, ""))
+        if rejection:
+            return JSONResponse({"ok": False, "message": rejection}, status_code=401)
         try:
             body = await request.json()
         except Exception:  # noqa: BLE001 - okunamayan gövde 500'e değil 400'e düşmeli

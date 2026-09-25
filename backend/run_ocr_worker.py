@@ -21,7 +21,9 @@ from app.ocr_worker import UPLOAD_PATH, create_server
 
 
 def main() -> None:
-    host = "127.0.0.1"
+    # Bind adresi ortamdan; varsayılan yerel (bkz. run_file_receiver.py'deki
+    # aynı gerekçe). Pod'da `MAHIR_OCR_WORKER_HOST=0.0.0.0` verilir.
+    host = os.environ.get("MAHIR_OCR_WORKER_HOST", "127.0.0.1")
     port = int(os.environ.get("MAHIR_OCR_WORKER_PORT", 8002))
     server = create_server(host=host, port=port)
 

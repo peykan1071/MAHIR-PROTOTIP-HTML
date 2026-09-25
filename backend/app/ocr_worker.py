@@ -10,7 +10,9 @@ needs no special-casing for what it's talking to.
 
 from __future__ import annotations
 
+import hmac
 import json
+import os
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -23,21 +25,17 @@ from .file_receiver import (
     extract_uploaded_files,
     validate_file_name,
 )
-from .ocr_worker_client import UPLOAD_PATH
+from .ocr_worker_client import SHARED_SECRET_ENV, SHARED_SECRET_HEADER, UPLOAD_PATH
 
 
 class OCRWorkerHandler(BaseHTTPRequestHandler):
     server_version = "MAHIROCRWorker/0.1"
 
-    def end_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        super().end_headers()
-
-    def do_OPTIONS(self) -> None:
-        self.send_response(204)
-        self.end_headers()
+    # CORS başlıkları ve `do_OPTIONS` KASITLI olarak yok (2026-09-25'te
+    # kaldırıldı): bu uca yalnız web backend'i sunucudan sunucuya
+    # (`ocr_worker_client.py`, urllib) istek atıyor - tarayıcı hiç
+    # konuşmuyor, dolayısıyla ön kontrol (preflight) de hiç gelmiyordu.
+    # `Allow-Origin: *` yalnız işçi ağa açıldığında zarar verebilirdi.
 
     def do_POST(self) -> None:
         if self.path != UPLOAD_PATH:
@@ -52,6 +50,23 @@ class OCRWorkerHandler(BaseHTTPRequestHandler):
             return
 
         body = self.rfile.read(content_length)
+
+        # Parola GÖVDE OKUNDUKTAN SONRA doğrulanır. Önce doğrulamak daha
+        # temiz görünüyor ama ölçüldü: istemci hâlâ gövdeyi gönderirken
+        # yanıt verip bağlantıyı kapatmak Windows'ta WinError 10053 üretiyor
+        # ve istemci 401'i HİÇ okuyamıyor - `ocr_worker_client` bunu
+        # bağlantı arızası sayıp üç kez yeniden deniyor, öğretmen de
+        # "Yetkisiz istek." yerine "OCR işçisine ulaşılamadı" görüyor.
+        # Tampon zaten yukarıdaki MAX_REQUEST_SIZE kontrolüyle sınırlı;
+        # asıl korunan şey (OCR motoru ve GPU) hâlâ bu kontrolün arkasında.
+        # Parola tanımlı değilse (yerel varsayılan) doğrulama atlanır.
+        expected_secret = os.environ.get(SHARED_SECRET_ENV, "")
+        if expected_secret and not hmac.compare_digest(
+            self.headers.get(SHARED_SECRET_HEADER, ""), expected_secret
+        ):
+            self._send_json(401, {"ok": False, "message": "Yetkisiz istek."})
+            return
+
         uploaded_files = extract_uploaded_files(body, content_type)
 
         if not uploaded_files or len(uploaded_files) > MAX_FILES_PER_UPLOAD:

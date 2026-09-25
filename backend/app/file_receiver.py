@@ -86,9 +86,15 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
     server_version = "MAHIRFileReceiver/0.1"
 
     def end_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        # CORS başlıkları KASITLI olarak yok (2026-09-25'te kaldırıldı).
+        # Ön yüz bu sunucunun kendi servis ettiği sayfadan GÖRELİ adreslere
+        # istek atıyor (`script.js`: `/mahir-upload`, `/mahir-analyze`,
+        # `/mahir-merge-reports`), yani her istek aynı kökenli - CORS hiç
+        # devreye girmiyordu. `Allow-Origin: *` yalnız 127.0.0.1 dışına
+        # açıldığında (VPS/pod) herhangi bir sitenin tarayıcıdan bu uçlara
+        # istek atmasına izin verirdi. `index.html`i dosya sisteminden
+        # doğrudan açmak zaten desteklenmiyor (bkz. README).
+        #
         # `SimpleHTTPRequestHandler` yalnızca `Last-Modified` gönderiyor,
         # `Cache-Control` göndermiyor. Tarayıcı bu durumda SEZGİSEL önbellekleme
         # uygular: dosyayı sunucuya hiç sormadan kendi kopyasından verir. Bu,
@@ -99,10 +105,6 @@ class MAHIRFileReceiverHandler(SimpleHTTPRequestHandler):
         # kazandıracağı hiçbir şey bu riski karşılamıyor.
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
-
-    def do_OPTIONS(self) -> None:
-        self.send_response(204)
-        self.end_headers()
 
     def do_POST(self) -> None:
         request_path = urlparse(self.path).path

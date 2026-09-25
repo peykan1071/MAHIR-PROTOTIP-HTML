@@ -11,8 +11,11 @@ backend/logs/
 # Yerel ortam değişkeni dosyaları - depoya girmemeli.
 .env
 .env.*
-# Şablon dosyası anahtar taşımaz; `.env.*` deseninin istisnası (local/.env.example).
+# Şablon dosyaları anahtar taşımaz; `.env.*` deseninin istisnasıdır.
+# `local/.env.bulut` uzak servis adreslerini VE paylaşılan parolaları taşır -
+# o dışlanır, yalnız şablonu izlenir.
 !.env.example
+!.env.bulut.example
 
 # Yerel LLM çalışma dosyaları (local/llm_server.ps1): llama.cpp binary'leri ve
 # GGUF model dosyaları - GB boyutunda, depoya girmemeli.

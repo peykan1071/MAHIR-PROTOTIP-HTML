@@ -14,6 +14,7 @@ tarayıcıya ulaştığı, kaynak ağacında ne yazdığından bağımsız bir o
 
 import threading
 import unittest
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -67,12 +68,22 @@ class StaticCacheHeaderTests(unittest.TestCase):
     def test_analysis_responses_are_not_cached_either(self):
         # Aynı `end_headers` yolundan geçiyorlar; bir analiz sonucunun
         # önbellekten dönmesi öğretmene başka bir sınavın raporunu gösterir.
+        #
+        # 2026-09-25: bu kontrol eskiden `method="OPTIONS"` ile yapılıyordu -
+        # CORS ön kontrolü, başlığa bakmanın en ucuz yoluydu. CORS katmanı
+        # kaldırılınca (aynı kökenli ön yüzde hiç devreye girmiyordu) o araç
+        # da gitti. Yerine GERÇEK rota kullanılıyor: boş gövdeyle POST, 400
+        # "Onaylanan veri alınamadı." döndürür ve o yanıt da `_send_json` ->
+        # `end_headers` yolundan geçer. Sınanan güvence aynı, aracı daha
+        # gerçekçi.
         port = self.server.server_address[1]
         request = urllib.request.Request(
-            f"http://127.0.0.1:{port}/mahir-analyze", method="OPTIONS"
+            f"http://127.0.0.1:{port}/mahir-analyze", data=b"", method="POST"
         )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            self.assertEqual(response.headers.get("Cache-Control"), "no-store")
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            urllib.request.urlopen(request, timeout=30)
+        self.assertEqual(caught.exception.code, 400)
+        self.assertEqual(caught.exception.headers.get("Cache-Control"), "no-store")
 
 
 if __name__ == "__main__":

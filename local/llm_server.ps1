@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   MAHİR yerel LLM sunucusu: llama.cpp llama-server ile Qwen3-4B-Instruct-2507 GGUF Q4_K_M.
 
