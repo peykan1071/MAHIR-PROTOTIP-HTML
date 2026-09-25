@@ -4,9 +4,11 @@ GPU katmanı (RAG, OCR, LLM) bir RunPod pod'unda; web arayüzü (`:8000`) ayrı
 bir VPS'te. Yerel çalışma bundan etkilenmez: `MAHIR_BASLAT.cmd` hâlâ her şeyi
 bu makinede açar (bkz. README, "Yerel mi, bulut mu?").
 
-> **Durum:** bu belgedeki kod tarafı hazır ve sınandı. İmaj derlemesi ve pod
-> kurulumu (Aşama 2-3) HENÜZ YAPILMADI; aşağıdaki panel adımları ilk koşuda
-> doğrulanacak ve gerçek değerlerle (pod kimliği, IP, port) güncellenecek.
+> **Durum:** kod tarafı hazır ve sınandı. **Aşama 2 (imaj) tamam:**
+> `hknrgl/mahir-gpu:latest` derlendi ve yerel kartla `--gpus all` altında
+> doğrulandı (aşağıdaki doğrulama tablosu). Docker Hub'a **push edilmedi**.
+> **Aşama 3 (pod) henüz yapılmadı;** panel adımları ilk koşuda doğrulanacak ve
+> gerçek değerlerle (pod kimliği, IP, port) güncellenecek.
 
 ## Neden bu biçim
 
@@ -33,12 +35,94 @@ imajından `/app`'i kopyalar. Bu COPY **bilerek en başta**: imaj adı ya da yol
 yanlışsa build saniyeler içinde düşsün, 10 GB'lık pip kurulumundan sonra
 değil.
 
-İlk build'de doğrulanacaklar:
-- `nvidia/cuda:12.6.3-runtime-ubuntu24.04` etiketi geçerli mi (değilse
-  `--build-arg CUDA_IMAGE=...`)
-- `/opt/llama.cpp/llama-server --version` çalışıyor mu (22.04'te derlenmiş
-  binary 24.04'te koşmalı; glibc geriye uyumlu)
-- `paddle` ve `torch` aynı ortamda import edilebiliyor mu
+### İlk build'de ölçülenler
+
+Üçü de varsayım olarak yazılmıştı; build sırasında **ölçüldü** ve ikisi
+Dockerfile'ı değiştirdi:
+
+| Varsayım | Ölçüm | Sonuç |
+|---|---|---|
+| Temel imaj `nvidia/cuda:12.6.x` yeter | `ldd /app/libggml-cuda.so` → `libcudart.so.12`, `libcublas.so.12` **`/app`'te değil**, `/usr/local/cuda/lib64`'ten geliyor; llama.cpp imajı CUDA **12.8** taşıyor | Temel imaj `12.8.1-runtime-ubuntu24.04`'e çekildi + `LD_LIBRARY_PATH` eklendi |
+| llama.cpp binary'si 24.04'te koşar | llama.cpp imajı **zaten** Ubuntu 24.04 / glibc 2.39 | Uyumsuzluk riski yokmuş; glibc varsayımına gerek kalmadı |
+| `paddle` ve `torch` aynı ortamda yaşar | **Hayır — Linux'ta pip düzeyinde çakışıyorlar** (aşağıya bakınız) | Üç nvidia pinini yeniden hizalayan katman eklendi |
+
+**torch ↔ paddle nvidia pin çakışması (Linux'a özgü).** `pip install -r
+local/requirements.txt` Linux'ta `ResolutionImpossible` ile düşüyor:
+
+| paket | torch 2.8.0+cu126 | paddlepaddle-gpu 3.3.1 |
+|---|---|---|
+| `nvidia-cudnn-cu12` | `==9.10.2.21` | `==9.5.1.17` |
+| `nvidia-cusparselt-cu12` | `==0.7.1` | `==0.6.3` |
+| `nvidia-nccl-cu12` | `==2.27.3` | `==2.25.1` |
+
+Her iki pin de `platform_system == "Linux"` işaretli, bu yüzden **Windows'taki
+yerel kurulumda hiç görülmüyor** — bu bir taşıma sürprizi, yerel bir kusur
+değil. Daha sinsi olanı: paddle'ı ayrı bir katmanda kurmak çakışmayı
+*gizliyor*, çünkü pip üçünü düşürüp yalnız bir **uyarı** basıyor ve 0 ile
+çıkıyor; imaj kırık bir torch ile üretilirdi.
+
+Dockerfile'ın çözümü (gerekçeler dosyanın kendisinde):
+1. paddle kurulduktan sonra üç paket `--no-deps` ile torch'un sürümlerine geri
+   çekiliyor — yön **yeni** sürüm, çünkü SONAME'ler (`libcudnn.so.9`,
+   `libcusparseLt.so.0`, `libnccl.so.2`) ana sürüm içinde geriye dönük uyumlu.
+2. Son `-r` adımı üç GPU satırını süzüyor; pip iki çerçeveyi aynı çözümlemede
+   görmezse çakışma doğmuyor.
+3. `pip check` + sürüm doğrulaması build'i kapatıyor: beklenen üç tutarsızlık
+   dışında bir şey çıkarsa build düşer.
+
+### İmaj doğrulaması (yerelde, `--gpus all` ile — pod beklemeden)
+
+Docker Desktop yerel kartı konteynere verebildiği için bu doğrulamaların
+tamamı **pod kurulmadan** yapıldı. Sonuçlar:
+
+| Doğrulama | Sonuç |
+|---|---|
+| `/opt/llama.cpp/llama-server --version` | `build 11176`, `built with GNU 14.2.0 for Linux x86_64`, çıkış 0 ✔ |
+| `import paddle` + `import torch` (aynı süreç, paddle önce) | ikisi de yükleniyor ✔ |
+| `torch.cuda.is_available()` | `True` ✔ |
+| `torch.backends.cudnn.version()` | **91002** → çalışma anında 9.10.2 yüklü, hizalama tuttu ✔ |
+| `paddle.utils.run_check()` | `PaddlePaddle works well on 1 GPU.` ✔ |
+| Triton çalışma anı kernel derlemesi (GPU'da) | derlendi ve doğru sonucu üretti ✔ |
+
+İki sonuç planı doğrudan değiştiriyor:
+
+- **cuDNN uyumu artık argüman değil ölçüm.** `ldd libpaddle.so` →
+  `libcudnn.so.9` (minor sürüm SONAME'de yok) ve bu bağ pip'in
+  `nvidia/cudnn` paketine çözülüyor; `run_check` gerçek GPU kernel'i
+  koşturuyor. Yani 9.5'e derlenmiş paddle, 9.10.2.21 ile çalışıyor.
+- **Triton bloker değil.** Önceki denemede PaddleOCR-VL'nin `transformers`
+  motoru çalışma anı derleme yüzünden tıkanmıştı; imajda derleme çalışıyor,
+  yani `MAHIR_OCR_ENGINE=paddle_dynamic` kaçış yoluna **mecbur değiliz**
+  (varsayılan `transformers` denenebilir).
+
+Ayrıca `ldd` iki kütüphanenin temel imajdan geldiğini gösteriyor
+(`libcudart.so.12`, `libcublas.so.12` → `/usr/local/cuda/lib64`) — llama.cpp'nin
+`libggml-cuda.so`'su ile aynı yol. "runtime" temel imaj seçimi bu yüzden
+doğru; "base" imajda cuBLAS yok.
+
+### İmaj boyutu
+
+| Ölçüm | Değer |
+|---|---|
+| `docker image ls` (sıkıştırılmamış) | **29,4 GB** |
+| Canlı `/opt/mahir-venv` | 11 GB |
+| `/opt/llama.cpp` | 206 MB |
+| pip katmanları toplamı | torch 6,11 + paddle 4,95 + hizalama 1,94 + kalan 1,32 GB |
+
+Katman toplamı canlı venv'den ~3,3 GB büyük: paddle katmanı torch'un cuDNN
+9.10'unu siliyor, hizalama katmanı da paddle'ın 9.5'ini — silinen dosyalar
+önceki katmanlarda ÖLÜ olarak taşınıyor. Bu bilinçli bir takas:
+katmanları birleştirmek bu 3,3 GB'ı kurtarırdı ama ~12 GB'lık TEK bir katman
+üretirdi ve `docker push`un önceki denemede düştüğü yer tam olarak büyük
+katmanlardı.
+
+`nvidia/nccl` (410 MB) ve `nvidia/cusparselt` (432 MB) tek GPU'lu pod'da
+fiilen kullanılmıyor ama torch onları `==` ile pinliyor; ~%3 kazanç için
+torch'un bağımlılık ağacını kırmaya değmez.
+
+> **Push maliyeti.** Docker Hub'a giden veri sıkıştırılmış bloklar (kabaca
+> 12-15 GB). Ev bağlantısının YÜKLEME hızı burada belirleyici; bu yüzden
+> imajın ayda ~1 değişmesi planın bir gereği, süsü değil.
 
 ## Aşama 3 — pod
 
@@ -136,9 +220,10 @@ yedek yol olarak kullanılabilir hale gelir.
 
 | Tuzak | Bugün |
 |---|---|
-| PaddleOCR-VL Triton ile çalışma anında kernel derliyor, `gcc` yok | İmajda `gcc`/`g++` var; ayrıca `OCR_ENGINE=paddle_dynamic` Triton'a hiç dokunmuyor |
+| PaddleOCR-VL Triton ile çalışma anında kernel derliyor, `gcc` yok | **Kapandı ve ÖLÇÜLDÜ:** imajda `gcc`/`g++` var ve Triton GPU kernel'i gerçekten derleyip koşuyor (yukarıdaki doğrulama tablosu). `OCR_ENGINE=paddle_dynamic` artık zorunlu kaçış yolu değil, yalnız yedek |
 | vLLM `flashinfer` Python ≥3.12 istiyordu | vLLM projeden çıktı; llama.cpp binary'si Python sürümüne duyarsız |
 | PEP 668 "externally-managed-environment" | İmaj `/opt/mahir-venv` kullanıyor |
 | `docker push` büyük katmanlarda düşüyordu | torch / paddle / kalanı ayrı katmanlar |
 | RunPod vekili `Python-urllib` UA'sını 403'lüyordu | TCP kullanılıyor, vekil devrede değil |
 | CRLF'li kabuk betiği Linux'ta "bad interpreter" | `.gitattributes` `*.sh` için LF zorluyor |
+| — (bu denemede **yeni**) torch ve paddle Linux'ta uzlaşmaz nvidia pinleri istiyor; ayrı katmanlar çakışmayı gizleyip kırık torch üretiyor | Yeniden hizalama katmanı + süzülmüş `-r` adımı + `pip check` kapısı (yukarıda) |

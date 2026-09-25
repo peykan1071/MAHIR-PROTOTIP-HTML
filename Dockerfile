@@ -33,7 +33,15 @@
 # o aşamaya kapsanır ve sonraki FROM onu boş görür ("base name should not be
 # blank" ile build düşer).
 ARG LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda
-ARG CUDA_IMAGE=nvidia/cuda:12.6.3-runtime-ubuntu24.04
+# CUDA 12.8, 12.6 DEĞİL - llama.cpp imajıyla eşleşmesi için. Ölçüldü:
+# `libggml-cuda.so` `/usr/local/cuda/lib64`'teki libcudart.so.12 /
+# libcublas.so.12'ye bağlanıyor ve bu kütüphaneler `/app`'te DEĞİL, yani
+# temel imajdan gelmek zorunda. llama.cpp imajı CUDA 12.8 taşıyor; 12.6
+# runtime'ı SONAME olarak uyar ama 12.8'de eklenen simgeleri garanti etmez.
+# torch/paddle bu seçimden etkilenmiyor: kendi CUDA kütüphanelerini
+# `nvidia-*-cu12` pip paketleriyle getiriyorlar (bkz. local/requirements.txt).
+# Temel imaj "runtime" olmalı, "base" değil - cuBLAS yalnız runtime'da var.
+ARG CUDA_IMAGE=nvidia/cuda:12.8.1-runtime-ubuntu24.04
 
 FROM ${LLAMA_IMAGE} AS llama
 FROM ${CUDA_IMAGE}
@@ -89,14 +97,68 @@ RUN pip install --no-cache-dir \
         --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/ \
         paddlepaddle-gpu==3.3.1
 
+# --- nvidia yığınını torch'un pinlerine geri hizala --------------------------
+# Bu katman bir ÖLÇÜMÜN sonucu (ilk build, adım #14): paddlepaddle-gpu 3.3.1
+# kurulumu torch'un ÜÇ bağımlılığını sessizce DÜŞÜRÜYOR ve pip bunu yalnız bir
+# uyarı olarak basıyor ("...but you have nvidia-cudnn-cu12 9.5.1.17 which is
+# incompatible"), çıkış kodu 0:
+#     nvidia-cudnn-cu12       9.10.2.21 -> 9.5.1.17
+#     nvidia-cusparselt-cu12  0.7.1     -> 0.6.3
+#     nvidia-nccl-cu12        2.27.3    -> 2.25.1
+# Bu katman olmasa imaj KIRIK bir torch ile çıkar. Çakışma Linux'a ÖZGÜ: her
+# iki pin de `platform_system == "Linux"` işaretli, bu yüzden Windows'taki
+# yerel kurulumda hiç görülmüyor (bkz. local/requirements.txt).
+#
+# Yön bilinçli olarak YENİ sürüm: üçünün de SONAME'i değişmiyor
+# (libcudnn.so.9, libcusparseLt.so.0, libnccl.so.2) ve bu kütüphaneler ana
+# sürüm içinde geriye dönük uyumlu - yani 9.5'e derlenmiş paddle 9.10 ile
+# koşar; TERSİ garanti değil (torch 2.8 doğrudan 9.10'a derlendi). NCCL ise
+# tek GPU'lu pod'da hiç kullanılmıyor.
+# `--no-deps`: paddle'ı yeniden çözümlemeye sokmadan yalnız bu üçünü değiştir.
+RUN pip install --no-cache-dir --no-deps \
+        nvidia-cudnn-cu12==9.10.2.21 \
+        nvidia-cusparselt-cu12==0.7.1 \
+        nvidia-nccl-cu12==2.27.3
+
 # --- Kalan bağımlılıklar -----------------------------------------------------
 # YALNIZ requirements dosyaları kopyalanır; uygulama kodu değil. Böylece kod
 # değişikliği bu katmanların önbelleğini HİÇ bozmaz.
 COPY local/requirements.txt /tmp/requirements-local.txt
 COPY requirements.txt /tmp/requirements-web.txt
-RUN pip install --no-cache-dir -r /tmp/requirements-local.txt \
+
+# GPU çerçeveleri yukarıda ayrı katmanlarda kuruldu ve burada TEKRAR
+# istenmiyor: pip ikisini AYNI çözümlemede görürse iş imkânsız
+# (`ResolutionImpossible`, ilk build'de ölçüldü) - iki paketin `==` pinleri
+# uzlaşamaz. Süzme paket ADIYLA yapılıyor; `paddleocr`/`paddlex` paddle'ı
+# bağımlılık olarak BİLDİRMEDİĞİ için süzülen satırlar geri gelmiyor.
+# `-c` kısıtı ikinci bir tuzağı kapatıyor: bir alt bağımlılık `torch>=2.9`
+# isterse +cu126 wheel'i sessizce PyPI'ın CPU wheel'iyle DEĞİŞMESİN - build
+# düşsün. (GPU'suz bir torch, pod'da ancak çalışma anında fark edilirdi.)
+RUN grep -vE '^(torch|torchvision|paddlepaddle-gpu)==' /tmp/requirements-local.txt \
+        > /tmp/requirements-rest.txt \
+    && printf 'torch==2.8.0+cu126\ntorchvision==0.23.0+cu126\n' > /tmp/constraints-gpu.txt \
+    && pip install --no-cache-dir -c /tmp/constraints-gpu.txt -r /tmp/requirements-rest.txt \
     && pip install --no-cache-dir -r /tmp/requirements-web.txt \
-    && rm -f /tmp/requirements-local.txt /tmp/requirements-web.txt
+    && rm -f /tmp/requirements-local.txt /tmp/requirements-rest.txt \
+             /tmp/requirements-web.txt /tmp/constraints-gpu.txt
+
+# --- Bağımlılık tutarlılığı kapısı ------------------------------------------
+# `pip check`in tam yeşil olması BEKLENMİYOR: paddle'ın üç nvidia pini
+# yukarıda bilerek eziliyor. Ama BAŞKA bir tutarsızlık çıkarsa build burada
+# düşsün - bu projede sessiz bağımlılık kayması pahalıya geldi.
+# Ayrıca üç sürümün gerçekten torch'un istediği değerde kaldığı doğrulanıyor:
+# yukarıdaki katmanların sırası değişirse bu satır hemen haber verir.
+RUN pip check | tee /tmp/pip-check.txt; \
+    if grep -v 'nvidia-\(cudnn\|cusparselt\|nccl\)-cu12' /tmp/pip-check.txt \
+         | grep -q 'requires'; then \
+        echo "BEKLENMEYEN bagimlilik tutarsizligi (yukari bakiniz)." >&2; exit 1; \
+    fi; \
+    rm -f /tmp/pip-check.txt
+RUN python -c "import importlib.metadata as m; \
+want = {'nvidia-cudnn-cu12': '9.10.2.21', 'nvidia-cusparselt-cu12': '0.7.1', 'nvidia-nccl-cu12': '2.27.3'}; \
+got = {k: m.version(k) for k in want}; \
+assert got == want, f'nvidia yigini torch pinlerinden sapmis: {got}'; \
+print('nvidia yigini torch pinleriyle uyumlu:', got)"
 
 # --- Çalışma zamanı ----------------------------------------------------------
 # Kod buraya `git clone` ile iner (ağ diski). İmajda boş durur.
@@ -109,6 +171,11 @@ ENV MAHIR_PYTHON=/opt/mahir-venv/bin/python
 # `local/llm_server.sh` bu değişkeni okur; verilmezse local/llama.cpp/ altına
 # bakar (Windows'taki yerel kurulum düzeni).
 ENV LLAMA_SERVER_EXE=/opt/llama.cpp/llama-server
+
+# `llama-server` kendi .so'larını RPATH ($ORIGIN) ile buluyor; bu yalnız
+# güvenlik ağı. ggml, CUDA backend'ini (`libggml-cuda.so`) çalışma anında
+# yüklüyor ve o da temel imajdaki libcudart/libcublas'a bağlanıyor.
+ENV LD_LIBRARY_PATH=/opt/llama.cpp:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 
 # Servisler konteyner dışından erişilebilir olmalı. Kodun varsayılanı
 # 127.0.0.1; ağa açılmak AÇIK bir karar (bkz. backend/run_ocr_worker.py).

@@ -38,6 +38,12 @@
 #   * PaddleOCR-VL transformers motoru Windows'ta Triton isterse:
 #     pip install "triton-windows<3.5"   (torch 2.8 -> triton 3.4 serisi)
 #     ya da .env'de OCR_ENGINE=paddle_dynamic.
+#   * LINUX'TA bu dosya OLDUĞU GİBİ KURULMAZ. torch 2.8 ve paddlepaddle-gpu 3.3.1
+#     üç nvidia paketini uzlaşmaz biçimde pinliyor (cudnn 9.10.2.21/9.5.1.17,
+#     cusparselt 0.7.1/0.6.3, nccl 2.27.3/2.25.1) ve pip ResolutionImpossible
+#     verir. Her iki pin de `platform_system == "Linux"` işaretli olduğu için
+#     WINDOWS'ta bu çakışma HİÇ oluşmaz - buradaki sürümler doğru. Linux kurulum
+#     sırası ve gerekçesi `Dockerfile`da; el kuruluşu yapılacaksa oraya bakınız.
 
 --extra-index-url https://download.pytorch.org/whl/cu126
 --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu126/
