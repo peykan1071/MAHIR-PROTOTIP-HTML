@@ -1,0 +1,18 @@
+# Satır sonu kuralları.
+#
+# Depo Windows'ta geliştiriliyor (`core.autocrlf=true`) ama GPU katmanı Linux
+# konteynerinde çalışıyor. CRLF taşıyan bir kabuk betiği Linux'ta
+# "bad interpreter: /usr/bin/env bash^M: no such file or directory" verir -
+# sebebi görünmeyen bir karakter olduğu için bulması da zordur. Aşağıdaki
+# kurallar bu sınıfı tümüyle kapatır.
+
+*.sh      text eol=lf
+Dockerfile text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+
+# PowerShell betikleri Windows'ta çalışır; CRLF doğal biçimleri.
+# (Türkçe karakterler için UTF-8 BOM'ları da korunmalı - PowerShell 5.1
+# BOM'suz dosyayı ANSI okuyup Türkçeyi bozuyor.)
+*.ps1     text eol=crlf
+*.cmd     text eol=crlf
