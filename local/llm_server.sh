@@ -66,10 +66,19 @@ if [ ! -x "$EXE" ]; then
     cat >&2 <<EOF
 llama-server bulunamadı (ya da çalıştırma izni yok): $EXE
 
-Linux CUDA derlemesi:
-  https://github.com/ggml-org/llama.cpp/releases  ->  llama-bNNNNN-bin-ubuntu-cuda-x64.zip
-local/llama.cpp/ klasörüne açın ve chmod +x uygulayın, ya da .env'de
-LLAMA_SERVER_EXE ile yolu verin.
+MAHİR GPU imajında bu dosya /opt/llama.cpp/llama-server'dadır ve imaj
+LLAMA_SERVER_EXE'yi zaten tanımlar - bu hatayı imajda görüyorsanız ortam
+değişkeni ezilmiş olabilir.
+
+İmajsız bir Linux makinesinde resmî CUDA sürümünü kullanın:
+  https://github.com/ggml-org/llama.cpp/releases
+    llama-bNNNNN-bin-ubuntu-cuda-12.8-x64.tar.gz          (llama-server)
+    cudart-llama-bNNNNN-bin-ubuntu-cuda-12.8-x64.tar.gz   (CUDA çalışma
+                                  zamanı - makinede CUDA yoksa bu da gerekir)
+İkisini de açın (tar -xzf), llama-server'a chmod +x uygulayın ve yolunu
+.env'de LLAMA_SERVER_EXE ile verin. Not: eski build'lerin sürüm sayfaları
+kalıcı değil (b11176 birkaç gün içinde kalkmıştı) - indirdiğiniz tarball'ı
+saklayın.
 EOF
     exit 1
 fi

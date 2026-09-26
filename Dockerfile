@@ -10,29 +10,41 @@
 #
 # İmaj yalnız `local/requirements.txt` değişince yeniden kurulur (~ayda 1).
 #
-# Kurulum:
-#     docker build -t <kullanici>/mahir-gpu:latest .
-#     docker push  <kullanici>/mahir-gpu:latest
+# Kurulum: imajı GitHub Actions derler ve GHCR'a iter
+# (`.github/workflows/gpu-image.yml`); yerel makineden push EDİLMEZ. Ölçüldü:
+# Docker Desktop registry trafiğini VM vekilinden geçiriyor ve bu makineden
+# 64 MB'tan büyük bir blob hiç yüklenemedi (2 GB'lık katmanda iki kez düştü).
+#     ghcr.io/peykan1071/mahir-gpu:<git-sha>    <- ana makinede BU kullanılır
+#     ghcr.io/peykan1071/mahir-gpu:latest
 #
-# Pod'da beklenen ortam değişkenleri (RunPod panelinden):
+# Ana makinede beklenen ortam değişkenleri - YALNIZ iki parola:
 #     MAHIR_RAG_SHARED_SECRET, MAHIR_OCR_SHARED_SECRET   (zorunlu - aksi hâlde
 #         uçlar korumasız açılır; bkz. local/.env.bulut.example)
-#     HF_HOME=/workspace/.cache/huggingface                (modeller ağ diskinde
-#         kalsın ki her yeniden başlatmada ~9 GB yeniden inmesin)
-#     PADDLE_PDX_MODEL_SOURCE / ~/.paddlex de aynı sebeple /workspace altına
-#         bağlanmalı.
+# Model önbellek yolları imajın içinde tanımlı (aşağıda) - sağlayıcı panelinde
+# hatırlanması gereken bir şey kalmasın. Ana makine sözleşmesinin tamamı:
+# docs/deploy/README.md.
 
 # --- llama-server kaynağı ----------------------------------------------------
-# Resmî llama.cpp sürümleri Linux için YALNIZ CPU binary'si yayımlıyor
-# (`llama-*-bin-ubuntu-x64.tar.gz`); CUDA'lı Linux binary'si için açık bir
-# istek var (ggml-org/llama.cpp#16205). Upstream'in desteklediği CUDA yolu
-# resmî Docker imajı: binary `/app/llama-server`, yanında kendi .so'ları.
-# Tek dosya değil `/app` bütünüyle kopyalanıyor - binary libggml/libllama'ya
-# bağlı.
+# Resmî Docker imajından kopyalanıyor: binary `/app/llama-server`, yanında
+# kendi .so'ları. Tek dosya değil `/app` bütünüyle kopyalanıyor - binary
+# libggml/libllama'ya bağlı.
+#
+# Resmî sürümlerde Linux CUDA tarball'ı da VAR
+# (`llama-bNNNNN-bin-ubuntu-cuda-12.8-x64.tar.gz` + `cudart-...` eki; b11195'te
+# ölçüldü) ama imaj bilinçli tercih: doğrulanan build 11176'nın sürüm sayfası
+# birkaç gün sonra bile YOKTU ("release not found", 2026-09-26) - GitHub
+# sürüm arşivi kalıcı değil. Digest ile sabitlenmiş imaj, doğrulanan binary'nin
+# kalıcı tek kopyası.
+#
+# Temel imajlar DIGEST ile sabit: aylar sonraki bir rebuild doğrulanan bitleri
+# üretsin. `:server-cuda` her gece değişen bir etiket; digest'siz bir rebuild
+# sessizce başka bir llama.cpp getirirdi. Yükseltme bilinçli bir düzenleme
+# olmalı: yeni digest + `scripts/verify_gpu_image.sh`.
+#
 # Her iki ARG da İLK FROM'dan ÖNCE tanımlanmalı: bir FROM'dan sonra gelen ARG
 # o aşamaya kapsanır ve sonraki FROM onu boş görür ("base name should not be
 # blank" ile build düşer).
-ARG LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda
+ARG LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda@sha256:1f4b9cf58982dd4d7cc497aea31b1a456ca9a3a1f94f527d317d3fdee0d60ab6
 # CUDA 12.8, 12.6 DEĞİL - llama.cpp imajıyla eşleşmesi için. Ölçüldü:
 # `libggml-cuda.so` `/usr/local/cuda/lib64`'teki libcudart.so.12 /
 # libcublas.so.12'ye bağlanıyor ve bu kütüphaneler `/app`'te DEĞİL, yani
@@ -41,7 +53,7 @@ ARG LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda
 # torch/paddle bu seçimden etkilenmiyor: kendi CUDA kütüphanelerini
 # `nvidia-*-cu12` pip paketleriyle getiriyorlar (bkz. local/requirements.txt).
 # Temel imaj "runtime" olmalı, "base" değil - cuBLAS yalnız runtime'da var.
-ARG CUDA_IMAGE=nvidia/cuda:12.8.1-runtime-ubuntu24.04
+ARG CUDA_IMAGE=nvidia/cuda:12.8.1-runtime-ubuntu24.04@sha256:ebef3c171eeef0298e4eb2e4be843105edf3b8b0ac45e0b43acee358e8046867
 
 FROM ${LLAMA_IMAGE} AS llama
 FROM ${CUDA_IMAGE}
@@ -160,6 +172,16 @@ got = {k: m.version(k) for k in want}; \
 assert got == want, f'nvidia yigini torch pinlerinden sapmis: {got}'; \
 print('nvidia yigini torch pinleriyle uyumlu:', got)"
 
+# --- İmaj kendi kilidini taşır ----------------------------------------------
+# `local/requirements.txt`'teki aralıklı pinler (docling, transformers...) iki
+# CI build'i arasında farklı çözülebilir; bu dosya her imajın GERÇEK içeriğini
+# kaydeder. İki kullanımı var:
+#   * kayma teşhisi: iki imajın freeze.txt'i `diff` ile karşılaştırılır;
+#   * Docker'sız bir makineye taşınma: `pip install --no-deps -r freeze.txt`.
+#     `--no-deps` ŞART - aksi hâlde paddle'ın üç nvidia pini çözümlemeyi
+#     yeniden kırar (yukarıdaki hizalama katmanına bakınız).
+RUN pip freeze > /opt/mahir-venv/freeze.txt
+
 # --- Çalışma zamanı ----------------------------------------------------------
 # Kod buraya `git clone` ile iner (ağ diski). İmajda boş durur.
 WORKDIR /workspace
@@ -194,9 +216,25 @@ ENV EMBEDDING_DEVICE=cuda \
 ENV PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK=True \
     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
+# Model önbellekleri kalıcı diskte (`/workspace`) olmalı; konteyner diski
+# durdurulunca silinir ve ~13 GB model her açılışta yeniden inerdi.
+# PADDLE_PDX_CACHE_HOME ayrıca şart: paddlex önbelleğini HF_HOME/XDG'den değil
+# bu değişkenden okuyor (paddlex/utils/cache.py:29), varsayılanı `~/.paddlex`
+# = konteyner diski. Önceki runbook bunu kaçırıyordu - PaddleOCR-VL (1,9 GB)
+# her pod açılışında yeniden inerdi.
+# TRITON_CACHE_DIR aynı sebeple (triton/knobs.py:341; varsayılanı
+# `~/.triton/cache`): PaddleOCR-VL'nin `transformers` motorunun çalışma anında
+# derlediği kernel'ler kalıcı diskte dursun, her açılışta yeniden derlenmesin.
+# Yollar imajda tanımlı ki hiçbir sağlayıcının panelinde hatırlanmaları
+# gerekmesin; kalıcı disk yoksa da çalışır (yalnız önbellek kalıcı olmaz).
+ENV HF_HOME=/workspace/.cache/huggingface \
+    XDG_CACHE_HOME=/workspace/.cache \
+    PADDLE_PDX_CACHE_HOME=/workspace/.paddlex \
+    TRITON_CACHE_DIR=/workspace/.cache/triton
+
 EXPOSE 8001 8002
 
-# Varsayılan komut yok: pod açıldığında `/workspace`'te kod olmayabilir.
-# Kurulum ve başlatma `scripts/gpu_services.sh` ile elle yapılır
-# (bkz. docs/deploy/runpod.md).
+# Varsayılan komut yok: ana makine açıldığında `/workspace`'te kod olmayabilir.
+# Kurulum, doğrulama ve başlatma elle yapılır (bkz. docs/deploy/README.md):
+#     scripts/verify_gpu_image.sh && scripts/gpu_services.sh start
 CMD ["sleep", "infinity"]

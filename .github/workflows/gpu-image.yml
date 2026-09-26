@@ -1,0 +1,144 @@
+name: MAHİR GPU imajı
+
+# GPU katmanının imajını (Dockerfile) derleyip GHCR'a iter.
+#
+# Neden CI: bu imaj ~29 GB ve geliştirme makinesinden push EDİLEMİYOR
+# (ölçüldü - Docker Desktop registry trafiğini VM vekilinden geçiriyor ve
+# 2 GB'lık bir katman iki denemede ~3,5 saatte düştü). Veri merkezinden
+# veri merkezine push bu sorunu tümüyle ortadan kaldırıyor.
+#
+# İmaj yalnız bağımlılıklar değişince yeniden derlenir; uygulama kodu imaja
+# GİRMEZ (ana makinede git ile güncellenir). Bu yüzden `paths` filtresi dar.
+#
+# Ana makinede kullanılacak etiket DEĞİŞMEZ olandır: `:<git-sha>`.
+# `:latest` yalnız kolaylık içindir - çalışan bir kurulumu sessizce
+# değiştirmemesi için ana makinelerde kullanılmaz (bkz. docs/deploy/README.md).
+
+on:
+  push:
+    branches: [main, migrate-runpod]
+    paths:
+      - Dockerfile
+      - local/requirements.txt
+      - requirements.txt
+      - .github/workflows/gpu-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write   # GHCR'a GITHUB_TOKEN ile yazılır - hiçbir gizli değer gerekmez
+
+concurrency:
+  group: mahir-gpu-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: İmajı derle ve GHCR'a it
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: İmaj adını belirle
+        shell: bash
+        run: |
+          # GHCR küçük harf ister; depo sahibinin adı büyük harf içerebilir.
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE=ghcr.io/${owner}/mahir-gpu" >> "$GITHUB_ENV"
+
+      - name: Disk aç
+        shell: bash
+        run: |
+          # Runner'ın garanti ettiği boş alan bu imaj için yetmeyebilir
+          # (katmanlar ~14 GB + temel imaj + BuildKit durumu). Önceden kurulu
+          # ve burada kullanılmayan araç zincirleri silinir.
+          {
+            echo "## Disk"
+            echo
+            echo "| | boş |"
+            echo "|---|---|"
+            echo "| önce | $(df -h / | awk 'NR==2 {print $4}') |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/local/lib/android \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL \
+            /usr/local/share/boost
+          sudo docker image prune --all --force > /dev/null
+          echo "| sonra | $(df -h / | awk 'NR==2 {print $4}') |" >> "$GITHUB_STEP_SUMMARY"
+          df -h /
+
+      - name: Depoyu al
+        uses: actions/checkout@v4
+
+      - name: Buildx hazırla
+        uses: docker/setup-buildx-action@v3
+
+      - name: Dockerfile'ı denetle
+        # Ucuz ön kontrol: sözdizimi ya da ARG kapsamı hatası 40 dakikalık
+        # bir build'in SONUNDA değil, saniyeler içinde görünsün.
+        run: docker buildx build --check .
+
+      - name: GHCR'a giriş yap
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derle ve it
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # `load` YOK: imaj runner'ın yerel image store'una ikinci kez
+          # yazılmaz, gereken disk yaklaşık yarıya iner.
+          #
+          # provenance/sbom kapalı: etiket, ek bir "unknown/unknown"
+          # platform girdisi taşıyan bir indeks yerine düz bir imaj
+          # manifestini göstersin. Bazı konteyner platformlarının çekicileri
+          # o girdiyle sorun çıkarabiliyor - taşınabilirlik için en sade
+          # biçim tercih edildi.
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Özeti yaz
+        shell: bash
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect --raw "$IMAGE:$GITHUB_SHA" > manifest.json
+          python3 - <<'PY'
+          import json
+          import os
+
+          manifest = json.load(open("manifest.json", encoding="utf-8"))
+          layers = manifest.get("layers", [])
+          image = os.environ["IMAGE"]
+          sha = os.environ["GITHUB_SHA"]
+          lines = [
+              "",
+              "## İmaj",
+              "",
+              f"- ana makinede kullanılacak: `{image}:{sha}`",
+              f"- digest: `{os.environ['DIGEST']}`",
+          ]
+          if layers:
+              total = sum(layer["size"] for layer in layers)
+              largest = max(layer["size"] for layer in layers)
+              lines.append(
+                  f"- ana makinenin çekeceği veri (sıkıştırılmış): **{total / 1e9:.2f} GB**, "
+                  f"{len(layers)} katman, en büyük katman {largest / 1e9:.2f} GB"
+              )
+          else:
+              lines.append("- manifest katman listesi taşımıyor (indeks olabilir)")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("\n".join(lines) + "\n")
+          PY
