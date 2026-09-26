@@ -1,4 +1,4 @@
-"""Paylaşılan parola katmanının sözleşmesi: OCR işçisi ve RAG `/agents`.
+"""Paylaşılan parola katmanının sözleşmesi: OCR işçisi ve RAG servisinin rotaları.
 
 Bu katman depoda VARDI ve `7189aba` ile kaldırılmıştı - o sırada iki servis de
 yalnız 127.0.0.1'e bağlanıyordu, yani korunacak bir yüzey yoktu. RunPod'a
@@ -83,6 +83,58 @@ class RagAgentSecretDecisionTests(unittest.TestCase):
 
     def test_correct_header_passes(self):
         self.assertEqual(self._rejection(_SECRET, secret=_SECRET), "")
+
+
+class RagRouteProtectionTests(unittest.TestCase):
+    """`request_secret_rejection` - parola tanımlıyken HANGİ yolların korunduğu.
+
+    Önceki sürüm yalnız `/agents`'ı koruyordu; `/query` LLM üretimini,
+    `/retrieve` gömme+reranker'ı parolasız çalıştırıyordu. llama-server tek
+    yuvada koştuğu için açık bir `/query`, öğretmenin `/agents` turunu
+    kilitleyebilirdi. Buradaki testler "varsayılan kapalı" sözleşmesini sabitler.
+    """
+
+    PROTECTED = ("/agents", "/retrieve", "/query", "/docs", "/openapi.json", "/yeni-bir-rota")
+
+    def setUp(self):
+        self.module = _load_local_service()
+
+    def _decide(self, path, header_value, secret):
+        import os
+
+        saved = os.environ.pop(self.module.AGENT_SECRET_ENV, None)
+        try:
+            if secret is not None:
+                os.environ[self.module.AGENT_SECRET_ENV] = secret
+            return self.module.request_secret_rejection(path, header_value)
+        finally:
+            os.environ.pop(self.module.AGENT_SECRET_ENV, None)
+            if saved is not None:
+                os.environ[self.module.AGENT_SECRET_ENV] = saved
+
+    def test_every_route_but_health_is_rejected_without_the_header(self):
+        for path in self.PROTECTED:
+            with self.subTest(path=path):
+                self.assertEqual(self._decide(path, "", _SECRET), "Yetkisiz istek.")
+
+    def test_wrong_header_is_rejected_on_the_generation_routes(self):
+        for path in ("/query", "/retrieve"):
+            with self.subTest(path=path):
+                self.assertEqual(self._decide(path, "yanlis-parola", _SECRET), "Yetkisiz istek.")
+
+    def test_correct_header_passes_every_route(self):
+        for path in self.PROTECTED:
+            with self.subTest(path=path):
+                self.assertEqual(self._decide(path, _SECRET, _SECRET), "")
+
+    def test_health_stays_open_for_the_reachability_probe(self):
+        # `MAHIR_BASLAT.ps1 -Kip bulut` pod'u /health'ten parolasız yokluyor.
+        self.assertEqual(self._decide("/health", "", _SECRET), "")
+
+    def test_without_a_configured_secret_nothing_changes_locally(self):
+        for path in self.PROTECTED + ("/health",):
+            with self.subTest(path=path):
+                self.assertEqual(self._decide(path, "", None), "")
 
 
 class OcrWorkerSecretTests(unittest.TestCase):

@@ -108,17 +108,27 @@ MAX_AGENT_OUTPUT_TOKENS = 1024
 # Değerler `_chat`in zaten atadığı kodlardır; yeni bir sinyal icat edilmiyor.
 ABORT_ON_LLM_STATUSES = frozenset({429, 503, 504})
 
-# `/agents` paylaşılan parolası. `backend/app/agents/llm.py` aynı başlık adını
-# gönderir. Servis 127.0.0.1 dışına açıldığında (RunPod pod'u) bu uç, GPU'yu
-# meşgul eden açık bir üretim noktası olurdu; `MAX_AGENT_*` sınırları kötüye
-# kullanımı yavaşlatır ama engellemez.
+# Servisin paylaşılan parolası. `backend/app/agents/llm.py` aynı başlık adını
+# gönderir. Servis 127.0.0.1 dışına açıldığında (RunPod pod'u) parolasız her
+# uç, GPU'yu meşgul eden açık bir hesaplama noktası olurdu; `MAX_AGENT_*` ve
+# `llm_max_tokens` sınırları kötüye kullanımı yavaşlatır ama engellemez.
 #
 # Parola BOŞSA doğrulama tümüyle atlanır - yerel kurulumda davranış değişmez.
-# Yalnız `/agents` korunur: `/health` durum sorgusudur, `/retrieve` ve
-# `/query` ise elle doğrulama yüzeyidir ve LLM'i `/query` üzerinden zaten
-# `llm_max_tokens` sınırlar.
+# Parola tanımlıysa `/health` DIŞINDAKİ her yol korunur (`UNPROTECTED_PATHS`,
+# `request_secret_rejection`). Önceki sürüm yalnız `/agents`'ı koruyup
+# `/retrieve` ve `/query`'yi "elle doğrulama yüzeyi, LLM'i `llm_max_tokens`
+# sınırlar" diye açık bırakıyordu - bu, `/agents` için geçerli saydığı
+# "sınırlar yavaşlatır ama engellemez" gerekçesiyle çelişiyordu. Üstelik
+# llama-server `--parallel 1` ile TEK yuvada koşuyor: `/query`'ye yüklenen
+# tek bir anonim istemci öğretmenin `/agents` turunu tümüyle kilitleyebilirdi.
 AGENT_SECRET_HEADER = "X-MAHIR-RAG-Key"
 AGENT_SECRET_ENV = "MAHIR_RAG_SHARED_SECRET"
+
+# Parola istemeyen TEK yol: `MAHIR_BASLAT.ps1 -Kip bulut` pod'a ulaşılabildiğini
+# buradan parolasız yokluyor ve uç yalnız durum bildiriyor. Liste bilerek dar
+# ve varsayılan KAPALI: yeni bir rota eklendiğinde korunması için bir şeyi
+# hatırlamak gerekmesin.
+UNPROTECTED_PATHS = frozenset({"/health"})
 
 # Katı, bağlama demirli sistem promptu - `/query` için. `/agents` bu promptu
 # KULLANMAZ: orada system/user çağırandan (backend `agents/prompts.py`) gelir.
@@ -242,6 +252,19 @@ def agent_secret_rejection(header_value: str) -> str:
     if expected and not hmac.compare_digest(header_value, expected):
         return "Yetkisiz istek."
     return ""
+
+
+def request_secret_rejection(path: str, header_value: str) -> str:
+    """Bir isteğin YOLUNA göre parola kararı; `agent_secret_rejection` biçiminde.
+
+    `UNPROTECTED_PATHS` dışındaki her yol korunur - `/retrieve` ve `/query`
+    dahil. Karar saf bir fonksiyonda ki FastAPI'siz sınanabilsin; HTTP zarfı
+    `create_app`'teki ara katmanda.
+    """
+
+    if path in UNPROTECTED_PATHS:
+        return ""
+    return agent_secret_rejection(header_value)
 
 
 def reject_agent_prompts(items: list[object]) -> str:
@@ -841,6 +864,18 @@ def create_app(settings: Settings | None = None) -> "FastAPI":
     @app.exception_handler(ValueError)
     async def _value_error(_request: Request, error: ValueError) -> JSONResponse:
         return JSONResponse({"ok": False, "message": str(error)}, status_code=422)
+
+    # Parola, HANGİ rota olursa olsun gövde okunmadan önce doğrulanır:
+    # `/retrieve` ve `/query` gövdeyi pydantic ile rota çalışmadan ayrıştırıyor,
+    # yetkisiz bir istek keyfî büyüklükte JSON ayrıştırtmamalı. Karar saf
+    # `request_secret_rejection`'da. `/agents` kendi içinde de denetliyor; bu
+    # katman onu kaldırmıyor, onun dışında açık kalan rotaları kapatıyor.
+    @app.middleware("http")
+    async def _require_shared_secret(request: Request, call_next: Any) -> Any:
+        rejection = request_secret_rejection(request.url.path, request.headers.get(AGENT_SECRET_HEADER, ""))
+        if rejection:
+            return JSONResponse({"ok": False, "message": rejection}, status_code=401)
+        return await call_next(request)
 
     @app.get("/health")
     def health(request: Request) -> dict[str, Any]:
