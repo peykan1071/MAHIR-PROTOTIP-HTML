@@ -19,6 +19,17 @@
 #
 #   3. MAHIR_AUTOSTART=1 ve kod kalıcı diskteyse GPU servisleri başlar.
 #      `git pull` YAPILMAZ: yeni kodu dağıtmak bilinçli bir eylem kalmalı.
+#      GPU görünmüyorsa (`nvidia-smi -L` başarısız) servisler BAŞLATILMAZ:
+#      ilk RunPod makinesinde NVML "Unknown Error" verdi ve torch/paddle GPU
+#      bulamadı (2026-09-26, ölçüldü) - servisleri CPU'da yarım kaldırmak
+#      yerine sebebi günlüğe yazıp durmak daha dürüst.
+#
+#   4. Konteyner ortamı SSH oturumlarına aktarılır. sshd yeni oturumu Docker
+#      ortamından DEĞİL sıfırdan kuruyor (pod'da ölçüldü: `env` boştu). Bu
+#      olmadan `ssh pod 'scripts/gpu_services.sh restart'` servisleri PAROLASIZ,
+#      venv'siz ve önbellek yolları olmadan yeniden başlatırdı. Ortam
+#      /etc/environment'a yazılır; sshd PAM (`pam_env`) ile onu her oturumda -
+#      komutlu, etkileşimsiz olanlar dahil - yükler.
 #
 # Sonunda `sleep infinity` ile konteyner açık tutulur.
 
@@ -81,6 +92,31 @@ start_sshd() {
     fi
 }
 
+export_env_for_ssh() {
+    # SSH anahtarları ve oturuma özgü değişkenler aktarılmaz. Değerler çift
+    # tırnakla yazılır (NVIDIA_REQUIRE_CUDA gibi boşluklu değerler var);
+    # tırnak ya da satır sonu içeren bir değer pam_env'i bozacağı için atlanır.
+    local name value count=0
+    : > /etc/environment.mahir
+    while IFS= read -r -d '' pair; do
+        name="${pair%%=*}"
+        value="${pair#*=}"
+        case "$name" in
+            SSH_PUBLIC_KEY|PUBLIC_KEY|HOME|HOSTNAME|PWD|OLDPWD|SHLVL|_|TERM) continue ;;
+        esac
+        case "$value" in *'"'*|*$'\n'*) continue ;; esac
+        printf '%s="%s"\n' "$name" "$value" >> /etc/environment.mahir
+        count=$((count + 1))
+    done < <(env -0)
+    chmod 600 /etc/environment.mahir
+    mv /etc/environment.mahir /etc/environment
+    log "konteyner ortamı SSH oturumlarına aktarıldı ($count değişken, /etc/environment)."
+}
+
+gpu_visible() {
+    command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L 2>/dev/null | grep -q '^GPU '
+}
+
 autostart_services() {
     if [ "${MAHIR_AUTOSTART:-0}" != "1" ]; then
         return 0
@@ -90,11 +126,17 @@ autostart_services() {
         log "MAHIR_AUTOSTART=1 ama kod yok ($REPO_DIR) - ilk kurulumda beklenen durum."
         return 0
     fi
+    if ! gpu_visible; then
+        log "UYARI: GPU görünmüyor (nvidia-smi -L başarısız) - servisler BAŞLATILMADI."
+        log "       Teşhis: scripts/verify_gpu_image.sh. Makine arızalıysa aynı diskle yeni pod açınız."
+        return 0
+    fi
     mkdir -p "$REPO_DIR/logs"
     log "GPU servisleri başlatılıyor (log: $REPO_DIR/logs/autostart.log)."
     bash "$services" start >> "$REPO_DIR/logs/autostart.log" 2>&1 &
 }
 
+export_env_for_ssh
 start_sshd
 autostart_services
 exec sleep infinity
