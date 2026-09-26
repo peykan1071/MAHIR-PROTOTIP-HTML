@@ -78,12 +78,33 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # libgl1, libglib2.0-0 : opencv (paddlex + docling'in rapidocr'ı) libGL ister;
 #                 konteynerde klasik "ImportError: libGL.so.1" sebebi.
 # git           : kod ağ diskine git ile iniyor - iş akışının kendisi.
+# openssh-server: tam SSH (bkz. scripts/image_start.sh). RunPod'un proxy
+#                 SSH'si SCP/SFTP'yi desteklemiyor ve uzaktan komutu
+#                 garanti etmiyor; geliştirme döngüsü
+#                 (`ssh pod 'git pull && gpu_services.sh restart'`) buna dayanıyor.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-venv python3-dev \
         build-essential gcc g++ \
         git curl ca-certificates \
         libgl1 libglib2.0-0 libgomp1 \
+        openssh-server \
     && rm -rf /var/lib/apt/lists/*
+
+# sshd: YALNIZ anahtarla giriş. Ayar `sshd_config.d`'de bir drop-in olarak
+# yazılıyor - ana dosyadaki `Include` en üstte ve sshd her anahtar kelimenin
+# İLK değerini kullanıyor, yani `00-` ile başlayan dosya kazanıyor. `sshd -T`
+# ETKİN ayarı doğruluyor: bir gün Ubuntu varsayılanı değişirse build düşsün,
+# parolaya açık bir sshd sessizce üretilmesin. Host anahtarları imajda
+# TUTULMAZ - `image_start.sh` onları kalıcı diske üretip saklıyor (aksi
+# hâlde bu imajdan açılan her makine aynı özel anahtarı paylaşırdı).
+RUN mkdir -p /run/sshd /etc/ssh/sshd_config.d \
+    && printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin prohibit-password\n' \
+        > /etc/ssh/sshd_config.d/00-mahir.conf \
+    && ssh-keygen -A >/dev/null \
+    && /usr/sbin/sshd -T | grep -qx 'passwordauthentication no' \
+    && /usr/sbin/sshd -T | grep -qx 'kbdinteractiveauthentication no' \
+    && /usr/sbin/sshd -T | grep -qE '^permitrootlogin (prohibit-password|without-password)$' \
+    && rm -f /etc/ssh/ssh_host_*
 
 # --- Sanal ortam -------------------------------------------------------------
 # Ubuntu 24.04 PEP 668 uyguluyor: sistem Python'ına pip ile kurmak
@@ -232,9 +253,16 @@ ENV HF_HOME=/workspace/.cache/huggingface \
     PADDLE_PDX_CACHE_HOME=/workspace/.paddlex \
     TRITON_CACHE_DIR=/workspace/.cache/triton
 
-EXPOSE 8001 8002
+# Başlangıç betiği imaja GİRER - uygulama kodu girmez. Kod kalıcı diske git
+# ile iniyor; bu betik ise kod yokken de çalışmak zorunda (SSH ile içeri
+# girip kodu indirebilmek için). Sona konuyor ki betik değişince ağır
+# katmanların önbelleği bozulmasın.
+COPY --chmod=0755 scripts/image_start.sh /opt/mahir/image_start.sh
 
-# Varsayılan komut yok: ana makine açıldığında `/workspace`'te kod olmayabilir.
-# Kurulum, doğrulama ve başlatma elle yapılır (bkz. docs/deploy/README.md):
+EXPOSE 22 8001 8002
+
+# Açılışta: anahtar verilmişse sshd, `MAHIR_AUTOSTART=1` ve kod varsa GPU
+# servisleri, sonra `sleep infinity`. İlk kurulum ve doğrulama elle yapılır
+# (bkz. docs/deploy/README.md):
 #     scripts/verify_gpu_image.sh && scripts/gpu_services.sh start
-CMD ["sleep", "infinity"]
+CMD ["/opt/mahir/image_start.sh"]

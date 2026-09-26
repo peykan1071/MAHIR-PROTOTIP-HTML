@@ -21,6 +21,7 @@ on:
       - Dockerfile
       - local/requirements.txt
       - requirements.txt
+      - scripts/image_start.sh          # imaja COPY ediliyor (CMD)
       - .github/workflows/gpu-image.yml
   workflow_dispatch:
 
