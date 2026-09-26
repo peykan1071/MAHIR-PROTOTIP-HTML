@@ -176,6 +176,18 @@ class PodSpecTests(unittest.TestCase):
         self.assertEqual(body["gpuTypeIds"], ["NVIDIA RTX A5000", "NVIDIA RTX A4500"])
         self.assertEqual(body["dataCenterIds"], ["EU-RO-1"])
 
+    def test_gpu_list_is_tried_in_the_given_order(self):
+        # Varsayılan "availability" RunPod'un seçimine bırakır; pahalı kart gelebilir.
+        self.assertEqual(self._body()["gpuTypePriority"], "custom")
+
+    def test_default_gpus_are_cheap_and_large_enough(self):
+        # Varsayılan liste 0,30 $/sa altı ve >= 20 GB kartlardan oluşmalı;
+        # L4/A4000/4090 gibi seçimler bilinçli olarak --gpu ile eklenir.
+        self.assertEqual(
+            rp.DEFAULT_GPUS,
+            ("NVIDIA RTX A4500", "NVIDIA RTX A5000", "NVIDIA RTX 4000 Ada Generation"),
+        )
+
     def test_env_carries_secrets_key_and_autostart(self):
         self.assertEqual(self._body()["env"], self.ENV)
 
@@ -186,6 +198,21 @@ class PodSpecTests(unittest.TestCase):
         self.assertNotIn("gizli-ocr", shown)
         self.assertNotIn(self.ENV["SSH_PUBLIC_KEY"], shown)
         self.assertEqual(body["env"]["MAHIR_RAG_SHARED_SECRET"], "gizli-rag")
+
+
+class RequestTests(unittest.TestCase):
+    def test_requests_do_not_use_the_python_urllib_user_agent(self):
+        # Cloudflare `Python-urllib/3.x`i 403 "error code: 1010" ile reddediyor
+        # (ölçüldü). urllib, başlık verilmezse kendi adını koyar.
+        request = rp.build_request("POST", "https://api.runpod.io/graphql", {"query": "{}"}, "anahtar")
+        agent = request.get_header("User-agent")
+        self.assertTrue(agent)
+        self.assertNotIn("Python-urllib", agent)
+
+    def test_key_travels_only_in_the_authorization_header(self):
+        request = rp.build_request("GET", "https://rest.runpod.io/v1/pods/x", None, "gizli-anahtar")
+        self.assertEqual(request.get_header("Authorization"), "Bearer gizli-anahtar")
+        self.assertNotIn("gizli-anahtar", request.full_url)
 
 
 class ScrubTests(unittest.TestCase):

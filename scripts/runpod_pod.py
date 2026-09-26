@@ -58,9 +58,12 @@ SSH_PORT, RAG_PORT, OCR_PORT = 22, 8001, 8002
 SECRET_KEYS = ("MAHIR_RAG_SHARED_SECRET", "MAHIR_OCR_SHARED_SECRET")
 URL_KEYS = ("MAHIR_RAG_URL", "MAHIR_OCR_URL")
 
-# Öncelik sırasıyla: ilk bulunan kullanılır. VRAM tahmini ~9,1 GB (ölçülmedi);
-# 20 GB altı yalnız elle seçilir.
-DEFAULT_GPUS = ("NVIDIA RTX A5000", "NVIDIA RTX A4500")
+# Öncelik sırasıyla: RunPod listeyi `gpuTypePriority: custom` ile BU sırada
+# dener ve ilk boştakini kiralar. Ucuzdan pahalıya. VRAM tahmini ~9,1 GB
+# (ölçülmedi); 20 GB altı ve 0,30 $/sa üstü yalnız elle (`--gpu`) eklenir.
+# Stok dakikalar içinde değişiyor (2026-09-26'da iki sorgu arasında tersine
+# döndü) - bu yüzden tek kart değil, sıralı liste.
+DEFAULT_GPUS = ("NVIDIA RTX A4500", "NVIDIA RTX A5000", "NVIDIA RTX 4000 Ada Generation")
 CANDIDATE_GPUS = (
     "NVIDIA RTX A5000",
     "NVIDIA RTX A4500",
@@ -186,6 +189,9 @@ def build_pod_body(
         "computeType": "GPU",
         "gpuCount": 1,
         "gpuTypeIds": list(gpu_ids),
+        # "custom": listeyi VERİLEN sırayla dene. Varsayılan "availability"
+        # RunPod'un o anki tercihine göre seçer - pahalı bir kart gelebilir.
+        "gpuTypePriority": "custom",
         "dataCenterIds": [data_center],
         "networkVolumeId": volume_id,
         "volumeMountPath": "/workspace",
@@ -245,14 +251,29 @@ def _hidden_values() -> list[str]:
     return [value for value in hidden if value]
 
 
-def _http(method: str, url: str, body: Any = None) -> Any:
+# RunPod'un API'si Cloudflare arkasında ve Cloudflare Python'un varsayılan
+# `Python-urllib/3.x` User-Agent'ını 403 "error code: 1010" ile REDDEDİYOR
+# (2026-09-26'da ölçüldü; 2026-08 denemesinde de aynı tuzak vardı). Kendi
+# adımızı göndermek yetiyor.
+USER_AGENT = "mahir-runpod-pod/1.0"
+
+
+def build_request(method: str, url: str, body: Any, key: str) -> urllib.request.Request:
     data = None if body is None else json.dumps(body).encode("utf-8")
-    request = urllib.request.Request(
+    return urllib.request.Request(
         url,
         data=data,
         method=method,
-        headers={"Authorization": f"Bearer {api_key()}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
+        },
     )
+
+
+def _http(method: str, url: str, body: Any = None) -> Any:
+    request = build_request(method, url, body, api_key())
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
             raw = response.read()
@@ -459,8 +480,10 @@ def cmd_status(_args: argparse.Namespace) -> None:
     machine = pod.get("machine") or {}
     print(f"pod       : {pod.get('id')}  ({pod.get('name')})")
     print(f"durum     : {pod.get('desiredStatus')}  - {pod.get('lastStatusChange', '')}")
-    print(f"GPU       : {machine.get('gpuTypeId', '?')}  merkez: {machine.get('dataCenterId', '?')}  $/sa: {pod.get('costPerHr', '?')}")
-    print(f"imaj      : {pod.get('image')}")
+    # `machine` pod hazırlanırken boş gelebiliyor (ölçüldü); ücret her zaman var.
+    gpu = machine.get("gpuDisplayName") or machine.get("gpuTypeId") or "?"
+    print(f"GPU       : {gpu}  makine: {pod.get('machineId', '?')}  $/sa: {pod.get('costPerHr', '?')}")
+    print(f"imaj      : {pod.get('imageName')}")
     print(f"IP/portlar: {pod.get('publicIp') or '-'}  {pod.get('portMappings') or {}}")
     try:
         urls = service_urls(pod)
@@ -475,6 +498,15 @@ def cmd_start(args: argparse.Namespace) -> None:
     try:
         rest("POST", f"/pods/{pod_id}/start")
     except RunPodError as error:
+        if "not enough free GPUs" in str(error):
+            # "Zero GPU Pods": pod fiziksel makineye bağlı ve o makinenin GPU'su
+            # başkasına verildi. 2026-09-26'da durdurduktan ~1 dk sonra yaşandı.
+            sys.exit(
+                "Pod'un makinesinde boş GPU kalmadı (\"Zero GPU Pods\"). Veri ağ diskinde güvende.\n"
+                "Aynı diskle başka bir makinede yeni pod:\n"
+                "    py scripts/runpod_pod.py create --new-pod --image <aynı-imaj> --dc <aynı-merkez> [--gpu ...]\n"
+                "Eski pod otomatik SİLİNMEZ; durmuş pod GPU ücreti yazmaz, panelden sonlandırılabilir."
+            )
         if error.status != 404:
             raise
         graphql("mutation($id: String!) { podResume(input: {podId: $id, gpuCount: 1}) { id } }", {"id": pod_id})
@@ -511,6 +543,9 @@ def cmd_ssh(args: argparse.Namespace) -> None:
     ip, port = ssh_target(get_pod())
     command = ["ssh", "-p", str(port), "-o", "StrictHostKeyChecking=accept-new", f"root@{ip}"]
     if args.command:
+        # Komutlu (betikten) kullanımda anahtar reddedilirse parola istemine
+        # düşüp asılı kalmasın; sshd zaten parolayı kabul etmiyor.
+        command[1:1] = ["-o", "BatchMode=yes"]
         command.append(" ".join(args.command))
     sys.exit(subprocess.call(command))
 
@@ -561,7 +596,7 @@ def main(argv: list[str] | None = None) -> None:
         args.gpu = list(DEFAULT_GPUS)
     try:
         args.func(args)
-    except RunPodError as error:
+    except (RunPodError, PodNotReady) as error:
         sys.exit(str(error))
 
 
