@@ -10,10 +10,12 @@ kendi dosyalarında:
 Yerel çalışma bundan etkilenmez: `MAHIR_BASLAT.cmd` hâlâ her şeyi bu makinede
 açar (bkz. kök README, "Yerel mi, bulut mu?").
 
-> **Durum (2026-09-26):** kod tarafı hazır ve sınandı. İmaj yerelde derlendi ve
-> yerel kartla `--gpus all` altında doğrulandı. İmajı artık GitHub Actions
-> derleyip GHCR'a itiyor (aşağıya bakınız). Henüz hiçbir ana makine
-> kurulmadı; ölçüm tablosu ilk kurulumda doldurulacak.
+> **Durum (2026-09-26):** kod tarafı hazır ve sınandı. İmajı GitHub Actions
+> derleyip GHCR'a itti (ilk koşu 16 dk, yeşil) ve imaj kimlik bilgisi
+> olmadan çekilebiliyor. Güncel etiket:
+> `ghcr.io/peykan1071/mahir-gpu:2e01c911aca5d321350462855864add03e98c385`.
+> Henüz hiçbir ana makine kurulmadı; ölçüm tablosu ilk kurulumda
+> doldurulacak.
 
 ## Neden bu biçim
 
@@ -67,6 +69,19 @@ ya da Actions sekmesinden elle (`workflow_dispatch`). Gizli değer gerekmez
 İş akışı özeti iki şeyi yazar: ana makinede kullanılacak **`:<git-sha>`
 etiketi** ve ana makinenin çekeceği sıkıştırılmış veri miktarı.
 
+**İlk CI koşusu (2026-09-26, run 36232709485) — ölçüldü:**
+
+| | |
+|---|---|
+| Süre | **16 dk** (derleme + push); dizüstünden push 3,5 saatte düşmüştü |
+| Runner'da boş disk (temizlikten sonra) | 110 GB / 145 GB — "disk yetmez" riski boşa çıktı |
+| `pip check` kapısı | yalnız beklenen üç paddle satırı ✔ |
+| nvidia sürüm doğrulaması | `cudnn 9.10.2.21, cusparselt 0.7.1, nccl 2.27.3` ✔ |
+| Digest | `sha256:8c849985d1baf3de2e9ed21a82a6ae907ad69ece0a0833cfa1c5b0bd8896cd5b` |
+| Manifest | düz OCI imaj manifesti (indeks değil — `provenance: false` tuttu) |
+| Ana makinenin çekeceği | **10,75 GB**, 23 katman; en büyükleri torch 3,47 · paddle 2,98 · CUDA temel 2,06 · hizalama 1,32 GB |
+| Erişim | kimlik bilgisi olmadan okunabiliyor (public depodan itildi) |
+
 **Neden geliştirme makinesinden push edilmiyor — ölçüldü (2026-09-25/26).**
 Docker Desktop bütün registry trafiğini VM vekilinden (`192.168.65.1:3128`)
 geçiriyor. 29,4 GB'lık imajın push'u iki denemede, toplam ~3,5 saatte, ikisinde
@@ -87,6 +102,23 @@ kalkmıştı ("release not found"), yani o binary'nin kalıcı tek kopyası imaj
   arasında farklı çözülebilir. İki imajın `freeze.txt`'i `diff` ile karşılaştırılır.
 - **Docker'sız bir makineye taşınma:** `pip install --no-deps -r freeze.txt`.
   `--no-deps` şart; aksi hâlde paddle'ın üç nvidia pini çözümlemeyi yeniden kırar.
+
+**Kayma gerçekten oluyor — ölçüldü.** Yerel build (2026-09-25) ile ilk CI build'i
+(2026-09-26) arasında, **bir günde**, 188 paketten biri kaydı:
+`docling-parse 7.21.0 → 7.22.0` (`docling>=2.127,<3` aralığından geçişli).
+Etkisi yok: `docling` yalnız çevrim dışı indeksleme aracında
+(`local/ingestion_pipeline.py`) import ediliyor; ana makinedeki servisler
+depoyla gelen hazır Qdrant indeksini kullanıyor. Ama aynı mekanizma bir gün
+çalışma anındaki bir paketi de kaydırabilir — bu yüzden ana makine `latest`
+değil değişmez `:<git-sha>` etiketini kullanır ve her yeni imaj
+`verify_gpu_image.sh`'ten geçer.
+
+**CI imajının yerelde doğrulanması (2026-09-26):** imaj bu makineye kimlik
+bilgisi olmadan ~20 dakikada indi (digest CI'nin ittiğiyle aynı) ve
+`verify_gpu_image.sh` **6/6** geçti: llama-server yine build 11176 (digest
+sabitlemesi tuttu), torch ve paddle cuDNN 91002, `run_check` ve Triton tamam.
+Dört önbellek değişkeni imajda tanımlı. Yani pod'un koşturacağı eser,
+yerelde doğrulananla aynı.
 
 ## Yeni bir ana makinede kurulum
 
@@ -243,7 +275,7 @@ Dockerfile'ın çözümü (gerekçeler dosyanın kendisinde):
 | Canlı `/opt/mahir-venv` | 11 GB |
 | `/opt/llama.cpp` | 206 MB |
 | pip katmanları toplamı | torch 6,11 + paddle 4,95 + hizalama 1,94 + kalan 1,32 GB |
-| Ana makinenin çekeceği (sıkıştırılmış) | CI özetinde; ilk koşuda buraya yazılacak |
+| Ana makinenin çekeceği (sıkıştırılmış) | **10,75 GB** (ilk CI koşusu) |
 
 Katman toplamı canlı venv'den ~3,3 GB büyük: paddle katmanı torch'un cuDNN
 9.10'unu siliyor, hizalama katmanı da paddle'ın 9.5'ini — silinen dosyalar

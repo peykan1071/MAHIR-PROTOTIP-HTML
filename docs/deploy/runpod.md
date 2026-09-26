@@ -29,11 +29,13 @@ ilk kurulumda doğrulanacak).
 | Expose TCP ports | `8001`, `8002` — `8080` **açılmaz** |
 | Ortam değişkenleri | `MAHIR_RAG_SHARED_SECRET`, `MAHIR_OCR_SHARED_SECRET` — başka hiçbir şey |
 
-**GHCR görünürlüğü:** GitHub'da yeni bir paket varsayılan olarak **özel**
-açılır. İlk CI koşusundan sonra bir kez: GitHub → Packages → `mahir-gpu` →
-Package settings → Change visibility → Public. İmajda kod ya da gizli değer
-yok, yalnız açık kaynak paketler. Özel kalması istenirse pod'a RunPod'un
-"Container Registry Credentials" alanından bir GHCR token'ı verilir.
+**GHCR erişimi:** imaj **kimlik bilgisi olmadan çekilebiliyor** — ölçüldü
+(2026-09-26, ilk CI koşusundan hemen sonra, `ghcr.io` için hiçbir kayıtlı
+kimlik yokken `docker manifest inspect` başarılı). Public bir deponun iş
+akışından itilen paket okunabilir açıldı; pod'a registry kimliği vermek
+gerekmez. Paket bir gün özele çekilirse: RunPod'un "Container Registry
+Credentials" alanına `read:packages` yetkili bir GHCR token'ı verilir.
+(Paket ayarlarını yalnız depo sahibi `peykan1071` değiştirebilir.)
 
 > RunPod'un HTTP vekili (`*.proxy.runpod.net`) KULLANILMAZ. Kendi belgeleri
 > *"If your service takes longer than 100 seconds to respond, consider using
