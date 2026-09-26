@@ -136,6 +136,37 @@ class PodAddressTests(unittest.TestCase):
         self.assertEqual(rp.ssh_target(_POD), ("203.0.113.7", 40022))
 
 
+class ReadinessTests(unittest.TestCase):
+    """`start`tan sonra API bir süre ÖNCEKİ oturumun eşlemesini döndürüyor (ölçüldü).
+
+    2026-09-26, iki ayrı durdur/başlat: betik 2-3 sn'de "hazır" deyip eski
+    portları yazdı, `/health` dakikalarca "bağlantı reddedildi" aldı.
+    `lastStartedAt` işaret değil - isteğin ilk saniyesinde güncelleniyor. Tek
+    güvenilir işaret: eşlenen bir port gerçekten cevap veriyor mu.
+    """
+
+    def test_a_stale_mapping_whose_ports_refuse_is_not_ready(self):
+        note = rp.readiness(_POD, probe=lambda ip, port: False)
+        self.assertIn("cevap vermiyor", note)
+
+    def test_ready_once_a_mapped_port_answers(self):
+        self.assertEqual(rp.readiness(_POD, probe=lambda ip, port: port == 40022), "")
+
+    def test_services_answering_is_enough_without_ssh(self):
+        # sshd yalnız anahtar verilince başlıyor; o zaman 8001/8002 yeter.
+        self.assertEqual(rp.readiness(_POD, probe=lambda ip, port: port == 40001), "")
+
+    def test_the_probe_targets_the_public_ip_and_mapped_ports(self):
+        asked = []
+        rp.readiness(_POD, probe=lambda ip, port: asked.append((ip, port)) or False)
+        self.assertEqual(asked, [("203.0.113.7", 40022), ("203.0.113.7", 40001), ("203.0.113.7", 40002)])
+
+    def test_stopped_or_initializing_pods_are_not_ready(self):
+        always = lambda ip, port: True  # noqa: E731
+        self.assertIn("EXITED", rp.readiness({**_POD, "desiredStatus": "EXITED"}, probe=always))
+        self.assertIn("IP/port", rp.readiness({**_POD, "publicIp": ""}, probe=always))
+
+
 class PodSpecTests(unittest.TestCase):
     ENV = {
         "MAHIR_RAG_SHARED_SECRET": "gizli-rag",

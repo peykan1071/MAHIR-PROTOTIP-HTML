@@ -35,6 +35,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import subprocess
 import sys
 import time
@@ -153,6 +154,42 @@ def service_urls(pod: dict[str, Any]) -> dict[str, str]:
     if not ip or not rag or not ocr:
         raise PodNotReady(f"IP/port henüz yok (publicIp={ip!r}, {RAG_PORT}->{rag}, {OCR_PORT}->{ocr}).")
     return {"MAHIR_RAG_URL": f"http://{ip}:{rag}/agents", "MAHIR_OCR_URL": f"http://{ip}:{ocr}"}
+
+
+def port_answers(ip: str, port: int, timeout: float = 3.0) -> bool:
+    with socket.socket() as probe:
+        probe.settimeout(timeout)
+        return probe.connect_ex((ip, port)) == 0
+
+
+def readiness(pod: dict[str, Any], probe: Callable[[str, int], bool] | None = None) -> str:
+    """Pod kullanılabilirse "", değilse beklemenin sebebi.
+
+    API'nin söylediği eşlemeye GÜVENİLMEZ, eşlenen bir portun gerçekten cevap
+    vermesi beklenir. Ölçüldü (2026-09-26, iki ayrı durdur/başlat): `start`tan
+    sonra API bir süre ÖNCEKİ oturumun `portMappings`'ini döndürüyor - betik
+    2-3 sn'de "hazır" deyip eski portları (25679, sonra 13719) yazdı, `/health`
+    dakikalarca "bağlantı reddedildi" aldı; gerçek portlar 13719 ve 29595'ti.
+    `lastStartedAt` işaret olarak işe YARAMIYOR: isteğin ilk saniyesinde
+    güncelleniyor, eşleme ise ancak konteyner kalkınca. sshd açılışta ilk
+    başlayan şey olduğu için önce 22 yoklanır; 8001/8002 servisler kalkınca
+    cevap verir.
+    """
+
+    status = pod.get("desiredStatus")
+    if status != "RUNNING":
+        return f"durum {status}"
+    try:
+        service_urls(pod)
+        ssh_target(pod)
+    except PodNotReady as error:
+        return str(error)
+    if probe is not None:
+        ip = pod["publicIp"]
+        ports = [_mapped_port(pod, port) for port in (SSH_PORT, RAG_PORT, OCR_PORT)]
+        if not any(probe(ip, port) for port in ports if port):
+            return "eşlenen portlar henüz cevap vermiyor (API bir süre önceki oturumun eşlemesini döndürüyor)"
+    return ""
 
 
 def ssh_target(pod: dict[str, Any]) -> tuple[str, int]:
@@ -336,23 +373,16 @@ def write_env_urls(pod: dict[str, Any]) -> dict[str, str]:
 
 
 def wait_until_reachable(timeout: float, started: float) -> dict[str, Any]:
-    """Pod RUNNING olup IP ve üç port eşlemesini alana kadar bekler."""
+    """Pod RUNNING olup BU oturumun eşlemesi gerçekten cevap verene kadar bekler."""
 
     deadline = time.monotonic() + timeout
     last = ""
     while True:
         pod = get_pod()
-        status = pod.get("desiredStatus")
-        try:
-            if status == "RUNNING":
-                service_urls(pod)
-                ssh_target(pod)
-                print(f"  RUNNING, IP ve portlar hazır: {time.monotonic() - started:.0f} sn")
-                return pod
-        except PodNotReady as error:
-            note = str(error)
-        else:
-            note = f"durum {status}"
+        note = readiness(pod, probe=port_answers)
+        if not note:
+            print(f"  RUNNING, IP ve portlar hazır: {time.monotonic() - started:.0f} sn")
+            return pod
         if note != last:
             print(f"  bekleniyor ({time.monotonic() - started:.0f} sn): {note}")
             last = note

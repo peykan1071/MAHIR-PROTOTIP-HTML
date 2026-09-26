@@ -42,11 +42,23 @@ katmanını çalıştırabilir; başka hiçbir sağlayıcı özelliğine bağım
 | Çalışma zamanı | GPU'lu konteyner: Docker + NVIDIA Container Toolkit, ya da bir konteyner-GPU platformu |
 | Kalıcı disk | `/workspace`'e bağlı, ≥ 30 GB (kod + ~13 GB model + log) |
 | Ağ | 8001 ve 8002 TCP portları dışarı açık; zaman aşımı 250 sn'den kısa olan bir HTTP vekilinin **arkasında olmamalı** (analiz turu bugün ~250 sn) |
-| Ortam değişkenleri | `MAHIR_RAG_SHARED_SECRET`, `MAHIR_OCR_SHARED_SECRET` — başka hiçbir şey |
+| Ortam değişkenleri | `MAHIR_RAG_SHARED_SECRET`, `MAHIR_OCR_SHARED_SECRET` — zorunlu olan yalnız bunlar |
+| SSH (isteğe bağlı) | `22/tcp` + `SSH_PUBLIC_KEY` (ya da sağlayıcının enjekte ettiği `PUBLIC_KEY`). Anahtar yoksa imaj sshd'yi **hiç başlatmaz**; yalnız anahtarla giriş, parola kapalı |
+| Kendiliğinden başlatma (isteğe bağlı) | `MAHIR_AUTOSTART=1`: kod kalıcı diskteyse açılışta `gpu_services.sh start` (`git pull` yapılmaz) |
 | İmaj | `ghcr.io/peykan1071/mahir-gpu:<git-sha>` — değişmez etiket, `latest` değil |
 
 Parolalar zorunlu: verilmezse uçlar korumasız açılır. Üretmek için
-`python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+`python -c "import secrets; print(secrets.token_urlsafe(32))"` ya da RunPod'da
+`py scripts/runpod_pod.py init-secrets` (değerleri `local/.env.bulut`'a yazar,
+ekrana basmaz).
+
+**Parola neyi korur:** OCR işçisinin yükleme ucu ve RAG servisinin `/health`
+**dışındaki bütün** rotaları (`/agents`, `/query`, `/retrieve`, `/docs` ve
+eklenecek her yeni rota — varsayılan kapalı). Önceki sürüm yalnız `/agents`'ı
+koruyordu; `/query` parolasız LLM üretimi çalıştırıyordu ve llama-server tek
+yuvada koştuğu için tek bir anonim istemci öğretmenin turunu kilitleyebilirdi.
+`/health` açık kalıyor, çünkü `MAHIR_BASLAT.ps1 -Kip bulut` ulaşılabilirliği
+oradan yokluyor.
 
 Model önbellek yolları (`HF_HOME`, `XDG_CACHE_HOME`, `PADDLE_PDX_CACHE_HOME`,
 `TRITON_CACHE_DIR`) imajın **içinde** `/workspace` altına tanımlı; hiçbir
@@ -137,10 +149,22 @@ curl -s http://127.0.0.1:8001/health | python3 -m json.tool
 
 `.env` gerekmez: gereken her şey sözleşmedeki iki parola, imajın ortam
 değişkenleri ve `gpu_services.sh`'in varsayılanlarından geliyor. Modeller ilk
-koşuda iner (~13 GB, tek seferlik; kalıcı diskte kalır).
+koşuda iner (~13 GB, tek seferlik; kalıcı diskte kalır). `MAHIR_AUTOSTART=1`
+verilmişse sonraki açılışlarda servisler kendiliğinden kalkar
+(`scripts/image_start.sh`); ilk açılışta kod henüz olmadığı için atlanır.
 
 `/health`'te `"ok": true` ve `reranker.device == "cuda"` görülmeli. `cuda`
 yerine `cpu` yazıyorsa asıl gecikme kazancı kaçıyor demektir.
+
+**SSH oturumları konteyner ortamını görür.** sshd oturumu Docker ortamından
+değil sıfırdan kuruyor (ilk RunPod pod'unda ölçüldü: `env` boştu); bu olmadan
+SSH'den `gpu_services.sh restart` servisleri **parolasız** ve venv'siz
+kaldırırdı. `image_start.sh` açılışta ortamı `/etc/environment`'a (izin 600)
+yazar, sshd onu PAM ile her oturumda yükler. SSH anahtarları aktarılmaz.
+
+**Autostart GPU'yu denetler.** `nvidia-smi -L` başarısızsa servisler
+başlatılmaz ve sebep açılış günlüğüne yazılır — ilk RunPod makinesinde NVML
+"Unknown Error" verdi ve GPU kullanılamıyordu.
 
 ## Doğrulama betiği
 
@@ -286,18 +310,66 @@ yalnız ölçülen çekme süresi sorun çıkarırsa yapılacak.
 fiilen kullanılmıyor ama torch onları `==` ile pinliyor; ~%3 kazanç için
 torch'un bağımlılık ağacını kırmaya değmez.
 
-## Ölçülecekler (ilk ana makine kurulumunda doldurulacak)
+## Ölçümler (ilk ana makine: RunPod, RTX 2000 Ada 16 GB, 2026-09-26)
 
 | Ölçüm | Hedef | Gerçekleşen |
 |---|---|---|
-| İlk imaj çekimi | bir kez | — |
-| Oturum ısınması (başlat → `/health` ok) | < 4 dk | — |
-| Analiz turu (`LLM turu: ... sure=Xs`) | < 120 sn | — |
-| Kod değişikliği → çalışır hâle gelme | < 60 sn | — |
+| İlk imaj çekimi (oluştur → çalışıyor, 10,75 GB) | bir kez | **261-283 sn** |
+| İlk açılış, boş disk (servisler → `/health` ok) | bir kez | **~24 dk** — neredeyse tamamı GGUF'un yavaş indirmesi (aşağıda) |
+| **Sıcak başlatma** (durdur → başlat → `/health` ok) | < 4 dk | **68 sn** |
+| **Analiz turu**, aynı 11 istemlik yük | < 120 sn | **35-36 sn** (pod içi) · **33-35 sn** (laptop → pod) · yerel 110-124 sn |
+| VRAM, üç servis yüklü | < kart | **8,5 / 16 GB** (llama 3,1 · RAG 3,3 · OCR 2,0) |
+| OCR, anonim sınav görseli | — | **4,1 sn/görsel** (5 görsel 20,3 sn, 5/5 satır) |
+| Kod değişikliği → çalışır hâle gelme | < 60 sn | ölçülmedi |
 
-Yerelde bugünkü tur ~249 sn ve bunun ~88 sn'si reranker (istem başına ~8 sn,
-CPU'da). Ana makinede reranker GPU'ya alınıyor; beklenti 40-80 sn ama bu bir
-**tahmin**, ölçülecek.
+**Nereden kazanıldı** (aynı yük, RAG servisi günlüğü):
+
+| Aşama, istem başına | Yerel (RTX 4050, reranker CPU) | Ana makine (RTX 2000 Ada) |
+|---|---|---|
+| rerank | 7.986 ms | **188 ms** (42×) |
+| gömme | 297 ms | 21 ms |
+| LLM üretimi | ~2-3 sn | 2,8 sn |
+
+Turdaki ~88 sn'lik CPU reranker payı ~2 sn'ye indi; kalan darboğaz LLM
+üretimi (turun ~31/36 sn'si). RTX 2000 Ada'nın bellek bant genişliği dizüstü
+kartına yakın olduğu için o kısım hızlanmadı — daha güçlü bir kart ancak onu
+kısaltır.
+
+**GGUF'un yavaş indirmesi.** Python tarafındaki modeller (bge-m3, reranker,
+PaddleOCR-VL) HF'nin Xet yolundan ~1 dakikada indi; llama.cpp'nin kendi
+indiricisi kimliksiz HF isteğiyle **~1,7 MB/s**'de kaldı ("set a HF_TOKEN to
+enable higher rate limits"). Bir kez ödeniyor (model kalıcı diskte), ama yeni
+bir diske taşınmada ilk açılışı belirleyen bu.
+
+**Ev hattından büyük yanıtlar arada bir takıldı.** Laptop'tan pod'a üç tam
+analiz turundan biri hiç dönmedi: pod `200 OK` yazdı, istemci yanıtı okuyamadı
+(54 dk askıda; `timeout=600` her okuma işlemine ayrı uygulandığı için hiç
+tetiklenmedi). SSH ile 2 MB'lık bir transfer de bir kez ~600 KB'de takıldı,
+tekrarı 3 MB'ı sorunsuz taşıdı. Boşta bekleyen bağlantılar ise 150 sn'de bile
+düşmedi (idle-NAT değil). Ev hattının MTU'su 1500'den küçük (yönlendirici
+"fragment needed" dönüyor). Üretimde web katmanı VPS'te olacağı için bu yol
+üretim yolu değil; ama `-Kip bulut` (web laptop'ta) bu yoldan geçer.
+
+### Yerel taban çizgisi (aynı yükle, 2026-09-26)
+
+Karşılaştırma için **aynı** yük hem yerelde hem ana makinede koşulur: gerçek
+TDE 9 kataloğundan 10 kazanım, 20 soru, 25 anonim öğrenci → **11 istem**
+(tarihsel kayıttaki turla aynı boy). Gerçek `/mahir-analyze` rotası, başsız bir
+backend üzerinden; süre yanıttaki `trace.llmRound.durationMs`.
+
+| Koşu (RTX 4050 6 GB, reranker CPU'da) | LLM turu |
+|---|---|
+| yalnız LLM GPU'da | 124,1 sn |
+| OCR işçisi de açık (VRAM 3,2 → 5,2 GB) | 109,9 sn |
+| tarihsel kayıt (2026-09-24, gerçek bir sınav) | 247,7 sn — bu yükle **yeniden üretilemedi** |
+
+Süre nereye gidiyor (RAG servisi günlüğü, 22 getirme): istem başına **rerank
+7.986 ms** (CPU), gömme 297 ms, arama 8 ms. Yani yerel turun **~88 sn'si
+(%70-80) CPU'daki reranker**; kalanı LLM üretimi. Ana makinede reranker GPU'da
+— asıl kazancın beklendiği yer. Hedef < 120 sn yerelde zaten tutuyor; ana
+makinenin sorusu "ne kadar daha hızlı".
+
+VRAM: yerelde llama-server tek başına ~3,2 GB, OCR yüklüyken ~5,2 GB.
 
 ## Bilinen tuzaklar
 
